@@ -12,12 +12,13 @@ module.exports = {
       colors: {
         primary: "#155D5F", // Wealthconomy teal
         gold: "#FFCF65", // Wealthconomy gold/yellow
-        dark: "#323232", // Dark text
+        dark: "#1A1A1A", // Dark text
         slate: "#454C59", // Slate secondary
         background: "#FFFFFF", // White background
-        muted: "#F5F5F5", // Light grey surface
-        border: "#E5E5E5", // Border
-        secondary: "#6B7280", // Muted text
+        surface: "#F8F8F8", // Light surface for segments
+        muted: "#F3F4F6", // Muted light grey
+        border: "#E5E5E5", // Standard border
+        secondary: "#6B7280", // Muted text for light mode
       },
     },
   },

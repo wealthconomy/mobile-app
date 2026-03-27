@@ -1,101 +1,127 @@
+import Skeleton from "@/src/components/common/Skeleton";
 import { StatusBar } from "expo-status-bar";
-import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  LogOut,
-  PieChart,
-  TrendingUp,
-} from "lucide-react-native";
-import {
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { useDispatch, useSelector } from "react-redux";
-import { RootState } from "../../store";
-import { logout } from "../../store/slices/authSlice";
+import { useEffect, useState } from "react";
+import { ScrollView, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { HomeHeader } from "./components/HomeHeader";
+import { PortfolioCard } from "./components/PortfolioCard";
+import { RecentActivityList } from "./components/RecentActivityList";
+import { TodoSection } from "./components/TodoSection";
+import { WealthCard } from "./components/WealthCard";
+import { WiseUpSection } from "./components/WiseUpSection";
 
 export default function HomeScreen() {
-  const dispatch = useDispatch();
-  const { user } = useSelector((state: RootState) => state.auth);
+  const [loading, setLoading] = useState(true);
 
-  const handleLogout = () => {
-    dispatch(logout());
-  };
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
-      <StatusBar style="auto" />
-      <ScrollView className="flex-1 px-6 pt-4">
-        {/* Header */}
-        <View className="flex-row justify-between items-center mb-8">
-          <View>
-            <Text className="text-secondary text-lg">Welcome back,</Text>
-            <Text className="text-primary text-3xl font-bold">
-              {user?.name || "User"}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={handleLogout}
-            className="w-12 h-12 items-center justify-center bg-muted rounded-2xl"
-          >
-            <LogOut size={24} color="#ef4444" />
-          </TouchableOpacity>
+    <SafeAreaView style={{ flex: 1 }} className="flex-1 bg-white">
+      <StatusBar style="dark" />
+      <ScrollView
+        className="flex-1 px-5"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 40 }}
+      >
+        {/* Header Section */}
+        <HomeHeader />
+
+        {/* Main Wealth Card Section */}
+        <View className="mb-10">
+          {loading ? (
+            <Skeleton width="100%" height={180} borderRadius={24} />
+          ) : (
+            <WealthCard />
+          )}
         </View>
 
-        {/* Balance Card */}
-        <View className="bg-primary p-6 rounded-3xl shadow-xl shadow-primary/30 mb-8">
-          <Text className="text-white/80 text-lg mb-2">Total Balance</Text>
-          <Text className="text-white text-4xl font-bold mb-6">$12,850.40</Text>
-
-          <View className="flex-row justify-between">
-            <View className="flex-row items-center">
-              <View className="bg-white/20 p-2 rounded-full mr-3">
-                <ArrowDownLeft size={20} color="white" />
-              </View>
-              <View>
-                <Text className="text-white/60 text-sm">Income</Text>
-                <Text className="text-white font-bold">$4,250</Text>
-              </View>
-            </View>
-
-            <View className="flex-row items-center">
-              <View className="bg-white/20 p-2 rounded-full mr-3">
-                <ArrowUpRight size={20} color="white" />
-              </View>
-              <View>
-                <Text className="text-white/60 text-sm">Expenses</Text>
-                <Text className="text-white font-bold">$1,840</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Quick Actions */}
-        <Text className="text-primary font-bold text-xl mb-4">
-          Market Overview
-        </Text>
-        <View className="flex-row justify-between mb-8">
-          <View className="bg-muted p-4 rounded-3xl items-center flex-1 mr-3 border border-border">
-            <TrendingUp size={28} color="#0369a1" className="mb-2" />
-            <Text className="text-secondary text-sm">Investment</Text>
-            <Text className="text-primary font-bold">+12.5%</Text>
-          </View>
-          <View className="bg-muted p-4 rounded-3xl items-center flex-1 border border-border">
-            <PieChart size={28} color="#0369a1" className="mb-2" />
-            <Text className="text-secondary text-sm">Savings</Text>
-            <Text className="text-primary font-bold">$8,400</Text>
-          </View>
-        </View>
-
-        {/* Recent Activity Placeholder */}
-        <View className="bg-muted p-6 rounded-3xl border border-dashed border-border items-center">
-          <Text className="text-secondary italic">
-            Recent transactions will appear here.
+        {/* Wealth Portfolios Section */}
+        {/* <View className="mb-10">
+          <Text className="text-[#1A1A1A] font-bold text-lg mb-4">
+            Wealth Portfolios
           </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {loading ? (
+              <View className="flex-row">
+                <Skeleton
+                  width={280}
+                  height={160}
+                  borderRadius={24}
+                  style={{ marginRight: 16 }}
+                />
+                <Skeleton width={280} height={160} borderRadius={24} />
+              </View>
+            ) : (
+              <>
+                <PortfolioCard
+                  type="flex"
+                  title="Wealth Flex"
+                  description="Smart flexible savings; earn interest, access anytime."
+                  image={require("../../../assets/images/wallet.png")}
+                />
+                <PortfolioCard
+                  type="goal"
+                  title="Wealth Goal"
+                  description="Save with focus and smash every target."
+                  image={require("../../../assets/images/arrow.png")}
+                />
+              </>
+            )}
+          </ScrollView>
+        </View> */}
+
+        {/* Todo Section */}
+        {/* <View className="mb-10">
+          {loading ? (
+            <View className="space-y-4">
+              <Skeleton width="40%" height={20} />
+              <Skeleton width="100%" height={80} borderRadius={16} />
+            </View>
+          ) : (
+            <TodoSection />
+          )}
+        </View> */}
+
+        {/* Wise Up Section */}
+        <View className="mb-10">
+          {loading ? (
+            <View className="space-y-4">
+              <Skeleton width="30%" height={20} />
+              <View className="flex-row">
+                <Skeleton
+                  width={169}
+                  height={107}
+                  borderRadius={10}
+                  style={{ marginRight: 12 }}
+                />
+                <Skeleton
+                  width={169}
+                  height={107}
+                  borderRadius={10}
+                  style={{ marginRight: 12 }}
+                />
+                <Skeleton width={169} height={107} borderRadius={10} />
+              </View>
+            </View>
+          ) : (
+            <WiseUpSection />
+          )}
         </View>
+
+        {/* Recent Activities Section */}
+        {loading ? (
+          <View className="space-y-4">
+            <Skeleton width="50%" height={20} />
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} width="100%" height={60} borderRadius={12} />
+            ))}
+          </View>
+        ) : (
+          <RecentActivityList />
+        )}
       </ScrollView>
     </SafeAreaView>
   );

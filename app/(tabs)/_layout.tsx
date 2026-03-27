@@ -1,6 +1,10 @@
-import { useClientOnlyValue } from "@/components/useClientOnlyValue";
+import {
+  HomeIcon,
+  MyAccountIcon,
+  WealthSaveIcon,
+  WealthVestIcon,
+} from "@/src/components/TabIcons";
 import { Tabs } from "expo-router";
-import { Home, PiggyBank, TrendingUp, User } from "lucide-react-native";
 import { Platform } from "react-native";
 
 export default function TabLayout() {
@@ -8,21 +12,20 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: "#155D5F",
-        tabBarInactiveTintColor: "#9CA3AF",
-        headerShown: useClientOnlyValue(false, true),
-        headerStyle: { backgroundColor: "#fff" },
-        headerTitleStyle: { fontWeight: "bold", color: "#323232" },
+        tabBarInactiveTintColor: "#2E2E2E",
+        headerShown: false, // change this to false globally
         tabBarStyle: {
           borderTopWidth: 1,
           borderTopColor: "#E5E5E5",
           backgroundColor: "#fff",
-          height: Platform.OS === "ios" ? 88 : 64,
-          paddingBottom: Platform.OS === "ios" ? 28 : 8,
-          paddingTop: 8,
+          height: Platform.OS === "ios" ? 88 : 70,
+          paddingBottom: Platform.OS === "ios" ? 28 : 12,
+          paddingTop: 12,
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          marginTop: 2,
+          marginTop: 4,
+          fontWeight: "500",
         },
       }}
     >
@@ -31,28 +34,36 @@ export default function TabLayout() {
         options={{
           title: "Home",
           headerTitle: "Wealthconomy",
-          tabBarIcon: ({ color }) => <Home size={24} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <HomeIcon focused={focused} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="wealth-save"
         options={{
-          title: "Wealth Save",
-          tabBarIcon: ({ color }) => <PiggyBank size={24} color={color} />,
+          title: "Portfolio",
+          tabBarIcon: ({ color, focused }) => (
+            <WealthSaveIcon focused={focused} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="wealth-vest"
         options={{
           title: "Wealth Vest",
-          tabBarIcon: ({ color }) => <TrendingUp size={24} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <WealthVestIcon focused={focused} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="two"
         options={{
-          title: "My Account",
-          tabBarIcon: ({ color }) => <User size={24} color={color} />,
+          title: "My account",
+          tabBarIcon: ({ color, focused }) => (
+            <MyAccountIcon focused={focused} color={color} />
+          ),
         }}
       />
     </Tabs>

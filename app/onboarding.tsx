@@ -158,6 +158,7 @@ export default function OnboardingScreen() {
   const flatListRef = useRef<FlatList>(null);
   const router = useRouter();
   const dispatch = useDispatch();
+  const { setCredentials } = require("../src/store/slices/authSlice");
 
   const goTo = (index: number) => {
     flatListRef.current?.scrollToIndex({ animated: true, index });
@@ -175,6 +176,15 @@ export default function OnboardingScreen() {
   const handleFinish = () => {
     dispatch(completeOnboarding());
     router.replace("/(auth)/login");
+  };
+
+  const handleSkipToHome = () => {
+    dispatch(completeOnboarding());
+    // Directly set mock credentials to bypass login
+    dispatch(
+      setCredentials({ user: { name: "Developer Mode" }, token: "dev-token" }),
+    );
+    router.replace("/(tabs)");
   };
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -223,6 +233,25 @@ export default function OnboardingScreen() {
         {" at a time towards\n"}
         <Text style={{ fontWeight: "800" }}>sustainable wealth.</Text>
       </Text>
+
+      {/* Skip Button (Temporary for development) */}
+      <TouchableOpacity
+        onPress={handleSkipToHome}
+        style={{
+          position: "absolute",
+          top: sy(55),
+          right: sx(28),
+          zIndex: 100,
+          backgroundColor: "rgba(255,255,255,0.2)",
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          borderRadius: 20,
+        }}
+      >
+        <Text style={{ color: "#fff", fontWeight: "600", fontSize: sx(13) }}>
+          Skip to Home
+        </Text>
+      </TouchableOpacity>
 
       {/* Next Button */}
       <TouchableOpacity
