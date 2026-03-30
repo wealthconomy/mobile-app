@@ -1,6 +1,6 @@
 import { ArrowUpRight, ShieldCheck, UserPlus } from "lucide-react-native";
 import React from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import { Text, View } from "react-native";
 
 interface ActivityItemProps {
   title: string;
@@ -46,17 +46,28 @@ const ActivityItem = ({
 export const RecentActivityList = () => {
   return (
     <View className="mb-4">
-      <View className="flex-row justify-between items-center mb-4">
-        <Text className="text-[#1A1A1A] font-bold text-lg">
-          Recent Activities
-        </Text>
-        <TouchableOpacity>
-          <Text className="text-[#155D5F] text-sm font-medium">View all</Text>
-        </TouchableOpacity>
-      </View>
-
       <View className="bg-[#F8F8F8] rounded-[40px] p-4 pt-6">
         <ActivityItem
+          title="Transfer to Wealth Flex"
+          subtitle="April 12, 2023 | 09:45:00"
+          amount="+N68,000.00"
+          status="Successful"
+          icon={<ArrowUpRight size={20} color="#155D5F" />}
+          iconBg="#D1F2F2"
+        />
+        <ActivityItem
+          title="Account Registered"
+          subtitle="April 12, 2023 | 09:45:00"
+          icon={<UserPlus size={20} color="#155D5F" />}
+          iconBg="#E7EFEF"
+        />
+        <ActivityItem
+          title="Password Changed"
+          subtitle="April 12, 2023 | 09:45:00"
+          icon={<ShieldCheck size={20} color="#155D5F" />}
+          iconBg="#E7EFEF"
+        />
+         <ActivityItem
           title="Transfer to Wealth Flex"
           subtitle="April 12, 2023 | 09:45:00"
           amount="+N68,000.00"

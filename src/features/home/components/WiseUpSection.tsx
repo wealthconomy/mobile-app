@@ -1,38 +1,67 @@
-import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { blogService } from "@/src/api/blogService";
+import { useQuery } from "@tanstack/react-query";
+import { router } from "expo-router";
+import {
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 interface WiseUpCardProps {
+  id: string;
   title: string;
   description: string;
-  image: any;
+  image: string;
 }
 
-export const WiseUpCard = ({ title, description, image }: WiseUpCardProps) => (
-  <View className="bg-[#F8F8F8] rounded-[10px] mr-4 overflow-hidden border border-gray-100 w-[169px] h-[107px]">
-    <Image
-      source={image}
-      className="absolute w-full h-full"
-      resizeMode="cover"
-    />
-    <View className="flex-1 bg-black/40 p-3 justify-end">
-      <Text
-        className="text-white font-bold text-[11px] leading-tight mb-0.5"
-        numberOfLines={2}
-      >
-        {title}
-      </Text>
-      <Text className="text-white/70 text-[9px]" numberOfLines={1}>
-        {description}
-      </Text>
+export const WiseUpCard = ({
+  id,
+  title,
+  description,
+  image,
+}: WiseUpCardProps) => (
+  <TouchableOpacity
+    className="mr-4"
+    style={{ width: 170, height: 162 }}
+    activeOpacity={0.8}
+    onPress={() => router.push(`/blog/${id}` as any)}
+  >
+    <View className="w-[169px] h-[107px] rounded-[10px] overflow-hidden mb-2">
+      <Image
+        source={{ uri: image }}
+        className="w-full h-full"
+        resizeMode="cover"
+      />
     </View>
-  </View>
+    <Text
+      className="text-[#1A1A1A] font-bold text-[15px] leading-tight mb-1"
+      numberOfLines={1}
+    >
+      {title}
+    </Text>
+    <Text
+      className="text-[#9CA3AF] text-[12px] font-medium leading-[16px]"
+      numberOfLines={2}
+    >
+      {description}
+    </Text>
+  </TouchableOpacity>
 );
 
 export const WiseUpSection = () => {
+  const { data: blogs, isLoading } = useQuery({
+    queryKey: ["home-blogs"],
+    queryFn: () => blogService.getBlogs(),
+  });
+
   return (
     <View>
       <View className="flex-row justify-between items-center mb-4">
-        <Text className="text-[#1A1A1A] font-bold text-lg">Wise Up</Text>
-        <TouchableOpacity>
+        <Text className="text-[#1A1A1A] font-bold text-lg">WiseUp</Text>
+        <TouchableOpacity onPress={() => router.push("/wise-up" as any)}>
           <Text className="text-[#155D5F] text-sm font-medium">View all</Text>
         </TouchableOpacity>
       </View>
@@ -41,21 +70,19 @@ export const WiseUpSection = () => {
         showsHorizontalScrollIndicator={false}
         className="-mx-5 px-5"
       >
-        <WiseUpCard
-          title="Emergency Funds 101"
-          description="Why your Wealth Flex account is..."
-          image={require("../../../../assets/images/advert.jpg")}
-        />
-        <WiseUpCard
-          title="Automation Secrets"
-          description="How to build wealth while you sleep."
-          image={require("../../../../assets/images/advert.jpg")}
-        />
-        <WiseUpCard
-          title="Investment Basics"
-          description="Start growing your wealth today."
-          image={require("../../../../assets/images/advert.jpg")}
-        />
+        {isLoading ? (
+          <ActivityIndicator color="#155D5F" size="small" className="py-10" />
+        ) : (
+          blogs?.map((blog) => (
+            <WiseUpCard
+              key={blog.id}
+              id={blog.id}
+              title={blog.title}
+              description={blog.description}
+              image={blog.image}
+            />
+          ))
+        )}
       </ScrollView>
     </View>
   );

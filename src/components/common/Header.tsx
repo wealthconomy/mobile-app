@@ -6,9 +6,15 @@ interface HeaderProps {
   title: string;
   showBack?: boolean;
   rightElement?: React.ReactNode;
+  onBack?: () => void;
 }
 
-const Header = ({ title, showBack = true, rightElement }: HeaderProps) => {
+const Header = ({
+  title,
+  showBack = true,
+  rightElement,
+  onBack,
+}: HeaderProps) => {
   const router = useRouter();
 
   return (
@@ -16,7 +22,7 @@ const Header = ({ title, showBack = true, rightElement }: HeaderProps) => {
       <View className="w-11">
         {showBack && (
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={onBack || (() => router.back())}
             className="w-11 h-11 items-center justify-center -ml-2"
           >
             <Ionicons name="chevron-back" size={28} color="#000" />

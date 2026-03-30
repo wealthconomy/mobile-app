@@ -1,10 +1,16 @@
-import { Text, TouchableOpacity, TouchableOpacityProps } from "react-native";
+import {
+  ActivityIndicator,
+  Text,
+  TouchableOpacity,
+  TouchableOpacityProps,
+} from "react-native";
 
 export interface ThemedButtonProps extends TouchableOpacityProps {
   title: string;
   className?: string;
   textClassName?: string;
   variant?: "primary" | "secondary" | "outline";
+  loading?: boolean;
 }
 
 export const ThemedButton = ({
@@ -12,6 +18,8 @@ export const ThemedButton = ({
   className,
   textClassName,
   variant = "primary",
+  loading = false,
+  disabled,
   ...props
 }: ThemedButtonProps) => {
   const variantStyles = {
@@ -28,15 +36,22 @@ export const ThemedButton = ({
 
   return (
     <TouchableOpacity
-      className={`p-4 rounded-xl items-center justify-center ${variantStyles[variant]} ${className || ""}`}
+      className={`p-4 rounded-xl items-center justify-center ${variantStyles[variant]} ${className || ""} ${disabled || loading ? "opacity-70" : ""}`}
       activeOpacity={0.7}
+      disabled={disabled || loading}
       {...props}
     >
-      <Text
-        className={`font-semibold text-base ${textStyles[variant]} ${textClassName || ""}`}
-      >
-        {title}
-      </Text>
+      {loading ? (
+        <ActivityIndicator
+          color={variant === "outline" ? "#155D5F" : "white"}
+        />
+      ) : (
+        <Text
+          className={`font-semibold text-base ${textStyles[variant]} ${textClassName || ""}`}
+        >
+          {title}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 };

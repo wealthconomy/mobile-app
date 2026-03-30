@@ -103,7 +103,11 @@ export default function MyAccountScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={{ flex: 1 }} className="flex-1 bg-white">
+    <SafeAreaView
+      edges={["top"]}
+      style={{ flex: 1 }}
+      className="flex-1 bg-white"
+    >
       <StatusBar barStyle="dark-content" />
       <ScrollView
         className="flex-1 px-5"

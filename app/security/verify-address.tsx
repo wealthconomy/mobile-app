@@ -86,7 +86,7 @@ export default function VerifyAddressScreen() {
           <View className="bg-white rounded-[32px] w-full p-8 items-center max-w-[340px]">
             <View className="w-20 h-20 bg-[#E7F5F5] rounded-full items-center justify-center mb-6">
               <Image
-                source={require("../../assets/images/success.png")}
+                source={require("../../assets/images/address_added.png")}
                 className="w-12 h-12"
                 resizeMode="contain"
               />

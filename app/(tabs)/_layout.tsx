@@ -40,7 +40,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="wealth-save"
+        name="wealth-portfolio"
         options={{
           title: "Portfolio",
           tabBarIcon: ({ color, focused }) => (
@@ -58,7 +58,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="two"
+        name="my-account"
         options={{
           title: "My account",
           tabBarIcon: ({ color, focused }) => (
