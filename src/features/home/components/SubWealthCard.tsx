@@ -6,12 +6,14 @@ import { BalanceText } from "../../../components/common/BalanceText";
 
 interface SubWealthCardProps {
   description: string;
+  amount?: string;
   onButtonPress?: () => void;
   showButton?: boolean;
 }
 
 export const SubWealthCard = ({
   description,
+  amount = "₦300,735.42",
   onButtonPress,
   showButton = true,
 }: SubWealthCardProps) => {
@@ -21,7 +23,7 @@ export const SubWealthCard = ({
     if (onButtonPress) {
       onButtonPress();
     } else {
-      router.push("/(tabs)/wealth-portfolio" as any);
+      router.push("/portfolios/" as any);
     }
   };
 
@@ -94,7 +96,7 @@ export const SubWealthCard = ({
         {/* Amount Section */}
         <View className="mb-2">
           {showBalance ? (
-            <BalanceText amount="₦300,735.42" fontSize={32} color="white" />
+            <BalanceText amount={amount} fontSize={32} color="white" />
           ) : (
             <Text className="text-white text-[32px] font-extrabold tracking-tight">
               ••••••••

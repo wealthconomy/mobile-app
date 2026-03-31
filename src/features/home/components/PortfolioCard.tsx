@@ -28,7 +28,7 @@ export const PortfolioCard = ({
           iconBg: "#FFD9D7",
           iconColor: "#F44336",
           iconName: "wallet-outline",
-          route: "/wealth-flex",
+          route: "/portfolios/wealth-flex",
           image: require("../../../../assets/images/wallet.png"),
           interest: interestRate || "5% Interest",
         };
@@ -39,7 +39,7 @@ export const PortfolioCard = ({
           iconBg: "#FDD7E4",
           iconColor: "#F3007A",
           iconName: "rocket-outline",
-          route: "/wealth-goal",
+          route: "/portfolios/wealth-goal",
           image: require("../../../../assets/images/arrow.png"),
           interest: interestRate || "12% Interest",
         };
@@ -50,7 +50,7 @@ export const PortfolioCard = ({
           iconBg: "#FFF1CC",
           iconColor: "#FFCF65",
           iconName: "lock-closed-outline",
-          route: "/wealth-fix",
+          route: "/portfolios/wealth-fix",
           image: require("../../../../assets/images/fix.png"),
           interest: interestRate || "15% Interest",
         };
@@ -142,7 +142,7 @@ export const PortfolioCard = ({
           borderRadius: 20,
           zIndex: 10,
         }}
-      >     
+      >
         <Text className="text-[#155D5F] font-medium text-[9px]">
           {styles.interest}
         </Text>

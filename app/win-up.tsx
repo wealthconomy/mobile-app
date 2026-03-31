@@ -31,7 +31,7 @@ export default function WinUpScreen() {
             onPress={() =>
               router.push({
                 pathname: "/deposit",
-                params: { plan: "WealthFlex" },
+                params: { plan: "WinUp" },
               })
             }
           >
@@ -49,7 +49,7 @@ export default function WinUpScreen() {
             onPress={() =>
               router.push({
                 pathname: "/withdraw",
-                params: { plan: "WealthFlex" },
+                params: { plan: "WinUp" },
               })
             }
           >

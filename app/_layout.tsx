@@ -88,9 +88,26 @@ function RootLayoutNav() {
               name="notifications"
               options={{ headerShown: false }}
             />
+            <Stack.Screen name="activities" options={{ headerShown: false }} />
+            <Stack.Screen name="win-up" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="wealth-flex-transactions"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen name="wise-up" options={{ headerShown: false }} />
             <Stack.Screen name="support" options={{ headerShown: false }} />
             <Stack.Screen name="faq-detail" options={{ headerShown: false }} />
             <Stack.Screen name="chat" options={{ headerShown: false }} />
+            <Stack.Screen name="create-goal" options={{ headerShown: false }} />
+            <Stack.Screen name="create-fix" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="goal-detail/[id]"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="fix-detail/[id]"
+              options={{ headerShown: false }}
+            />
             <Stack.Screen name="profile" options={{ headerShown: false }} />
             <Stack.Screen name="invite" options={{ headerShown: false }} />
             <Stack.Screen
@@ -105,9 +122,6 @@ function RootLayoutNav() {
               name="transaction-detail"
               options={{ headerShown: false }}
             />
-            <Stack.Screen name="activities" options={{ headerShown: false }} />
-            <Stack.Screen name="win-up" options={{ headerShown: false }} />
-            <Stack.Screen name="wise-up" options={{ headerShown: false }} />
             <Stack.Screen name="deposit" options={{ headerShown: false }} />
             <Stack.Screen name="withdraw" options={{ headerShown: false }} />
             <Stack.Screen name="security" options={{ headerShown: false }} />

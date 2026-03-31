@@ -31,7 +31,8 @@ const PORTFOLIOS = [
     id: "4",
     type: "fam" as const,
     title: "WealthFam",
-    description: "Build a wealthy family; save for kids, spouse, and loved ones.",
+    description:
+      "Build a wealthy family; save for kids, spouse, and loved ones.",
   },
   {
     id: "5",
@@ -43,7 +44,8 @@ const PORTFOLIOS = [
     id: "6",
     type: "group" as const,
     title: "WealthGroup",
-    description: "Build a wealthy family; save for kids, spouse, and loved ones.",
+    description:
+      "Build a wealthy family; save for kids, spouse, and loved ones.",
   },
 ];
 
@@ -88,13 +90,14 @@ export default function WealthPortfolioScreen() {
             {/* Total Savings Card */}
             <View className="mb-6">
               <SubWealthCard
-                description="Best for building a strong brand identity around empowerment."
+                amount="₦350,000.00"
+                description="Track your growth, manage and distribute your wealth across multiple portfolios with ease."
                 showButton={true}
               />
             </View>
 
             {/* Portfolio Wealth Section */}
-            <View className="mb-8">
+            <View className="mb-5">
               <View className="h-[1px] bg-[#E5E5E5] mb-5" />
 
               <View className="flex-row items-center justify-between px-1">

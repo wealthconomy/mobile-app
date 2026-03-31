@@ -1,5 +1,8 @@
 import Header from "@/src/components/common/Header";
 import Skeleton from "@/src/components/common/Skeleton";
+import { blogService } from "@/src/api/blogService";
+import { WiseUpCard } from "@/src/features/home/components/WiseUpSection";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -158,6 +161,11 @@ export default function SupportCenterScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
 
+  const { data: blogs, isLoading: isLoadingBlogs } = useQuery({
+    queryKey: ["support-blogs"],
+    queryFn: () => blogService.getBlogs(),
+  });
+
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 1500);
     return () => clearTimeout(timer);
@@ -262,47 +270,31 @@ export default function SupportCenterScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            className="pl-2"
+            className="-mx-3 px-3"
           >
-            {[1, 2, 3].map((item, idx) => (
-              <View key={idx} className="w-[169px] mr-4">
-                {loading ? (
-                  <View className="space-y-2">
-                    <Skeleton width="100%" height={107} borderRadius={10} />
-                    <Skeleton width="80%" height={14} />
-                    <Skeleton width="60%" height={10} />
+            {isLoadingBlogs ? (
+              <View className="flex-row">
+                {[1, 2, 3].map((i) => (
+                  <View key={i} className="mr-4">
+                    <Skeleton width={169} height={107} borderRadius={10} />
+                    <View className="mt-2 space-y-2">
+                      <Skeleton width={140} height={15} />
+                      <Skeleton width={100} height={10} />
+                    </View>
                   </View>
-                ) : (
-                  <>
-                    <Image
-                      source={{
-                        uri:
-                          idx === 0
-                            ? "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?q=80&w=400&auto=format&fit=crop"
-                            : idx === 1
-                              ? "https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=400&auto=format&fit=crop"
-                              : "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?q=80&w=400&auto=format&fit=crop",
-                      }}
-                      className="w-full h-[107px] rounded-[10px] mb-2"
-                    />
-                    <Text className="text-[12px] font-bold text-[#323232]">
-                      {idx === 0
-                        ? "Emergency Funds 101"
-                        : idx === 1
-                          ? "Automation Secrets"
-                          : "Smarter Savvy"}
-                    </Text>
-                    <Text className="text-[10px] text-[#6B7280] mt-1">
-                      {idx === 0
-                        ? "Why your Wealth Flex account is..."
-                        : idx === 1
-                          ? "How to build wealth while you..."
-                          : "How to save efficiently without..."}
-                    </Text>
-                  </>
-                )}
+                ))}
               </View>
-            ))}
+            ) : (
+              blogs?.map((blog: any) => (
+                <WiseUpCard
+                  key={blog.id}
+                  id={blog.id}
+                  title={blog.title}
+                  description={blog.description}
+                  image={blog.image}
+                />
+              ))
+            )}
           </ScrollView>
         </View>
 

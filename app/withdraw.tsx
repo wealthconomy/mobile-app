@@ -357,7 +357,20 @@ export default function WithdrawScreen() {
           elevation: 2,
         }}
       >
-        <View className="flex-row justify-between mb-8">
+        {/* Wealthconomy Logo */}
+        <Image
+          source={require("../assets/images/wealth.png")}
+          style={{
+            width: 80,
+            height: 20,
+            position: "absolute",
+            right: 20,
+            top: 20,
+          }}
+          resizeMode="contain"
+        />
+
+        <View className="flex-row justify-between mb-8 mt-2 items-start">
           <View>
             <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
               Amount To Transfer
@@ -398,9 +411,11 @@ export default function WithdrawScreen() {
         <View className="flex-row justify-between">
           <View>
             <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
-              Wealth Send Into
+              Wealth Send From
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">WinUp</Text>
+            <Text className="text-[#1A1A1A] font-bold text-[16px]">
+              {wealthPlan}
+            </Text>
           </View>
         </View>
 

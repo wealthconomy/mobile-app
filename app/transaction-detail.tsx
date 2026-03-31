@@ -2,6 +2,7 @@ import Header from "@/src/components/common/Header";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
+  Image,
   ScrollView,
   StatusBar,
   Text,
@@ -28,10 +29,10 @@ export default function TransactionDetailScreen() {
         <View className="bg-white rounded-[30px] p-6 border border-[#E5E7EB] mb-6">
           <View className="flex-row justify-between items-start mb-4">
             <View>
-              <Text className="text-[#10B981] text-[13px] font-bold mb-1">
+              <Text className="text-[13px] font-bold text-[#10B981] mb-1">
                 Money Sent
               </Text>
-              <Text className="text-[32px] font-extrabold text-[#323232]">
+              <Text className="text-[32px] font-bold text-[#323232]">
                 -₦68,000<Text className="text-[#9CA3AF]">.00</Text>
               </Text>
               <Text className="text-[#9CA3AF] text-[11px] mt-1">
@@ -39,10 +40,12 @@ export default function TransactionDetailScreen() {
               </Text>
             </View>
             <View className="items-end">
-              <View className="flex-row items-center mb-6">
-                <Text className="text-[#155D5F] font-bold text-lg">Wealth</Text>
-                <Text className="text-[#F59E0B] font-bold text-lg">conomy</Text>
-              </View>
+              <Image
+                source={require("../assets/images/wealth.png")}
+                className="mb-8"
+                style={{ width: 110, height: 49 }}
+                resizeMode="contain"
+              />
               <TouchableOpacity className="flex-row items-center border border-[#F59E0B] px-3 py-1.5 rounded-full">
                 <Ionicons
                   name="reader"
@@ -61,7 +64,7 @@ export default function TransactionDetailScreen() {
         {/* Detailed Info Card */}
         <View className="bg-white rounded-[30px] border border-[#E5E7EB] overflow-hidden">
           <View className="p-5 border-b border-[#F3F4F6]">
-            <Text className="text-[15px] font-extrabold text-[#323232]">
+            <Text className="text-[15px] font-bold text-[#323232]">
               Details
             </Text>
           </View>

@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Svg, { Path } from "react-native-svg";
 
 type Step = "select-method" | "use-card" | "preview";
 
@@ -111,14 +112,21 @@ export default function DepositScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity className="flex-row items-center">
-          <Image
-            source={{
-              uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/2560px-Visa_Inc._logo.svg.png",
-            }}
-            style={{ width: 32, height: 20, resizeMode: "contain" }}
+        <TouchableOpacity className="flex-row items-center" activeOpacity={0.7}>
+          <Svg
+            width={32}
+            height={20}
+            viewBox="0 0 20 16"
+            fill="none"
             className="mr-4"
-          />
+          >
+            <Path
+              fillRule="evenodd"
+              clipRule="evenodd"
+              d="M0 2C0 0.9 0.9 0 2 0H18C18.5304 0 19.0391 0.210714 19.4142 0.585786C19.7893 0.960859 20 1.46957 20 2V14C20 14.5304 19.7893 15.0391 19.4142 15.4142C19.0391 15.7893 18.5304 16 18 16H2C1.46957 16 0.960859 15.7893 0.585786 15.4142C0.210714 15.0391 0 14.5304 0 14V2ZM12.5 5.2C12.9 5.2 13.3 5.2 13.6 5.4L13.5 6.4H13.4C13.0991 6.21323 12.754 6.1097 12.4 6.1C11.9 6.1 11.7 6.4 11.7 6.6C11.7 6.8 11.9 6.9 12.4 7.1C13.1 7.5 13.4 7.9 13.4 8.4C13.4 9.4 12.6 10.1 11.2 10.1C10.6 10.1 10.1 9.9 9.8 9.8L10 8.8H10.1C10.5 9 10.8 9.1 11.3 9.1C11.7 9.1 12.1 8.9 12.1 8.6C12.1 8.4 11.9 8.3 11.4 8C10.9 7.8 10.3 7.4 10.3 6.7C10.3 5.8 11.3 5.2 12.5 5.2ZM16 5.2H17L18 10H16.8L16.6 9.3H15L14.7 10H13.4L15.3 5.6C15.4 5.3 15.6 5.3 16 5.3V5.2ZM9.8 5.2H8.5L7.7 10H9L9.8 5.2ZM5.3 8.5L5.2 7.8L4.7 5.6C4.7 5.3 4.4 5.3 4.1 5.2H2.1V5.3L3.3 5.8L3.4 6L4.5 10H6L8 5.3H6.7L5.4 8.5H5.3Z"
+              fill="#1A1A1A"
+            />
+          </Svg>
           <View>
             <Text className="text-[#1A1A1A] font-bold text-sm">**** 8372</Text>
             <Text className="text-[#6B7280] text-[11px]">Secondary card</Text>
@@ -257,7 +265,20 @@ export default function DepositScreen() {
           elevation: 2,
         }}
       >
-        <View className="flex-row justify-between mb-8">
+        {/* Wealthconomy Logo */}
+        <Image
+          source={require("../assets/images/wealth.png")}
+          style={{
+            width: 80,
+            height: 20,
+            position: "absolute",
+            right: 20,
+            top: 20,
+          }}
+          resizeMode="contain"
+        />
+
+        <View className="flex-row justify-between mb-8 mt-2 items-start">
           <View>
             <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
               Amount To Deposit
@@ -289,9 +310,7 @@ export default function DepositScreen() {
             <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
               Bank Name
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              Opay
-            </Text>
+            <Text className="text-[#1A1A1A] font-bold text-[16px]">Opay</Text>
           </View>
         </View>
 
@@ -301,7 +320,7 @@ export default function DepositScreen() {
               Wealth Send Into
             </Text>
             <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              WinUp
+              {wealthPlan}
             </Text>
           </View>
         </View>

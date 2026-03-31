@@ -40,9 +40,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="wealth-portfolio"
+        name="portfolios"
         options={{
           title: "Portfolio",
+          unmountOnBlur: true,
           tabBarIcon: ({ color, focused }) => (
             <WealthSaveIcon focused={focused} color={color} />
           ),

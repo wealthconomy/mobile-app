@@ -120,7 +120,7 @@ export const WealthCard = () => {
             marginRight: 5,
           }}
           activeOpacity={0.9}
-          onPress={() => router.push("/(tabs)/wealth-portfolio" as any)}
+          onPress={() => router.push("/portfolios/" as any)}
         >
           <Text className="text-[#1A1A1A] font-bold text-[12px]">
             View Wealth

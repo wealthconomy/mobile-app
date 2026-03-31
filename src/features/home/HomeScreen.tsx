@@ -50,7 +50,7 @@ export default function HomeScreen() {
               Wealth Portfolios
             </Text>
             <TouchableOpacity
-              onPress={() => router.push("/(tabs)/wealth-portfolio" as any)}
+              onPress={() => router.push("/portfolios/" as any)}
             >
               <Text className="text-[#155D5F] text-sm font-medium">
                 View all
