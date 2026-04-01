@@ -39,6 +39,10 @@ export default function CreateFixScreen() {
   const [agreedPenalty, setAgreedPenalty] = useState(false);
   const [acknowledgedTemptation, setAcknowledgedTemptation] = useState(false);
 
+  // Dropdown state
+  const [showSourceDropdown, setShowSourceDropdown] = useState(false);
+  const SOURCES = ["Wealth Save", "Wealth Flex", "Bank Account"];
+
   // PIN state
   const [pin, setPin] = useState("");
   const pinInputRef = useRef<TextInput>(null);
@@ -240,7 +244,9 @@ export default function CreateFixScreen() {
         >
           Funding Source
         </Text>
-        <View
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setShowSourceDropdown(!showSourceDropdown)}
           style={{
             backgroundColor: "#F3F4F6",
             height: 56,
@@ -254,8 +260,21 @@ export default function CreateFixScreen() {
           <Text style={{ color: fundingSource ? "#1A1A1A" : "#9CA3AF", fontSize: 14 }}>
             {fundingSource || "Select funding source"}
           </Text>
-          <Ionicons name="chevron-down" size={20} color="#6B7280" />
-        </View>
+          <Ionicons name={showSourceDropdown ? "chevron-up" : "chevron-down"} size={20} color="#6B7280" />
+        </TouchableOpacity>
+        {showSourceDropdown && (
+          <View style={{ backgroundColor: "white", borderRadius: 12, marginTop: 4, overflow: "hidden", borderWidth: 1, borderColor: "#E5E5E5", elevation: 4, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 6 }}>
+            {SOURCES.map((s) => (
+              <TouchableOpacity
+                key={s}
+                onPress={() => { setFundingSource(s); setShowSourceDropdown(false); }}
+                style={{ paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#F5F5F5" }}
+              >
+                <Text style={{ color: "#323232", fontSize: 15 }}>{s}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Manual Toggle */}
@@ -365,24 +384,22 @@ export default function CreateFixScreen() {
       </View>
 
       {/* Ticket card */}
-    {/* Card - remove borderWidth completely */}
-<View
-  style={{
-    width: "100%",
-    backgroundColor: "#F9F9F9",
-    borderRadius: 24,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    padding: 28,
-    // ❌ Remove these:
-    // borderWidth: 1,
-    // borderBottomWidth: 0,
-    // borderColor: "#EEEEEE",
-    marginBottom: 0,
-  }}
->
+      <View
+        style={{
+          width: "100%",
+          backgroundColor: "#F9F9F9",
+          borderRadius: 24,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          borderBottomLeftRadius: 0,
+          borderBottomRightRadius: 0,
+          padding: 28,
+          borderWidth: 1,
+          borderBottomWidth: 0,
+          borderColor: "#EEEEEE",
+          marginBottom: 0,
+        }}
+      >
         <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 28 }}>
           <View>
             <Text style={{ color: "#6B7280", fontSize: 11, marginBottom: 6, fontWeight: "500" }}>
@@ -460,27 +477,25 @@ export default function CreateFixScreen() {
             overflow: "hidden",
           }}
         >
-       {/* Jagged diamonds - no border */}
-{Array.from({ length: 40 }).map((_, i) => (
-  <View
-    key={i}
-    style={{
-      width: 14,
-      height: 14,
-      backgroundColor: "white",
-      transform: [{ rotate: "45deg" }],
-      marginTop: 4,
-      // ❌ Remove these:
-      // borderLeftWidth: 1,
-      // borderTopWidth: 1,
-      // borderColor: "#EEEEEE",
-    }}
-  />
-))}
+          {Array.from({ length: 40 }).map((_, i) => (
+            <View
+              key={i}
+              style={{
+                width: 14,
+                height: 14,
+                backgroundColor: "white",
+                transform: [{ rotate: "45deg" }],
+                marginTop: 4,
+                borderLeftWidth: 1,
+                borderTopWidth: 1,
+                borderColor: "#EEEEEE",
+              }}
+            />
+          ))}
         </View>
       </View>
 
-<View style={{ height: 1, backgroundColor: "#EEEEEE", marginTop: 20, marginBottom: 20 }} />
+      <View style={{ height: 1, backgroundColor: "#EEEEEE", marginBottom: 28 }} />
 
       {/* Agreement Checkboxes */}
       <TouchableOpacity

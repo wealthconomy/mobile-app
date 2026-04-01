@@ -1,6 +1,8 @@
 import {
   ActivityIndicator,
+  StyleProp,
   Text,
+  TextStyle,
   TouchableOpacity,
   TouchableOpacityProps,
 } from "react-native";
@@ -9,6 +11,7 @@ export interface ThemedButtonProps extends TouchableOpacityProps {
   title: string;
   className?: string;
   textClassName?: string;
+  textStyle?: StyleProp<TextStyle>;
   variant?: "primary" | "secondary" | "outline";
   loading?: boolean;
 }
@@ -17,6 +20,7 @@ export const ThemedButton = ({
   title,
   className,
   textClassName,
+  textStyle,
   variant = "primary",
   loading = false,
   disabled,
@@ -48,6 +52,7 @@ export const ThemedButton = ({
       ) : (
         <Text
           className={`font-semibold text-base ${textStyles[variant]} ${textClassName || ""}`}
+          style={textStyle}
         >
           {title}
         </Text>

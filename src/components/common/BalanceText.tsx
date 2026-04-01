@@ -2,6 +2,8 @@ import { Text, TextStyle, View } from "react-native";
 
 interface BalanceTextProps {
   amount: string | number;
+  decimal?: string;
+  visible?: boolean;
   fontSize?: number;
   color?: string;
   bold?: boolean;
@@ -10,11 +12,31 @@ interface BalanceTextProps {
 
 export const BalanceText = ({
   amount,
+  decimal,
+  visible = true,
   fontSize = 32,
   color = "white",
   bold = true,
   style,
 }: BalanceTextProps) => {
+  // When hidden, show bullet placeholder
+  if (!visible) {
+    return (
+      <Text
+        style={[
+          {
+            fontSize,
+            color,
+            fontWeight: bold ? "bold" : "normal",
+          },
+          style,
+        ]}
+      >
+        ••••••
+      </Text>
+    );
+  }
+
   const amountStr =
     typeof amount === "number"
       ? amount.toLocaleString("en-US", {
@@ -22,6 +44,40 @@ export const BalanceText = ({
           maximumFractionDigits: 2,
         })
       : amount;
+
+  // If a separate decimal prop is provided, render it smaller
+  if (decimal) {
+    return (
+      <View style={{ flexDirection: "row", alignItems: "baseline" }}>
+        <Text
+          style={[
+            {
+              fontSize,
+              color,
+              fontWeight: bold ? "bold" : "normal",
+            },
+            style,
+          ]}
+        >
+          {amountStr}
+        </Text>
+        <Text
+          style={[
+            {
+              fontSize: fontSize * 0.6,
+              color,
+              opacity: 0.5,
+              fontWeight: "400",
+              marginLeft: 1,
+            },
+            style,
+          ]}
+        >
+          {decimal}
+        </Text>
+      </View>
+    );
+  }
 
   if (!amountStr.includes(".") || amountStr.includes("•")) {
     return (
@@ -59,10 +115,10 @@ export const BalanceText = ({
       <Text
         style={[
           {
-            fontSize: fontSize * 0.6, // Smaller kobo (60%)
+            fontSize: fontSize * 0.6,
             color,
-            opacity: 0.5, // Even lighter kobo (50% opacity)
-            fontWeight: "400", // Explicitly lighter weight
+            opacity: 0.5,
+            fontWeight: "400",
             marginLeft: 1,
             marginBottom: fontSize * 0.05,
           },

@@ -61,7 +61,7 @@ export const PortfolioCard = ({
           iconBg: "#E0E0FF",
           iconColor: "#6366F1",
           iconName: "people-outline",
-          route: "/wealth-fam",
+          route: "/portfolios/wealth-fam",
           image: require("../../../../assets/images/fam.png"),
           interest: interestRate || "10% Interest",
         };

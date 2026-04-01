@@ -108,6 +108,11 @@ function RootLayoutNav() {
               name="fix-detail/[id]"
               options={{ headerShown: false }}
             />
+            <Stack.Screen name="create-fam" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="fam-detail/[id]"
+              options={{ headerShown: false }}
+            />
             <Stack.Screen name="profile" options={{ headerShown: false }} />
             <Stack.Screen name="invite" options={{ headerShown: false }} />
             <Stack.Screen
