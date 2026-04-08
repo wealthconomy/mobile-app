@@ -572,6 +572,10 @@ function GoalListItem({ goal }: any) {
             <Text style={{ fontSize: 10, color: "#4CAF50", marginLeft: 2 }}>
               ↑
             </Text>
+            <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
+              {" "}
+              | Progressive: ₦50,000.00
+            </Text>
           </View>
 
           {/* Progress Bar (Width 129) */}

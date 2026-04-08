@@ -113,6 +113,20 @@ function RootLayoutNav() {
               name="fam-detail/[id]"
               options={{ headerShown: false }}
             />
+            <Stack.Screen name="create-auto" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="auto-detail/[id]"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="create-group"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="group-detail/[id]"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen name="top-up" options={{ headerShown: false }} />
             <Stack.Screen name="profile" options={{ headerShown: false }} />
             <Stack.Screen name="invite" options={{ headerShown: false }} />
             <Stack.Screen

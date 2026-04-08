@@ -27,7 +27,8 @@ const SUGGESTIONS = [
   {
     id: "spouse",
     title: "Spousal Savings",
-    subtitle: "Work together with your partner toward shared family milestones.",
+    subtitle:
+      "Work together with your partner toward shared family milestones.",
     icon: "💑",
     category: "Spouse",
     amount: "3000",
@@ -56,7 +57,9 @@ const SUGGESTIONS = [
 export default function WealthFamScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [showTips, setShowTips] = useState(true);
-  const [activeTab, setActiveTab] = useState<"ongoing" | "completed">("ongoing");
+  const [activeTab, setActiveTab] = useState<"ongoing" | "completed">(
+    "ongoing",
+  );
   const [ongoingPlans, setOngoingPlans] = useState<WealthGoal[]>([]);
   const [completedPlans, setCompletedPlans] = useState<WealthGoal[]>([]);
 
@@ -192,7 +195,6 @@ export default function WealthFamScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         <View className="px-5 py-2">
-
           {/* ── Hero Card (same size/structure as WealthGoal) ─────── */}
           <View
             className="relative overflow-hidden mb-8"
@@ -283,10 +285,7 @@ export default function WealthFamScreen() {
               }}
               onPress={() => router.push("/create-fam" as any)}
             >
-              <Text
-                style={{ color: THEME }}
-                className="font-bold text-[14px]"
-              >
+              <Text style={{ color: THEME }} className="font-bold text-[14px]">
                 Create a WealthFam
               </Text>
             </TouchableOpacity>
@@ -423,7 +422,8 @@ export default function WealthFamScreen() {
                 height: 40,
                 justifyContent: "center",
                 alignItems: "center",
-                backgroundColor: activeTab === "ongoing" ? THEME_BG : "transparent",
+                backgroundColor:
+                  activeTab === "ongoing" ? THEME_BG : "transparent",
                 borderBottomWidth: activeTab === "ongoing" ? 2 : 0,
                 borderBottomColor: THEME,
                 borderTopLeftRadius: 15,
@@ -448,7 +448,8 @@ export default function WealthFamScreen() {
                 height: 40,
                 justifyContent: "center",
                 alignItems: "center",
-                backgroundColor: activeTab === "completed" ? THEME_BG : "transparent",
+                backgroundColor:
+                  activeTab === "completed" ? THEME_BG : "transparent",
                 borderBottomWidth: activeTab === "completed" ? 2 : 0,
                 borderBottomColor: THEME,
                 borderTopLeftRadius: 15,
@@ -503,7 +504,6 @@ export default function WealthFamScreen() {
               ))
             )}
           </View>
-
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -520,10 +520,10 @@ function FamListItem({
   const icon = plan.title.includes("Kids")
     ? "👨‍👩‍👧‍👦"
     : plan.title.includes("Spouse")
-    ? "💑"
-    : plan.title.includes("Parent")
-    ? "👴"
-    : "🤝";
+      ? "💑"
+      : plan.title.includes("Parent")
+        ? "👴"
+        : "🤝";
 
   return (
     <TouchableOpacity
@@ -598,6 +598,10 @@ function FamListItem({
             </Text>
             <Text style={{ fontSize: 10, color: "#4CAF50", marginLeft: 2 }}>
               ↑
+            </Text>
+            <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
+              {" "}
+              | Progressive: ₦50,000.00
             </Text>
           </View>
 

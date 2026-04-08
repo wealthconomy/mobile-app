@@ -1,8 +1,17 @@
 import Header from "@/src/components/common/Header";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { ThemedButton } from "@/src/components/ThemedButton";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { Image, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // Re-defining interface for local use
@@ -20,6 +29,7 @@ export interface WealthFix {
   lockDuration: string;
   wealthGrowth: string;
   wealthGrowsInto: string;
+  progressiveAmount: string;
 }
 
 const fixService = {
@@ -31,6 +41,7 @@ const fixService = {
       wealthGrowth: "₦2,453.00",
       wealthGrowsInto: "WinUp",
       endDate: "31th Dec 2023",
+      progressiveAmount: "₦50,000.00",
     };
     return [
       {
@@ -65,57 +76,7 @@ const fixService = {
       },
       {
         ...base,
-        id: "fix-4",
-        title: "House Rent",
-        subtitle: "Business",
-        amount: "3,000,000.00",
-        saved: "1,800,000.00",
-        progress: 0.6,
-        daysLeft: 54,
-      },
-      {
-        ...base,
-        id: "fix-5",
-        title: "Wedding Clothes",
-        subtitle: "Personal",
-        amount: "3,000,000.00",
-        saved: "1,800,000.00",
-        progress: 0.6,
-        daysLeft: 54,
-      },
-      {
-        ...base,
         id: "fix-u1",
-        title: "Wedding Clothes",
-        subtitle: "Personal",
-        amount: "3,000,000.00",
-        saved: "3,000,000.00",
-        progress: 1.0,
-        daysLeft: 0,
-      },
-      {
-        ...base,
-        id: "fix-u2",
-        title: "House Rent",
-        subtitle: "Business",
-        amount: "3,000,000.00",
-        saved: "3,000,000.00",
-        progress: 1.0,
-        daysLeft: 0,
-      },
-      {
-        ...base,
-        id: "fix-u3",
-        title: "House Rent",
-        subtitle: "Business",
-        amount: "3,000,000.00",
-        saved: "3,000,000.00",
-        progress: 1.0,
-        daysLeft: 0,
-      },
-      {
-        ...base,
-        id: "fix-u4",
         title: "Wedding Clothes",
         subtitle: "Personal",
         amount: "3,000,000.00",
@@ -131,8 +92,10 @@ export default function FixDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [fix, setFix] = useState<WealthFix | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showTerminateModal, setShowTerminateModal] = useState(false);
 
   const THEME_COLOR = "#D48E00";
+  const TEAL = "#0B575B";
 
   useEffect(() => {
     const loadFix = async () => {
@@ -146,37 +109,69 @@ export default function FixDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center">
-        <StatusBar style="dark" />
-        <Text className="text-gray-400">Loading details...</Text>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: "white" }}
+        edges={["top"]}
+      >
+        <Stack.Screen options={{ headerShown: false }} />
+        <ActivityIndicator style={{ flex: 1 }} color={THEME_COLOR} />
       </SafeAreaView>
     );
   }
 
   if (!fix) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center">
-        <StatusBar style="dark" />
-        <Text className="text-gray-400">Fix not found</Text>
+      <SafeAreaView
+        style={{
+          flex: 1,
+          backgroundColor: "white",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+        edges={["top"]}
+      >
+        <Stack.Screen options={{ headerShown: false }} />
+        <Text style={{ color: "#6B7280" }}>Fix not found</Text>
       </SafeAreaView>
     );
   }
 
   const isUnlocked = fix.progress >= 1;
 
+  const handleTerminate = () => {
+    setShowTerminateModal(false);
+    router.replace("/(tabs)/portfolios/wealth-fix");
+  };
+
   const renderLockedHeader = () => (
-    <View className="px-5 mt-4">
-      {/* Title, Subtitle, Amount & Icon Row */}
-      <View className="flex-row justify-between items-start mb-8">
-        <View className="flex-1 mr-4">
-          <Text className="text-[#1A1A1A] font-bold text-[24px] mb-1">
+    <View style={{ paddingHorizontal: 20, marginTop: 4 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 28,
+        }}
+      >
+        <View style={{ flex: 1, marginRight: 16 }}>
+          <Text
+            style={{
+              color: "#1A1A1A",
+              fontWeight: "800",
+              fontSize: 24,
+              marginBottom: 4,
+            }}
+          >
             {fix.title}
           </Text>
-          <Text className="text-[#6B7280] text-[14px] mb-4">
+          <Text style={{ color: "#6B7280", fontSize: 14, marginBottom: 16 }}>
             {fix.subtitle}
           </Text>
-          <Text className="text-[#1A1A1A] font-bold text-[28px]">
-            ₦{fix.amount}
+          <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 28 }}>
+            ₦{fix.saved}
+          </Text>
+          <Text style={{ color: "#9CA3AF", fontSize: 11, marginTop: 2 }}>
+            of ₦{fix.amount} target
           </Text>
         </View>
         <Image
@@ -186,11 +181,9 @@ export default function FixDetailScreen() {
         />
       </View>
 
-      {/* Progress Bar Area */}
-      <View className="w-full">
+      <View style={{ width: "100%" }}>
         <View
           style={{
-            width: 365,
             height: 10,
             borderRadius: 20,
             backgroundColor: "#FFF8E1",
@@ -207,30 +200,49 @@ export default function FixDetailScreen() {
             }}
           />
         </View>
-        <View className="flex-row justify-between mb-8">
-          <Text className="text-[#9CA3AF] text-[13px] font-medium">
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 28,
+          }}
+        >
+          <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
             {Math.round(fix.progress * 100)}%
           </Text>
-          <Text className="text-[#9CA3AF] text-[13px] font-medium">
+          <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
             {fix.daysLeft} days Left
           </Text>
         </View>
       </View>
 
-      {/* Horizontal Line */}
-      <View className="h-[1px] bg-[#EEEEEE] w-full mb-10" />
+      <View
+        style={{ height: 1, backgroundColor: "#EEEEEE", marginBottom: 28 }}
+      />
     </View>
   );
 
   const renderUnlockedHeader = () => (
-    <View className="items-center px-5 mb-10">
+    <View
+      style={{ alignItems: "center", paddingHorizontal: 20, marginBottom: 28 }}
+    >
       <View
-        className="relative items-center justify-center mb-8"
-        style={{ width: 220, height: 220 }}
+        style={{
+          width: 220,
+          height: 220,
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: 20,
+        }}
       >
         <Image
           source={require("../../assets/images/success.png")}
-          style={{ width: 220, height: 220, position: "absolute" }}
+          style={{
+            width: 220,
+            height: 220,
+            position: "absolute",
+            opacity: 0.3,
+          }}
           resizeMode="contain"
         />
         <Image
@@ -240,119 +252,148 @@ export default function FixDetailScreen() {
         />
       </View>
 
-      <View className="flex-row items-center mb-3">
-        <Text className="text-[24px] mr-2">🎉</Text>
-        <Text className="text-[#1A1A1A] font-bold text-[28px]">
+      <View
+        style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}
+      >
+        <Text style={{ fontSize: 24, marginRight: 8 }}>🎉</Text>
+        <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 26 }}>
           Wealth Unlocked
         </Text>
-        <Text className="text-[24px] ml-2">🎉</Text>
+        <Text style={{ fontSize: 24, marginLeft: 8 }}>🎉</Text>
       </View>
 
-      <Text className="text-[#6B7280] text-center text-[14px] leading-[22px] px-4">
-        Your <Text className="font-bold text-[#1A1A1A]">Fixed Wealth</Text> has
-        been{" "}
-        <Text className="font-bold text-[#1A1A1A]">unlocked successfully</Text>,
-        your <Text className="font-bold text-[#1A1A1A]">"₦{fix.amount}"</Text>{" "}
+      <Text
+        style={{
+          color: "#6B7280",
+          textAlign: "center",
+          fontSize: 14,
+          lineHeight: 22,
+          paddingHorizontal: 16,
+        }}
+      >
+        Your{" "}
+        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
+          Fixed Wealth
+        </Text>{" "}
+        has been{" "}
+        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
+          unlocked successfully
+        </Text>
+        , your{" "}
+        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
+          "₦{fix.amount}"
+        </Text>{" "}
         is sent into your Wealth Save account by {fix.endDate}.
       </Text>
     </View>
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }} edges={["top"]}>
       <StatusBar style="dark" />
       <Stack.Screen options={{ headerShown: false }} />
       <Header title="Review" showBack={true} />
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-        <View className="py-4">
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={{ paddingTop: 8, paddingBottom: 40 }}>
           {isUnlocked ? renderUnlockedHeader() : renderLockedHeader()}
 
           {/* Jagged Summary Card */}
           <View
-            className="bg-[#F6F6F6] p-8 rounded-t-[24px] relative self-center"
             style={{
-              width: 365,
-              height: 380, // Increased to fit 7 rows
-              borderColor: "#fefcfc40",
-              borderWidth: 0.8,
-              borderBottomWidth: 0,
+              backgroundColor: "#F6F6F6",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 28,
+              marginHorizontal: 20,
             }}
           >
-            <View className="flex-row justify-between mb-8">
-              <View>
-                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-                  Amount To Fix
-                </Text>
-                <Text className="text-[#1A1A1A] font-bold text-[16px]">
-                  ₦{fix.amount}
-                </Text>
+            {/* Row 1: Amount To Fix & Lock Duration */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 28,
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Amount To Fix</Text>
+                <Text style={styles.value}>₦{fix.amount}</Text>
               </View>
-              <View className="items-end">
-                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-                  Lock Duration
-                </Text>
-                <Text className="text-[#1A1A1A] font-bold text-[16px]">
-                  {fix.lockDuration}
-                </Text>
-              </View>
-            </View>
-
-            <View className="flex-row justify-between mb-8">
-              <View>
-                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-                  Wealth Growth
-                </Text>
-                <Text className="text-[#1A1A1A] font-bold text-[16px]">
-                  {fix.wealthGrowth}
-                </Text>
-              </View>
-              <View className="items-end">
-                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-                  Wealth from:
-                </Text>
-                <Text className="text-[#1A1A1A] font-bold text-[16px]">
-                  {fix.source}
-                </Text>
+              <View style={{ flex: 1, alignItems: "flex-end" }}>
+                <Text style={styles.label}>Lock Duration</Text>
+                <Text style={styles.value}>{fix.lockDuration}</Text>
               </View>
             </View>
 
-            <View className="flex-row justify-between mb-8">
-              <View>
-                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-                  Method
-                </Text>
-                <Text className="text-[#1A1A1A] font-bold text-[16px]">
+            {/* Row 2: Wealth Growth & Progressive Amount */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 28,
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Wealth Growth</Text>
+                <Text style={styles.value}>{fix.wealthGrowth}</Text>
+              </View>
+              <View style={{ flex: 1, alignItems: "flex-end" }}>
+                <Text style={styles.label}>Progressive Amount</Text>
+                <Text style={styles.value}>{fix.progressiveAmount}</Text>
+              </View>
+            </View>
+
+            {/* Row 3: Method & End Date */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 28,
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Method</Text>
+                <Text style={styles.value}>
                   {fix.automationFrequency === "Manual"
-                    ? "Manuel"
+                    ? "Manual"
                     : "Automation"}
                 </Text>
               </View>
-              <View className="items-end">
-                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-                  End Date
-                </Text>
-                <Text className="text-[#1A1A1A] font-bold text-[16px]">
-                  {fix.endDate}
-                </Text>
+              <View style={{ flex: 1, alignItems: "flex-end" }}>
+                <Text style={styles.label}>End Date</Text>
+                <Text style={styles.value}>{fix.endDate}</Text>
               </View>
             </View>
 
-            <View className="flex-row justify-between mb-8">
-              <View>
-                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-                  Wealth grows Into
-                </Text>
-                <Text className="text-[#1A1A1A] font-bold text-[16px]">
-                  {fix.wealthGrowsInto}
-                </Text>
+            {/* Row 4: Wealth grows Into & Wealth from */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 8,
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Wealth grows Into</Text>
+                <Text style={styles.value}>{fix.wealthGrowsInto}</Text>
+              </View>
+              <View style={{ flex: 1, alignItems: "flex-end" }}>
+                <Text style={styles.label}>Wealth from:</Text>
+                <Text style={styles.value}>{fix.source}</Text>
               </View>
             </View>
 
             {/* Jagged Edge Bottom */}
             <View
-              className="flex-row absolute -bottom-[10px] left-0 right-0 overflow-hidden"
-              style={{ width: 365.1 }}
+              style={{
+                flexDirection: "row",
+                position: "absolute",
+                bottom: -10,
+                left: 0,
+                right: 0,
+                overflow: "hidden",
+              }}
             >
               {Array.from({ length: 40 }).map((_, i) => (
                 <View
@@ -368,8 +409,178 @@ export default function FixDetailScreen() {
               ))}
             </View>
           </View>
+
+          <View
+            style={{
+              height: 1,
+              backgroundColor: "#EEEEEE",
+              marginTop: 12,
+              marginBottom: 28,
+              marginHorizontal: 20,
+            }}
+          />
+
+          <View style={{ paddingHorizontal: 20 }}>
+            {!isUnlocked && (
+              <>
+                <ThemedButton
+                  title="TopUp Wealth"
+                  onPress={() =>
+                    router.push({
+                      pathname: "/top-up",
+                      params: { portfolioName: "WealthFix" },
+                    })
+                  }
+                  style={{
+                    backgroundColor: TEAL,
+                    borderRadius: 14,
+                    height: 56,
+                    marginBottom: 12,
+                  }}
+                />
+                <View style={{ height: 100 }} />
+                <ThemedButton
+                  title="Terminate Progress"
+                  onPress={() => setShowTerminateModal(true)}
+                  style={{
+                    backgroundColor: "white",
+                    borderRadius: 14,
+                    height: 56,
+                    borderWidth: 1,
+                    borderColor: "#e4e4e4",
+                  }}
+                  textStyle={{ color: "#E53935", fontWeight: "700" }}
+                />
+              </>
+            )}
+          </View>
         </View>
       </ScrollView>
+
+      {/* Terminate Modal */}
+      {showTerminateModal && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+            zIndex: 100,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "white",
+              borderRadius: 20,
+              padding: 24,
+              width: "100%",
+              alignItems: "center",
+            }}
+          >
+            <Image
+              source={require("../../assets/images/terminate.png")}
+              style={{ width: 120, height: 120, marginBottom: 12 }}
+              resizeMode="contain"
+            />
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "900",
+                color: "#1A1A1A",
+                textAlign: "center",
+                marginBottom: 12,
+              }}
+            >
+              Terminate Fixed Fund?
+            </Text>
+            <Text
+              style={{
+                fontSize: 13,
+                color: "#6B7280",
+                textAlign: "center",
+                marginBottom: 28,
+                lineHeight: 20,
+              }}
+            >
+              You are about to close the{" "}
+              <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
+                {fix.title}
+              </Text>{" "}
+              portfolio. This fund was created to secure a future legacy.
+              {"\n\n"}
+              Please note: Closing this will stop all automated Fixed Wealth
+              contributions. We recommend moving these funds to Wealth Flex
+              instead of withdrawing to keep the "Fixed Wealth" habit alive.
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                width: "100%",
+                gap: 12,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => setShowTerminateModal(false)}
+                style={{
+                  width: 163,
+                  height: 50,
+                  borderRadius: 15,
+                  borderWidth: 0.8,
+                  borderColor: "#CDCDCD",
+                  backgroundColor: "#FFFFFF",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingHorizontal: 20,
+                }}
+              >
+                <Text
+                  style={{ fontSize: 14, color: "#747474", fontWeight: "500" }}
+                >
+                  Keep building Legacy
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleTerminate}
+                style={{
+                  width: 163,
+                  height: 50,
+                  borderRadius: 15,
+                  backgroundColor: "#FFD7D4",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingHorizontal: 20,
+                }}
+              >
+                <Text
+                  style={{ fontSize: 14, color: "#F44336", fontWeight: "500" }}
+                >
+                  Close goal
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  label: {
+    color: "#6B7280",
+    fontSize: 11,
+    marginBottom: 6,
+    fontWeight: "500",
+  },
+  value: {
+    color: "#1A1A1A",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+});

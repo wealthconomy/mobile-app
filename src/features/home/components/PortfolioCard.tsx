@@ -72,7 +72,7 @@ export const PortfolioCard = ({
           iconBg: "#BAE7FF",
           iconColor: "#0EA5E9",
           iconName: "refresh-outline",
-          route: "/wealth-auto",
+          route: "/portfolios/wealth-auto",
           image: require("../../../../assets/images/auto.png.png"),
           interest: interestRate || "10% Interest",
         };
@@ -83,7 +83,7 @@ export const PortfolioCard = ({
           iconBg: "#E5E7EB",
           iconColor: "#4B5563",
           iconName: "people-circle-outline",
-          route: "/wealth-group",
+          route: "/portfolios/wealth-group",
           image: require("../../../../assets/images/group.png"),
           interest: interestRate || "8% Interest",
         };
