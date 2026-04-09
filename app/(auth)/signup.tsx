@@ -198,7 +198,7 @@ export default function SignupScreen() {
             <Text
               style={{ color: SECONDARY, fontSize: 13, textAlign: "center" }}
             >
-              Low friction entry to get the user into the ecosystem.
+              Join other purposeful wealth builders
             </Text>
           </View>
 

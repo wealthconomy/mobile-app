@@ -11,6 +11,13 @@ export type Category =
   | "WealthAuto"
   | "WealthFam";
 
+export interface BlogComment {
+  id: string;
+  author: Author;
+  text: string;
+  timePosted: string;
+}
+
 export interface Blog {
   id: string;
   title: string;
@@ -22,5 +29,11 @@ export interface Blog {
   timePosted: string;
   readingDuration: string;
   isBookmarked: boolean;
+  isLiked: boolean;
+  likesCount: number;
+  commentsCount: number;
+  sharesCount: number;
+  bookmarkCount: number;
   views: number;
+  comments: BlogComment[];
 }

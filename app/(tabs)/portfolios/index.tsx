@@ -25,7 +25,7 @@ const PORTFOLIOS = [
     id: "3",
     type: "goal" as const,
     title: "WealthGoal",
-    description: "Save with focus and smash every target.",
+    description: "Save with discipline and smash every goals.",
   },
   {
     id: "4",
@@ -38,14 +38,14 @@ const PORTFOLIOS = [
     id: "5",
     type: "auto" as const,
     title: "WealthAuto",
-    description: "Automate it and save effortlessly: daily, weekly, monthly",
+    description: "WealthFlow- Automated savings for continous wealth flow",
   },
   {
     id: "6",
     type: "group" as const,
     title: "WealthGroup",
     description:
-      "Build a wealthy family; save for kids, spouse, and loved ones.",
+      "Save together, grow together and win together.",
   },
 ];
 
@@ -91,49 +91,14 @@ export default function WealthPortfolioScreen() {
             <View className="mb-6">
               <SubWealthCard
                 amount="₦350,000.00"
-                description="Track your growth, manage and distribute your wealth across multiple portfolios with ease."
-                showButton={true}
+                description="Discipline Today, Wealth Tomorrow"
+             
               />
             </View>
 
             {/* Portfolio Wealth Section */}
             <View className="mb-5">
-              <View className="h-[1px] bg-[#E5E5E5] mb-5" />
-
-              <View className="flex-row items-center justify-between px-1">
-                <View>
-                  <Text className="text-[#64748B] text-[13px] font-medium mb-1">
-                    Portfolio Wealth
-                  </Text>
-                  {showPortfolioBalance ? (
-                    <BalanceText
-                      amount="₦350,000.00"
-                      fontSize={24}
-                      color="#1A1A1A"
-                    />
-                  ) : (
-                    <Text className="text-[#1A1A1A] font-bold text-[24px]">
-                      ••••••••
-                    </Text>
-                  )}
-                </View>
-
-                <TouchableOpacity
-                  onPress={() => setShowPortfolioBalance(!showPortfolioBalance)}
-                  className="p-2"
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name={
-                      showPortfolioBalance ? "eye-outline" : "eye-off-outline"
-                    }
-                    size={24}
-                    color="#155D5F"
-                  />
-                </TouchableOpacity>
-              </View>
-
-              <View className="h-[1px] bg-[#E5E5E5] mt-5" />
+              <View className="h-[1px] bg-[#E5E5E5] mb-2" />
             </View>
 
             <Text className="text-[#1A1A1A] font-bold text-[20px] mb-6 tracking-tight">

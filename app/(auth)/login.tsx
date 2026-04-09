@@ -147,8 +147,8 @@ export default function LoginScreen() {
                 lineHeight: 20,
               }}
             >
-              To sign in to your account in the application,{"\n"}enter your
-              email and your password
+              Please Log in to Continue your Wealth{"\n"}Building Journey
+
             </Text>
           </View>
 

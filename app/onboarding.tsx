@@ -47,15 +47,8 @@ const SLIDES: SlideData[] = [
     highlight: "Win",
     rest: " Up",
     segments: [
-      { t: "Save ", b: true },
-      { t: "purposefully." },
-      { t: "\n" },
-      { t: "Build the discipline", b: true },
-      { t: " to reach your " },
-      { t: "Financial", b: true },
-      { t: "\n" },
-      { t: " goals", b: true },
-      { t: ", one naira at a time." },
+      { t: "Save Purposefully & Win Financially. ", },
+ 
     ],
   },
   {
@@ -65,13 +58,8 @@ const SLIDES: SlideData[] = [
     highlight: "Wise",
     rest: " Up",
     segments: [
-      { t: "Learn as you " },
-      { t: "Grow", b: true },
-      { t: ".\n" },
-      { t: "Access financial literacy", b: true },
-      { t: " tools to move from\n a saver to a " },
-      { t: "Confident investor", b: true },
-      { t: "." },
+      { t: "Learn & Get Smart About Money" },
+     
     ],
   },
   {
@@ -81,14 +69,7 @@ const SLIDES: SlideData[] = [
     highlight: "Wealth",
     rest: " Up",
     segments: [
-      { t: "Invest", b: true },
-      { t: " confidently.\nBuild " },
-      { t: "Boundless Wealth", b: true },
-      { t: " and make a\n" },
-      { t: "real-world", b: true },
-      { t: " impact through our " },
-      { t: "trusted", b: true },
-      { t: " ecosystem." },
+      { t: " Build Wealth Confidently &\n Be Boundless " },
     ],
   },
 ];
@@ -220,7 +201,7 @@ export default function OnboardingScreen() {
       <Text
         style={{
           position: "absolute",
-          top: sy(400),
+          top: sy(380),
           left: sx(28),
           right: sx(28),
           fontSize: sx(15),
@@ -229,9 +210,7 @@ export default function OnboardingScreen() {
           lineHeight: sy(22),
         }}
       >
-        <Text style={{ fontWeight: "800" }}>One wealth decision</Text>
-        {" at a time towards\n"}
-        <Text style={{ fontWeight: "800" }}>sustainable wealth.</Text>
+        <Text style={{ fontWeight: "800" }}>Build Wealth...The Smart Way</Text>
       </Text>
 
       {/* Skip Button (Temporary for development) */}

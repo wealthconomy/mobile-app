@@ -1,14 +1,18 @@
 import { blogService } from "@/src/api/blogService";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Audio } from "expo-av";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   ScrollView,
   Share,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -23,6 +27,8 @@ export default function BlogDetailScreen() {
     queryFn: () => blogService.getBlogById(id as string),
     enabled: !!id,
   });
+  const [commentText, setCommentText] = useState("");
+  const [isCommenting, setIsCommenting] = useState(false);
 
   const toggleBookmarkMutation = useMutation({
     mutationFn: (id: string) => blogService.toggleBookmark(id),
@@ -30,6 +36,23 @@ export default function BlogDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ["blogs"] });
       queryClient.invalidateQueries({ queryKey: ["bookmarked-blogs"] });
       queryClient.invalidateQueries({ queryKey: ["blog"] });
+    },
+  });
+  const toggleLikeMutation = useMutation({
+    mutationFn: (id: string) => blogService.toggleLike(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["blogs"] });
+      queryClient.invalidateQueries({ queryKey: ["blog", id] });
+    },
+  });
+  const commentMutation = useMutation({
+    mutationFn: ({ id, text }: { id: string; text: string }) =>
+      blogService.addComment(id, text),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["blog", id] });
+      setCommentText("");
+      setIsCommenting(false);
+      Alert.alert("Success", "Comment added successfully!");
     },
   });
 
@@ -47,6 +70,28 @@ export default function BlogDetailScreen() {
   const handleBookmark = () => {
     if (!id) return;
     toggleBookmarkMutation.mutate(id);
+  };
+  const handleLike = async () => {
+    if (!id) return;
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        require("../../assets/like.mp3"),
+      );
+      await sound.playAsync();
+      // Unload sound from memory after playing
+      sound.setOnPlaybackStatusUpdate(async (status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          await sound.unloadAsync();
+        }
+      });
+    } catch (error) {
+      console.log("Error playing sound:", error);
+    }
+    toggleLikeMutation.mutate(id);
+  };
+  const handleCommentSubmit = () => {
+    if (!id || !commentText.trim()) return;
+    commentMutation.mutate({ id, text: commentText });
   };
 
   if (isLoading) {
@@ -145,20 +190,13 @@ export default function BlogDetailScreen() {
             </Text>
           </View>
 
-          <View className="flex-row justify-between items-start mb-6">
-            <Text className="text-[#1A1A1A] font-extrabold text-[22px] leading-tight flex-1 mr-4">
+          <View className="mb-6">
+            <Text className="text-[#1A1A1A] font-extrabold text-[22px] leading-tight mb-2">
               {blog.title}
             </Text>
-            <TouchableOpacity onPress={handleBookmark}>
-              <Ionicons
-                name={blog.isBookmarked ? "bookmark" : "bookmark-outline"}
-                size={24}
-                color={blog.isBookmarked ? "#155D5F" : "#6B7280"}
-              />
-            </TouchableOpacity>
           </View>
 
-          <View className="flex-row items-center mb-8">
+          <View className="flex-row items-center mb-6">
             <Image
               source={{ uri: blog.author.image }}
               className="w-10 h-10 rounded-full bg-gray-200 mr-3"
@@ -173,11 +211,140 @@ export default function BlogDetailScreen() {
             </View>
           </View>
 
-          <View className="h-[1px] bg-gray-100 w-full mb-8" />
+          {/* Interaction Bar */}
+          <View className="flex-row items-center justify-between mb-1 px-1">
+            <TouchableOpacity
+              onPress={handleLike}
+              className="flex-row items-center"
+            >
+              <Ionicons
+                name={blog.isLiked ? "thumbs-up" : "thumbs-up-outline"}
+                size={20}
+                color={blog.isLiked ? "#155D5F" : "#6B7280"}
+              />
+              <Text className="text-[#6B7280] text-xs ml-2 font-bold">
+                {blog.likesCount}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setIsCommenting(!isCommenting)}
+              className="flex-row items-center"
+            >
+              <Ionicons name="chatbubble-outline" size={20} color="#6B7280" />
+              <Text className="text-[#6B7280] text-xs ml-2 font-bold">
+                {blog.commentsCount}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleShare}
+              className="flex-row items-center"
+            >
+              <Ionicons name="share-social-outline" size={20} color="#6B7280" />
+              <Text className="text-[#6B7280] text-xs ml-2 font-bold">
+                {blog.sharesCount}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleBookmark}
+              className="flex-row items-center"
+            >
+              <Ionicons
+                name={blog.isBookmarked ? "bookmark" : "bookmark-outline"}
+                size={20}
+                color={blog.isBookmarked ? "#155D5F" : "#6B7280"}
+              />
+              <Text className="text-[#6B7280] text-xs ml-2 font-bold">
+                {blog.bookmarkCount}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {isCommenting && (
+            <View className="mb-8 p-4 bg-gray-50 rounded-2xl">
+              <TextInput
+                placeholder="Write a comment..."
+                placeholderTextColor="#9CA3AF"
+                className="text-[#1A1A1A] text-sm mb-4 min-h-[80px]"
+                multiline
+                value={commentText}
+                onChangeText={setCommentText}
+                autoFocus
+              />
+              <View className="flex-row justify-end space-x-3">
+                <TouchableOpacity
+                  onPress={() => setIsCommenting(false)}
+                  className="px-4 py-2"
+                >
+                  <Text className="text-[#6B7280] font-bold">Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleCommentSubmit}
+                  className="bg-[#155D5F] px-4 py-2 rounded-lg"
+                  disabled={!commentText.trim() || commentMutation.isPending}
+                >
+                  {commentMutation.isPending ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text className="text-white font-bold">Post Comment</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          <View className="h-[1px] bg-gray-100 w-full mb-5" />
 
           <Text className="text-[#4B5563] text-base leading-relaxed mb-10">
             {blog.content}
           </Text>
+
+          {/* Comments Section */}
+          <View className="mb-10">
+            <View className="h-[1px] bg-gray-100 w-full mb-8" />
+            <Text className="text-[#1A1A1A] font-bold text-lg mb-6">
+              Comments ({blog.commentsCount})
+            </Text>
+            {blog.comments && blog.comments.length > 0 ? (
+              blog.comments.map((comment) => (
+                <View
+                  key={comment.id}
+                  className="mb-6 pb-6 border-b border-gray-50"
+                >
+                  <View className="flex-row items-center mb-2">
+                    <Image
+                      source={{ uri: comment.author.image }}
+                      className="w-8 h-8 rounded-full bg-gray-200 mr-3"
+                    />
+                    <View>
+                      <Text className="text-[#1A1A1A] font-bold text-sm">
+                        {comment.author.name}
+                      </Text>
+                      <Text className="text-[#9CA3AF] text-[10px]">
+                        {comment.timePosted}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text className="text-[#4B5563] text-sm leading-relaxed">
+                    {comment.text}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <View className="py-10 items-center justify-center bg-gray-50 rounded-2xl border-dashed border-2 border-gray-200">
+                <Ionicons
+                  name="chatbubbles-outline"
+                  size={32}
+                  color="#94A3B8"
+                />
+                <Text className="text-[12px] text-[#94A3B8] font-bold mt-2">
+                  No comments yet. Be the first to join the conversation!
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
       </ScrollView>
     </View>

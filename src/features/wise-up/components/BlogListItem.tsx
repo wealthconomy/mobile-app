@@ -70,16 +70,21 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
               >
                 {blog.title}
               </Text>
-              <TouchableOpacity
-                onPress={onBookmark}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons
-                  name={blog.isBookmarked ? "bookmark" : "bookmark-outline"}
-                  size={18}
-                  color={blog.isBookmarked ? "#155D5F" : "#6B7280"}
-                />
-              </TouchableOpacity>
+              <View className="flex-row items-center">
+                <TouchableOpacity
+                  onPress={onBookmark}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons
+                    name={blog.isBookmarked ? "bookmark" : "bookmark-outline"}
+                    size={18}
+                    color={blog.isBookmarked ? "#155D5F" : "#6B7280"}
+                  />
+                </TouchableOpacity>
+                <Text className="text-[#6B7280] text-[10px] font-bold ml-1">
+                  {blog.bookmarkCount}
+                </Text>
+              </View>
             </View>
           </View>
 

@@ -52,7 +52,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="wealth-vest"
         options={{
-          title: "Wealth Vest",
+          title: "WealthVest",
           tabBarIcon: ({ color, focused }) => (
             <WealthVestIcon focused={focused} color={color} />
           ),

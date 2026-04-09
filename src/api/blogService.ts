@@ -28,7 +28,26 @@ const MOCK_BLOGS: Blog[] = [
     timePosted: "7 hours ago",
     readingDuration: "4 mins reading",
     isBookmarked: false,
+    isLiked: false,
+    likesCount: 124,
+    commentsCount: 124,
+    sharesCount: 347,
+    bookmarkCount: 6,
     views: 1200,
+    comments: [
+      {
+        id: "101",
+        author: MOCK_AUTHORS.ayo,
+        text: "This is so helpful! I definitely need to start an emergency fund.",
+        timePosted: "2 hours ago",
+      },
+      {
+        id: "102",
+        author: MOCK_AUTHORS.sarah,
+        text: "Great advice. WealthFlex is really convenient.",
+        timePosted: "1 hour ago",
+      },
+    ],
   },
   {
     id: "2",
@@ -42,7 +61,13 @@ const MOCK_BLOGS: Blog[] = [
     timePosted: "7 hours ago",
     readingDuration: "4 mins reading",
     isBookmarked: true,
+    isLiked: true,
+    likesCount: 85,
+    commentsCount: 42,
+    sharesCount: 120,
+    bookmarkCount: 6,
     views: 850,
+    comments: [],
   },
   {
     id: "3",
@@ -56,7 +81,13 @@ const MOCK_BLOGS: Blog[] = [
     timePosted: "1 day ago",
     readingDuration: "6 mins reading",
     isBookmarked: false,
+    isLiked: false,
+    likesCount: 230,
+    commentsCount: 15,
+    sharesCount: 56,
+    bookmarkCount: 6,
     views: 2300,
+    comments: [],
   },
   {
     id: "4",
@@ -70,7 +101,13 @@ const MOCK_BLOGS: Blog[] = [
     timePosted: "2 days ago",
     readingDuration: "5 mins reading",
     isBookmarked: false,
+    isLiked: false,
+    likesCount: 45,
+    commentsCount: 8,
+    sharesCount: 12,
+    bookmarkCount: 6,
     views: 450,
+    comments: [],
   },
   {
     id: "5",
@@ -83,76 +120,13 @@ const MOCK_BLOGS: Blog[] = [
     timePosted: "3 days ago",
     readingDuration: "3 mins reading",
     isBookmarked: false,
+    isLiked: true,
+    likesCount: 78,
+    commentsCount: 20,
+    sharesCount: 34,
+    bookmarkCount: 6,
     views: 600,
-  },
-    {
-    id: "6",
-    title: "Emergency Funds 101",
-    description: "Why your Wealth Flex account is your best friend.",
-    content:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut duis lorem facilisi enim, quis a neque. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut duis lorem facilisi enim, quis a neque.\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Ut duis lorem facilisi enim, quis a neque. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut duis lorem facilisi enim, quis a neque.\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Ut duis lorem facilisi enim, quis a neque. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut duis lorem facilisi enim, quis a neque.",
-    image: "https://picsum.photos/seed/1/800/600",
-    author: MOCK_AUTHORS.ayo,
-    category: "WealthFlex",
-    timePosted: "7 hours ago",
-    readingDuration: "4 mins reading",
-    isBookmarked: false,
-    views: 1200,
-  },
-  {
-    id: "7",
-    title: "Automation Secrets",
-    description: "How to build wealth while you sleep.",
-    content:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut duis lorem facilisi enim, quis a neque. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut duis lorem facilisi enim, quis a neque.",
-    image: "https://picsum.photos/seed/2/800/600",
-    author: MOCK_AUTHORS.ayo,
-    category: "WealthFam",
-    timePosted: "7 hours ago",
-    readingDuration: "4 mins reading",
-    isBookmarked: true,
-    views: 850,
-  },
-  {
-    id: "8",
-    title: "Investment Basics",
-    description: "Start growing your wealth today.",
-    content:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut duis lorem facilisi enim, quis a neque.",
-    image: "https://picsum.photos/seed/3/800/600",
-    author: MOCK_AUTHORS.sarah,
-    category: "WealthGoal",
-    timePosted: "1 day ago",
-    readingDuration: "6 mins reading",
-    isBookmarked: false,
-    views: 2300,
-  },
-  {
-    id: "9",
-    title: "Financial Planning",
-    description: "Getting it right from the start.",
-    content:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut duis lorem facilisi enim, quis a neque.",
-    image: "https://picsum.photos/seed/4/800/600",
-    author: MOCK_AUTHORS.ayo,
-    category: "WealthFix",
-    timePosted: "2 days ago",
-    readingDuration: "5 mins reading",
-    isBookmarked: false,
-    views: 450,
-  },
-  {
-    id: "10",
-    title: "Saving for the Future",
-    description: "Small steps today lead to big gains.",
-    content: "Content for savings blog...",
-    image: "https://picsum.photos/seed/5/800/600",
-    author: MOCK_AUTHORS.sarah,
-    category: "WealthAuto",
-    timePosted: "3 days ago",
-    readingDuration: "3 mins reading",
-    isBookmarked: false,
-    views: 600,
+    comments: [],
   },
 ];
 
@@ -189,7 +163,34 @@ export const blogService = {
     const blog = MOCK_BLOGS.find((b) => b.id === id);
     if (blog) {
       blog.isBookmarked = !blog.isBookmarked;
+      blog.bookmarkCount += blog.isBookmarked ? 1 : -1;
       return blog.isBookmarked;
+    }
+    return false;
+  },
+
+  toggleLike: async (id: string): Promise<boolean> => {
+    const blog = MOCK_BLOGS.find((b) => b.id === id);
+    if (blog) {
+      blog.isLiked = !blog.isLiked;
+      blog.likesCount += blog.isLiked ? 1 : -1;
+      return blog.isLiked;
+    }
+    return false;
+  },
+
+  addComment: async (id: string, text: string): Promise<boolean> => {
+    const blog = MOCK_BLOGS.find((b) => b.id === id);
+    if (blog) {
+      const newComment = {
+        id: Math.random().toString(36).substr(2, 9),
+        author: MOCK_AUTHORS.ayo, // Simulation: assume current user is Ayo
+        text,
+        timePosted: "Just now",
+      };
+      blog.comments = [newComment, ...blog.comments];
+      blog.commentsCount = blog.comments.length;
+      return true;
     }
     return false;
   },

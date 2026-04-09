@@ -106,12 +106,16 @@ export const PortfolioCard = ({
     <TouchableOpacity
       onPress={() => router.push(styles.route as any)}
       activeOpacity={0.85}
-      className="relative overflow-hidden p-4 rounded-[15px] border-[0.7px]"
+      className="relative overflow-hidden p-4 border-[0.7px]"
       style={{
         width: 179,
         height: 119,
         backgroundColor: styles.bg,
         borderColor: styles.border,
+        borderTopLeftRadius: 37,
+        borderTopRightRadius: 15,
+        borderBottomRightRadius: 37,
+        borderBottomLeftRadius: 15,
       }}
     >
       {/* Decorative Background Image */}
