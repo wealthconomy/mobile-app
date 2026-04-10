@@ -6,7 +6,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Eye, EyeOff } from "lucide-react-native";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
@@ -49,8 +49,17 @@ const RECOMMENDATIONS = [
   },
 ];
 
+import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
+
 export default function WealthFixScreen() {
   const [showBalance, setShowBalance] = useState(true);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [showTips, setShowTips] = useState(true);
   const [activeTab, setActiveTab] = useState("locked"); // 'locked' or 'unlocked'
   const [lockedGoals, setLockedGoals] = useState<WealthGoal[]>([]);
@@ -183,6 +192,16 @@ export default function WealthFixScreen() {
       loadGoals();
     }, []),
   );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
+        <StatusBar style="dark" />
+        <Header title="WealthFix" onBack={() => router.back()} />
+        <PortfolioDetailSkeleton />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>

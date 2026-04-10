@@ -375,12 +375,18 @@ export default function CreateGoalScreen() {
         </View>
       </View>
 
-      <ThemedButton
-        title="Continue"
-        onPress={handleContinue}
-        disabled={!goalName || !amount}
-        className="mb-10"
-      />
+      {(() => {
+        const isFormValid = goalName && category && source && amount && endDate;
+        return (
+          <ThemedButton
+            title="Continue"
+            onPress={handleContinue}
+            disabled={!isFormValid}
+            style={{ opacity: !isFormValid ? 0.5 : 1 }}
+            className="mb-10"
+          />
+        );
+      })()}
     </View>
   );
 

@@ -30,7 +30,7 @@ export default function TransactionDetailScreen() {
           <View className="flex-row justify-between items-start mb-4">
             <View>
               <Text className="text-[13px] font-bold text-[#10B981] mb-1">
-                Money Sent
+                Wealth Withdrawal
               </Text>
               <Text className="text-[32px] font-bold text-[#323232]">
                 -₦68,000<Text className="text-[#9CA3AF]">.00</Text>

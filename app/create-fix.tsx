@@ -125,9 +125,7 @@ export default function CreateFixScreen() {
             SafeLock is unique because the interest is paid upfront.{"\n\n"}
             <Text style={{ fontWeight: "700" }}>Calculation:</Text> The interest
             is calculated based on how long you lock the funds.{"\n"}•{" "}
-            <Text style={{ fontWeight: "700" }}>
-              Short term (10–90 days):
-            </Text>{" "}
+            <Text style={{ fontWeight: "700" }}>Short term (10–90 days):</Text>{" "}
             Lower rates (around 6%–9% p.a.).{"\n"}•{" "}
             <Text style={{ fontWeight: "700" }}>Long term (1–3 years):</Text>{" "}
             Higher rates (currently up to 20%–22% per annum).{"\n\n"}
@@ -148,7 +146,12 @@ export default function CreateFixScreen() {
       {/* Title field */}
       <View style={{ marginBottom: 18 }}>
         <Text
-          style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 13, marginBottom: 8 }}
+          style={{
+            color: "#1A1A1A",
+            fontWeight: "700",
+            fontSize: 13,
+            marginBottom: 8,
+          }}
         >
           Title
         </Text>
@@ -174,7 +177,12 @@ export default function CreateFixScreen() {
       {/* Target Amount */}
       <View style={{ marginBottom: 18 }}>
         <Text
-          style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 13, marginBottom: 8 }}
+          style={{
+            color: "#1A1A1A",
+            fontWeight: "700",
+            fontSize: 13,
+            marginBottom: 8,
+          }}
         >
           {lockType === "WealthFix" ? "Target Amount" : "Amount To Fix"}
         </Text>
@@ -210,7 +218,12 @@ export default function CreateFixScreen() {
                 n ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "",
               );
             }}
-            style={{ flex: 1, fontSize: 15, color: "#1A1A1A", fontWeight: "700" }}
+            style={{
+              flex: 1,
+              fontSize: 15,
+              color: "#1A1A1A",
+              fontWeight: "700",
+            }}
           />
         </View>
       </View>
@@ -218,7 +231,12 @@ export default function CreateFixScreen() {
       {/* End Date */}
       <View style={{ marginBottom: 18 }}>
         <Text
-          style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 13, marginBottom: 8 }}
+          style={{
+            color: "#1A1A1A",
+            fontWeight: "700",
+            fontSize: 13,
+            marginBottom: 8,
+          }}
         >
           End Date
         </Text>
@@ -240,7 +258,12 @@ export default function CreateFixScreen() {
       {/* Funding Source */}
       <View style={{ marginBottom: 18 }}>
         <Text
-          style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 13, marginBottom: 8 }}
+          style={{
+            color: "#1A1A1A",
+            fontWeight: "700",
+            fontSize: 13,
+            marginBottom: 8,
+          }}
         >
           Funding Source
         </Text>
@@ -257,18 +280,48 @@ export default function CreateFixScreen() {
             justifyContent: "space-between",
           }}
         >
-          <Text style={{ color: fundingSource ? "#1A1A1A" : "#9CA3AF", fontSize: 14 }}>
+          <Text
+            style={{
+              color: fundingSource ? "#1A1A1A" : "#9CA3AF",
+              fontSize: 14,
+            }}
+          >
             {fundingSource || "Select funding source"}
           </Text>
-          <Ionicons name={showSourceDropdown ? "chevron-up" : "chevron-down"} size={20} color="#6B7280" />
+          <Ionicons
+            name={showSourceDropdown ? "chevron-up" : "chevron-down"}
+            size={20}
+            color="#6B7280"
+          />
         </TouchableOpacity>
         {showSourceDropdown && (
-          <View style={{ backgroundColor: "white", borderRadius: 12, marginTop: 4, overflow: "hidden", borderWidth: 1, borderColor: "#E5E5E5", elevation: 4, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 6 }}>
+          <View
+            style={{
+              backgroundColor: "white",
+              borderRadius: 12,
+              marginTop: 4,
+              overflow: "hidden",
+              borderWidth: 1,
+              borderColor: "#E5E5E5",
+              elevation: 4,
+              shadowColor: "#000",
+              shadowOpacity: 0.08,
+              shadowRadius: 6,
+            }}
+          >
             {SOURCES.map((s) => (
               <TouchableOpacity
                 key={s}
-                onPress={() => { setFundingSource(s); setShowSourceDropdown(false); }}
-                style={{ paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#F5F5F5" }}
+                onPress={() => {
+                  setFundingSource(s);
+                  setShowSourceDropdown(false);
+                }}
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  borderBottomWidth: 1,
+                  borderBottomColor: "#F5F5F5",
+                }}
               >
                 <Text style={{ color: "#323232", fontSize: 15 }}>{s}</Text>
               </TouchableOpacity>
@@ -287,7 +340,14 @@ export default function CreateFixScreen() {
         }}
       >
         <View style={{ flex: 1, marginRight: 16 }}>
-          <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 13, marginBottom: 4 }}>
+          <Text
+            style={{
+              color: "#1A1A1A",
+              fontWeight: "700",
+              fontSize: 13,
+              marginBottom: 4,
+            }}
+          >
             Manual
           </Text>
           <Text style={{ color: "#6B7280", fontSize: 11, lineHeight: 16 }}>
@@ -327,7 +387,14 @@ export default function CreateFixScreen() {
         }}
       >
         <View style={{ flex: 1, marginRight: 16 }}>
-          <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 13, marginBottom: 4 }}>
+          <Text
+            style={{
+              color: "#1A1A1A",
+              fontWeight: "700",
+              fontSize: 13,
+              marginBottom: 4,
+            }}
+          >
             Consent
           </Text>
           <Text style={{ color: "#6B7280", fontSize: 11, lineHeight: 16 }}>
@@ -358,16 +425,24 @@ export default function CreateFixScreen() {
         </TouchableOpacity>
       </View>
 
-      <ThemedButton
-        title="Preview Fix"
-        onPress={() => setStep("preview")}
-        style={{
-          backgroundColor: TEAL,
-          borderRadius: 14,
-          height: 56,
-          marginBottom: 40,
-        }}
-      />
+      {(() => {
+        const isFormValid =
+          title && initialAmount && duration && fundingSource && isConsent;
+        return (
+          <ThemedButton
+            title="Preview Fix"
+            onPress={() => setStep("preview")}
+            disabled={!isFormValid}
+            style={{
+              backgroundColor: TEAL,
+              borderRadius: 14,
+              height: 56,
+              marginBottom: 40,
+              opacity: !isFormValid ? 0.45 : 1,
+            }}
+          />
+        );
+      })()}
     </ScrollView>
   );
 
@@ -375,7 +450,14 @@ export default function CreateFixScreen() {
   const renderPreviewStep = () => (
     <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-5">
       <View style={{ marginBottom: 20, marginTop: 4 }}>
-        <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 24, marginBottom: 4 }}>
+        <Text
+          style={{
+            color: "#1A1A1A",
+            fontWeight: "700",
+            fontSize: 24,
+            marginBottom: 4,
+          }}
+        >
           WealthFix Preview 🔒
         </Text>
         <Text style={{ color: "#6B7280", fontSize: 13 }}>
@@ -400,9 +482,22 @@ export default function CreateFixScreen() {
           marginBottom: 0,
         }}
       >
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 28 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 28,
+          }}
+        >
           <View>
-            <Text style={{ color: "#6B7280", fontSize: 11, marginBottom: 6, fontWeight: "500" }}>
+            <Text
+              style={{
+                color: "#6B7280",
+                fontSize: 11,
+                marginBottom: 6,
+                fontWeight: "500",
+              }}
+            >
               Amount To Fix
             </Text>
             <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
@@ -410,7 +505,14 @@ export default function CreateFixScreen() {
             </Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
-            <Text style={{ color: "#6B7280", fontSize: 11, marginBottom: 6, fontWeight: "500" }}>
+            <Text
+              style={{
+                color: "#6B7280",
+                fontSize: 11,
+                marginBottom: 6,
+                fontWeight: "500",
+              }}
+            >
               Lock Duration
             </Text>
             <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
@@ -419,9 +521,22 @@ export default function CreateFixScreen() {
           </View>
         </View>
 
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 28 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 28,
+          }}
+        >
           <View>
-            <Text style={{ color: "#6B7280", fontSize: 11, marginBottom: 6, fontWeight: "500" }}>
+            <Text
+              style={{
+                color: "#6B7280",
+                fontSize: 11,
+                marginBottom: 6,
+                fontWeight: "500",
+              }}
+            >
               Wealth Growth
             </Text>
             <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
@@ -429,7 +544,14 @@ export default function CreateFixScreen() {
             </Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
-            <Text style={{ color: "#6B7280", fontSize: 11, marginBottom: 6, fontWeight: "500" }}>
+            <Text
+              style={{
+                color: "#6B7280",
+                fontSize: 11,
+                marginBottom: 6,
+                fontWeight: "500",
+              }}
+            >
               Wealth from:
             </Text>
             <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
@@ -438,9 +560,22 @@ export default function CreateFixScreen() {
           </View>
         </View>
 
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 28 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 28,
+          }}
+        >
           <View>
-            <Text style={{ color: "#6B7280", fontSize: 11, marginBottom: 6, fontWeight: "500" }}>
+            <Text
+              style={{
+                color: "#6B7280",
+                fontSize: 11,
+                marginBottom: 6,
+                fontWeight: "500",
+              }}
+            >
               Method
             </Text>
             <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
@@ -448,7 +583,14 @@ export default function CreateFixScreen() {
             </Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
-            <Text style={{ color: "#6B7280", fontSize: 11, marginBottom: 6, fontWeight: "500" }}>
+            <Text
+              style={{
+                color: "#6B7280",
+                fontSize: 11,
+                marginBottom: 6,
+                fontWeight: "500",
+              }}
+            >
               End Date
             </Text>
             <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
@@ -458,7 +600,14 @@ export default function CreateFixScreen() {
         </View>
 
         <View style={{ marginBottom: 8 }}>
-          <Text style={{ color: "#6B7280", fontSize: 11, marginBottom: 6, fontWeight: "500" }}>
+          <Text
+            style={{
+              color: "#6B7280",
+              fontSize: 11,
+              marginBottom: 6,
+              fontWeight: "500",
+            }}
+          >
             Wealth grows Into
           </Text>
           <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
@@ -495,11 +644,17 @@ export default function CreateFixScreen() {
         </View>
       </View>
 
-      <View style={{ height: 1, backgroundColor: "#EEEEEE", marginBottom: 28 }} />
+      <View
+        style={{ height: 1, backgroundColor: "#EEEEEE", marginBottom: 28 }}
+      />
 
       {/* Agreement Checkboxes */}
       <TouchableOpacity
-        style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 20 }}
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          marginBottom: 20,
+        }}
         activeOpacity={0.8}
         onPress={() => setAgreedPenalty(!agreedPenalty)}
       >
@@ -519,14 +674,20 @@ export default function CreateFixScreen() {
         >
           {agreedPenalty && <Check size={13} color="white" />}
         </View>
-        <Text style={{ flex: 1, color: "#6B7280", fontSize: 12, lineHeight: 18 }}>
+        <Text
+          style={{ flex: 1, color: "#6B7280", fontSize: 12, lineHeight: 18 }}
+        >
           You must agree that early withdrawal from a Wealth Fix is discouraged
           and will attract a penalty to ensure financial discipline.
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 36 }}
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          marginBottom: 36,
+        }}
         activeOpacity={0.8}
         onPress={() => setAcknowledgedTemptation(!acknowledgedTemptation)}
       >
@@ -546,7 +707,9 @@ export default function CreateFixScreen() {
         >
           {acknowledgedTemptation && <Check size={13} color="white" />}
         </View>
-        <Text style={{ flex: 1, color: "#6B7280", fontSize: 12, lineHeight: 18 }}>
+        <Text
+          style={{ flex: 1, color: "#6B7280", fontSize: 12, lineHeight: 18 }}
+        >
           You must also acknowledge that the lock feature is designed to "block
           temptation," and breaking the lock undermines their wealth-building
           goal.
@@ -570,7 +733,9 @@ export default function CreateFixScreen() {
 
   // ─── PIN STEP ─────────────────────────────────────────────────────────────────
   const renderPinStep = () => (
-    <View style={{ alignItems: "center", paddingHorizontal: 24, marginTop: 40 }}>
+    <View
+      style={{ alignItems: "center", paddingHorizontal: 24, marginTop: 40 }}
+    >
       <Image
         source={require("../assets/images/change-pin.png")}
         style={{ width: 120, height: 120 }}
@@ -645,7 +810,14 @@ export default function CreateFixScreen() {
       />
 
       <View style={{ marginBottom: 40, paddingHorizontal: 16 }}>
-        <Text style={{ color: "#6B7280", textAlign: "center", fontSize: 12, lineHeight: 18 }}>
+        <Text
+          style={{
+            color: "#6B7280",
+            textAlign: "center",
+            fontSize: 12,
+            lineHeight: 18,
+          }}
+        >
           If you have forgotten your pin, change it from your settings page
         </Text>
       </View>
@@ -655,7 +827,9 @@ export default function CreateFixScreen() {
         onPress={() => setStep("success")}
       >
         <Ionicons name="finger-print" size={36} color={TEAL} />
-        <Text style={{ color: TEAL, fontWeight: "700", fontSize: 14, marginTop: 8 }}>
+        <Text
+          style={{ color: TEAL, fontWeight: "700", fontSize: 14, marginTop: 8 }}
+        >
           Use fingerprint
         </Text>
       </TouchableOpacity>
@@ -664,7 +838,9 @@ export default function CreateFixScreen() {
 
   // ─── SUCCESS STEP ─────────────────────────────────────────────────────────────
   const renderSuccessStep = () => (
-    <View style={{ alignItems: "center", paddingHorizontal: 24, marginTop: 40 }}>
+    <View
+      style={{ alignItems: "center", paddingHorizontal: 24, marginTop: 40 }}
+    >
       {/* success.png as large faded background, fix3.png centered on top */}
       <View
         style={{
@@ -677,7 +853,12 @@ export default function CreateFixScreen() {
       >
         <Image
           source={require("../assets/images/success.png")}
-          style={{ width: 280, height: 280, position: "absolute", opacity: 0.3 }}
+          style={{
+            width: 280,
+            height: 280,
+            position: "absolute",
+            opacity: 0.3,
+          }}
           resizeMode="contain"
         />
         <Image
@@ -687,64 +868,64 @@ export default function CreateFixScreen() {
         />
       </View>
 
-        <Text
-          style={{
-            fontSize: 26,
-            fontWeight: "800",
-            color: "#1A1A1A",
-            textAlign: "center",
-            marginBottom: 16,
-            lineHeight: 34,
-          }}
-        >
-          Wealth Fixed{"\n"}Successfully 🔒
-        </Text>
+      <Text
+        style={{
+          fontSize: 26,
+          fontWeight: "800",
+          color: "#1A1A1A",
+          textAlign: "center",
+          marginBottom: 16,
+          lineHeight: 34,
+        }}
+      >
+        Wealth Fixed{"\n"}Successfully 🔒
+      </Text>
 
-        <Text
-          style={{
-            color: "#6B7280",
-            fontSize: 13,
-            textAlign: "center",
-            lineHeight: 21,
-            marginBottom: 48,
-            paddingHorizontal: 8,
-          }}
-        >
-          <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-            Congratulations, WealthBuilder!
-          </Text>{" "}
-          You've successfully locked{" "}
-          <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-            ₦{formatAmount(initialAmount)}
-          </Text>{" "}
-          until{" "}
-          <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-            [24th Dec 2026]
-          </Text>
-          .{"\n\n"}You've successfully blocked temptation and set your money on
-          a path to grow by{" "}
-          <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-            (₦{formatAmount(calculateInterest())})
-          </Text>
-          . It's a win for your future self!
+      <Text
+        style={{
+          color: "#6B7280",
+          fontSize: 13,
+          textAlign: "center",
+          lineHeight: 21,
+          marginBottom: 48,
+          paddingHorizontal: 8,
+        }}
+      >
+        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
+          Congratulations, WealthBuilder!
+        </Text>{" "}
+        You've successfully locked{" "}
+        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
+          ₦{formatAmount(initialAmount)}
+        </Text>{" "}
+        until{" "}
+        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
+          [24th Dec 2026]
         </Text>
+        .{"\n\n"}You've successfully blocked temptation and set your money on a
+        path to grow by{" "}
+        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
+          (₦{formatAmount(calculateInterest())})
+        </Text>
+        . It's a win for your future self!
+      </Text>
 
-        <TouchableOpacity
-          onPress={() => router.replace("/(tabs)/portfolios/wealth-fix")}
-          style={{
-            backgroundColor: TEAL,
-            height: 56,
-            borderRadius: 14,
-            alignItems: "center",
-            justifyContent: "center",
-            width: "100%",
-            marginBottom: 40,
-          }}
-        >
-          <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
-            Close
-          </Text>
-        </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => router.replace("/(tabs)/portfolios/wealth-fix")}
+        style={{
+          backgroundColor: TEAL,
+          height: 56,
+          borderRadius: 14,
+          alignItems: "center",
+          justifyContent: "center",
+          width: "100%",
+          marginBottom: 40,
+        }}
+      >
+        <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
+          Close
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -768,12 +949,18 @@ export default function CreateFixScreen() {
         {step === "form" && renderFormStep()}
         {step === "preview" && renderPreviewStep()}
         {step === "pin" && (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
             {renderPinStep()}
           </ScrollView>
         )}
         {step === "success" && (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
             {renderSuccessStep()}
           </ScrollView>
         )}

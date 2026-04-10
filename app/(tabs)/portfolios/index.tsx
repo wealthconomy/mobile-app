@@ -1,11 +1,9 @@
-import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
 import { PortfolioCard } from "@/src/features/home/components/PortfolioCard";
 import { SubWealthCard } from "@/src/features/home/components/SubWealthCard";
-import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { FlatList, Text, TouchableOpacity, View } from "react-native";
+import { FlatList, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const PORTFOLIOS = [
@@ -44,28 +42,38 @@ const PORTFOLIOS = [
     id: "6",
     type: "group" as const,
     title: "WealthGroup",
-    description:
-      "Save together, grow together and win together.",
+    description: "Save together, grow together and win together.",
   },
 ];
+
+import Skeleton from "@/src/components/common/Skeleton";
+import { PortfolioCardSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 
 export default function WealthPortfolioScreen() {
   const [loading, setLoading] = useState(true);
   const [showPortfolioBalance, setShowPortfolioBalance] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 1000);
+    const timer = setTimeout(() => setLoading(false), 1500);
     return () => clearTimeout(timer);
   }, []);
 
-  const renderPortfolioItem = ({ item }: { item: (typeof PORTFOLIOS)[0] }) => (
+  const renderPortfolioItem = ({
+    item,
+  }: {
+    item: (typeof PORTFOLIOS)[0] | number;
+  }) => (
     <View style={{ width: "48.5%", marginBottom: 16 }}>
-      <PortfolioCard
-        type={item.type}
-        title={item.title}
-        description={item.description}
-        showEarnTag={false}
-      />
+      {typeof item === "number" ? (
+        <PortfolioCardSkeleton />
+      ) : (
+        <PortfolioCard
+          type={item.type}
+          title={item.title}
+          description={item.description}
+          showEarnTag={false}
+        />
+      )}
     </View>
   );
 
@@ -75,8 +83,10 @@ export default function WealthPortfolioScreen() {
       <Header title="Wealth Portfolio" />
 
       <FlatList
-        data={PORTFOLIOS}
-        keyExtractor={(item) => item.id}
+        data={(loading ? [1, 2, 3, 4, 5, 6] : PORTFOLIOS) as any[]}
+        keyExtractor={(item, index) =>
+          typeof item === "number" ? index.toString() : item.id
+        }
         numColumns={2}
         columnWrapperStyle={{ justifyContent: "space-between" }}
         contentContainerStyle={{
@@ -89,11 +99,19 @@ export default function WealthPortfolioScreen() {
           <>
             {/* Total Savings Card */}
             <View className="mb-6">
-              <SubWealthCard
-                amount="₦350,000.00"
-                description="Discipline Today, Wealth Tomorrow"
-             
-              />
+              {loading ? (
+                <Skeleton
+                  width="100%"
+                  height={170}
+                  borderRadius={18}
+                  style={{ backgroundColor: "#E1E1E1" }}
+                />
+              ) : (
+                <SubWealthCard
+                  amount="₦350,000.00"
+                  description="Discipline Today, Wealth Tomorrow"
+                />
+              )}
             </View>
 
             {/* Portfolio Wealth Section */}
@@ -106,7 +124,7 @@ export default function WealthPortfolioScreen() {
             </Text>
           </>
         }
-        renderItem={renderPortfolioItem}
+        renderItem={renderPortfolioItem as any}
       />
     </SafeAreaView>
   );

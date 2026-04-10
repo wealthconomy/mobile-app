@@ -1,10 +1,10 @@
 import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
+import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
@@ -100,8 +100,10 @@ export default function AutoDetailScreen() {
         style={{ flex: 1, backgroundColor: "white" }}
         edges={["top"]}
       >
+        <StatusBar style="dark" />
         <Stack.Screen options={{ headerShown: false }} />
-        <ActivityIndicator style={{ flex: 1 }} color={TEAL} />
+        <Header title="Review" onBack={() => router.back()} />
+        <PortfolioDetailSkeleton />
       </SafeAreaView>
     );
   }

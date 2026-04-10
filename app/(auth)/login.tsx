@@ -148,7 +148,6 @@ export default function LoginScreen() {
               }}
             >
               Please Log in to Continue your Wealth{"\n"}Building Journey
-
             </Text>
           </View>
 
@@ -256,22 +255,29 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           {/* Login Button */}
-          <TouchableOpacity
-            onPress={handleLogin}
-            disabled={isSubmitting}
-            style={{
-              backgroundColor: PRIMARY,
-              borderRadius: 12,
-              paddingVertical: 16,
-              alignItems: "center",
-              marginBottom: 20,
-              opacity: isSubmitting ? 0.7 : 1,
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>
-              {isSubmitting ? "Logging in..." : "Log in"}
-            </Text>
-          </TouchableOpacity>
+          {(() => {
+            const isFormValid = email.length > 0 && password.length > 0;
+            return (
+              <TouchableOpacity
+                onPress={handleLogin}
+                disabled={isSubmitting || !isFormValid}
+                style={{
+                  backgroundColor: PRIMARY,
+                  borderRadius: 12,
+                  paddingVertical: 16,
+                  alignItems: "center",
+                  marginBottom: 20,
+                  opacity: isSubmitting || !isFormValid ? 0.5 : 1,
+                }}
+              >
+                <Text
+                  style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}
+                >
+                  {isSubmitting ? "Logging in..." : "Log in"}
+                </Text>
+              </TouchableOpacity>
+            );
+          })()}
 
           {/* Divider */}
           <View

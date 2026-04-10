@@ -1,10 +1,10 @@
 import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
+import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
@@ -14,7 +14,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// Re-defining interface for local use
 export interface WealthFix {
   id: string;
   title: string;
@@ -113,8 +112,10 @@ export default function FixDetailScreen() {
         style={{ flex: 1, backgroundColor: "white" }}
         edges={["top"]}
       >
+        <StatusBar style="dark" />
         <Stack.Screen options={{ headerShown: false }} />
-        <ActivityIndicator style={{ flex: 1 }} color={THEME_COLOR} />
+        <Header title="Review" onBack={() => router.back()} />
+        <PortfolioDetailSkeleton />
       </SafeAreaView>
     );
   }

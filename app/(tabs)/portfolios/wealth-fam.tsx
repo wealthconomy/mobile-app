@@ -1,12 +1,13 @@
 import { WealthGoal } from "@/src/api/goalService";
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
+import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Eye, EyeOff } from "lucide-react-native";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -56,6 +57,13 @@ const SUGGESTIONS = [
 
 export default function WealthFamScreen() {
   const [showBalance, setShowBalance] = useState(true);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [showTips, setShowTips] = useState(true);
   const [activeTab, setActiveTab] = useState<"ongoing" | "completed">(
     "ongoing",
@@ -187,6 +195,16 @@ export default function WealthFamScreen() {
       setCompletedPlans(mockCompleted);
     }, []),
   );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
+        <StatusBar style="dark" />
+        <Header title="WealthFam" onBack={() => router.back()} />
+        <PortfolioDetailSkeleton />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>

@@ -1,10 +1,11 @@
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
+import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Eye, EyeOff, Search } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Image,
   ScrollView,
@@ -143,6 +144,13 @@ const DUMMY_RECOMMENDED: DiscoveryGroup[] = [
 ];
 
 export default function WealthGroupScreen() {
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [showBalance, setShowBalance] = useState(true);
   const [showTips, setShowTips] = useState(true);
   const [activeTab, setActiveTab] = useState<"ongoing" | "completed">(
@@ -151,6 +159,16 @@ export default function WealthGroupScreen() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [ongoingGroups] = useState<any[]>([]); // Empty state by default
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
+        <StatusBar style="dark" />
+        <Header title="Wealth Group" onBack={() => router.back()} />
+        <PortfolioDetailSkeleton />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>

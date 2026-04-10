@@ -496,22 +496,37 @@ export default function SignupScreen() {
           ) : null}
 
           {/* Register Button */}
-          <TouchableOpacity
-            onPress={handleSignup}
-            disabled={isSubmitting}
-            style={{
-              backgroundColor: PRIMARY,
-              borderRadius: 12,
-              paddingVertical: 16,
-              alignItems: "center",
-              marginBottom: 16,
-              opacity: isSubmitting ? 0.7 : 1,
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>
-              {isSubmitting ? "Creating Account..." : "Register"}
-            </Text>
-          </TouchableOpacity>
+          {(() => {
+            const isFormValid =
+              firstName &&
+              lastName &&
+              phone &&
+              email &&
+              wealthPreference &&
+              password &&
+              confirmPassword &&
+              agreeToTerms;
+            return (
+              <TouchableOpacity
+                onPress={handleSignup}
+                disabled={isSubmitting || !isFormValid}
+                style={{
+                  backgroundColor: PRIMARY,
+                  borderRadius: 12,
+                  paddingVertical: 16,
+                  alignItems: "center",
+                  marginBottom: 16,
+                  opacity: isSubmitting || !isFormValid ? 0.5 : 1,
+                }}
+              >
+                <Text
+                  style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}
+                >
+                  {isSubmitting ? "Creating Account..." : "Register"}
+                </Text>
+              </TouchableOpacity>
+            );
+          })()}
 
           {/* Already have account */}
           <View

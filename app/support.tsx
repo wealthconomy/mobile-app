@@ -1,7 +1,8 @@
+import { blogService } from "@/src/api/blogService";
 import Header from "@/src/components/common/Header";
 import Skeleton from "@/src/components/common/Skeleton";
-import { blogService } from "@/src/api/blogService";
 import { WiseUpCard } from "@/src/features/home/components/WiseUpSection";
+import { WiseUpSkeleton } from "@/src/features/home/components/WiseUpSkeleton";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -273,17 +274,7 @@ export default function SupportCenterScreen() {
             className="-mx-3 px-3"
           >
             {isLoadingBlogs ? (
-              <View className="flex-row">
-                {[1, 2, 3].map((i) => (
-                  <View key={i} className="mr-4">
-                    <Skeleton width={169} height={107} borderRadius={10} />
-                    <View className="mt-2 space-y-2">
-                      <Skeleton width={140} height={15} />
-                      <Skeleton width={100} height={10} />
-                    </View>
-                  </View>
-                ))}
-              </View>
+              <WiseUpSkeleton />
             ) : (
               blogs?.map((blog: any) => (
                 <WiseUpCard

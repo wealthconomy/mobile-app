@@ -1,12 +1,12 @@
 import Header from "@/src/components/common/Header";
 import { Trophy } from "@/src/components/icons/Trophy";
 import { ThemedButton } from "@/src/components/ThemedButton";
+import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
@@ -188,8 +188,10 @@ export default function GoalDetailScreen() {
         style={{ flex: 1, backgroundColor: "white" }}
         edges={["top"]}
       >
+        <StatusBar style="dark" />
         <Stack.Screen options={{ headerShown: false }} />
-        <ActivityIndicator style={{ flex: 1 }} color={PINK} />
+        <Header title="Review" onBack={() => router.back()} />
+        <PortfolioDetailSkeleton />
       </SafeAreaView>
     );
   }

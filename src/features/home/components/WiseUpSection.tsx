@@ -1,14 +1,8 @@
 import { blogService } from "@/src/api/blogService";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
-import {
-  ActivityIndicator,
-  Image,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { WiseUpSkeleton } from "./WiseUpSkeleton";
 
 interface WiseUpCardProps {
   id: string;
@@ -71,7 +65,7 @@ export const WiseUpSection = () => {
         className="-mx-5 px-5"
       >
         {isLoading ? (
-          <ActivityIndicator color="#155D5F" size="small" className="py-10" />
+          <WiseUpSkeleton />
         ) : (
           blogs?.map((blog) => (
             <WiseUpCard

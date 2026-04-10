@@ -152,8 +152,15 @@ export default function CreateGroupScreen() {
               (step === 2 && !isStep2Valid) ||
               (step === 3 && !isStep3Valid) ||
               (step === 5 && !isStep5Valid)
-                ? "#E2E8F0"
+                ? "#E0E0E0"
                 : THEME,
+            opacity:
+              (step === 1 && !isStep1Valid) ||
+              (step === 2 && !isStep2Valid) ||
+              (step === 3 && !isStep3Valid) ||
+              (step === 5 && !isStep5Valid)
+                ? 0.45
+                : 1,
           }}
           disabled={
             (step === 1 && !isStep1Valid) ||

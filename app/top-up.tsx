@@ -28,127 +28,162 @@ export default function TopUpScreen() {
   const [step, setStep] = useState<"form" | "pin" | "success">("form");
   const [fundingSource, setFundingSource] = useState("WealthFlex");
   const [showSourceDropdown, setShowSourceDropdown] = useState(false);
+  const [amount, setAmount] = useState("");
   const [pin, setPin] = useState("");
   const pinInputRef = useRef<TextInput>(null);
 
   // ─── FORM ─────────────────────────────────────────────────────────────────
-  const renderForm = () => (
-    <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-5">
-      <View style={{ alignItems: "center", marginTop: 40, marginBottom: 32 }}>
-        <Image
-          source={require("../assets/images/topup.png")}
-          style={{ width: 100, height: 100 }}
-          resizeMode="contain"
-        />
-        <Text
-          style={{
-            fontSize: 24,
-            fontWeight: "800",
-            color: TEXT_DARK,
-            textAlign: "center",
-            marginTop: 20,
-          }}
-        >
-          Top Up your{"\n"}
-          {name}
-        </Text>
-        <Text
-          style={{
-            color: "#6B7280",
-            fontSize: 13,
-            textAlign: "center",
-            marginTop: 12,
-            lineHeight: 20,
-            paddingHorizontal: 20,
-          }}
-        >
-          You can top up your {name} amount to increase the funds already saved.
-          Select a funding source to top up the saved funds.
-        </Text>
-      </View>
+  const renderForm = () => {
+    const isFormValid = amount.length > 0;
 
-      <View style={{ marginBottom: 40 }}>
-        <Text
-          style={{
-            color: TEXT_DARK,
-            fontWeight: "700",
-            fontSize: 13,
-            marginBottom: 12,
-          }}
-        >
-          Top Up from
-        </Text>
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setShowSourceDropdown(!showSourceDropdown)}
-          style={{
-            backgroundColor: "#F3F4F6",
-            height: 56,
-            borderRadius: 12,
-            paddingHorizontal: 16,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <Text style={{ color: TEXT_DARK, fontSize: 14 }}>
-            {fundingSource}
-          </Text>
-          <Ionicons
-            name={showSourceDropdown ? "chevron-up" : "chevron-down"}
-            size={20}
-            color="#6B7280"
+    return (
+      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-5">
+        <View style={{ alignItems: "center", marginTop: 40, marginBottom: 32 }}>
+          <Image
+            source={require("../assets/images/topup.png")}
+            style={{ width: 100, height: 100 }}
+            resizeMode="contain"
           />
-        </TouchableOpacity>
-        {showSourceDropdown && (
-          <View
+          <Text
             style={{
-              backgroundColor: "white",
-              borderRadius: 12,
-              marginTop: 4,
-              overflow: "hidden",
-              borderWidth: 1,
-              borderColor: "#E5E5E5",
-              elevation: 4,
-              shadowColor: "#000",
-              shadowOpacity: 0.08,
-              shadowRadius: 6,
-              zIndex: 50,
+              fontSize: 24,
+              fontWeight: "800",
+              color: TEXT_DARK,
+              textAlign: "center",
+              marginTop: 20,
             }}
           >
-            {SOURCES.map((s) => (
-              <TouchableOpacity
-                key={s}
-                onPress={() => {
-                  setFundingSource(s);
-                  setShowSourceDropdown(false);
-                }}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 14,
-                  borderBottomWidth: 1,
-                  borderBottomColor: "#F5F5F5",
-                }}
-              >
-                <Text style={{ color: "#323232", fontSize: 15 }}>{s}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-      </View>
+            Top Up your{"\n"}
+            {name}
+          </Text>
+          <Text
+            style={{
+              color: "#6B7280",
+              fontSize: 13,
+              textAlign: "center",
+              marginTop: 12,
+              lineHeight: 20,
+              paddingHorizontal: 20,
+            }}
+          >
+            You can top up your {name} amount to increase the funds already
+            saved. Select a funding source to top up the saved funds.
+          </Text>
+        </View>
 
-      <ThemedButton
-        title="Add Funds"
-        onPress={() => setStep("pin")}
-        style={{
-          backgroundColor: TEAL,
-          borderRadius: 14,
-          height: 56,
-          marginBottom: 40,
-        }}
-      />
-    </ScrollView>
-  );
+        <View style={{ marginBottom: 24 }}>
+          <Text
+            style={{
+              color: TEXT_DARK,
+              fontWeight: "700",
+              fontSize: 13,
+              marginBottom: 12,
+            }}
+          >
+            Amount(₦)
+          </Text>
+          <TextInput
+            placeholder="₦0.00"
+            placeholderTextColor="#9CA3AF"
+            style={{
+              backgroundColor: "#F3F4F6",
+              height: 56,
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              fontSize: 14,
+              color: TEXT_DARK,
+            }}
+            keyboardType="numeric"
+            value={amount}
+            onChangeText={setAmount}
+          />
+        </View>
+
+        <View style={{ marginBottom: 40 }}>
+          <Text
+            style={{
+              color: TEXT_DARK,
+              fontWeight: "700",
+              fontSize: 13,
+              marginBottom: 12,
+            }}
+          >
+            Top Up from
+          </Text>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setShowSourceDropdown(!showSourceDropdown)}
+            style={{
+              backgroundColor: "#F3F4F6",
+              height: 56,
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Text style={{ color: TEXT_DARK, fontSize: 14 }}>
+              {fundingSource}
+            </Text>
+            <Ionicons
+              name={showSourceDropdown ? "chevron-up" : "chevron-down"}
+              size={20}
+              color="#6B7280"
+            />
+          </TouchableOpacity>
+          {showSourceDropdown && (
+            <View
+              style={{
+                backgroundColor: "white",
+                borderRadius: 12,
+                marginTop: 4,
+                overflow: "hidden",
+                borderWidth: 1,
+                borderColor: "#E5E5E5",
+                elevation: 4,
+                shadowColor: "#000",
+                shadowOpacity: 0.08,
+                shadowRadius: 6,
+                zIndex: 50,
+              }}
+            >
+              {SOURCES.map((s) => (
+                <TouchableOpacity
+                  key={s}
+                  onPress={() => {
+                    setFundingSource(s);
+                    setShowSourceDropdown(false);
+                  }}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    borderBottomWidth: 1,
+                    borderBottomColor: "#F5F5F5",
+                  }}
+                >
+                  <Text style={{ color: "#323232", fontSize: 15 }}>{s}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+
+        <ThemedButton
+          title="Add Funds"
+          onPress={() => setStep("pin")}
+          disabled={!isFormValid}
+          style={{
+            backgroundColor: isFormValid ? TEAL : "#E0E0E0",
+            opacity: isFormValid ? 1 : 0.45,
+            borderRadius: 14,
+            height: 56,
+            marginBottom: 40,
+          }}
+        />
+      </ScrollView>
+    );
+  };
 
   // ─── PIN ──────────────────────────────────────────────────────────────────
   const renderPin = () => (

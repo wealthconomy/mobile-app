@@ -64,12 +64,12 @@ export const SubWealthCard = ({
       <View
         className="absolute"
         style={{
-          width: 208,
-          height: 261,
-          top: 99,
-          left: 80,
+          width: 210,
+          height: 200,
+          top: 120,
+          left: 10,
           backgroundColor: "#E2E2E233",
-          borderRadius: 50,
+          borderRadius: 100,
           zIndex: 5,
         }}
       />
@@ -111,27 +111,19 @@ export const SubWealthCard = ({
         </View>
 
         {/* Bottom Section */}
-        {/* Info Box */}
-        <View
+        {/* Description Text */}
+        <Text
+          className="text-white text-[10px] font-medium opacity-100"
           style={{
             position: "absolute",
-            width: 147,
-            height: 38,
-            top: 122,
+            width: 170,
+            top: 138,
             left: 10,
-            borderRadius: 10,
-            padding: 8,
-            backgroundColor: "#4A8788",
-            justifyContent: "center",
+            lineHeight: 14,
           }}
         >
-          <Text
-            className="text-white text-[8px] font-normal leading-[10.4px]"
-            numberOfLines={2}
-          >
-            {description}
-          </Text>
-        </View>
+          {description}
+        </Text>
 
         {/* Transfer Button */}
         {showButton && (
@@ -151,16 +143,6 @@ export const SubWealthCard = ({
             <Text className="text-[#1A1A1A] font-bold text-[12px]">
               Transfer to Portfolio
             </Text>
-            {/* Red dot status */}
-            <View
-              className="absolute bg-[#FF4B4B] rounded-full border border-white"
-              style={{
-                width: 12,
-                height: 12,
-                top: -4,
-                right: -4,
-              }}
-            />
           </TouchableOpacity>
         )}
       </View>

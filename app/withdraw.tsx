@@ -254,17 +254,30 @@ export default function WithdrawScreen() {
         </View>
       </View>
 
-      <ThemedButton
-        title="Proceed"
-        onPress={async () => {
-          setLoading(true);
-          await new Promise((res) => setTimeout(res, 800));
-          setLoading(false);
-          setStep("preview");
-        }}
-        loading={loading}
-        className="mt-10"
-      />
+      {(() => {
+        const isFormValid =
+          amount &&
+          accountNumber.length === 10 &&
+          selectedBank !== "Select bank";
+        return (
+          <ThemedButton
+            title="Proceed"
+            onPress={async () => {
+              setLoading(true);
+              await new Promise((res) => setTimeout(res, 800));
+              setLoading(false);
+              setStep("preview");
+            }}
+            loading={loading}
+            disabled={!isFormValid || loading}
+            style={{
+              backgroundColor: !isFormValid || loading ? "#E0E0E0" : "#155D5F",
+              opacity: !isFormValid || loading ? 0.45 : 1,
+            }}
+            className="mt-10"
+          />
+        );
+      })()}
     </View>
   );
 

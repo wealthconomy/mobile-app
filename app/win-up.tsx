@@ -20,7 +20,7 @@ export default function WinUpScreen() {
       >
         {/* Total Savings Card */}
         <View className="mb-10">
-          <SubWealthCard description="Build a discipline of savings tailored to your goals and income." />
+          <SubWealthCard description="WinUp!. Save Smarter, Build Faster." />
         </View>
 
         {/* Action Buttons */}
@@ -39,7 +39,7 @@ export default function WinUpScreen() {
               <Ionicons name="add" size={24} color="white" />
             </View>
             <Text className="text-[#fefefe] font-bold text-sm">
-              Deposit funds
+              Wealth Deposit
             </Text>
           </TouchableOpacity>
 
@@ -61,7 +61,7 @@ export default function WinUpScreen() {
               />
             </View>
             <Text className="text-[#feffff] font-bold text-sm">
-              Withdraw funds
+              Wealth Withdraw
             </Text>
           </TouchableOpacity>
         </View>

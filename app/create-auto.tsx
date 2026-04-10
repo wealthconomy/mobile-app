@@ -455,16 +455,24 @@ export default function CreateAutoScreen() {
         )}
       </View>
 
-      <ThemedButton
-        title="Continue"
-        onPress={() => setStep("preview")}
-        style={{
-          backgroundColor: TEAL,
-          borderRadius: 14,
-          height: 56,
-          marginBottom: 40,
-        }}
-      />
+      {(() => {
+        const isFormValid =
+          wealthTitle && targetAmount && endDate && frequency && fundingSource;
+        return (
+          <ThemedButton
+            title="Continue"
+            onPress={() => setStep("preview")}
+            disabled={!isFormValid}
+            style={{
+              backgroundColor: TEAL,
+              borderRadius: 14,
+              height: 56,
+              marginBottom: 40,
+              opacity: !isFormValid ? 0.45 : 1,
+            }}
+          />
+        );
+      })()}
     </ScrollView>
   );
 

@@ -1,11 +1,10 @@
-import { LinearGradient } from "expo-linear-gradient";
-import { useState } from "react";
-import { LayoutChangeEvent, StyleSheet, View, ViewStyle } from "react-native";
+import { useEffect } from "react";
+import { ViewStyle } from "react-native";
 import Animated, {
-  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
+  withSequence,
   withTiming,
 } from "react-native-reanimated";
 
@@ -15,6 +14,7 @@ interface SkeletonProps {
   borderRadius?: number;
   style?: ViewStyle;
   circle?: boolean;
+  color?: string;
 }
 
 const Skeleton = ({
@@ -23,27 +23,24 @@ const Skeleton = ({
   borderRadius = 4,
   style,
   circle,
+  color = "#F3F4F6",
 }: SkeletonProps) => {
-  const [layoutWidth, setLayoutWidth] = useState(0);
-  const translateX = useSharedValue(-1);
+  const opacity = useSharedValue(0.5);
 
-  const onLayout = (event: LayoutChangeEvent) => {
-    const { width: w } = event.nativeEvent.layout;
-    setLayoutWidth(w);
-    translateX.value = withRepeat(withTiming(1, { duration: 1200 }), -1, false);
-  };
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 800 }),
+        withTiming(0.4, { duration: 800 }),
+      ),
+      -1,
+      true,
+    );
+  }, []);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
-      transform: [
-        {
-          translateX: interpolate(
-            translateX.value,
-            [-1, 1],
-            [-layoutWidth, layoutWidth],
-          ),
-        },
-      ],
+      opacity: opacity.value,
     };
   });
 
@@ -55,22 +52,11 @@ const Skeleton = ({
         ? height / 2
         : 999
       : borderRadius,
-    backgroundColor: "#F3F4F6", // Gray 100 - cleaner base
+    backgroundColor: color,
     overflow: "hidden",
   };
 
-  return (
-    <View style={[shapeStyle, style]} onLayout={onLayout}>
-      <Animated.View style={[StyleSheet.absoluteFill, animatedStyle]}>
-        <LinearGradient
-          colors={["transparent", "rgba(255, 255, 255, 0.6)", "transparent"]}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
-    </View>
-  );
+  return <Animated.View style={[shapeStyle, animatedStyle, style]} />;
 };
 
 export default Skeleton;

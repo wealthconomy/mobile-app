@@ -26,6 +26,11 @@ export default function DepositScreen() {
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState("");
   const [wealthPlan] = useState(plan || "WealthFlex");
+  const [cardNumber, setCardNumber] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [nameOnCard, setNameOnCard] = useState("");
+  const [pin, setPin] = useState("");
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
@@ -174,6 +179,8 @@ export default function DepositScreen() {
             placeholderTextColor="#9CA3AF"
             className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
             keyboardType="numeric"
+            value={cardNumber}
+            onChangeText={setCardNumber}
           />
         </View>
 
@@ -186,6 +193,8 @@ export default function DepositScreen() {
               placeholder="MM / YY"
               placeholderTextColor="#9CA3AF"
               className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
+              value={expiryDate}
+              onChangeText={setExpiryDate}
             />
           </View>
           <View className="flex-1">
@@ -196,6 +205,8 @@ export default function DepositScreen() {
               className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
               keyboardType="numeric"
               secureTextEntry
+              value={cvv}
+              onChangeText={setCvv}
             />
           </View>
         </View>
@@ -208,6 +219,8 @@ export default function DepositScreen() {
             placeholder="John Doe"
             placeholderTextColor="#9CA3AF"
             className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
+            value={nameOnCard}
+            onChangeText={setNameOnCard}
           />
         </View>
 
@@ -219,28 +232,38 @@ export default function DepositScreen() {
             className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
             keyboardType="numeric"
             secureTextEntry
+            value={pin}
+            onChangeText={setPin}
           />
         </View>
       </View>
 
-      <ThemedButton
-        title="Confirm"
-        onPress={async () => {
-          setLoading(true);
-          await paymentService.depositViaCard({
-            amount,
-            cardNumber: "",
-            expiryDate: "",
-            cvv: "",
-            nameOnCard: "",
-            pin: "",
-          });
-          setLoading(false);
-          setStep("preview");
-        }}
-        loading={loading}
-        className="mt-10"
-      />
+      {(() => {
+        const isFormValid =
+          amount && cardNumber && expiryDate && cvv && nameOnCard && pin;
+        return (
+          <ThemedButton
+            title="Confirm"
+            onPress={async () => {
+              setLoading(true);
+              await paymentService.depositViaCard({
+                amount,
+                cardNumber,
+                expiryDate,
+                cvv,
+                nameOnCard,
+                pin,
+              });
+              setLoading(false);
+              setStep("preview");
+            }}
+            loading={loading}
+            disabled={!isFormValid || loading}
+            style={{ opacity: !isFormValid || loading ? 0.5 : 1 }}
+            className="mt-10"
+          />
+        );
+      })()}
     </View>
   );
 

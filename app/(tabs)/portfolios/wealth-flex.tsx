@@ -4,7 +4,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Eye, EyeOff } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -54,10 +54,28 @@ const TransferMoneyIcon = () => (
   </Svg>
 );
 
+import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
+
 export default function WealthFlexScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [showTips, setShowTips] = useState(true);
+  const [loading, setLoading] = useState(true);
   const amount = "₦300,735.42";
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
+        <StatusBar style="dark" />
+        <Header title="WealthFlex" onBack={() => router.back()} />
+        <PortfolioDetailSkeleton />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
