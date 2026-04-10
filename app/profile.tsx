@@ -1,17 +1,17 @@
 import Header from "@/src/components/common/Header";
 import KycIcon from "@/src/components/common/KycIcon";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
+  Alert,
   Image,
-  Modal,
   ScrollView,
   StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -26,7 +26,9 @@ interface ProfileFormData {
 
 export default function ProfileScreen() {
   const [isEditing, setIsEditing] = useState(false);
-  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [profileImage, setProfileImage] = useState(
+    "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=200&auto=format&fit=crop",
+  );
 
   const { control, handleSubmit, reset } = useForm<ProfileFormData>({
     defaultValues: {
@@ -37,6 +39,62 @@ export default function ProfileScreen() {
       email: "simon@gmail.com",
     },
   });
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission Denied",
+        "We need access to your gallery to change your profile photo.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setProfileImage(result.assets[0].uri);
+    }
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission Denied",
+        "We need access to your camera to take a photo.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setProfileImage(result.assets[0].uri);
+    }
+  };
+
+  const handlePhotoUpdate = () => {
+    Alert.alert(
+      "Update Profile Photo",
+      "Choose a source for your photo",
+      [
+        { text: "Take a Photo", onPress: takePhoto },
+        { text: "Choose from Gallery", onPress: pickImage },
+        { text: "Cancel", style: "cancel" },
+      ],
+      { cancelable: true },
+    );
+  };
 
   const onSubmit = (data: ProfileFormData) => {
     console.log("Saving data:", data);
@@ -62,17 +120,12 @@ export default function ProfileScreen() {
         {/* Profile Pic Section */}
         <View className="items-center mb-8">
           <TouchableOpacity
-            onPress={() => setShowPhotoModal(true)}
+            onPress={handlePhotoUpdate}
             activeOpacity={0.8}
             className="relative"
           >
-            <View className="w-24 h-24 rounded-full border-4 border-white shadow-sm overflow-hidden">
-              <Image
-                source={{
-                  uri: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=200&auto=format&fit=crop",
-                }}
-                className="w-full h-full"
-              />
+            <View className="w-24 h-24 rounded-full border-4 border-white shadow-sm overflow-hidden bg-gray-100">
+              <Image source={{ uri: profileImage }} className="w-full h-full" />
             </View>
             <View className="absolute bottom-0 right-0 bg-[#155D5F] w-8 h-8 rounded-full items-center justify-center border-2 border-white">
               <Ionicons name="camera-outline" size={16} color="white" />
@@ -152,71 +205,6 @@ export default function ProfileScreen() {
           </View>
         )}
       </ScrollView>
-
-      {/* Profile Photo Picker Modal */}
-      <Modal
-        visible={showPhotoModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowPhotoModal(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setShowPhotoModal(false)}>
-          <View className="flex-1 bg-black/50 justify-end">
-            <TouchableWithoutFeedback>
-              <View className="bg-white rounded-t-[36px] px-6 pb-12 pt-3">
-                <View className="w-20 h-1.5 bg-[#bababa] rounded-full self-center mb-8" />
-
-                <Text className="text-[22px] font-extrabold text-[#323232] mb-8 text-center">
-                  Update Profile Photo
-                </Text>
-
-                <View className="gap-y-4">
-                  <TouchableOpacity
-                    className="flex-row items-center bg-[#F8F9FA] h-16 px-5 rounded-2xl border border-[#F0F0F0]"
-                    onPress={() => setShowPhotoModal(false)}
-                  >
-                    <View className="w-10 h-10 bg-[#E7F5F5] rounded-full items-center justify-center mr-4">
-                      <Ionicons
-                        name="camera-outline"
-                        size={20}
-                        color="#155D5F"
-                      />
-                    </View>
-                    <Text className="text-[16px] font-bold text-[#323232]">
-                      Take a Photo
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    className="flex-row items-center bg-[#F8F9FA] h-16 px-5 rounded-2xl border border-[#F0F0F0]"
-                    onPress={() => setShowPhotoModal(false)}
-                  >
-                    <View className="w-10 h-10 bg-[#E7F5F5] rounded-full items-center justify-center mr-4">
-                      <Ionicons
-                        name="images-outline"
-                        size={20}
-                        color="#155D5F"
-                      />
-                    </View>
-                    <Text className="text-[16px] font-bold text-[#323232]">
-                      Choose from Gallery
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    className="mt-4 h-16 rounded-2xl items-center justify-center border border-[#E5E7EB]"
-                    onPress={() => setShowPhotoModal(false)}
-                  >
-                    <Text className="text-[16px] font-bold text-[#323232]">
-                      Cancel
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
     </SafeAreaView>
   );
 }
