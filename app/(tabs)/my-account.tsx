@@ -246,7 +246,7 @@ export default function MyAccountScreen() {
             iconBgColor="#E0F2F1"
             iconColor="#155D5F"
             label="Wallet & Payment Settings"
-            onPress={() => {}}
+            onPress={() => router.push("/payment-settings" as any)}
           />
         </MenuGroup>
 
