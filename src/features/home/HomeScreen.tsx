@@ -49,9 +49,7 @@ export default function HomeScreen() {
                 <Text className="text-[#1A1A1A] font-bold text-lg">
                   Wealth Portfolios
                 </Text>
-                <TouchableOpacity
-                  onPress={() => router.push("/portfolios/" as any)}
-                >
+                <TouchableOpacity onPress={() => router.push("/portfolios")}>
                   <Text className="text-[#155D5F] text-sm font-medium">
                     View all
                   </Text>
@@ -102,7 +100,9 @@ export default function HomeScreen() {
                 <Text className="text-[#1A1A1A] font-bold text-lg tracking-tight">
                   Recent Activities
                 </Text>
-                <TouchableOpacity onPress={() => router.push("/activities")}>
+                <TouchableOpacity
+                  onPress={() => router.push("/transactions/activities")}
+                >
                   <Text className="text-[#155D5F] text-[13px] font-bold">
                     View all
                   </Text>

@@ -313,7 +313,7 @@ export default function WealthAutoScreen() {
                 elevation: 3,
                 zIndex: 20,
               }}
-              onPress={() => router.push("/create-auto")}
+              onPress={() => router.push("/portfolio/create/auto")}
             >
               <Text style={{ color: THEME }} className="font-bold text-[14px]">
                 Create a WealthAuto
@@ -377,7 +377,7 @@ export default function WealthAutoScreen() {
                   }}
                   onPress={() =>
                     router.push({
-                      pathname: "/create-auto",
+                      pathname: "/portfolio/create/auto",
                       params: {
                         category: cat.title,
                         amount: cat.amount,
@@ -569,7 +569,10 @@ function AutoListItem({
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={() =>
-        router.push({ pathname: "/auto-detail/[id]", params: { id: plan.id } })
+        router.push({
+          pathname: "/portfolio/detail/auto/[id]",
+          params: { id: plan.id },
+        })
       }
       className="mb-6 flex-row items-center border-b border-[#F3F4F6] pb-4"
     >

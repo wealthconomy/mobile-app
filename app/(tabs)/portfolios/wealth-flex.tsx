@@ -233,7 +233,7 @@ export default function WealthFlexScreen() {
             activeOpacity={0.8}
             onPress={() =>
               router.push({
-                pathname: "/deposit",
+                pathname: "/wallet/deposit",
                 params: { plan: "WealthFlex" },
               })
             }
@@ -269,7 +269,7 @@ export default function WealthFlexScreen() {
             activeOpacity={0.8}
             onPress={() =>
               router.push({
-                pathname: "/withdraw",
+                pathname: "/wallet/withdraw",
                 params: { plan: "WealthFlex" },
               })
             }
@@ -304,7 +304,7 @@ export default function WealthFlexScreen() {
               Flex Transactions
             </Text>
             <TouchableOpacity
-              onPress={() => router.push("/wealth-flex-transactions")}
+              onPress={() => router.push("/transactions/wealth-flex")}
             >
               <Text className="text-[#1A1A1A] text-[13px] font-bold">
                 View all
@@ -377,7 +377,7 @@ function TransactionItem({ title, date, amount, status, type }: any) {
         alignItems: "center",
       }}
       activeOpacity={0.9}
-      onPress={() => router.push("/transaction-detail")}
+      onPress={() => router.push("/transactions/detail")}
     >
       <View
         className={`w-11 h-11 items-center justify-center mr-3 ${getIconBg()} rounded-full`}

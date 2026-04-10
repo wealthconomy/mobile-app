@@ -84,7 +84,7 @@ export const WealthCard = () => {
 
           <TouchableOpacity
             className="flex-row items-baseline"
-            onPress={() => router.push("/win-up" as any)}
+            onPress={() => router.push("/education/win-up" as any)}
             activeOpacity={0.8}
           >
             {showBalance ? (

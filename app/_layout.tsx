@@ -85,70 +85,135 @@ function RootLayoutNav() {
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen
-              name="notifications"
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen name="activities" options={{ headerShown: false }} />
-            <Stack.Screen name="win-up" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="wealth-flex-transactions"
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen name="wise-up" options={{ headerShown: false }} />
-            <Stack.Screen name="support" options={{ headerShown: false }} />
-            <Stack.Screen name="faq-detail" options={{ headerShown: false }} />
-            <Stack.Screen name="chat" options={{ headerShown: false }} />
-            <Stack.Screen name="create-goal" options={{ headerShown: false }} />
-            <Stack.Screen name="create-fix" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="goal-detail/[id]"
+              name="profile/notifications/index"
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="fix-detail/[id]"
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen name="create-fam" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="fam-detail/[id]"
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen name="create-auto" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="auto-detail/[id]"
+              name="profile/notifications/settings"
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="create-group"
+              name="transactions/activities"
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="group-detail/[id]"
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen name="top-up" options={{ headerShown: false }} />
-            <Stack.Screen name="profile" options={{ headerShown: false }} />
-            <Stack.Screen name="invite" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="notification-settings"
+              name="education/win-up"
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="transactions"
+              name="transactions/wealth-flex"
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="transaction-detail"
+              name="education/wise-up"
               options={{ headerShown: false }}
             />
-            <Stack.Screen name="deposit" options={{ headerShown: false }} />
-            <Stack.Screen name="withdraw" options={{ headerShown: false }} />
-            <Stack.Screen name="security" options={{ headerShown: false }} />
             <Stack.Screen
-              name="reading-list"
+              name="support/index"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen name="support/faq" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="support/chat"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="portfolio/create/goal"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="portfolio/create/fix"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="portfolio/detail/goal/[id]"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="portfolio/detail/fix/[id]"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="portfolio/create/fam"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="portfolio/detail/fam/[id]"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="portfolio/create/auto"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="portfolio/detail/auto/[id]"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="portfolio/create/group"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="portfolio/detail/group/[id]"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="wallet/top-up"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="profile/index"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="profile/invite"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="transactions/index"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="transactions/detail"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="wallet/deposit"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="wallet/withdraw"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="profile/security"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="support/reading-list"
               options={{ headerShown: false }}
             />
             <Stack.Screen name="blog/[id]" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="payment/index"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="payment/add-bank"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="payment/use-card"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="payment/account-details"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="payment/insert-pin"
+              options={{ headerShown: false }}
+            />
             <Stack.Screen name="modal" options={{ presentation: "modal" }} />
           </Stack>
         </ThemeProvider>

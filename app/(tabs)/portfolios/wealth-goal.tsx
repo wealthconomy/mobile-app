@@ -244,7 +244,7 @@ export default function WealthGoalScreen() {
               </View>
 
               <TouchableOpacity
-                onPress={() => router.push("/win-up" as any)}
+                onPress={() => router.push("/education/win-up" as any)}
                 activeOpacity={0.8}
                 className="flex-row items-baseline mb-1"
               >
@@ -283,7 +283,7 @@ export default function WealthGoalScreen() {
                 elevation: 3,
                 zIndex: 20,
               }}
-              onPress={() => router.push("/create-goal" as any)}
+              onPress={() => router.push("/portfolio/create/goal" as any)}
             >
               <Text className="text-[#F3007A] font-bold text-[14px]">
                 Create a WealthGoal
@@ -361,7 +361,7 @@ export default function WealthGoalScreen() {
                     justifyContent: "center",
                   }}
                   onPress={() =>
-                    router.push(`/create-goal?category=${cat.title}` as any)
+                    router.push(`/portfolio/create/goal?category=${cat.title}`)
                   }
                 >
                   <View className="mb-2">
@@ -517,7 +517,7 @@ function GoalListItem({ goal }: any) {
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      onPress={() => router.push(`/goal-detail/${goal.id}` as any)}
+      onPress={() => router.push(`/portfolio/detail/goal/${goal.id}` as any)}
       style={{
         width: 355,
         height: 51,

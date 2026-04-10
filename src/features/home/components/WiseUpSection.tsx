@@ -55,7 +55,9 @@ export const WiseUpSection = () => {
     <View>
       <View className="flex-row justify-between items-center mb-4">
         <Text className="text-[#1A1A1A] font-bold text-lg">WiseUp</Text>
-        <TouchableOpacity onPress={() => router.push("/wise-up" as any)}>
+        <TouchableOpacity
+          onPress={() => router.push("/education/wise-up" as any)}
+        >
           <Text className="text-[#155D5F] text-sm font-medium">View all</Text>
         </TouchableOpacity>
       </View>

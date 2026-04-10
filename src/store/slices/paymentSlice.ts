@@ -7,11 +7,13 @@ export interface BankAccount {
   accountNumber: string;
 }
 
+export type CardBrand = "mastercard" | "visa" | "verve" | "other";
+
 export interface Card {
   id: string;
   holderName: string;
   lastFour: string;
-  brand: "mastercard" | "visa";
+  brand: CardBrand;
   isDefault: boolean;
 }
 
@@ -21,30 +23,8 @@ interface PaymentState {
 }
 
 const initialState: PaymentState = {
-  banks: [
-    {
-      id: "1",
-      name: "James Jackson",
-      bankName: "Opay",
-      accountNumber: "62345278396",
-    },
-  ],
-  cards: [
-    {
-      id: "1",
-      holderName: "Simon Mike",
-      lastFour: "4252",
-      brand: "mastercard",
-      isDefault: true,
-    },
-    {
-      id: "2",
-      holderName: "Simon Mike",
-      lastFour: "8372",
-      brand: "visa",
-      isDefault: false,
-    },
-  ],
+  banks: [],
+  cards: [],
 };
 
 const paymentSlice = createSlice({
@@ -63,9 +43,10 @@ const paymentSlice = createSlice({
       }
       state.cards.push(action.payload);
       // Sort so default is first
-      state.cards.sort((a, b) =>
-        a.isDefault === b.isDefault ? 0 : a.isDefault ? -1 : 1,
-      );
+      state.cards.sort((a, b) => {
+        if (a.isDefault === b.isDefault) return 0;
+        return a.isDefault ? -1 : 1;
+      });
     },
     removeCard: (state, action: PayloadAction<string>) => {
       state.cards = state.cards.filter((card) => card.id !== action.payload);
@@ -75,9 +56,10 @@ const paymentSlice = createSlice({
         card.isDefault = card.id === action.payload;
       });
       // Sort so default is first
-      state.cards.sort((a, b) =>
-        a.isDefault === b.isDefault ? 0 : a.isDefault ? -1 : 1,
-      );
+      state.cards.sort((a, b) => {
+        if (a.isDefault === b.isDefault) return 0;
+        return a.isDefault ? -1 : 1;
+      });
     },
   },
 });

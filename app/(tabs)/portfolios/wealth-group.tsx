@@ -276,7 +276,7 @@ export default function WealthGroupScreen() {
                     justifyContent: "center",
                     paddingHorizontal: 10,
                   }}
-                  onPress={() => router.push("/create-group")}
+                  onPress={() => router.push("/portfolio/create/group")}
                 >
                   <View className="mb-2">
                     <Ionicons name={cat.icon as any} size={24} color={THEME} />
@@ -592,6 +592,12 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
         <TouchableOpacity
           className="w-full h-[34px] rounded-[8px] items-center justify-center p-2"
           style={{ backgroundColor: THEME }}
+          onPress={() =>
+            router.push({
+              pathname: "/portfolio/detail/group/[id]",
+              params: { id: item.id },
+            })
+          }
         >
           <Text className="text-white text-[10px] font-black ">View Group</Text>
         </TouchableOpacity>

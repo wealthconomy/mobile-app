@@ -298,7 +298,7 @@ export default function WealthFixScreen() {
                 elevation: 3,
                 zIndex: 20,
               }}
-              onPress={() => router.push("/create-fix" as any)}
+              onPress={() => router.push("/portfolio/create/fix" as any)}
             >
               <Text
                 style={{ color: "#323232" }}
@@ -399,7 +399,7 @@ export default function WealthFixScreen() {
                   key={cat.id}
                   onPress={() =>
                     router.push({
-                      pathname: "/create-fix",
+                      pathname: "/portfolio/create/fix",
                       params: {
                         lockType: cat.title,
                         amount: cat.amount,
@@ -572,7 +572,10 @@ function FixListItem({ goal, themeColor, isUnlocked }: any) {
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={() =>
-        router.push({ pathname: "/fix-detail/[id]", params: { id: goal.id } })
+        router.push({
+          pathname: "/portfolio/detail/fix/[id]",
+          params: { id: goal.id },
+        })
       }
       style={{
         width: 355,

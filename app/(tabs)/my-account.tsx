@@ -206,14 +206,14 @@ export default function MyAccountScreen() {
             iconBgColor="#E0F2F1"
             iconColor="#155D5F"
             label="Invitations"
-            onPress={() => router.push("/invite" as any)}
+            onPress={() => router.push("/profile/invite" as any)}
           />
           <MenuItem
             icon="notifications"
             iconBgColor="#E0F2F1"
             iconColor="#155D5F"
             label="Notifications"
-            onPress={() => router.push("/notifications" as any)}
+            onPress={() => router.push("/profile/notifications" as any)}
           />
         </MenuGroup>
         <View className="h-[1px] bg-[#E5E5E5] mb-6" />
@@ -246,7 +246,7 @@ export default function MyAccountScreen() {
             iconBgColor="#E0F2F1"
             iconColor="#155D5F"
             label="Wallet & Payment Settings"
-            onPress={() => router.push("/payment-settings" as any)}
+            onPress={() => router.push("/payment" as any)}
           />
         </MenuGroup>
 
@@ -260,7 +260,7 @@ export default function MyAccountScreen() {
             iconColor="#155D5F"
             label="Security Settings"
             subtitle="Protect your funds"
-            onPress={() => router.push("/security" as any)}
+            onPress={() => router.push("/profile/security" as any)}
           />
           <MenuItem
             icon="people"

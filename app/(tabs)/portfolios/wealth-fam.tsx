@@ -301,7 +301,7 @@ export default function WealthFamScreen() {
                 elevation: 3,
                 zIndex: 20,
               }}
-              onPress={() => router.push("/create-fam" as any)}
+              onPress={() => router.push("/portfolio/create/fam" as any)}
             >
               <Text style={{ color: THEME }} className="font-bold text-[14px]">
                 Create a WealthFam
@@ -380,7 +380,7 @@ export default function WealthFamScreen() {
                   }}
                   onPress={() =>
                     router.push({
-                      pathname: "/create-fam",
+                      pathname: "/portfolio/create/fam",
                       params: {
                         category: cat.category,
                         amount: cat.amount,
@@ -547,7 +547,10 @@ function FamListItem({
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={() =>
-        router.push({ pathname: "/fam-detail/[id]", params: { id: plan.id } })
+        router.push({
+          pathname: "/portfolio/detail/fam/[id]",
+          params: { id: plan.id },
+        })
       }
       style={{
         width: 355,
