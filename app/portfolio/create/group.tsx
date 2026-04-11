@@ -1,181 +1,774 @@
 import Header from "@/src/components/common/Header";
+import { addGroup } from "@/src/store/slices/wealthGroupSlice";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Check, ChevronDown, X } from "lucide-react-native";
-import { useState } from "react";
+import { Check, Share2, Upload, X } from "lucide-react-native";
+import { useMemo, useState } from "react";
 import {
   Image,
-  ImageBackground,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
-  Switch,
+  Share,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useDispatch } from "react-redux";
 
-const THEME = "#155D5F"; // Deep teal for buttons
-const THEME_LIGHT = "#F2FFFF"; // Request color for info boxes
+const THEME = "#155D5F";
+const THEME_BG = "#F2FFFF";
+
+// ── Types ───────────────────────────────────────────────────────────────────
+
+type GroupData = {
+  name: string;
+  category: string;
+  coverImage: string | null;
+  description: string;
+  amount: string;
+  frequency: string;
+  hasInterest: boolean;
+  startDate: string;
+  endDate: string;
+  memberLimit: string;
+  accessType: string;
+  penalty: string;
+  earlyExit: string;
+  exitRule: boolean;
+  emergencyWithdrawal: boolean;
+  agreed: boolean;
+};
+
+// ── Main Component ──────────────────────────────────────────────────────────
 
 export default function CreateGroupScreen() {
+  const router = useRouter();
+  const dispatch = useDispatch();
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
+  const [isInfoVisible, setIsInfoVisible] = useState(true);
+  const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
+  const [formData, setFormData] = useState<GroupData>({
     name: "",
     category: "",
+    coverImage: null,
     description: "",
-    image: null as string | null,
     amount: "",
-    frequency: "Monthly",
-    interest: false,
+    frequency: "",
+    hasInterest: false,
     startDate: "",
     endDate: "",
     memberLimit: "",
-    accessType: "Public/Open",
-    penalty: "Immediate (5% of Contribution)",
-    earlyExit: "Set a Penalty",
+    accessType: "",
+    penalty: "",
+    earlyExit: "",
     exitRule: false,
     emergencyWithdrawal: false,
     agreed: false,
   });
 
-  const nextStep = () => setStep(step + 1);
-  const prevStep = () => setStep(step - 1);
+  const updateFormData = (field: string, value: any) => {
+    // Defensive check to prevent event objects from being saved as values
+    if (value && typeof value === "object" && value.nativeEvent) {
+      return;
+    }
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
-  const isStep1Valid =
-    formData.name && formData.category && formData.description;
-  const isStep2Valid =
-    formData.amount && formData.startDate && formData.endDate;
-  const isStep3Valid = formData.memberLimit && formData.accessType;
-  const isStep4Valid = true; // Most are optional or have defaults
-  const isStep5Valid = formData.agreed;
+  const nextStep = () => {
+    if (step === 5) {
+      const newId = Math.random().toString(36).substring(7);
+      dispatch(
+        addGroup({
+          ...formData,
+          id: newId,
+          membersCount: 1,
+          currentSavings: "0.00",
+          growthToday: "0.00",
+          isAdmin: true,
+          isMember: true,
+        }),
+      );
+      setCreatedGroupId(newId);
+    }
+    setStep((s) => s + 1);
+  };
+  const prevStep = () => setStep((s) => s - 1);
+
+  const isStepValid = useMemo(() => {
+    switch (step) {
+      case 1:
+        return !!(formData.name && formData.category && formData.description);
+      case 2:
+        return !!(
+          formData.amount &&
+          formData.frequency &&
+          formData.startDate.length >= 10 &&
+          formData.endDate.length >= 10
+        );
+      case 3:
+        const limit = parseInt(formData.memberLimit);
+        return !!(
+          formData.memberLimit &&
+          limit > 0 &&
+          limit <= 200 &&
+          formData.accessType
+        );
+      case 4:
+        return !!(formData.penalty && formData.earlyExit);
+      case 5:
+        return !!formData.agreed;
+      default:
+        return true;
+    }
+  }, [step, formData]);
 
   if (step === 6) {
-    return <SuccessScreen />;
+    return (
+      <SuccessScreen
+        onDone={() => router.replace("/portfolios/wealth-group")}
+        onView={() =>
+          router.replace({
+            pathname: "/portfolio/detail/group/[id]",
+            params: { id: createdGroupId || "new", member: "true" },
+          })
+        }
+        groupName={String(formData.name || "")}
+      />
+    );
   }
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
       <StatusBar style="dark" />
       <Header
-        title={`Create a Wealth Group${step < 6 ? `_Step ${step}:...` : ""}`}
-        onBack={() => (step === 1 ? router.back() : prevStep())}
+        title="Create a WealthGroup"
+        onBack={step > 1 ? prevStep : () => router.back()}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-        <View className="px-5 py-2">
-          {/* ── Progress Indicator ────────────────────────────────── */}
-          <View className="flex-row items-center space-x-1 mb-6">
-            {[1, 2, 3, 4, 5].map((s) => (
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      >
+        <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+          <View className="px-5 py-6 pb-20">
+            <Text className="text-[#155D5F] text-[18px] font-bold mb-1">
+              Step {step}:
+            </Text>
+            <Text className="text-[#155D5F] text-[24px] font-bold mb-6">
+              {getStepTitle(step)}
+            </Text>
+
+            {isInfoVisible && (
               <View
-                key={s}
-                className="flex-1 h-1 rounded-full"
-                style={{ backgroundColor: s <= step ? THEME : "#E2E8F0" }}
-              />
-            ))}
-          </View>
-
-          {/* ── Step Title ────────────────────────────────────────── */}
-          <Text className="text-[20px] font-black text-[#1A1A1A] mb-2">
-            Step {step}:
-          </Text>
-          <Text className="text-[22px] font-black text-[#1A1A1A] mb-6">
-            {getStepTitle(step)}
-          </Text>
-
-          {/* ── Info Box ──────────────────────────────────────────── */}
-          <View
-            className="rounded-2xl p-4 mb-8 flex-row items-start relative"
-            style={{ backgroundColor: THEME_LIGHT }}
-          >
-            <TouchableOpacity className="absolute right-3 top-3">
-              <X size={16} color={THEME} />
-            </TouchableOpacity>
-            <View className="flex-1">
-              <Text
-                className="font-black text-[12px] mb-2"
-                style={{ color: THEME }}
+                className="rounded-[15px] p-5 mb-8 relative"
+                style={{
+                  width: 366,
+                  height: 132,
+                  backgroundColor: THEME_BG,
+                  alignSelf: "center",
+                }}
               >
-                Important things to know
-              </Text>
-              <Text
-                className="text-[10px] leading-[15px] opacity-80"
-                style={{ color: THEME }}
+                <TouchableOpacity
+                  className="absolute right-3 top-3"
+                  onPress={() => setIsInfoVisible(false)}
+                >
+                  <X size={16} color={THEME} />
+                </TouchableOpacity>
+                <Text className="text-[#155D5F] font-black text-[14px] mb-2">
+                  Important things to know
+                </Text>
+                <Text className="text-[#155D5F] text-[12px] leading-[18px]">
+                  To keep the experience simple and intuitive for the
+                  "WealthBuilder," the form for creating a Fixed Contribution
+                  Group should be broken down into logical steps. This prevents
+                  the user from feeling overwhelmed by too many fields at once.
+                </Text>
+              </View>
+            )}
+
+            {step === 1 && (
+              <Step1Identity data={formData} update={updateFormData} />
+            )}
+            {step === 2 && (
+              <Step2Financial data={formData} update={updateFormData} />
+            )}
+            {step === 3 && (
+              <Step3Membership data={formData} update={updateFormData} />
+            )}
+            {step === 4 && (
+              <Step4Risk data={formData} update={updateFormData} />
+            )}
+            {step === 5 && (
+              <Step5Review data={formData} update={updateFormData} />
+            )}
+
+            {/* ── Action Button (Inside ScrollView) ────────────────── */}
+            <View className="mt-10">
+              <TouchableOpacity
+                disabled={!isStepValid}
+                onPress={nextStep}
+                className={`h-14 rounded-2xl items-center justify-center ${
+                  isStepValid ? "bg-[#155D5F]" : "bg-gray-200"
+                }`}
               >
-                {getStepInfo(step)}
-              </Text>
+                <Text className="text-white font-bold text-base">
+                  {step === 5 ? "Launch your Wealth Tribe" : "Proceed"}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
 
-          {/* ── Form Content ──────────────────────────────────────── */}
-          {step === 1 && (
-            <Step1
-              data={formData}
-              onChange={(data) => setFormData({ ...formData, ...data })}
-            />
-          )}
-          {step === 2 && (
-            <Step2
-              data={formData}
-              onChange={(data) => setFormData({ ...formData, ...data })}
-            />
-          )}
-          {step === 3 && (
-            <Step3
-              data={formData}
-              onChange={(data) => setFormData({ ...formData, ...data })}
-            />
-          )}
-          {step === 4 && (
-            <Step4
-              data={formData}
-              onChange={(data) => setFormData({ ...formData, ...data })}
-            />
-          )}
-          {step === 5 && (
-            <Step5
-              data={formData}
-              onChange={(data) => setFormData({ ...formData, ...data })}
-            />
+// ── Step Components ─────────────────────────────────────────────────────────
+
+function Step1Identity({ data, update }: any) {
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 1,
+    });
+    if (!result.canceled) {
+      update("coverImage", result.assets[0].uri);
+    }
+  };
+
+  return (
+    <View className="space-y-6">
+      <FormField
+        label="Group Name"
+        placeholder='e.g., "The 2026 Homeowners Circle"'
+        value={data.name}
+        onChange={(t: string) => update("name", t)}
+      />
+
+      <FormField
+        label="Group Category"
+        placeholder="eg., Rent, Festival, Business, etc."
+        value={data.category}
+        onChange={(t: string) => update("category", t)}
+      />
+
+      <View className="mb-4">
+        <Text className="text-[#64748B] text-[13px] font-bold mb-2">
+          Group Cover Image (Optional)
+        </Text>
+        <View className="relative">
+          <TouchableOpacity
+            onPress={pickImage}
+            className="h-32 bg-gray-50 rounded-xl items-center justify-center border-2 border-dashed border-gray-200"
+          >
+            {data.coverImage ? (
+              <Image
+                source={{ uri: data.coverImage }}
+                className="w-full h-full rounded-xl"
+              />
+            ) : (
+              <View className="items-center">
+                <Upload size={24} color="#64748B" className="mb-2" />
+                <Text className="text-gray-400 text-[12px]">
+                  Browse a file in a PNG and JPG format
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          {data.coverImage && (
+            <TouchableOpacity
+              onPress={() => update("coverImage", null)}
+              className="absolute -top-2 -right-2 bg-red-500 w-6 h-6 rounded-full items-center justify-center shadow-md"
+            >
+              <X size={14} color="white" />
+            </TouchableOpacity>
           )}
         </View>
-      </ScrollView>
-
-      {/* ── Bottom Button ─────────────────────────────────────── */}
-      <View className="px-5 py-6 bg-white border-t border-gray-100">
-        <TouchableOpacity
-          className="h-14 rounded-2xl items-center justify-center"
-          style={{
-            backgroundColor:
-              (step === 1 && !isStep1Valid) ||
-              (step === 2 && !isStep2Valid) ||
-              (step === 3 && !isStep3Valid) ||
-              (step === 5 && !isStep5Valid)
-                ? "#E0E0E0"
-                : THEME,
-            opacity:
-              (step === 1 && !isStep1Valid) ||
-              (step === 2 && !isStep2Valid) ||
-              (step === 3 && !isStep3Valid) ||
-              (step === 5 && !isStep5Valid)
-                ? 0.45
-                : 1,
-          }}
-          disabled={
-            (step === 1 && !isStep1Valid) ||
-            (step === 2 && !isStep2Valid) ||
-            (step === 3 && !isStep3Valid) ||
-            (step === 5 && !isStep5Valid)
-          }
-          onPress={nextStep}
-        >
-          <Text className="text-white font-black text-[16px]">
-            {step === 5 ? "Launch your Wealth Tribe" : "Proceed"}
-          </Text>
-        </TouchableOpacity>
       </View>
+
+      <View className="mb-4">
+        <Text className="text-[#64748B] text-[13px] font-bold mb-2">
+          Group Description
+        </Text>
+        <TextInput
+          multiline
+          numberOfLines={4}
+          value={data.description}
+          onChangeText={(t) => update("description", t)}
+          placeholder="Enter group description..."
+          className="bg-gray-50 rounded-xl p-4 text-[#1A1A1A] border border-gray-100 min-h-[100px]"
+          textAlignVertical="top"
+        />
+        <Text className="text-right text-gray-400 text-[11px] mt-1">
+          {data.description.split(/\s+/).filter(Boolean).length}/100 words
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function Step2Financial({ data, update }: any) {
+  const [isOpen, setIsOpen] = useState(false);
+  const options = ["Daily", "Weekly", "Monthly"];
+
+  const formatAmount = (val: string) => {
+    if (typeof val !== "string") return "";
+    const n = val.replace(/\D/g, "");
+    return n ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "";
+  };
+
+  const formatDate = (val: string) => {
+    if (typeof val !== "string") return "";
+    const n = val.replace(/\D/g, "");
+    if (n.length <= 2) return n;
+    if (n.length <= 4) return `${n.slice(0, 2)} / ${n.slice(2)}`;
+    return `${n.slice(0, 2)} / ${n.slice(2, 4)} / ${n.slice(4, 8)}`;
+  };
+
+  return (
+    <View className="space-y-6">
+      <FormField
+        label="Wealth Amount(₦)"
+        placeholder="e.g, ₦3,500,000.00"
+        value={data.amount}
+        onChange={(t: string) => update("amount", formatAmount(t))}
+        keyboardType="numeric"
+      />
+
+      <View className="mb-4">
+        <Text className="text-[#64748B] text-[13px] font-bold mb-2">
+          Contribution Frequency
+        </Text>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setIsOpen(!isOpen)}
+          className="h-14 bg-gray-50 rounded-xl px-4 flex-row items-center justify-between border border-gray-100"
+        >
+          <Text className={data.frequency ? "text-[#1A1A1A]" : "text-gray-400"}>
+            {data.frequency || "Daily, Weekly, or Monthly"}
+          </Text>
+          <Ionicons
+            name={isOpen ? "chevron-up" : "chevron-down"}
+            size={20}
+            color="#64748B"
+          />
+        </TouchableOpacity>
+        {isOpen && (
+          <View className="bg-white rounded-xl mt-2 border border-gray-100 overflow-hidden shadow-sm">
+            {options.map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                onPress={() => {
+                  update("frequency", opt);
+                  setIsOpen(false);
+                }}
+                className="px-4 py-4 border-b border-gray-50 flex-row items-center justify-between"
+              >
+                <Text className="text-[#1A1A1A] font-medium">{opt}</Text>
+                {data.frequency === opt && <Check size={16} color={THEME} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+
+      <View className="flex-row items-center justify-between mb-4">
+        <View className="flex-1 pr-4">
+          <Text className="text-[#64748B] text-[13px] font-bold">
+            Member Interest
+          </Text>
+          <Text className="text-gray-400 text-[10px]">
+            Enable this allow each member to earn interest from the group
+            savings
+          </Text>
+        </View>
+        <CustomSwitch
+          value={data.hasInterest}
+          onValueChange={(v) => update("hasInterest", v)}
+        />
+      </View>
+
+      <FormField
+        label="Start Date"
+        placeholder="DD / MM / YYYY"
+        value={data.startDate}
+        onChange={(t: string) => update("startDate", formatDate(t))}
+        keyboardType="numeric"
+        maxLength={14}
+      />
+      <FormField
+        label="End Date"
+        placeholder="DD / MM / YYYY"
+        value={data.endDate}
+        onChange={(t: string) => update("endDate", formatDate(t))}
+        keyboardType="numeric"
+        maxLength={14}
+      />
+
+      <Text className="text-[10px] text-gray-400 italic">
+        Note: To earn the full interest, you must meet your target amount and
+        reach this date.
+      </Text>
+    </View>
+  );
+}
+
+function Step3Membership({ data, update }: any) {
+  const [isOpen, setIsOpen] = useState(false);
+  const options = ["Public/Open", "Private/Invite-Only"];
+  const isOverLimit = parseInt(data.memberLimit) > 200;
+
+  return (
+    <View className="space-y-6">
+      <View className="mb-4">
+        <View className="flex-row justify-between mb-2">
+          <Text className="text-[#64748B] text-[13px] font-bold">
+            Members Limit
+          </Text>
+          <Text className="text-gray-400 text-[11px]">200 maximum</Text>
+        </View>
+        <TextInput
+          placeholder="e.g., 10 members"
+          value={data.memberLimit}
+          onChangeText={(t) => update("memberLimit", t)}
+          keyboardType="numeric"
+          className={`h-14 bg-gray-50 rounded-xl px-4 text-[#1A1A1A] border ${
+            isOverLimit ? "border-red-500" : "border-gray-100"
+          }`}
+        />
+        {isOverLimit && (
+          <Text className="text-red-500 text-[10px] mt-1">
+            Limit cannot exceed 200 members
+          </Text>
+        )}
+      </View>
+
+      <View className="mb-4">
+        <Text className="text-[#64748B] text-[13px] font-bold mb-2">
+          Access Type
+        </Text>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setIsOpen(!isOpen)}
+          className="h-14 bg-gray-50 rounded-xl px-4 flex-row items-center justify-between border border-gray-100"
+        >
+          <Text
+            className={data.accessType ? "text-[#1A1A1A]" : "text-gray-400"}
+          >
+            {data.accessType || "Choose an access type"}
+          </Text>
+          <Ionicons
+            name={isOpen ? "chevron-up" : "chevron-down"}
+            size={20}
+            color="#64748B"
+          />
+        </TouchableOpacity>
+        {isOpen && (
+          <View className="bg-white rounded-xl mt-2 border border-gray-100 overflow-hidden shadow-sm">
+            {options.map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                onPress={() => {
+                  update("accessType", opt);
+                  setIsOpen(false);
+                }}
+                className="px-4 py-4 border-b border-gray-50 flex-row items-center justify-between"
+              >
+                <Text className="text-[#1A1A1A] font-medium">{opt}</Text>
+                {data.accessType === opt && <Check size={16} color={THEME} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function Step4Risk({ data, update }: any) {
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+  const penaltyOptions = [
+    "Immediate (5% of contribution)",
+    "Grace period (24hours)",
+  ];
+  const exitOptions = ["Fixed Penalty (10%)", "No Withdrawal", "Custom Rule"];
+
+  return (
+    <View className="space-y-6">
+      <View className="mb-4">
+        <Text className="text-[#64748B] text-[13px] font-bold mb-1">
+          Penalty Settings
+        </Text>
+        <TouchableOpacity
+          onPress={() =>
+            setOpenDropdown(openDropdown === "penalty" ? null : "penalty")
+          }
+          className="h-14 bg-gray-50 rounded-xl px-4 flex-row items-center justify-between border border-gray-100"
+        >
+          <Text className={data.penalty ? "text-[#1A1A1A]" : "text-gray-400"}>
+            {data.penalty || "Set a Penalty"}
+          </Text>
+          <Ionicons
+            name={openDropdown === "penalty" ? "chevron-up" : "chevron-down"}
+            size={20}
+            color="#64748B"
+          />
+        </TouchableOpacity>
+        {openDropdown === "penalty" && (
+          <View className="bg-white rounded-xl mt-2 border border-gray-100 overflow-hidden shadow-sm">
+            {penaltyOptions.map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                onPress={() => {
+                  update("penalty", opt);
+                  setOpenDropdown(null);
+                }}
+                className="px-4 py-4 border-b border-gray-50 flex-row items-center justify-between"
+              >
+                <Text className="text-[#1A1A1A] font-medium">{opt}</Text>
+                {data.penalty === opt && <Check size={16} color={THEME} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+        <Text className="text-gray-400 text-[10px] mt-1">
+          Note: This is for late contribution
+        </Text>
+      </View>
+
+      <View className="mb-4">
+        <Text className="text-[#64748B] text-[13px] font-bold mb-1">
+          Early Exit
+        </Text>
+        <TouchableOpacity
+          onPress={() =>
+            setOpenDropdown(openDropdown === "exit" ? null : "exit")
+          }
+          className="h-14 bg-gray-50 rounded-xl px-4 flex-row items-center justify-between border border-gray-100"
+        >
+          <Text className={data.earlyExit ? "text-[#1A1A1A]" : "text-gray-400"}>
+            {data.earlyExit || "Set a Penalty"}
+          </Text>
+          <Ionicons
+            name={openDropdown === "exit" ? "chevron-up" : "chevron-down"}
+            size={20}
+            color="#64748B"
+          />
+        </TouchableOpacity>
+        {openDropdown === "exit" && (
+          <View className="bg-white rounded-xl mt-2 border border-gray-100 overflow-hidden shadow-sm">
+            {exitOptions.map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                onPress={() => {
+                  update("earlyExit", opt);
+                  setOpenDropdown(null);
+                }}
+                className="px-4 py-4 border-b border-gray-50 flex-row items-center justify-between"
+              >
+                <Text className="text-[#1A1A1A] font-medium">{opt}</Text>
+                {data.earlyExit === opt && <Check size={16} color={THEME} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+
+      <View className="flex-row items-center justify-between mb-4">
+        <View className="flex-1 pr-4">
+          <Text className="text-[#64748B] text-[13px] font-bold">
+            Exit Rule
+          </Text>
+          <Text className="text-gray-400 text-[10px]">
+            Users must agree to the "Lock-in Period" (Funds cannot be withdrawn
+            until the end of the cycle)
+          </Text>
+        </View>
+        <CustomSwitch
+          value={data.exitRule}
+          onValueChange={(v) => update("exitRule", v)}
+        />
+      </View>
+
+      <View className="flex-row items-center justify-between mb-4">
+        <View className="flex-1 pr-4">
+          <Text className="text-[#64748B] text-[13px] font-bold">
+            Emergency Withdrawal
+          </Text>
+          <Text className="text-gray-400 text-[10px]">
+            For members to request funds before the goal date
+          </Text>
+        </View>
+        <CustomSwitch
+          value={data.emergencyWithdrawal}
+          onValueChange={(v) => update("emergencyWithdrawal", v)}
+        />
+      </View>
+    </View>
+  );
+}
+
+function Step5Review({ data, update }: any) {
+  return (
+    <View className="space-y-6">
+      <Text className="text-[#155D5F] font-black text-[15px] mb-2 underline">
+        Terms of Service
+      </Text>
+      <TouchableOpacity
+        onPress={() => update("agreed", !data.agreed)}
+        className="flex-row items-start"
+      >
+        <View
+          className={`w-5 h-5 rounded border items-center justify-center mr-3 mt-1 ${
+            data.agreed
+              ? "bg-[#155D5F] border-[#155D5F]"
+              : "bg-white border-gray-300"
+          }`}
+        >
+          {data.agreed && <Check size={14} color="white" />}
+        </View>
+        <Text className="text-[#64748B] text-[14px] leading-[20px] flex-1">
+          I agree with the{" "}
+          <Text className="font-bold underline text-[#1A1A1A]">
+            Group Savings Agreement and Accountability Rules.
+          </Text>
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function SuccessScreen({
+  onDone,
+  onView,
+  groupName,
+}: {
+  onDone: () => void;
+  onView: () => void;
+  groupName: string;
+}) {
+  const onShare = async () => {
+    try {
+      await Share.share({
+        message: `Join my Wealth Tribe "${groupName}" on Wealthconomy!`,
+      });
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  return (
+    <SafeAreaView
+      style={{ flex: 1 }}
+      className="bg-white"
+      edges={["top", "bottom"]}
+    >
+      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+        <View className="px-5 py-4">
+          <TouchableOpacity onPress={onDone}>
+            <Ionicons name="chevron-back" size={24} color="#1A1A1A" />
+          </TouchableOpacity>
+        </View>
+
+        <View className="items-center px-5 pt-4">
+          <View className="w-full h-64 items-center justify-center relative">
+            <Image
+              source={require("../../../assets/images/success.png")}
+              style={{
+                width: "150%",
+                height: "150%",
+                opacity: 0.7,
+                position: "absolute",
+              }}
+              resizeMode="contain"
+            />
+            <Image
+              source={require("../../../assets/images/congrats.png")}
+              style={{ width: 220, height: 220 }}
+              resizeMode="contain"
+            />
+          </View>
+
+          <Text className="text-[30px] font-bold mt-8 text-[#1A1A1A]">
+            🎉 Congratulations🎉
+          </Text>
+          <Text className="text-[16px] font-bold mt-5">
+            You’re Leading the Way! 🚀
+          </Text>
+
+          <Text className="text-[14px] text-center text-[#64748B] leading-[22px] mt-1">
+            {`Congratulations, WealthBuilder! Your group [${
+              groupName || "Wealth Tribe"
+            }] is officially live. You’ve just taken a massive step toward sustainable wealth for yourself and your community.`}
+          </Text>
+
+          {/* Dynamic QR Code */}
+          <View className="mt-10 mb-6 w-48 h-48 bg-white border border-gray-100 items-center justify-center rounded-2xl shadow-sm overflow-hidden p-4">
+            <Image
+              source={{
+                uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                  `wealthconomy://group/join/${groupName || "tribe"}`,
+                )}`,
+              }}
+              style={{ width: "100%", height: "100%" }}
+              resizeMode="contain"
+            />
+          </View>
+
+          <TouchableOpacity
+            onPress={onView}
+            className="w-full h-14 bg-[#155D5F] rounded-2xl items-center justify-center mb-3"
+          >
+            <Text className="text-white font-bold text-base">View Group</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onShare}
+            className="w-full h-14 rounded-2xl border border-gray-200 flex-row items-center justify-center space-x-2"
+          >
+            <Share2 size={20} color="#64748B" />
+            <Text className="text-[#64748B] font-bold">Invite Members</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </SafeAreaView>
+  );
+}
+
+// ── Components & Helpers ───────────────────────────────────────────────────
+
+function CustomSwitch({ value, onValueChange }: any) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => onValueChange(!value)}
+      style={{
+        width: 44,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: value ? THEME : "#64748B",
+        padding: 2,
+      }}
+    >
+      <View
+        style={{
+          width: 20,
+          height: 20,
+          borderRadius: 10,
+          backgroundColor: "white",
+          marginLeft: value ? 20 : 0,
+        }}
+      />
+    </TouchableOpacity>
   );
 }
 
@@ -196,382 +789,17 @@ function getStepTitle(step: number) {
   }
 }
 
-function getStepInfo(step: number) {
-  return "To keep the experience simple and intuitive for the 'Wealth Builder', the form for creating a Wealth Contribution Group should be broken down into logical steps. This prevents the user from feeling overwhelmed by too many fields at once.";
-}
-
-function InputLabel({ label, extra }: { label: string; extra?: string }) {
+function FormField({ label, placeholder, onChange, ...props }: any) {
   return (
-    <View className="flex-row justify-between items-center mb-2">
-      <Text className="text-[13px] font-black text-[#1A1A1A]">{label}</Text>
-      {extra && <Text className="text-[11px] text-[#94A3B8]">{extra}</Text>}
+    <View className="mb-4">
+      <Text className="text-[#64748B] text-[13px] font-bold mb-2">{label}</Text>
+      <TextInput
+        {...props}
+        placeholder={placeholder}
+        placeholderTextColor="#94A3B8"
+        onChangeText={onChange}
+        className="h-14 bg-gray-50 rounded-xl px-4 text-[#1A1A1A] border border-gray-100"
+      />
     </View>
-  );
-}
-
-function Step1({ data, onChange }: { data: any; onChange: (d: any) => void }) {
-  return (
-    <View className="space-y-6">
-      <View>
-        <InputLabel label="Group Name" />
-        <TextInput
-          placeholder='e.g. "The 2024 Homeowners Circle"'
-          className="h-12 bg-gray-50 rounded-xl px-4 text-[14px]"
-          value={data.name}
-          onChangeText={(t) => onChange({ name: t })}
-        />
-      </View>
-
-      <View>
-        <InputLabel label="Group Category" />
-        <TextInput
-          placeholder="e.g. Rent, Festival, Business, etc."
-          className="h-12 bg-gray-50 rounded-xl px-4 text-[14px]"
-          value={data.category}
-          onChangeText={(t) => onChange({ category: t })}
-        />
-      </View>
-
-      <View>
-        <InputLabel label="Group Cover Image (Optional)" />
-        {data.image ? (
-          <View className="relative w-full h-40 rounded-2xl overflow-hidden mb-2">
-            <ImageBackground
-              source={{ uri: data.image }}
-              className="w-full h-full"
-              resizeMode="cover"
-            >
-              <TouchableOpacity
-                className="absolute right-3 top-3 bg-white/80 p-2 rounded-full"
-                onPress={() => onChange({ image: null })}
-              >
-                <X size={16} color={THEME} />
-              </TouchableOpacity>
-            </ImageBackground>
-          </View>
-        ) : (
-          <TouchableOpacity
-            className="w-full h-32 bg-gray-50 rounded-2xl border-2 border-dashed border-[#E2E8F0] items-center justify-center"
-            onPress={() =>
-              onChange({
-                image:
-                  "https://images.unsplash.com/photo-1542435503-956c469947f6",
-              })
-            }
-          >
-            <View className="items-center">
-              <Ionicons name="cloud-upload-outline" size={28} color="#94A3B8" />
-              <Text className="text-[11px] text-[#94A3B8] mt-2">
-                Browse a file in a PNG and JPG format
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View>
-        <InputLabel label="Group Description" />
-        <TextInput
-          placeholder="e.g. 2024 Homeowners Circle description"
-          multiline
-          className="h-24 bg-gray-50 rounded-xl px-4 py-3 text-[14px]"
-          value={data.description}
-          onChangeText={(t) => onChange({ description: t })}
-        />
-      </View>
-    </View>
-  );
-}
-
-function Step2({ data, onChange }: { data: any; onChange: (d: any) => void }) {
-  return (
-    <View className="space-y-6">
-      <View>
-        <InputLabel label="Wealth Amount(₦)" />
-        <TextInput
-          placeholder="e.g. ₦1,000,000.00"
-          keyboardType="numeric"
-          className="h-12 bg-gray-50 rounded-xl px-4 text-[14px]"
-          value={data.amount}
-          onChangeText={(t) => onChange({ amount: t })}
-        />
-      </View>
-
-      <View>
-        <InputLabel label="Contribution Frequency" />
-        <TouchableOpacity className="h-12 bg-gray-50 rounded-xl px-4 flex-row justify-between items-center">
-          <Text className="text-[14px]">
-            {data.frequency || "Select Frequency"}
-          </Text>
-          <ChevronDown size={20} color="#94A3B8" />
-        </TouchableOpacity>
-      </View>
-
-      <View className="flex-row items-center justify-between">
-        <View>
-          <Text className="text-[13px] font-black text-[#1A1A1A]">
-            Member Interest
-          </Text>
-          <Text className="text-[10px] text-[#94A3B8] max-w-[200px]">
-            Enable the option each member to earn interest from the group
-            savings.
-          </Text>
-        </View>
-        <Switch
-          value={data.interest}
-          onValueChange={(v) => onChange({ interest: v })}
-          trackColor={{ false: "#E2E8F0", true: THEME }}
-        />
-      </View>
-
-      <View>
-        <InputLabel label="Start Date" />
-        <TextInput
-          placeholder="DD / MM / YYYY"
-          className="h-12 bg-gray-50 rounded-xl px-4 text-[14px]"
-          value={data.startDate}
-          onChangeText={(t) => onChange({ startDate: t })}
-        />
-      </View>
-
-      <View>
-        <InputLabel label="End Date" />
-        <TextInput
-          placeholder="DD / MM / YYYY"
-          className="h-12 bg-gray-50 rounded-xl px-4 text-[14px]"
-          value={data.endDate}
-          onChangeText={(t) => onChange({ endDate: t })}
-        />
-        <Text className="text-[9px] text-[#94A3B8] mt-2">
-          Note: To earn the full interest, you must meet your target amount on
-          or each of this date.
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function Step3({ data, onChange }: { data: any; onChange: (d: any) => void }) {
-  const ACCESS_TYPES = ["Private/Invite-only", "Public/Open"];
-  return (
-    <View className="space-y-6">
-      <View>
-        <InputLabel label="Members Limit" extra="100 maximum" />
-        <TextInput
-          placeholder="e.g. 10 members"
-          keyboardType="numeric"
-          className="h-12 bg-gray-50 rounded-xl px-4 text-[14px]"
-          value={data.memberLimit}
-          onChangeText={(t) => onChange({ memberLimit: t })}
-        />
-      </View>
-
-      <View>
-        <InputLabel label="Access Type" />
-        <View className="space-y-3">
-          {ACCESS_TYPES.map((type) => (
-            <TouchableOpacity
-              key={type}
-              className="h-12 bg-gray-50 rounded-xl px-4 flex-row justify-between items-center"
-              style={{
-                borderWidth: data.accessType === type ? 1 : 0,
-                borderColor: THEME,
-              }}
-              onPress={() => onChange({ accessType: type })}
-            >
-              <Text className="text-[14px]">{type}</Text>
-              {data.accessType === type && <Check size={18} color={THEME} />}
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function Step4({ data, onChange }: { data: any; onChange: (d: any) => void }) {
-  const PENALTIES = [
-    "Immediate (5% of Contribution)",
-    "Grace period (24 hours)",
-  ];
-  return (
-    <View className="space-y-6">
-      <View>
-        <InputLabel
-          label="Penalty Settings"
-          extra="Note: This is for late contribution"
-        />
-        <View className="space-y-3">
-          {PENALTIES.map((p) => (
-            <TouchableOpacity
-              key={p}
-              className="h-12 bg-gray-50 rounded-xl px-4 flex-row justify-between items-center"
-              style={{
-                borderWidth: data.penalty === p ? 1 : 0,
-                borderColor: THEME,
-              }}
-              onPress={() => onChange({ penalty: p })}
-            >
-              <Text className="text-[14px]">{p}</Text>
-              {data.penalty === p && <Check size={18} color={THEME} />}
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View>
-        <InputLabel label="Early Exit" />
-        <TouchableOpacity className="h-12 bg-gray-50 rounded-xl px-4 flex-row justify-between items-center">
-          <Text className="text-[14px]">{data.earlyExit}</Text>
-          <ChevronDown size={20} color="#94A3B8" />
-        </TouchableOpacity>
-      </View>
-
-      <View className="flex-row items-center justify-between">
-        <View>
-          <Text className="text-[13px] font-black text-[#1A1A1A]">
-            Exit Rule
-          </Text>
-          <Text className="text-[10px] text-[#94A3B8] max-w-[200px]">
-            Users must agree to the "Lock-in Period". Funds cannot be withdrawn
-            until the end of the cycle.
-          </Text>
-        </View>
-        <Switch
-          value={data.exitRule}
-          onValueChange={(v) => onChange({ exitRule: v })}
-          trackColor={{ false: "#E2E8F0", true: THEME }}
-        />
-      </View>
-
-      <View className="flex-row items-center justify-between">
-        <View>
-          <Text className="text-[13px] font-black text-[#1A1A1A]">
-            Emergency Withdrawal
-          </Text>
-          <Text className="text-[10px] text-[#94A3B8] max-w-[200px]">
-            For members to request fund before the options.
-          </Text>
-        </View>
-        <Switch
-          value={data.emergencyWithdrawal}
-          onValueChange={(v) => onChange({ emergencyWithdrawal: v })}
-          trackColor={{ false: "#E2E8F0", true: THEME }}
-        />
-      </View>
-    </View>
-  );
-}
-
-function Step5({ data, onChange }: { data: any; onChange: (d: any) => void }) {
-  return (
-    <View className="space-y-6">
-      <View className="bg-gray-50 p-4 rounded-2xl">
-        <Text className="font-extrabold text-[14px] mb-3">Group Summary</Text>
-        <View className="space-y-2">
-          <SummaryRow label="Name" value={data.name} />
-          <SummaryRow label="Category" value={data.category} />
-          <SummaryRow label="Wealth Amount" value={`₦${data.amount}`} />
-          <SummaryRow label="Frequency" value={data.frequency} />
-          <SummaryRow label="Access" value={data.accessType} />
-        </View>
-      </View>
-
-      <View className="flex-row items-start space-x-3 mt-4">
-        <TouchableOpacity
-          className="w-6 h-6 rounded border items-center justify-center"
-          style={{
-            borderColor: data.agreed ? THEME : "#E2E8F0",
-            backgroundColor: data.agreed ? THEME : "white",
-          }}
-          onPress={() => onChange({ agreed: !data.agreed })}
-        >
-          {data.agreed && <Check size={14} color="white" />}
-        </TouchableOpacity>
-        <View className="flex-1">
-          <Text className="text-[13px] text-[#1A1A1A]">
-            I agree with the{" "}
-            <Text className="text-teal-600 font-bold decoration-teal-600 underline">
-              Group Savings Agreement and Accountability Rules.
-            </Text>
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View className="flex-row justify-between items-center py-1">
-      <Text className="text-[11px] text-[#64748B] font-bold">{label}:</Text>
-      <Text className="text-[11px] text-[#1A1A1A] font-black">{value}</Text>
-    </View>
-  );
-}
-
-function SuccessScreen() {
-  return (
-    <SafeAreaView style={{ flex: 1 }} className="bg-white">
-      <ImageBackground
-        source={require("../../../assets/images/success.png")}
-        className="flex-1 items-center justify-center px-10"
-        resizeMode="cover"
-      >
-        <View className="items-center mb-10">
-          <Image
-            source={require("../../../assets/images/group1.png")}
-            style={{ width: 150, height: 150, marginBottom: 20 }}
-            resizeMode="contain"
-          />
-          <Text className="text-[28px] font-black text-center mb-4">
-            🎉 Congratulation
-          </Text>
-          <Text className="text-[14px] text-center text-[#64748B] leading-[22px]">
-            You're leading the Way! 🚀 {"\n"}
-            Congratulations. Wealth Builder! Your group{" "}
-            {`"The 2024 Homeowners Circle"`} is now active and live. You've just
-            taken a massive step toward sustainable wealth for yourself and your
-            community.
-          </Text>
-        </View>
-
-        <View className="bg-white p-4 rounded-2xl shadow-sm mb-10 border border-gray-100">
-          {/* Mock QR Code */}
-          <View className="w-32 h-32 bg-gray-50 items-center justify-center">
-            <Ionicons name="qr-code-outline" size={80} color="#1A1A1A" />
-          </View>
-        </View>
-
-        <TouchableOpacity
-          className="w-full h-14 rounded-2xl flex-row items-center justify-center"
-          style={{
-            backgroundColor: THEME_LIGHT,
-            borderWidth: 1,
-            borderColor: "#E2E8F0",
-          }}
-        >
-          <Ionicons
-            name="share-social-outline"
-            size={20}
-            color={THEME}
-            className="mr-2"
-          />
-          <Text
-            style={{ color: THEME }}
-            className="font-black text-[16px] ml-2"
-          >
-            Invite Members
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          className="mt-6"
-          onPress={() => router.replace("/(tabs)/portfolios/wealth-group")}
-        >
-          <Text className="text-[#64748B] font-bold">Go back to dashboard</Text>
-        </TouchableOpacity>
-      </ImageBackground>
-    </SafeAreaView>
   );
 }

@@ -1,10 +1,12 @@
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
+import { RootState } from "@/src/store";
+import { WealthGroup } from "@/src/store/slices/wealthGroupSlice";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Eye, EyeOff, Search } from "lucide-react-native";
+import { Eye, EyeOff, Search, Users } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   Image,
@@ -15,36 +17,13 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSelector } from "react-redux";
 
 const THEME = "#155D5F"; // Deep teal
 const THEME_BG = "#F2FFFF"; // Request color for info cards
 const CREATE_CARD_BG = "#D2FEFF4D";
 const BORDER_COLOR = "#D9D9D9";
 const DISCOVERY_BORDER = "#E8E8E8";
-
-interface GroupCategory {
-  id: string;
-  title: string;
-  icon: string;
-}
-
-const CREATE_CATEGORIES: GroupCategory[] = [
-  {
-    id: "fixed",
-    title: "Fixed\nContribution\nGroups",
-    icon: "people-outline",
-  },
-  {
-    id: "flex",
-    title: "Flex\nContribution\nGroups",
-    icon: "cash-outline",
-  },
-  {
-    id: "rotational",
-    title: "Rotational\nSavings (Ajo/\nEsusu model)",
-    icon: "people-circle-outline",
-  },
-];
 
 interface DiscoveryGroup {
   id: string;
@@ -143,8 +122,29 @@ const DUMMY_RECOMMENDED: DiscoveryGroup[] = [
   },
 ];
 
+const CREATE_CATEGORIES = [
+  {
+    id: "fixed",
+    title: "Fixed\nContribution\nGroups",
+    icon: "people-outline",
+  },
+  {
+    id: "flex",
+    title: "Flex\nContribution\nGroups",
+    icon: "cash-outline",
+  },
+  {
+    id: "rotational",
+    title: "Rotational\nSavings (Ajo/\nEsusu model)",
+    icon: "people-circle-outline",
+  },
+];
+
 export default function WealthGroupScreen() {
   const [loading, setLoading] = useState(true);
+  const groupsFromRedux = useSelector(
+    (state: RootState) => state.wealthGroup.groups,
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000);
@@ -158,7 +158,31 @@ export default function WealthGroupScreen() {
   );
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [ongoingGroups] = useState<any[]>([]); // Empty state by default
+  // Map Redux groups to DiscoveryGroup interface
+  const mappedGroups = groupsFromRedux.map((g: WealthGroup) => ({
+    id: g.id,
+    title: g.name,
+    category: g.category,
+    dailyAmount: `₦${g.amount} ${g.frequency}`,
+    endDate: g.endDate,
+    growth: `₦${g.growthToday}/day`,
+    members: g.membersCount,
+    image: g.coverImage
+      ? { uri: g.coverImage }
+      : require("../../../assets/images/group_trending_1.png"),
+  }));
+
+  const trendingGroups = [...mappedGroups, ...DUMMY_TRENDING].filter(
+    (g) =>
+      g.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      g.category.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+  const recommendedGroups = [...mappedGroups, ...DUMMY_RECOMMENDED].filter(
+    (g) =>
+      g.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      g.category.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+  const ongoingGroups = groupsFromRedux.filter((g: WealthGroup) => g.isMember);
 
   if (loading) {
     return (
@@ -366,14 +390,14 @@ export default function WealthGroupScreen() {
           {/* ── Trending Groups ───────────────────────────────────── */}
           <DiscoverySection
             title="Trending Groups"
-            data={DUMMY_TRENDING}
+            data={trendingGroups}
             onViewAll={() => {}}
           />
 
           {/* ── Recommended Groups ────────────────────────────────── */}
           <DiscoverySection
             title="Recommended Groups"
-            data={DUMMY_RECOMMENDED}
+            data={recommendedGroups}
             onViewAll={() => {}}
           />
 
@@ -440,32 +464,110 @@ export default function WealthGroupScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* ── Empty State ───────────────────────────────────────── */}
-          <View className="items-center justify-center py-10 mb-10">
-            <View
-              style={{
-                width: 60,
-                height: 60,
-                borderRadius: 30,
-                backgroundColor: "#F2FFFF",
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: 20,
-              }}
-            >
-              <Ionicons name="person-add-outline" size={30} color={THEME} />
+          {/* ── Group List ────────────────────────────────────────── */}
+          {activeTab === "ongoing" ? (
+            ongoingGroups.length > 0 ? (
+              <View className="space-y-6 mb-10">
+                {ongoingGroups.map((g: WealthGroup) => {
+                  const target = parseFloat(g.amount.replace(/,/g, "")) || 1;
+                  const current =
+                    parseFloat(g.currentSavings.replace(/,/g, "")) || 0;
+                  const progress = Math.min(
+                    Math.max((current / target) * 100, 5),
+                    100,
+                  );
+
+                  return (
+                    <TouchableOpacity
+                      key={g.id}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/portfolio/detail/group/[id]",
+                          params: { id: g.id, member: "true" },
+                        })
+                      }
+                      className="flex-row items-center p-4 bg-white rounded-2xl"
+                      style={{
+                        shadowColor: "#000",
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.03,
+                        shadowRadius: 5,
+                        elevation: 1,
+                        borderWidth: 1,
+                        borderColor: "#F1F5F9",
+                      }}
+                    >
+                      <View className="w-16 h-16 rounded-xl overflow-hidden mr-4">
+                        {g.coverImage ? (
+                          <Image
+                            source={{ uri: g.coverImage }}
+                            className="w-full h-full"
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View className="w-full h-full bg-[#F2FFFF] items-center justify-center">
+                            <Users size={28} color={THEME} />
+                          </View>
+                        )}
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-[16px] font-bold text-[#1A1A1A] mb-1">
+                          {g.name}
+                        </Text>
+                        <View className="flex-row items-center justify-between mb-2">
+                          <Text className="text-[12px] text-[#64748B]">
+                            Progress:{" "}
+                            <Text className="text-[#155D5F] font-bold">
+                              ₦{g.currentSavings}
+                            </Text>
+                          </Text>
+                          <Text className="text-[11px] text-[#64748B]">
+                            {g.membersCount} members
+                          </Text>
+                        </View>
+                        {/* Progress Bar */}
+                        <View className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <View
+                            className="h-full bg-[#155D5F] rounded-full"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : (
+              <View className="items-center justify-center py-10 mb-10">
+                <View
+                  style={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: 30,
+                    backgroundColor: "#F2FFFF",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 20,
+                  }}
+                >
+                  <Ionicons name="person-add-outline" size={30} color={THEME} />
+                </View>
+                <Text className="text-[18px] font-black text-[#155D5F] mb-4">
+                  Create or Join a group
+                </Text>
+                <Text className="text-[11px] text-center text-[#155D5F] opacity-70 px-10 leading-[18px]">
+                  For users who want to start a new savings circle (leads to
+                  choosing Fixed, Flex, or Rotational). {"\n"}
+                  For users with an invite code or those looking for "Open"
+                  groups.
+                </Text>
+              </View>
+            )
+          ) : (
+            <View className="items-center justify-center py-10 mb-10">
+              <Text className="text-gray-400">No completed groups yet</Text>
             </View>
-
-            <Text className="text-[18px] font-black text-[#155D5F] mb-4">
-              Create or Join a group
-            </Text>
-
-            <Text className="text-[11px] text-center text-[#155D5F] opacity-70 px-10 leading-[18px]">
-              For users who want to start a new savings circle (leads to
-              choosing Fixed, Flex, or Rotational). {"\n"}
-              For users with an invite code or those looking for "Open" groups.
-            </Text>
-          </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -517,16 +619,25 @@ function DiscoverySection({
           <Text className="text-[13px] font-bold text-[#64748B]">View all</Text>
         </TouchableOpacity>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        className="space-x-4"
-        contentContainerStyle={{ paddingRight: 20 }}
-      >
-        {data.map((item) => (
-          <DiscoveryCard key={item.id} item={item} />
-        ))}
-      </ScrollView>
+      {data.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          className="space-x-4"
+          contentContainerStyle={{ paddingRight: 20 }}
+        >
+          {data.map((item) => (
+            <DiscoveryCard key={item.id} item={item} />
+          ))}
+        </ScrollView>
+      ) : (
+        <View className="w-full h-32 items-center justify-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+          <Ionicons name="search-outline" size={32} color="#94A3B8" />
+          <Text className="text-[#64748B] text-[12px] font-bold mt-2">
+            No tribes found matching your search
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
