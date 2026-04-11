@@ -69,7 +69,17 @@ export default function GroupDetailScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
-      <Header title={group.name} onBack={() => router.back()} />
+      <Header
+        title={group.name}
+        onBack={() => router.back()}
+        rightElement={
+          <TouchableOpacity
+            onPress={() => router.push("/profile/notifications")}
+          >
+            <Ionicons name="notifications-outline" size={24} color="#1A1A1A" />
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         <View className="px-5 py-6 pb-12">

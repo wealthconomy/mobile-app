@@ -43,7 +43,7 @@ export const HomeHeader = () => {
       <View className="flex-row items-center space-x-3">
         {/* Notification Bell */}
         <TouchableOpacity
-          onPress={() => router.push("/notifications" as any)}
+          onPress={() => router.push("/profile/notifications")}
           className="w-10 h-10 rounded-full bg-[#F5F5F5] items-center justify-center relative mr-3"
         >
           <NotificationIcon />
