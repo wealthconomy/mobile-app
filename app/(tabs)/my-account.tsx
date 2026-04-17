@@ -213,7 +213,9 @@ export default function MyAccountScreen() {
             iconBgColor="#E0F2F1"
             iconColor="#155D5F"
             label="Notifications"
-            onPress={() => router.push("/profile/notifications" as any)}
+            onPress={() =>
+              router.push("/profile/notifications/settings" as any)
+            }
           />
         </MenuGroup>
         <View className="h-[1px] bg-[#E5E5E5] mb-6" />
