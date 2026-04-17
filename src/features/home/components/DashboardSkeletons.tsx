@@ -7,10 +7,10 @@ export const PortfolioCardSkeleton = () => (
       width: 179,
       height: 119,
       backgroundColor: "#F9F9F9",
-      borderTopLeftRadius: 37,
-      borderTopRightRadius: 15,
-      borderBottomRightRadius: 37,
-      borderBottomLeftRadius: 15,
+      borderTopLeftRadius: 50,
+      borderTopRightRadius: 20,
+      borderBottomRightRadius: 50,
+      borderBottomLeftRadius: 20,
       padding: 16,
       borderWidth: 0.7,
       borderColor: "#E5E7EB",
@@ -104,7 +104,10 @@ export const PortfolioDetailSkeleton = () => (
         style={{
           width: "100%",
           height: 140,
-          borderRadius: 20,
+          borderTopLeftRadius: 50,
+          borderTopRightRadius: 20,
+          borderBottomRightRadius: 50,
+          borderBottomLeftRadius: 20,
           backgroundColor: "#F9F9F9",
           padding: 20,
           marginBottom: 32,
@@ -195,8 +198,13 @@ export const DashboardLoadingState = () => (
       <Skeleton
         width="100%"
         height={170}
-        borderRadius={20}
-        style={{ backgroundColor: "#EEEEEE" }}
+        style={{
+          borderTopLeftRadius: 50,
+          borderTopRightRadius: 20,
+          borderBottomRightRadius: 50,
+          borderBottomLeftRadius: 20,
+          backgroundColor: "#EEEEEE",
+        }}
       />
     </View>
 

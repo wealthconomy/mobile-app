@@ -19,7 +19,7 @@ const Header = ({
 
   return (
     <View className="flex-row items-center justify-between px-4 h-14 bg-white">
-      <View className="w-11">
+      <View className="min-w-[44px]">
         {showBack && (
           <TouchableOpacity
             onPress={onBack || (() => router.back())}
@@ -30,11 +30,14 @@ const Header = ({
         )}
       </View>
 
-      <Text className="text-base font-bold text-black text-center flex-1">
+      <Text
+        numberOfLines={1}
+        className="text-xl font-extrabold text-[#323232] text-center flex-1 px-2"
+      >
         {title}
       </Text>
 
-      <View className="w-11 items-end">{rightElement}</View>
+      <View className="min-w-[44px] items-end">{rightElement}</View>
     </View>
   );
 };

@@ -345,7 +345,7 @@ export default function NotificationsScreen() {
         >
           <Ionicons name="chevron-back" size={28} color="#000" />
         </TouchableOpacity>
-        <Text className="text-xl font-extrabold text-[#323232]">
+        <Text className="text-2xl font-extrabold text-[#323232]">
           Notification
         </Text>
         <View className="w-11" />

@@ -91,9 +91,12 @@ export default function WealthFlexScreen() {
         <View
           className="relative overflow-hidden self-center mb-8"
           style={{
-            width: 366,
-            height: 140,
-            borderRadius: 20,
+            width: 365,
+            height: 170,
+            borderTopLeftRadius: 50,
+            borderTopRightRadius: 20,
+            borderBottomRightRadius: 50,
+            borderBottomLeftRadius: 20,
             backgroundColor: "#F4433633", // Red with 20% opacity
             shadowColor: "#323232",
             shadowOffset: { width: 0, height: 4 },
@@ -238,15 +241,15 @@ export default function WealthFlexScreen() {
               })
             }
           >
-            <View className="w-8 h-8 rounded-full bg-white/20 items-center justify-center">
+            <View className="items-center justify-center">
               <Ionicons name="add" size={20} color="white" />
             </View>
             <View>
               <Text className="text-white font-bold text-[14px]">
-                Deposit Funds
+                Wealth Deposit{" "}
               </Text>
               <Text className="text-white mt-2 text-[10px]">
-                {"Add to your Wealth\nAccount"}
+                {"Add to your WealthFles"}
               </Text>
             </View>
           </TouchableOpacity>
@@ -274,7 +277,7 @@ export default function WealthFlexScreen() {
               })
             }
           >
-            <View className="w-8 h-8 rounded-full bg-[#FFE9E9] items-center justify-center">
+            <View className="items-center justify-center">
               <MaterialCommunityIcons
                 name="arrow-top-right"
                 size={24}
@@ -289,7 +292,7 @@ export default function WealthFlexScreen() {
                 Withdraw Funds
               </Text>
               <Text className="text-[10px] mt-2" style={{ color: "#F06358" }}>
-                {"Move to Bank or other\nportfolio"}
+                {"Move or send to other\nportfolios"}
               </Text>
             </View>
           </TouchableOpacity>
@@ -300,7 +303,7 @@ export default function WealthFlexScreen() {
         {/* Flex Transactions Section */}
         <View>
           <View className="flex-row justify-between items-center mb-6 px-1">
-            <Text className="text-[#1A1A1A] font-bold text-[18px]">
+            <Text className="text-2xl font-extrabold text-[#323232]">
               Flex Transactions
             </Text>
             <TouchableOpacity

@@ -46,10 +46,7 @@ const SLIDES: SlideData[] = [
     image: require("../assets/images/onboarding-1.png"),
     highlight: "Win",
     rest: " Up",
-    segments: [
-      { t: "Save Purposefully & Win Financially. ", },
- 
-    ],
+    segments: [{ t: "Save Purposefully & Win Financially. " }],
   },
   {
     id: "2",
@@ -57,10 +54,7 @@ const SLIDES: SlideData[] = [
     image: require("../assets/images/onboarding-2.png"),
     highlight: "Wise",
     rest: " Up",
-    segments: [
-      { t: "Learn & Get Smart About Money" },
-     
-    ],
+    segments: [{ t: "Learn & Get Smart About Money" }],
   },
   {
     id: "3",
@@ -68,9 +62,7 @@ const SLIDES: SlideData[] = [
     image: require("../assets/images/onboarding-3.png"),
     highlight: "Wealth",
     rest: " Up",
-    segments: [
-      { t: " Build Wealth Confidently &\n Be Boundless " },
-    ],
+    segments: [{ t: " Build Wealth Confidently &\n Be Boundless " }],
   },
 ];
 

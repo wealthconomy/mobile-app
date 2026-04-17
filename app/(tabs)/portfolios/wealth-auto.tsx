@@ -234,15 +234,19 @@ export default function WealthAutoScreen() {
           <View
             className="relative overflow-hidden mb-8"
             style={{
-              width: "100%",
-              height: 180,
-              borderRadius: 20,
+              width: 365,
+              height: 170,
+              borderTopLeftRadius: 50,
+              borderTopRightRadius: 20,
+              borderBottomRightRadius: 50,
+              borderBottomLeftRadius: 20,
               backgroundColor: THEME_BG,
-              shadowColor: "#000",
+              shadowColor: "#323232",
               shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.1,
-              shadowRadius: 10,
+              shadowOpacity: 0.12,
+              shadowRadius: 13,
               elevation: 5,
+              alignSelf: "center",
             }}
           >
             <Image
@@ -251,9 +255,9 @@ export default function WealthAutoScreen() {
               style={{
                 width: 180,
                 height: 180,
-                right: -20,
+                right: -40,
                 top: -10,
-                opacity: 0.8,
+                opacity: 0.3,
               }}
               resizeMode="contain"
             />
@@ -307,7 +311,7 @@ export default function WealthAutoScreen() {
               style={{
                 width: 160,
                 height: 40,
-                borderRadius: 10,
+                borderRadius: 18,
                 bottom: 20,
                 right: 20,
                 elevation: 3,

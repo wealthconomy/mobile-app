@@ -103,8 +103,13 @@ export default function WealthPortfolioScreen() {
                 <Skeleton
                   width="100%"
                   height={170}
-                  borderRadius={18}
-                  style={{ backgroundColor: "#E1E1E1" }}
+                  style={{
+                    borderTopLeftRadius: 50,
+                    borderTopRightRadius: 20,
+                    borderBottomRightRadius: 50,
+                    borderBottomLeftRadius: 20,
+                    backgroundColor: "#E1E1E1",
+                  }}
                 />
               ) : (
                 <SubWealthCard

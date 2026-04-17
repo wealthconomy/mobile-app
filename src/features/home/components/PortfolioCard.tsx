@@ -112,10 +112,10 @@ export const PortfolioCard = ({
         height: 119,
         backgroundColor: styles.bg,
         borderColor: styles.border,
-        borderTopLeftRadius: 37,
-        borderTopRightRadius: 15,
-        borderBottomRightRadius: 37,
-        borderBottomLeftRadius: 15,
+        borderTopLeftRadius: 50,
+        borderTopRightRadius: 20,
+        borderBottomRightRadius: 50,
+        borderBottomLeftRadius: 20,
       }}
     >
       {/* Decorative Background Image */}

@@ -192,9 +192,12 @@ export default function WealthGoalScreen() {
           <View
             className="relative overflow-hidden mb-8"
             style={{
-              width: 366,
-              height: 180,
-              borderRadius: 20,
+              width: 365,
+              height: 170,
+              borderTopLeftRadius: 50,
+              borderTopRightRadius: 20,
+              borderBottomRightRadius: 50,
+              borderBottomLeftRadius: 20,
               backgroundColor: "#F3007A33",
               shadowColor: "#323232",
               shadowOffset: { width: 0, height: 4 },
@@ -277,7 +280,7 @@ export default function WealthGoalScreen() {
               style={{
                 width: 200,
                 height: 40,
-                borderRadius: 10,
+                borderRadius: 18,
                 bottom: 15,
                 right: 20,
                 elevation: 3,

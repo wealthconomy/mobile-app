@@ -40,7 +40,7 @@ export default function DepositScreen() {
   };
 
   const getTitle = () => {
-    if (step === "select-method") return "Deposit Funds";
+    if (step === "select-method") return "Wealth Deposit";
     if (step === "use-card") return "Use Card";
     if (step === "preview") return `${wealthPlan} Preview`;
     return "";
@@ -289,17 +289,16 @@ export default function DepositScreen() {
         }}
       >
         {/* Wealthconomy Logo */}
-        <Image
+        {/* <Image
           source={require("../../assets/images/wealth.png")}
           style={{
             width: 80,
             height: 20,
             position: "absolute",
-            right: 20,
-            top: 20,
+            right: 10,
           }}
           resizeMode="contain"
-        />
+        /> */}
 
         <View className="flex-row justify-between mb-8 mt-2 items-start">
           <View>

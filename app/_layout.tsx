@@ -154,10 +154,6 @@ function RootLayoutNav() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="portfolio/detail/group/[id]"
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
               name="wallet/top-up"
               options={{ headerShown: false }}
             />

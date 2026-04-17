@@ -2,7 +2,7 @@ import Header from "@/src/components/common/Header";
 import { RootState } from "@/src/store";
 import { WealthGroup } from "@/src/store/slices/wealthGroupSlice";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Share2 } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import {
@@ -33,6 +33,7 @@ export default function GroupDetailScreen() {
   const isMember = member === "true" || group.isMember || group.isAdmin;
 
   const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
+  const [isMoreModalVisible, setIsMoreModalVisible] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
   const [requestSentLocally, setRequestSentLocally] = useState(false);
 
@@ -69,23 +70,46 @@ export default function GroupDetailScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <Header
         title={group.name}
         onBack={() => router.back()}
         rightElement={
-          <TouchableOpacity
-            onPress={() => router.push("/profile/notifications")}
-          >
-            <Ionicons name="notifications-outline" size={24} color="#1A1A1A" />
-          </TouchableOpacity>
+          group.isAdmin ? (
+            <TouchableOpacity onPress={() => setIsMoreModalVisible(true)}>
+              <Ionicons name="ellipsis-vertical" size={24} color="#1A1A1A" />
+            </TouchableOpacity>
+          ) : undefined
         }
       />
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         <View className="px-5 py-6 pb-12">
-          <Text className="text-[20px] font-bold text-[#1A1A1A] mb-6">
-            Group Details
-          </Text>
+          <View className="flex-row items-center justify-between mb-6">
+            <Text className="text-2xl font-extrabold text-[#323232]">
+              Group Details
+            </Text>
+            {group.isAdmin && (
+              <TouchableOpacity
+                onPress={() =>
+                  router.push(
+                    `/portfolio/detail/group/${id}/notifications` as any,
+                  )
+                }
+              >
+                <View>
+                  <Ionicons
+                    name="notifications-outline"
+                    size={24}
+                    color="#1A1A1A"
+                  />
+                  <View className="absolute -top-1 -right-1 bg-red-500 rounded-full h-4 w-4 items-center justify-center border border-white">
+                    <Text className="text-white text-[8px] font-bold">3</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
 
           <View className="mb-8">
             <Image
@@ -101,13 +125,17 @@ export default function GroupDetailScreen() {
 
           {/* Savings Card */}
           <View
-            className="rounded-[20px] p-6 mb-8 relative overflow-hidden self-center"
+            className="p-6 mb-8 relative overflow-hidden self-center"
             style={{
               width: 365,
               height: 140,
               backgroundColor: "white",
               borderWidth: 0.7,
               borderColor: "#D9D9D9",
+              borderTopLeftRadius: 50,
+              borderTopRightRadius: 20,
+              borderBottomRightRadius: 50,
+              borderBottomLeftRadius: 20,
             }}
           >
             <Image
@@ -227,6 +255,60 @@ export default function GroupDetailScreen() {
         </View>
       </ScrollView>
 
+      {/* More Options Modal */}
+      <Modal
+        visible={isMoreModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsMoreModalVisible(false)}
+      >
+        <TouchableOpacity
+          className="flex-1 bg-black/20"
+          activeOpacity={1}
+          onPress={() => setIsMoreModalVisible(false)}
+        >
+          <View
+            className="absolute top-24 right-5 w-56 bg-white rounded-2xl shadow-xl overflow-hidden p-2"
+            style={{
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 10,
+              elevation: 10,
+            }}
+          >
+            <OptionItem
+              icon="information-circle-outline"
+              label="Group Info"
+              onPress={() => {
+                setIsMoreModalVisible(false);
+                router.push(`/` as any);
+              }}
+            />
+            <OptionItem
+              icon="people-outline"
+              label="Tribe Members"
+              onPress={() => {
+                setIsMoreModalVisible(false);
+                router.push(
+                  `/portfolio/detail/group/${id}/tribe-settings/members-list` as any,
+                );
+              }}
+            />
+            <OptionItem
+              icon="settings-outline"
+              label="Tribe Setting"
+              onPress={() => {
+                setIsMoreModalVisible(false);
+                router.push(
+                  `/portfolio/detail/group/${id}/tribe-settings` as any,
+                );
+              }}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Join Request Modal */}
       <Modal
         visible={isJoinModalVisible}
@@ -334,5 +416,27 @@ function StatRow({ label, value, valueColor = "#1A1A1A" }: any) {
         {value}
       </Text>
     </View>
+  );
+}
+
+function OptionItem({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: any;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      className="flex-row items-center p-3 hover:bg-gray-50 rounded-xl"
+    >
+      <Ionicons name={icon} size={20} color="#155D5F" className="mr-3" />
+      <Text className="text-[#1A1A1A] font-medium text-[14px] ml-3">
+        {label}
+      </Text>
+    </TouchableOpacity>
   );
 }

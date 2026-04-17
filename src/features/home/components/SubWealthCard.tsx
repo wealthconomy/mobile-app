@@ -31,9 +31,12 @@ export const SubWealthCard = ({
     <View
       className="relative overflow-hidden"
       style={{
-        width: 366,
+        width: 365,
         height: 170,
-        borderRadius: 20,
+        borderTopLeftRadius: 50,
+        borderTopRightRadius: 20,
+        borderBottomRightRadius: 50,
+        borderBottomLeftRadius: 20,
         backgroundColor: "#155D5F",
         borderWidth: 0.7,
         borderColor: "#D9D9D9",
@@ -64,9 +67,9 @@ export const SubWealthCard = ({
       <View
         className="absolute"
         style={{
-          width: 210,
+          width: 250,
           height: 200,
-          top: 120,
+          top: 100,
           left: 10,
           backgroundColor: "#E2E2E233",
           borderRadius: 100,
@@ -132,11 +135,11 @@ export const SubWealthCard = ({
             className="bg-[#FFCF65] items-center justify-center"
             style={{
               position: "absolute",
-              width: 171,
+              width: 150,
               height: 37,
               top: 123,
               left: 186,
-              borderRadius: 10,
+              borderRadius: 18,
             }}
             activeOpacity={0.9}
           >

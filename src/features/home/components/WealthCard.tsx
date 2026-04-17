@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { Eye, EyeOff } from "lucide-react-native";
 import { useState } from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
-import Svg, { ClipPath, Defs, G, Path, Rect } from "react-native-svg";
+import Svg, { ClipPath, Defs, G, Path } from "react-native-svg";
 
 export const WealthCard = () => {
   const [showBalance, setShowBalance] = useState(true);
@@ -15,7 +15,10 @@ export const WealthCard = () => {
       style={{
         width: 365,
         height: 170,
-        borderRadius: 20,
+        borderTopLeftRadius: 50,
+        borderTopRightRadius: 20,
+        borderBottomRightRadius: 50,
+        borderBottomLeftRadius: 20,
         backgroundColor: "#008185",
         shadowColor: "#323232",
         shadowOffset: { width: 0, height: 4 },
@@ -30,7 +33,7 @@ export const WealthCard = () => {
         <Svg width="365" height="170" viewBox="0 0 365 170" fill="none">
           <Defs>
             <ClipPath id="clip-card">
-              <Rect width="365" height="170" rx="20" fill="white" />
+              <Path d="M50,0 L345,0 Q365,0 365,20 L365,120 Q365,170 315,170 L20,170 Q0,170 0,150 L0,50 Q0,0 50,0 Z" />
             </ClipPath>
           </Defs>
           <G clipPath="url(#clip-card)">
@@ -113,7 +116,7 @@ export const WealthCard = () => {
           style={{
             width: 128,
             height: 37,
-            borderRadius: 10,
+            borderRadius: 18,
             padding: 10,
             alignSelf: "flex-end",
             marginBottom: 5,
