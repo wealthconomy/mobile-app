@@ -3,10 +3,11 @@ import { paymentService } from "@/src/api/paymentService";
 import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -46,15 +47,43 @@ const INITIAL_RECIPIENTS = [
   },
 ];
 
+const STORAGE_KEY = "@recent_recipients";
+
 export default function WithdrawScreen() {
   const { plan } = useLocalSearchParams<{ plan: string }>();
   const [recipients, setRecipients] = useState(INITIAL_RECIPIENTS);
   const [step, setStep] = useState<Step>("select-recipient");
+
+  // Load recipients from storage on mount
+  useEffect(() => {
+    const loadRecipients = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          setRecipients(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.error("Failed to load recipients", e);
+      }
+    };
+    loadRecipients();
+  }, []);
+
+  const saveRecipients = async (newRecipients: typeof INITIAL_RECIPIENTS) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newRecipients));
+    } catch (e) {
+      console.error("Failed to save recipients", e);
+    }
+  };
+
   const [showSuccess, setShowSuccess] = useState(false);
   const [amount, setAmount] = useState("");
   const [selectedBank, setSelectedBank] = useState("Select bank");
+  const [selectedBankCode, setSelectedBankCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [userName, setUserName] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
   const [narrative, setNarrative] = useState("");
   const [bankSearchQuery, setBankSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -71,9 +100,37 @@ export default function WithdrawScreen() {
     setAmount("");
     setAccountNumber("");
     setSelectedBank("Select bank");
+    setSelectedBankCode("");
     setUserName("");
     setNarrative("");
   };
+
+  // Auto-fetch account name
+  useEffect(() => {
+    const resolveName = async () => {
+      if (accountNumber.length === 10 && selectedBankCode) {
+        setIsVerifying(true);
+        try {
+          const resolvedName = await bankService.resolveAccount(
+            accountNumber,
+            selectedBankCode,
+          );
+          setUserName(resolvedName);
+        } catch (error) {
+          console.error("Verification failed:", error);
+        } finally {
+          setIsVerifying(false);
+        }
+      }
+    };
+    resolveName();
+  }, [accountNumber, selectedBankCode]);
+
+  useEffect(() => {
+    if (accountNumber.length === 10 && selectedBank === "Select bank") {
+      setStep("select-bank");
+    }
+  }, [accountNumber, selectedBank]);
 
   const {
     data: banks,
@@ -93,8 +150,8 @@ export default function WithdrawScreen() {
   };
 
   const getTitle = () => {
-    if (step === "select-recipient") return "Transfer Funds";
-    if (step === "recipient-details") return "Recipient Bank Account";
+    if (step === "select-recipient") return "Wealth Transfer";
+    if (step === "recipient-details") return "Wealth Withdrawal";
     if (step === "select-bank") return "Select Bank";
     if (step === "preview") return `${wealthPlan} Preview`;
     return "";
@@ -143,6 +200,7 @@ export default function WithdrawScreen() {
               onPress={() => {
                 setAccountNumber(item.accountNumber);
                 setSelectedBank(item.bankName);
+                // In a real app, we'd find the bank code too
                 setUserName(item.name);
                 setStep("recipient-details");
               }}
@@ -196,6 +254,7 @@ export default function WithdrawScreen() {
             placeholderTextColor="#9CA3AF"
             className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
             keyboardType="numeric"
+            maxLength={10}
             value={accountNumber}
             onChangeText={setAccountNumber}
           />
@@ -232,12 +291,21 @@ export default function WithdrawScreen() {
           <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
             Bank User's Name
           </Text>
-          <TextInput
-            placeholder="Simon John"
-            className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
-            editable={false}
-            value={userName}
-          />
+          <View className="relative">
+            <TextInput
+              placeholder="John Doe"
+              placeholderTextColor="#9CA3AF"
+              className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] pr-12"
+              value={userName}
+              onChangeText={setUserName}
+              editable={!isVerifying}
+            />
+            {isVerifying && (
+              <View className="absolute right-4 top-4">
+                <ActivityIndicator size="small" color="#155D5F" />
+              </View>
+            )}
+          </View>
         </View>
 
         <View>
@@ -258,7 +326,8 @@ export default function WithdrawScreen() {
         const isFormValid =
           amount &&
           accountNumber.length === 10 &&
-          selectedBank !== "Select bank";
+          selectedBank !== "Select bank" &&
+          userName;
         return (
           <ThemedButton
             title="Proceed"
@@ -329,6 +398,7 @@ export default function WithdrawScreen() {
                 key={bank.id}
                 onPress={() => {
                   setSelectedBank(bank.name);
+                  setSelectedBankCode(bank.code);
                   setStep("recipient-details");
                 }}
                 className="bg-[#F8F8F8] p-4 rounded-xl"
@@ -371,7 +441,7 @@ export default function WithdrawScreen() {
         }}
       >
         {/* Wealthconomy Logo */}
-        <Image
+        {/* <Image
           source={require("../../assets/images/wealth.png")}
           style={{
             width: 80,
@@ -381,7 +451,7 @@ export default function WithdrawScreen() {
             top: 20,
           }}
           resizeMode="contain"
-        />
+        /> */}
 
         <View className="flex-row justify-between mb-8 mt-2 items-start">
           <View>
@@ -424,7 +494,7 @@ export default function WithdrawScreen() {
         <View className="flex-row justify-between">
           <View>
             <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
-              Wealth Send From
+              Wealth Send to
             </Text>
             <Text className="text-[#1A1A1A] font-bold text-[16px]">
               {wealthPlan}
@@ -468,15 +538,15 @@ export default function WithdrawScreen() {
             (r) => r.accountNumber === accountNumber,
           );
           if (!exists && accountNumber && userName) {
-            setRecipients((prev) => [
-              {
-                id: Date.now(),
-                name: userName,
-                bankName: selectedBank,
-                accountNumber: accountNumber,
-              },
-              ...prev,
-            ]);
+            const newRes = {
+              id: Date.now(),
+              name: userName,
+              bankName: selectedBank,
+              accountNumber: accountNumber,
+            };
+            const updated = [newRes, ...recipients];
+            setRecipients(updated);
+            await saveRecipients(updated);
           }
 
           setLoading(false);

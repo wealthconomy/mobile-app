@@ -74,4 +74,39 @@ export const bankService = {
       );
     }
   },
+
+  /**
+   * Simulates resolving an account name from a bank code and account number.
+   * In a real app, this would call Paystack's /bank/resolve endpoint.
+   */
+  resolveAccount: async (
+    accountNumber: string,
+    bankCode: string,
+  ): Promise<string> => {
+    await new Promise((res) => setTimeout(res, 1000)); // Simulate network lag
+
+    // Mock logic: return a dummy name for specific numbers, or a default
+    const names = [
+      "CHIZOBA ANTHONY NWOSU",
+      "FATIMA ZAHRA ABUBAKAR",
+      "OLUWASEUN ADEYEMI",
+      "BLESSING EGBE",
+      "IBRAHIM HASSAN",
+      "NGOZI EZE",
+      "BABATUNDE OLAREWAJU",
+      "CHUKWUDI OKEKE",
+    ];
+
+    if (accountNumber === "0123456789") return "ADAMU CHUKWUMA OKORO";
+    if (accountNumber === "9876543210") return "FADEKE MODUPEOLA";
+
+    // Use a hash of the account number to pick a deterministic name from the list
+    let hash = 0;
+    for (let i = 0; i < accountNumber.length; i++) {
+      hash = (hash << 5) - hash + accountNumber.charCodeAt(i);
+      hash |= 0;
+    }
+    const index = Math.abs(hash) % names.length;
+    return names[index];
+  },
 };
