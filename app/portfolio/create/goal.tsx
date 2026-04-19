@@ -22,7 +22,7 @@ type Step = "form" | "preview" | "pin" | "success";
 
 const CATEGORY_DETAILS: Record<string, { subtitle: string; emoji: string }> = {
   Rent: { subtitle: "Stay ahead of your landlord", emoji: "🏠" },
-  Business: { subtitle: "Fund your entrepreneurship dreams", emoji: "💼" },
+  Business: { subtitle: "Fund your business dreams", emoji: "💼" },
   "School Fees": { subtitle: "Fund your education dreams", emoji: "🎓" },
   Vacation: { subtitle: "Save for your dream trip", emoji: "✈️" },
 };
@@ -189,7 +189,7 @@ export default function CreateGoalScreen() {
       <View className="space-y-6 gap-6 mb-10">
         <View className="mb-6">
           <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
-            Target Goal
+            Wealth Goal
           </Text>
           <TextInput
             placeholder="e.g., 'Tuition fee,' 'New Laptop,' or 'Wedding'"

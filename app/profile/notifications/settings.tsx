@@ -15,14 +15,14 @@ export default function NotificationSettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1 }} className="bg-white">
+    <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
       <StatusBar barStyle="dark-content" />
       <Header title="Notification" />
 
+      {/* Settings Options */}
       <ScrollView
-        className="flex-1 px-5"
+        className="flex-1 px-5 mt-5"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: 20, paddingBottom: 40 }}
       >
         <View className="gap-y-6">
           <SettingItem
@@ -56,7 +56,7 @@ const SettingItem = ({
   onToggle: () => void;
 }) => (
   <View className="flex-row items-center justify-between py-2">
-    <Text className="text-[15px] font-medium text-[#6B7280]">{label}</Text>
+    <Text className="text-[16px] font-medium text-[#4B5563]">{label}</Text>
     <Switch
       trackColor={{ false: "#E5E7EB", true: "#155D5F" }}
       thumbColor="#FFFFFF"

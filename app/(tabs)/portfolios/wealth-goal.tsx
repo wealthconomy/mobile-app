@@ -13,7 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const CATEGORIES = [
   { id: "1", title: "Rent", subtitle: "Stay ahead of your landlord" },
-  { id: "2", title: "Business", subtitle: "Fund your entrepreneurship dreams" },
+  { id: "2", title: "Business", subtitle: "Fund your business dreams" },
   { id: "3", title: "School Fees", subtitle: "Fund your education dreams" },
   { id: "4", title: "Vacation", subtitle: "Save for your dream trip" },
 ];
@@ -310,7 +310,7 @@ export default function WealthGoalScreen() {
                 className="font-extrabold text-[12px] mb-4"
                 style={{ color: "#F3007A" }}
               >
-                What’s New on Wealth Goal? 🎯✨
+                What’s Wealth Goal? 🎯✨
               </Text>
               <View>
                 {[
