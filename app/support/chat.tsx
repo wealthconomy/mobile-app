@@ -26,8 +26,8 @@ const INITIAL_MESSAGES: Message[] = [
   {
     id: "1",
     sender: "admin",
-    senderName: "Adeola Funmilayo",
-    text: "Hello!\nI'm Adeola, your virtual assistance.\nHow can I help you pls",
+    senderName: "Wealthconomy Support",
+    text: "Hello!\nI'm your Wealthconomy virtual assistant.\nHow can I help you pls",
     time: "2:00pm",
   },
   {
@@ -39,14 +39,14 @@ const INITIAL_MESSAGES: Message[] = [
   {
     id: "3",
     sender: "admin",
-    senderName: "Adeola Funmilayo",
+    senderName: "Wealthconomy Support",
     text: "Sorry about that, We are working on it now",
     time: "2:00pm",
   },
   {
     id: "4",
     sender: "admin",
-    senderName: "Adeola Funmilayo",
+    senderName: "Wealthconomy Support",
     text: "It's done now,\nYou can try lock your funds again",
     time: "2:00pm",
   },
@@ -59,7 +59,7 @@ const INITIAL_MESSAGES: Message[] = [
   {
     id: "6",
     sender: "admin",
-    senderName: "Adeola Funmilayo",
+    senderName: "Wealthconomy Support",
     text: "You are welcome",
     time: "2:00pm",
   },
@@ -93,9 +93,7 @@ export default function ChatScreen() {
       >
         {isAdmin && (
           <Image
-            source={{
-              uri: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop",
-            }}
+            source={require("../../assets/images/logo1.png")}
             className="w-8 h-8 rounded-full mr-2 mt-[18px]"
           />
         )}
@@ -143,7 +141,7 @@ export default function ChatScreen() {
       <View className="flex-row items-center px-5 my-3">
         <View className="flex-1 h-[1px] bg-[#E5E5E5]" />
         <Text className="text-[12px] text-[#9CA3AF] mx-3">
-          Adeola Funmilayo is available for you
+          Wealthconomy Support is available for you
         </Text>
         <View className="flex-1 h-[1px] bg-[#E5E5E5]" />
       </View>

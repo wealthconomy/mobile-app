@@ -213,27 +213,13 @@ export default function MyAccountScreen() {
             iconBgColor="#E0F2F1"
             iconColor="#155D5F"
             label="Notifications"
-            onPress={() => router.push("/profile/notifications" as any)}
+            onPress={() => router.push("/profile/notifications/settings" as any)}
           />
         </MenuGroup>
         <View className="h-[1px] bg-[#E5E5E5] mb-6" />
 
         {/* Menu Items Group 2 */}
         <MenuGroup>
-          <MenuItem
-            icon={
-              <MaterialCommunityIcons
-                name="hand-coin"
-                size={18}
-                color="#155D5F"
-              />
-            }
-            iconBgColor="#E0F2F1"
-            iconColor="#155D5F"
-            label="Finance and Growth"
-            subtitle="View your wealth growth progress"
-            onPress={() => {}}
-          />
           <MenuItem
             icon="list"
             iconBgColor="#E0F2F1"
