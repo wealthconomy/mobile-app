@@ -23,7 +23,7 @@ const TEXT_DARK = "#1A1A1A";
 const SOURCES = ["Wealth Save", "Wealth Flex", "Bank Account"];
 const FREQUENCIES = ["Daily", "Weekly", "Monthly"];
 
-export default function CreateAutoScreen() {
+export default function CreateFlowScreen() {
   const params = useLocalSearchParams<{
     category: string;
     amount: string;
@@ -69,7 +69,7 @@ export default function CreateAutoScreen() {
   // ─── FORM ─────────────────────────────────────────────────────────────────
   const renderForm = () => (
     <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-5">
-      {/* What's on WealthAuto? */}
+      {/* What's on WealthFlow? */}
       {showInfoCard && (
         <View
           style={{
@@ -94,7 +94,7 @@ export default function CreateAutoScreen() {
               marginBottom: 10,
             }}
           >
-            What is WealthAuto? 🏎️
+            What is WealthFlow? 🏎️
           </Text>
           <Text
             style={{
@@ -706,7 +706,7 @@ export default function CreateAutoScreen() {
         }}
       >
         Your must insert your pin to confirm to{"\n"}completely create your
-        Wealth Auto
+        Wealth Flow
       </Text>
 
       {/* PIN boxes */}
@@ -811,7 +811,7 @@ export default function CreateAutoScreen() {
           marginBottom: 16,
         }}
       >
-        WealthAuto Activated{"\n"}Successfully 🏎️
+        WealthFlow Activated{"\n"}Successfully 🏎️
       </Text>
 
       <Text
@@ -846,7 +846,7 @@ export default function CreateAutoScreen() {
 
       <ThemedButton
         title="Close"
-        onPress={() => router.replace("/(tabs)/portfolios/wealth-auto")}
+        onPress={() => router.replace("/(tabs)/portfolios/wealth-flow")}
         style={{
           backgroundColor: TEAL,
           width: "100%",
@@ -866,12 +866,12 @@ export default function CreateAutoScreen() {
           step === "form"
             ? isRecommendation
               ? params.title!
-              : "Create WealthAuto"
+              : "Create WealthFlow"
             : step === "preview"
-              ? "WealthAuto Preview"
+              ? "WealthFlow Preview"
               : step === "pin"
                 ? "Insert your Pin"
-                : "WealthAuto"
+                : "WealthFlow"
         }
         onBack={() => {
           if (step === "preview") setStep("form");

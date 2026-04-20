@@ -39,9 +39,19 @@ const authSlice = createSlice({
     completeOnboarding: (state) => {
       state.hasCompletedOnboarding = true;
     },
+    updateKycLevel: (state, action: PayloadAction<number>) => {
+      if (state.user) {
+        state.user.kycLevel = action.payload;
+      }
+    },
   },
 });
 
-export const { setCredentials, logout, setLoading, completeOnboarding } =
-  authSlice.actions;
+export const {
+  setCredentials,
+  logout,
+  setLoading,
+  completeOnboarding,
+  updateKycLevel,
+} = authSlice.actions;
 export default authSlice.reducer;

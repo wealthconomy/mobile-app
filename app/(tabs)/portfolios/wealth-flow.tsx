@@ -71,7 +71,7 @@ const CATEGORIES: Category[] = [
   },
 ];
 
-export default function WealthAutoScreen() {
+export default function WealthFlowScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -217,7 +217,7 @@ export default function WealthAutoScreen() {
     return (
       <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
         <StatusBar style="dark" />
-        <Header title="WealthAuto" onBack={() => router.back()} />
+        <Header title="WealthFlow" onBack={() => router.back()} />
         <PortfolioDetailSkeleton />
       </SafeAreaView>
     );
@@ -226,7 +226,7 @@ export default function WealthAutoScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
       <StatusBar style="dark" />
-      <Header title="WealthAuto" onBack={() => router.back()} />
+      <Header title="WealthFlow" onBack={() => router.back()} />
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         <View className="px-5 py-2">
@@ -317,10 +317,10 @@ export default function WealthAutoScreen() {
                 elevation: 3,
                 zIndex: 20,
               }}
-              onPress={() => router.push("/portfolio/create/auto")}
+              onPress={() => router.push("/portfolio/create/flow")}
             >
               <Text style={{ color: THEME }} className="font-bold text-[14px]">
-                Create a WealthAuto
+                Create a WealthFlow
               </Text>
             </TouchableOpacity>
           </View>
@@ -341,14 +341,14 @@ export default function WealthAutoScreen() {
                 className="font-extrabold text-[12px] mb-4"
                 style={{ color: THEME }}
               >
-                What's on WealthAuto? 🚀
+                What's on WealthFlow? 🚀
               </Text>
               <Text
                 className="text-[10px] leading-[15px] mb-4"
                 style={{ color: THEME }}
               >
                 To make saving effortless and consistent,{" "}
-                <Text className="font-bold">Wealth Auto</Text> allows you to put
+                <Text className="font-bold">Wealth Flow</Text> allows you to put
                 your{" "}
                 <Text className="font-bold">wealth-building on autopilot.</Text>{" "}
                 It is designed to{" "}
@@ -362,7 +362,7 @@ export default function WealthAutoScreen() {
           {/* ── Category Grid (2x2) ───────────────────────────────── */}
           <View className="mb-8">
             <Text className="text-[18px] font-bold text-[#323232] mb-4">
-              Categories of Wealth Auto
+              Categories of Wealth Flow
             </Text>
             <View
               className="flex-row flex-wrap justify-between"
@@ -381,7 +381,7 @@ export default function WealthAutoScreen() {
                   }}
                   onPress={() =>
                     router.push({
-                      pathname: "/portfolio/create/auto",
+                      pathname: "/portfolio/create/flow",
                       params: {
                         category: cat.title,
                         amount: cat.amount,
@@ -574,7 +574,7 @@ function AutoListItem({
       activeOpacity={0.9}
       onPress={() =>
         router.push({
-          pathname: "/portfolio/detail/auto/[id]",
+          pathname: "/portfolio/detail/flow/[id]",
           params: { id: plan.id },
         })
       }

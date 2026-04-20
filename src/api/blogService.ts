@@ -116,7 +116,7 @@ const MOCK_BLOGS: Blog[] = [
     content: "Content for savings blog...",
     image: "https://picsum.photos/seed/5/800/600",
     author: MOCK_AUTHORS.sarah,
-    category: "WealthAuto",
+    category: "WealthFlow",
     timePosted: "3 days ago",
     readingDuration: "3 mins reading",
     isBookmarked: false,

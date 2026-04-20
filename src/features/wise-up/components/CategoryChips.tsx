@@ -6,7 +6,7 @@ const CATEGORIES: Category[] = [
   "WealthFlex",
   "WealthFix",
   "WealthGoal",
-  "WealthAuto",
+  "WealthFlow",
   "WealthFam",
 ];
 

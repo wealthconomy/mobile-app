@@ -34,9 +34,9 @@ const PORTFOLIOS = [
   },
   {
     id: "5",
-    type: "auto" as const,
-    title: "WealthAuto",
-    description: "WealthFlow- Automated savings for continous wealth flow",
+    type: "flow" as const,
+    title: "WealthFlow",
+    description: "Automated savings for a continuous wealth flow.",
   },
   {
     id: "6",

@@ -278,14 +278,6 @@ export default function GroupDetailScreen() {
             }}
           >
             <OptionItem
-              icon="information-circle-outline"
-              label="Group Info"
-              onPress={() => {
-                setIsMoreModalVisible(false);
-                router.push(`/` as any);
-              }}
-            />
-            <OptionItem
               icon="people-outline"
               label="Tribe Members"
               onPress={() => {
@@ -303,6 +295,14 @@ export default function GroupDetailScreen() {
                 router.push(
                   `/portfolio/detail/group/${id}/tribe-settings` as any,
                 );
+              }}
+            />
+            <OptionItem
+              icon="chatbubble-ellipses-outline"
+              label="Support Center"
+              onPress={() => {
+                setIsMoreModalVisible(false);
+                router.push("/support/chat");
               }}
             />
           </View>

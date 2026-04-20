@@ -13,7 +13,7 @@ const getPlanStyles = (category: Category) => {
       return { bg: "#FFF9E6", text: "#FFCF65" };
     case "WealthFam":
       return { bg: "#F0F0FF", text: "#6366F1" };
-    case "WealthAuto":
+    case "WealthFlow":
       return { bg: "#E6F7FF", text: "#0EA5E9" };
     default:
       return { bg: "#F3F4F6", text: "#4B5563" };

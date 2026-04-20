@@ -164,7 +164,7 @@ export default function BlogDetailScreen() {
                       ? "#FFF9E6"
                       : blog.category === "WealthFam"
                         ? "#F0F0FF"
-                        : blog.category === "WealthAuto"
+                        : blog.category === "WealthFlow"
                           ? "#E6F7FF"
                           : "#F3F4F6",
             }}
@@ -181,7 +181,7 @@ export default function BlogDetailScreen() {
                         ? "#FFCF65"
                         : blog.category === "WealthFam"
                           ? "#6366F1"
-                          : blog.category === "WealthAuto"
+                          : blog.category === "WealthFlow"
                             ? "#0EA5E9"
                             : "#4B5563",
               }}

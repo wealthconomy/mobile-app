@@ -6,7 +6,7 @@ interface PortfolioCardProps {
   title: string;
   description: string;
   image?: any;
-  type: "flex" | "goal" | "fix" | "fam" | "auto" | "group";
+  type: "flex" | "goal" | "fix" | "fam" | "flow" | "group";
   showEarnTag?: boolean;
   interestRate?: string;
 }
@@ -65,14 +65,14 @@ export const PortfolioCard = ({
           image: require("../../../../assets/images/fam.png"),
           interest: interestRate || "10% Interest",
         };
-      case "auto":
+      case "flow":
         return {
           bg: "#E6F7FF",
           border: "#0EA5E966",
           iconBg: "#BAE7FF",
           iconColor: "#0EA5E9",
           iconName: "refresh-outline",
-          route: "/portfolios/wealth-auto",
+          route: "/portfolios/wealth-flow",
           image: require("../../../../assets/images/auto.png.png"),
           interest: interestRate || "10% Interest",
         };

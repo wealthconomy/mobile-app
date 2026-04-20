@@ -1,7 +1,9 @@
+import { RootState } from "@/src/store";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { router } from "expo-router";
+import React from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useSelector } from "react-redux";
 
 interface TodoCardProps {
   title: string;
@@ -55,18 +57,16 @@ const TodoCard = ({
 );
 
 export const TodoSection = () => {
-  const router = useRouter();
+  const user = useSelector((state: RootState) => state.auth.user);
 
-  // These would typically come from your global state (Redux/Auth context)
-  // For now, using local state to demonstrate the logic
-  const [userState, setUserState] = useState({
-    kycLevel: 1, // 1 to 3
+  const userState = {
+    kycLevel: user?.kycLevel || 1,
     isEmailVerified: true,
     hasFirstGoal: false,
     hasJoinedTribe: false,
     hasEnabledSecurity: false,
     hasFundedWallet: false,
-  });
+  };
 
   const onboardingTasks = [];
 
@@ -77,7 +77,7 @@ export const TodoSection = () => {
       title: "Proceed to level 2",
       description: "Complete your KYC registration to enable withdrawal",
       icon: <Ionicons name="id-card-outline" size={18} color="#1A1A1A" />,
-      onPress: () => router.push("/profile" as any),
+      onPress: () => router.push("/kyc/level2-intro"),
       isComplete: false,
     });
   } else if (userState.kycLevel === 2) {
@@ -88,7 +88,7 @@ export const TodoSection = () => {
       icon: (
         <Ionicons name="shield-checkmark-outline" size={18} color="#1A1A1A" />
       ),
-      onPress: () => router.push("/profile" as any),
+      onPress: () => router.push("/kyc/level3-intro"),
       isComplete: false,
     });
   }
@@ -141,7 +141,6 @@ export const TodoSection = () => {
     });
   }
 
-  // If all tasks are completed, we can hide the section or show a "Congrats" message
   if (onboardingTasks.length === 0) return null;
 
   return (

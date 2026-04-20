@@ -8,9 +8,10 @@ import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Provider, useSelector } from "react-redux";
+import { Provider, useDispatch, useSelector } from "react-redux";
 import "../global.css";
-import { RootState, store } from "../src/store";
+import { AppDispatch, RootState, store } from "../src/store";
+import { loadGroupsFromStorage } from "../src/store/slices/wealthGroupSlice";
 
 const queryClient = new QueryClient();
 
@@ -48,9 +49,14 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const segments = useSegments();
   const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
   const { isAuthenticated, hasCompletedOnboarding, isLoading } = useSelector(
     (state: RootState) => state.auth,
   );
+
+  useEffect(() => {
+    dispatch(loadGroupsFromStorage());
+  }, [dispatch]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -142,11 +148,11 @@ function RootLayoutNav() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="portfolio/create/auto"
+              name="portfolio/create/flow"
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="portfolio/detail/auto/[id]"
+              name="portfolio/detail/flow/[id]"
               options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -154,7 +160,17 @@ function RootLayoutNav() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="wallet/top-up"
+              name="kyc/level2-intro"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen name="kyc/level2" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="kyc/level3-intro"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen name="kyc/level3" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="transactions/index"
               options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -163,10 +179,6 @@ function RootLayoutNav() {
             />
             <Stack.Screen
               name="profile/invite"
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="transactions/index"
               options={{ headerShown: false }}
             />
             <Stack.Screen

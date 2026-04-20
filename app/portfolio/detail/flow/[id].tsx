@@ -81,7 +81,7 @@ const autoService = {
   },
 };
 
-export default function AutoDetailScreen() {
+export default function FlowDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [plan, setPlan] = useState<AutoPlan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -130,7 +130,7 @@ export default function AutoDetailScreen() {
 
   const handleTerminate = () => {
     setShowTerminateModal(false);
-    router.replace("/(tabs)/portfolios/wealth-auto");
+    router.replace("/(tabs)/portfolios/wealth-flow");
   };
 
   // ─── ONGOING HEADER ──────────────────────────────────────────────────────
@@ -249,7 +249,7 @@ export default function AutoDetailScreen() {
       >
         <Text style={{ fontSize: 24, marginRight: 8 }}>🏆</Text>
         <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 26 }}>
-          Auto Save Completed!
+          Flow Save Completed!
         </Text>
         <Text style={{ fontSize: 24, marginLeft: 8 }}>🥳</Text>
       </View>
@@ -264,7 +264,7 @@ export default function AutoDetailScreen() {
         }}
       >
         Your{" "}
-        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>WealthAuto</Text>{" "}
+        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>WealthFlow</Text>{" "}
         plan for{" "}
         <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
           {plan.title}
@@ -411,7 +411,7 @@ export default function AutoDetailScreen() {
                   onPress={() =>
                     router.push({
                       pathname: "/wallet/top-up",
-                      params: { portfolioName: "WealthAuto" },
+                      params: { portfolioName: "WealthFlow" },
                     })
                   }
                   style={{

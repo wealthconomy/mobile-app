@@ -188,7 +188,7 @@ export default function WealthGroupScreen() {
     return (
       <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
         <StatusBar style="dark" />
-        <Header title="Wealth Group" onBack={() => router.back()} />
+        <Header title="WealthGroup" onBack={() => router.back()} />
         <PortfolioDetailSkeleton />
       </SafeAreaView>
     );
@@ -203,19 +203,22 @@ export default function WealthGroupScreen() {
         <View className="px-5 py-2">
           {/* ── Hero Card ────────────────────────────────────────── */}
           <View
-            className="relative overflow-hidden mb-8"
+            className="relative overflow-hidden mb-8 self-center"
             style={{
-              width: "100%",
+              width: 365,
               height: 160,
-              borderRadius: 20,
+              borderTopLeftRadius: 50,
+              borderTopRightRadius: 20,
+              borderBottomRightRadius: 50,
+              borderBottomLeftRadius: 20,
               backgroundColor: "white",
-              shadowColor: "#000",
+              shadowColor: "#323232",
               shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.1,
-              shadowRadius: 12,
-              elevation: 5,
-              borderWidth: 1,
-              borderColor: "#dbdcdcff",
+              shadowOpacity: 0.12,
+              shadowRadius: 9.3,
+              elevation: 4,
+              borderWidth: 0.7,
+              borderColor: "#D9D9D9",
             }}
           >
             <Image
@@ -265,7 +268,7 @@ export default function WealthGroupScreen() {
 
               <View className="flex-row items-center space-x-1">
                 <Text className="text-[#64748B] text-[12px] font-bold">
-                  Your wealth grew to N230.00 today
+                  Your wealth grew by N230.00 today
                 </Text>
                 <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
               </View>

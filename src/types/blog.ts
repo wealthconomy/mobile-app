@@ -8,7 +8,7 @@ export type Category =
   | "WealthFlex"
   | "WealthFix"
   | "WealthGoal"
-  | "WealthAuto"
+  | "WealthFlow"
   | "WealthFam";
 
 export interface BlogComment {
