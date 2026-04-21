@@ -137,7 +137,7 @@ export default function KYCLevel2Screen() {
                   <Text
                     style={{
                       color: "#1A1A1A",
-                      fontWeight: "800",
+                      fontWeight: "700",
                       fontSize: 18,
                     }}
                   >
@@ -174,7 +174,7 @@ export default function KYCLevel2Screen() {
               <Text
                 style={{
                   color: "#1A1A1A",
-                  fontWeight: "800",
+                  fontWeight: "600",
                   fontSize: 15,
                   marginBottom: 16,
                 }}
@@ -223,7 +223,7 @@ export default function KYCLevel2Screen() {
                     <Text
                       style={{
                         fontSize: 11,
-                        fontWeight: "700",
+                        fontWeight: "600",
                         textAlign: "center",
                         color: docType === opt.label ? THEME_TEAL : "#64748B",
                       }}
@@ -249,7 +249,7 @@ export default function KYCLevel2Screen() {
               <Text
                 style={{
                   color: "#1A1A1A",
-                  fontWeight: "800",
+                  fontWeight: "600",
                   fontSize: 15,
                   marginBottom: 16,
                 }}
@@ -276,7 +276,7 @@ export default function KYCLevel2Screen() {
                   style={{
                     flex: 1,
                     color: "#1A1A1A",
-                    fontWeight: "700",
+                    fontWeight: "600",
                     fontSize: 15,
                   }}
                 />
@@ -288,7 +288,7 @@ export default function KYCLevel2Screen() {
               <Text
                 style={{
                   color: "#1A1A1A",
-                  fontWeight: "800",
+                  fontWeight: "600",
                   fontSize: 15,
                   marginBottom: 16,
                 }}
@@ -318,7 +318,7 @@ export default function KYCLevel2Screen() {
               <Text
                 style={{
                   color: "#1A1A1A",
-                  fontWeight: "800",
+                  fontWeight: "600",
                   fontSize: 15,
                   marginBottom: 16,
                 }}
@@ -388,7 +388,7 @@ export default function KYCLevel2Screen() {
                           color: "white",
                           textAlign: "center",
                           fontSize: 12,
-                          fontWeight: "700",
+                          fontWeight: "600",
                         }}
                       >
                         Tap to Retake Selfie
@@ -418,7 +418,7 @@ export default function KYCLevel2Screen() {
                     <Text
                       style={{
                         color: "#1A1A1A",
-                        fontWeight: "800",
+                        fontWeight: "600",
                         fontSize: 16,
                         marginBottom: 8,
                       }}
@@ -541,7 +541,7 @@ function SuccessState({ onDone }: { onDone: () => void }) {
         <Text
           style={{
             fontSize: 32,
-            fontWeight: "800",
+            fontWeight: "600",
             color: "#1A1A1A",
             textAlign: "center",
             marginBottom: 16,

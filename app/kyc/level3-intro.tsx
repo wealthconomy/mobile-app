@@ -47,7 +47,7 @@ export default function KYCLevel3Intro() {
             <View className="w-24 h-24 bg-[#F2FFFF] rounded-full items-center justify-center mb-6">
               <Ionicons name="location" size={48} color={THEME_TEAL} />
             </View>
-            <Text className="text-[28px] font-bold text-[#1A1A1A] text-center mb-2">
+            <Text className="text-[28px] font-semibold text-[#1A1A1A] text-center mb-2">
               Full Verification
             </Text>
             <Text className="text-[#64748B] text-center text-[15px] leading-[22px] px-4 font-medium">
@@ -60,7 +60,7 @@ export default function KYCLevel3Intro() {
             entering={FadeInDown.duration(600).delay(300)}
             className="mb-10"
           >
-            <Text className="text-[#1A1A1A] font-bold text-[18px] mb-6">
+            <Text className="text-[#1A1A1A] font-semibold text-[18px] mb-6">
               Premium Privileges
             </Text>
             {benefits.map((benefit, index) => (
@@ -72,7 +72,7 @@ export default function KYCLevel3Intro() {
                   {benefit.icon}
                 </View>
                 <View className="flex-1">
-                  <Text className="text-[#1A1A1A] font-semibold text-[15px] mb-1">
+                  <Text className="text-[#1A1A1A] font-medium text-[15px] mb-1">
                     {benefit.title}
                   </Text>
                   <Text className="text-[#64748B] text-[13px] leading-[18px]">
@@ -87,18 +87,18 @@ export default function KYCLevel3Intro() {
             entering={FadeInDown.duration(600).delay(500)}
             className="bg-[#155D5F08] p-6 rounded-[24px] mb-10"
           >
-            <Text className="text-[#155D5F] font-bold text-[15px] mb-4">
+            <Text className="text-[#155D5F] font-semibold text-[15px] mb-4">
               Requirements
             </Text>
             <View className="flex-row items-center mb-3">
               <CheckCircle2 size={18} color={THEME_TEAL} />
-              <Text className="text-[#1A1A1A] ml-3 font-semibold text-[14px]">
+              <Text className="text-[#1A1A1A] ml-3 font-medium text-[14px]">
                 Residential Address Details
               </Text>
             </View>
             <View className="flex-row items-center">
               <CheckCircle2 size={18} color={THEME_TEAL} />
-              <Text className="text-[#1A1A1A] ml-3 font-semibold text-[14px]">
+              <Text className="text-[#1A1A1A] ml-3 font-medium text-[14px]">
                 Proof of Residency (Utility Bill, etc.)
               </Text>
             </View>

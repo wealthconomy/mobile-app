@@ -3,7 +3,7 @@ import { RootState } from "@/src/store";
 import { WealthGroup } from "@/src/store/slices/wealthGroupSlice";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { Share2 } from "lucide-react-native";
+import { ArrowUpRight, Share2 } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import {
   Alert,
@@ -384,19 +384,23 @@ function ProgressTracker({ group }: { group: WealthGroup }) {
 }
 
 function MemberActions({ group }: { group: WealthGroup }) {
+  const router = useRouter();
   return (
     <View className="mb-4">
-      <TouchableOpacity className="w-full h-14 bg-[#155D5F] rounded-2xl items-center justify-center mb-3 flex-row space-x-2">
+      <TouchableOpacity
+        onPress={() => router.push("/wallet/deposit")}
+        className="w-full h-14 bg-[#155D5F] rounded-2xl items-center justify-center mb-3 flex-row space-x-2"
+      >
         <Ionicons name="add" size={24} color="white" />
         <Text className="text-white font-bold text-base">Deposit funds</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        disabled
-        className="w-full h-14 bg-[#E2E8F0] rounded-2xl items-center justify-center flex-row space-x-2"
+        onPress={() => router.push("/wallet/withdraw")}
+        className="w-full h-14 bg-white border border-[#155D5F] rounded-2xl items-center justify-center flex-row space-x-2"
       >
-        <Ionicons name="arrow-up-outline" size={20} color="#94A3B8" />
-        <Text className="text-[#94A3B8] font-bold text-base">
+        <ArrowUpRight size={20} color="#155D5F" />
+        <Text className="text-[#155D5F] font-bold text-base">
           Withdraw funds
         </Text>
       </TouchableOpacity>

@@ -21,6 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch } from "react-redux";
 
 const THEME_TEAL = "#155D5F";
+const SOFT_TEAL = "#F2FFFF";
 const TEXT_MUTED = "#64748B";
 
 export default function KYCLevel3Screen() {
@@ -48,7 +49,6 @@ export default function KYCLevel3Screen() {
       aspect: [4, 3],
       quality: 1,
     });
-
     if (!result.canceled) {
       setProofImage(result.assets[0].uri);
     }
@@ -74,19 +74,38 @@ export default function KYCLevel3Screen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-          <View className="px-5 py-6">
+        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+          <View style={{ paddingHorizontal: 20, paddingVertical: 24 }}>
             {/* 1. Progress Step Indicator */}
-            <View className="mb-8">
-              <View className="flex-row items-center justify-between mb-3">
-                <View className="flex-row items-center">
-                  <View className="w-8 h-8 bg-[#155D5F] rounded-full items-center justify-center mr-3">
-                    <Text className="text-white font-bold">2</Text>
+            <View style={{ marginBottom: 32 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 12,
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View
+                    style={{
+                      width: 32,
+                      height: 32,
+                      backgroundColor: THEME_TEAL,
+                      borderRadius: 16,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginRight: 12,
+                    }}
+                  >
+                    <Text style={{ color: "white", fontWeight: "bold" }}>
+                      2
+                    </Text>
                   </View>
                   <Text
                     style={{
                       color: "#1A1A1A",
-                      fontWeight: "800",
+                      fontWeight: "700",
                       fontSize: 18,
                     }}
                   >
@@ -94,7 +113,7 @@ export default function KYCLevel3Screen() {
                   </Text>
                 </View>
                 <Text
-                  style={{ color: "#64748B", fontWeight: "700", fontSize: 13 }}
+                  style={{ color: TEXT_MUTED, fontWeight: "700", fontSize: 13 }}
                 >
                   Level 3 Verification
                 </Text>
@@ -119,57 +138,147 @@ export default function KYCLevel3Screen() {
             </View>
 
             {/* 2. Address Details Form */}
-            <View className="mb-8">
-              <Text className="text-[#1A1A1A] font-extrabold text-[15px] mb-4">
+            <View style={{ marginBottom: 32 }}>
+              <Text
+                style={{
+                  color: "#1A1A1A",
+                  fontWeight: "600",
+                  fontSize: 15,
+                  marginBottom: 16,
+                }}
+              >
                 Residential Address
               </Text>
 
-              <View className="mb-5">
-                <View className="h-16 bg-gray-50 border border-gray-100 rounded-2xl px-5 flex-row items-center">
-                  <MapPin size={20} color={THEME_TEAL} className="mr-3" />
+              {/* Street Address */}
+              <View style={{ marginBottom: 16 }}>
+                <View
+                  style={{
+                    height: 64,
+                    backgroundColor: "#F9FAFB",
+                    borderWidth: 1,
+                    borderColor: "#F1F5F9",
+                    borderRadius: 16,
+                    paddingHorizontal: 20,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
+                  <MapPin
+                    size={20}
+                    color={THEME_TEAL}
+                    style={{ marginRight: 10 }}
+                  />
                   <TextInput
                     placeholder="Street Address"
                     placeholderTextColor="#adb5bd"
                     value={address}
                     onChangeText={setAddress}
-                    className="flex-1 text-[#1A1A1A] font-bold text-[15px]"
+                    style={{
+                      flex: 1,
+                      color: "#1A1A1A",
+                      fontWeight: "600",
+                      fontSize: 15,
+                    }}
                   />
                 </View>
               </View>
 
-              <View className="flex-row justify-between mb-5">
-                <View className="w-[48%] h-16 bg-gray-50 border border-gray-100 rounded-2xl px-5 flex-row items-center">
+              {/* City & State Row */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                }}
+              >
+                <View
+                  style={{
+                    width: "48%",
+                    height: 64,
+                    backgroundColor: "#F9FAFB",
+                    borderWidth: 1,
+                    borderColor: "#F1F5F9",
+                    borderRadius: 16,
+                    paddingHorizontal: 20,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
                   <TextInput
                     placeholder="City"
                     placeholderTextColor="#adb5bd"
                     value={city}
                     onChangeText={setCity}
-                    className="flex-1 text-[#1A1A1A] font-bold text-[15px]"
+                    style={{
+                      flex: 1,
+                      color: "#1A1A1A",
+                      fontWeight: "600",
+                      fontSize: 15,
+                    }}
                   />
                 </View>
-                <View className="w-[48%] h-16 bg-gray-50 border border-gray-100 rounded-2xl px-5 flex-row items-center">
+                <View
+                  style={{
+                    width: "48%",
+                    height: 64,
+                    backgroundColor: "#F9FAFB",
+                    borderWidth: 1,
+                    borderColor: "#F1F5F9",
+                    borderRadius: 16,
+                    paddingHorizontal: 20,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
                   <TextInput
                     placeholder="State"
                     placeholderTextColor="#adb5bd"
                     value={state}
                     onChangeText={setState}
-                    className="flex-1 text-[#1A1A1A] font-bold text-[15px]"
+                    style={{
+                      flex: 1,
+                      color: "#1A1A1A",
+                      fontWeight: "600",
+                      fontSize: 15,
+                    }}
                   />
                 </View>
               </View>
             </View>
 
-            {/* 3. Proof of Address Type */}
-            <View className="mb-8">
-              <Text className="text-[#1A1A1A] font-extrabold text-[15px] mb-4">
+            {/* 3. Proof of Address Type Dropdown */}
+            <View style={{ marginBottom: 32 }}>
+              <Text
+                style={{
+                  color: "#1A1A1A",
+                  fontWeight: "600",
+                  fontSize: 15,
+                  marginBottom: 16,
+                }}
+              >
                 Proof of Address
               </Text>
+
               <TouchableOpacity
                 onPress={() => setShowProofDropdown(!showProofDropdown)}
-                className="h-16 bg-gray-50 border border-gray-100 rounded-2xl px-5 flex-row items-center justify-between"
+                style={{
+                  height: 64,
+                  backgroundColor: "#F9FAFB",
+                  borderWidth: 1,
+                  borderColor: "#F1F5F9",
+                  borderRadius: 16,
+                  paddingHorizontal: 20,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
               >
                 <Text
-                  className={`font-bold text-[15px] ${proofType ? "text-[#1A1A1A]" : "text-gray-400"}`}
+                  style={{
+                    fontWeight: "600",
+                    fontSize: 15,
+                    color: proofType ? "#1A1A1A" : "#adb5bd",
+                  }}
                 >
                   {proofType || "Select Document Type"}
                 </Text>
@@ -181,17 +290,45 @@ export default function KYCLevel3Screen() {
               </TouchableOpacity>
 
               {showProofDropdown && (
-                <View className="mt-3 bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-lg">
-                  {proofTypes.map((type) => (
+                <View
+                  style={{
+                    marginTop: 8,
+                    backgroundColor: "white",
+                    borderWidth: 1,
+                    borderColor: "#F1F5F9",
+                    borderRadius: 16,
+                    overflow: "hidden",
+                    elevation: 4,
+                    shadowColor: "#000",
+                    shadowOpacity: 0.08,
+                    shadowRadius: 8,
+                  }}
+                >
+                  {proofTypes.map((type, index) => (
                     <TouchableOpacity
                       key={type}
                       onPress={() => {
                         setProofType(type);
                         setShowProofDropdown(false);
                       }}
-                      className="px-5 py-4 border-b border-gray-50 flex-row items-center justify-between"
+                      style={{
+                        paddingHorizontal: 20,
+                        paddingVertical: 16,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        borderBottomWidth:
+                          index < proofTypes.length - 1 ? 1 : 0,
+                        borderBottomColor: "#F9FAFB",
+                      }}
                     >
-                      <Text className="text-[#1A1A1A] font-bold text-[14px]">
+                      <Text
+                        style={{
+                          color: "#1A1A1A",
+                          fontWeight: "600",
+                          fontSize: 14,
+                        }}
+                      >
                         {type}
                       </Text>
                       {proofType === type && (
@@ -203,59 +340,151 @@ export default function KYCLevel3Screen() {
               )}
             </View>
 
-            {/* 4. Proof Upload */}
-            <View className="mb-10">
-              <Text className="text-[#1A1A1A] font-extrabold text-[15px] mb-4">
+            {/* 4. Upload Document - Full Width */}
+            <View style={{ marginBottom: 40 }}>
+              <Text
+                style={{
+                  color: "#1A1A1A",
+                  fontWeight: "600",
+                  fontSize: 15,
+                  marginBottom: 16,
+                }}
+              >
                 Upload Document
               </Text>
-              <TouchableOpacity
-                onPress={pickImage}
-                className={`w-full h-56 rounded-[30px] border-2 border-dashed items-center justify-center overflow-hidden ${
-                  proofImage
-                    ? "border-[#155D5F] bg-white"
-                    : "border-gray-200 bg-gray-50"
-                }`}
-              >
-                {proofImage ? (
-                  <View className="w-full h-full relative">
-                    <Image
-                      source={{ uri: proofImage }}
-                      className="w-full h-full"
-                      resizeMode="cover"
-                    />
-                    <TouchableOpacity
-                      className="absolute top-4 right-4 bg-red-500 w-10 h-10 rounded-full items-center justify-center border-4 border-white shadow-sm"
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        setProofImage(null);
+
+              <View style={{ width: "100%", height: 160 }}>
+                <TouchableOpacity
+                  onPress={pickImage}
+                  activeOpacity={0.8}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: 24,
+                    borderWidth: 2,
+                    borderStyle: "dashed",
+                    borderColor: proofImage ? THEME_TEAL : "#D1D5DB",
+                    backgroundColor: proofImage ? SOFT_TEAL : "#F9FAFB",
+                    overflow: "hidden",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {proofImage ? (
+                    <View
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        position: "relative",
                       }}
                     >
-                      <X size={20} color="white" />
-                    </TouchableOpacity>
-                    <View className="absolute bottom-0 left-0 right-0 bg-black/50 py-3">
-                      <Text className="text-white text-center text-[12px] font-bold">
-                        Change Document
+                      <Image
+                        source={{ uri: proofImage }}
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                        }}
+                        resizeMode="cover"
+                      />
+                      {/* Clear button */}
+                      <TouchableOpacity
+                        style={{
+                          position: "absolute",
+                          top: 12,
+                          right: 12,
+                          backgroundColor: "#EF4444",
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderWidth: 3,
+                          borderColor: "white",
+                          zIndex: 10,
+                        }}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          setProofImage(null);
+                        }}
+                      >
+                        <X size={18} color="white" />
+                      </TouchableOpacity>
+                      {/* Bottom overlay */}
+                      <View
+                        style={{
+                          position: "absolute",
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          backgroundColor: "rgba(0,0,0,0.5)",
+                          paddingVertical: 10,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: "white",
+                            textAlign: "center",
+                            fontSize: 12,
+                            fontWeight: "700",
+                          }}
+                        >
+                          Tap to Change Document
+                        </Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <View
+                      style={{ alignItems: "center", paddingHorizontal: 32 }}
+                    >
+                      <View
+                        style={{
+                          width: 56,
+                          height: 56,
+                          backgroundColor: "white",
+                          borderRadius: 28,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginBottom: 12,
+                          shadowColor: "#000",
+                          shadowOpacity: 0.08,
+                          shadowRadius: 8,
+                          elevation: 3,
+                        }}
+                      >
+                        <Upload size={26} color={THEME_TEAL} />
+                      </View>
+                      <Text
+                        style={{
+                          color: "#1A1A1A",
+                          fontWeight: "800",
+                          fontSize: 15,
+                          marginBottom: 6,
+                        }}
+                      >
+                        Upload Document
+                      </Text>
+                      <Text
+                        style={{
+                          color: TEXT_MUTED,
+                          fontSize: 11,
+                          textAlign: "center",
+                          lineHeight: 17,
+                        }}
+                      >
+                        Upload a clear copy of your utility bill or bank
+                        statement
                       </Text>
                     </View>
-                  </View>
-                ) : (
-                  <View className="items-center px-10">
-                    <View className="w-20 h-20 bg-white rounded-full items-center justify-center mb-4 shadow-sm">
-                      <Upload size={32} color={THEME_TEAL} />
-                    </View>
-                    <Text className="text-[#1A1A1A] font-extrabold text-[16px]">
-                      Upload Document
-                    </Text>
-                    <Text className="text-[#64748B] text-[12px] mt-2 text-center">
-                      Please upload a clear copy of your utility bill or bank
-                      statement
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
 
-            <View className="mt-4 mb-12">
+            {/* 5. Submit Button */}
+            <View style={{ marginTop: 8, marginBottom: 48 }}>
               <ThemedButton
                 title="Complete Verification"
                 onPress={handleSubmit}
@@ -286,15 +515,57 @@ function SuccessState({ onDone }: { onDone: () => void }) {
       style={{ flex: 1, backgroundColor: "white" }}
       edges={["top", "bottom"]}
     >
-      <View className="flex-1 px-5 items-center justify-center">
-        <View className="w-72 h-72 relative items-center justify-center mb-10">
+      <View
+        style={{
+          flex: 1,
+          paddingHorizontal: 20,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <View
+          style={{
+            width: 288,
+            height: 288,
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 40,
+          }}
+        >
           <Image
             source={require("../../assets/images/success.png")}
-            className="w-full h-full absolute opacity-40"
+            style={{
+              width: "100%",
+              height: "100%",
+              position: "absolute",
+              opacity: 0.4,
+            }}
             resizeMode="contain"
           />
-          <View className="w-36 h-36 bg-[#F2FFFF] rounded-full items-center justify-center shadow-md">
-            <View className="w-24 h-24 bg-white rounded-full items-center justify-center shadow-sm">
+          <View
+            style={{
+              width: 144,
+              height: 144,
+              backgroundColor: SOFT_TEAL,
+              borderRadius: 72,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <View
+              style={{
+                width: 96,
+                height: 96,
+                backgroundColor: "white",
+                borderRadius: 48,
+                alignItems: "center",
+                justifyContent: "center",
+                elevation: 4,
+                shadowColor: "#000",
+                shadowOpacity: 0.08,
+                shadowRadius: 8,
+              }}
+            >
               <Ionicons name="checkmark" size={60} color={THEME_TEAL} />
             </View>
           </View>
@@ -314,7 +585,7 @@ function SuccessState({ onDone }: { onDone: () => void }) {
         </Text>
         <Text
           style={{
-            color: "#64748B",
+            color: TEXT_MUTED,
             textAlign: "center",
             fontSize: 15,
             lineHeight: 26,
@@ -328,7 +599,7 @@ function SuccessState({ onDone }: { onDone: () => void }) {
         </Text>
 
         <ThemedButton
-          title="Return to Dashboard"
+          title="Return to HomeScreen"
           onPress={onDone}
           style={{
             backgroundColor: THEME_TEAL,
