@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { authApi } from "../../api/auth";
 
@@ -134,7 +135,8 @@ export default function ResetPasswordScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Image */}
-          <View
+          <Animated.View
+            entering={FadeInUp.duration(600).delay(100)}
             style={{ alignItems: "center", marginTop: 32, marginBottom: 20 }}
           >
             <Image
@@ -142,9 +144,10 @@ export default function ResetPasswordScreen() {
               style={{ width: 69, height: 73 }}
               resizeMode="contain"
             />
-          </View>
+          </Animated.View>
 
           {/* Title */}
+          <Animated.View entering={FadeInDown.duration(600).delay(250)}>
           <Text
             style={{
               fontSize: 22,
@@ -156,8 +159,10 @@ export default function ResetPasswordScreen() {
           >
             New Password
           </Text>
+          </Animated.View>
 
           {/* New Password */}
+          <Animated.View entering={FadeInDown.duration(600).delay(350)}>
           <Text
             style={{
               color: DARK,
@@ -274,8 +279,10 @@ export default function ResetPasswordScreen() {
               })}
             </View>
           )}
+          </Animated.View>
 
           {/* Confirm Password */}
+          <Animated.View entering={FadeInDown.duration(600).delay(450)}>
           <Text
             style={{
               color: DARK,
@@ -314,8 +321,10 @@ export default function ResetPasswordScreen() {
               {confirmPasswordError}
             </Text>
           ) : null}
+          </Animated.View>
 
           {/* Continue Button */}
+          <Animated.View entering={FadeInDown.duration(600).delay(550)}>
           <TouchableOpacity
             onPress={handleContinue}
             disabled={isSubmitting}
@@ -332,6 +341,7 @@ export default function ResetPasswordScreen() {
               {isSubmitting ? "Saving..." : "Continue"}
             </Text>
           </TouchableOpacity>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

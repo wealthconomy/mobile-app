@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { authApi } from "../../api/auth";
 
@@ -88,7 +89,8 @@ export default function ForgotPasswordScreen() {
       >
         <View style={{ flex: 1, paddingHorizontal: 24 }}>
           {/* Image */}
-          <View
+          <Animated.View
+            entering={FadeInUp.duration(600).delay(100)}
             style={{ alignItems: "center", marginTop: 40, marginBottom: 28 }}
           >
             <Image
@@ -96,9 +98,10 @@ export default function ForgotPasswordScreen() {
               style={{ width: 69, height: 73 }}
               resizeMode="contain"
             />
-          </View>
+          </Animated.View>
 
           {/* Title */}
+          <Animated.View entering={FadeInDown.duration(600).delay(250)}>
           <Text
             style={{
               fontSize: 22,
@@ -110,8 +113,10 @@ export default function ForgotPasswordScreen() {
           >
             Forget Password
           </Text>
+          </Animated.View>
 
           {/* Email Field */}
+          <Animated.View entering={FadeInDown.duration(600).delay(350)}>
           <Text
             style={{
               color: DARK,
@@ -156,8 +161,10 @@ export default function ForgotPasswordScreen() {
               {emailError}
             </Text>
           ) : null}
+          </Animated.View>
 
           {/* Continue Button */}
+          <Animated.View entering={FadeInDown.duration(600).delay(500)}>
           <TouchableOpacity
             onPress={handleContinue}
             disabled={isSubmitting}
@@ -185,6 +192,7 @@ export default function ForgotPasswordScreen() {
           >
             We'll send a 6-digit code to this email to verify your identity.
           </Text>
+          </Animated.View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

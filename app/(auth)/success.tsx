@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import { Image, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const PRIMARY = "#155D5F";
@@ -28,7 +29,8 @@ export default function SuccessScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
       {/* Success Image (Confetti) - Move to upper part */}
-      <View
+      <Animated.View
+        entering={FadeInUp.duration(700).delay(100)}
         style={{
           marginTop: 60, // Push to upper part
           alignItems: "center",
@@ -89,10 +91,10 @@ export default function SuccessScreen() {
             />
           </View>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Text Content */}
-      <View style={{ alignItems: "center", width: "100%", marginBottom: 40 }}>
+      <Animated.View entering={FadeInDown.duration(600).delay(300)} style={{ alignItems: "center", width: "100%", marginBottom: 40 }}>
         {/* Title */}
         <Text
           style={{
@@ -120,9 +122,10 @@ export default function SuccessScreen() {
             Wealth Building!
           </Text>
         </Text>
-      </View>
+      </Animated.View>
 
       {/* Let's Go Button */}
+      <Animated.View entering={FadeInDown.duration(600).delay(500)} style={{ width: "100%" }}>
       <TouchableOpacity
         onPress={handleLetsGo}
         style={{
@@ -137,6 +140,7 @@ export default function SuccessScreen() {
           Let's Go!
         </Text>
       </TouchableOpacity>
+      </Animated.View>
     </SafeAreaView>
   );
 }
