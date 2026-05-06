@@ -13,6 +13,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch } from "react-redux";
 
@@ -115,7 +116,7 @@ export default function MyAccountScreen() {
         contentContainerStyle={{ paddingTop: 20, paddingBottom: 40 }}
       >
         {/* Header Profile */}
-        <View className="flex-row items-center mb-8">
+        <Animated.View entering={FadeInUp.duration(600).delay(100)} className="flex-row items-center mb-8">
           {loading ? (
             <Skeleton width={64} height={64} circle />
           ) : (
@@ -148,10 +149,10 @@ export default function MyAccountScreen() {
               </>
             )}
           </View>
-        </View>
+        </Animated.View>
 
         {/* Savings Info */}
-        <View className="mb-8">
+        <Animated.View entering={FadeInDown.duration(600).delay(250)} className="mb-8">
           <View className="flex-row items-center mb-1">
             <Text className="text-sm font-medium text-[#6B7280] mr-2">
               Total Savings
@@ -184,9 +185,10 @@ export default function MyAccountScreen() {
             Your wealth grew to{" "}
             <Text className="text-[#10B981]">N230.00 today ↑</Text>
           </Text>
-        </View>
+        </Animated.View>
 
         {/* Menu Items Group 1 */}
+        <Animated.View entering={FadeInDown.duration(600).delay(400)}>
         <MenuGroup>
           <MenuItem
             icon="person"
@@ -216,9 +218,11 @@ export default function MyAccountScreen() {
             onPress={() => router.push("/profile/notifications/settings" as any)}
           />
         </MenuGroup>
+        </Animated.View>
         <View className="h-[1px] bg-[#E5E5E5] mb-6" />
 
         {/* Menu Items Group 2 */}
+        <Animated.View entering={FadeInDown.duration(600).delay(500)}>
         <MenuGroup>
           <MenuItem
             icon="list"
@@ -235,10 +239,12 @@ export default function MyAccountScreen() {
             onPress={() => router.push("/payment" as any)}
           />
         </MenuGroup>
+        </Animated.View>
 
         <View className="h-[1px] bg-[#E5E5E5] mb-6" />
 
         {/* Menu Items Group 3 */}
+        <Animated.View entering={FadeInDown.duration(600).delay(600)}>
         <MenuGroup>
           <MenuItem
             icon="shield-checkmark"
@@ -256,8 +262,10 @@ export default function MyAccountScreen() {
             onPress={() => router.push("/support" as any)}
           />
         </MenuGroup>
+        </Animated.View>
 
         {/* Logout Group */}
+        <Animated.View entering={FadeInDown.duration(600).delay(700)}>
         <MenuGroup>
           <MenuItem
             icon="log-out"
@@ -268,6 +276,7 @@ export default function MyAccountScreen() {
             onPress={() => setShowLogoutModal(true)}
           />
         </MenuGroup>
+        </Animated.View>
       </ScrollView>
 
       {/* Logout Confirmation Modal */}

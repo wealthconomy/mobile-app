@@ -19,6 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SvgXml } from "react-native-svg";
 import { authApi } from "../../api/auth";
@@ -176,7 +177,8 @@ export default function SignupScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Logo + Header */}
-          <View
+          <Animated.View
+            entering={FadeInUp.duration(600).delay(100)}
             style={{ alignItems: "center", marginTop: 24, marginBottom: 28 }}
           >
             <Image
@@ -200,7 +202,7 @@ export default function SignupScreen() {
             >
               Join other purposeful wealth builders
             </Text>
-          </View>
+          </Animated.View>
 
           {/* General Error */}
           {errors.general ? (
@@ -221,6 +223,7 @@ export default function SignupScreen() {
             </View>
           ) : null}
 
+          <Animated.View entering={FadeInDown.duration(600).delay(250)}>
           <F label="First Name" field="firstName" errors={errors}>
             <View style={inputWrap(!!errors.firstName)}>
               <TextInput
@@ -236,7 +239,9 @@ export default function SignupScreen() {
               />
             </View>
           </F>
+          </Animated.View>
 
+          <Animated.View entering={FadeInDown.duration(600).delay(320)}>
           <F label="Last Name" field="lastName" errors={errors}>
             <View style={inputWrap(!!errors.lastName)}>
               <TextInput
@@ -252,7 +257,9 @@ export default function SignupScreen() {
               />
             </View>
           </F>
+          </Animated.View>
 
+          <Animated.View entering={FadeInDown.duration(600).delay(380)}>
           <F label="Phone Number" field="phone" errors={errors}>
             <View style={inputWrap(!!errors.phone)}>
               <TextInput
@@ -268,7 +275,9 @@ export default function SignupScreen() {
               />
             </View>
           </F>
+          </Animated.View>
 
+          <Animated.View entering={FadeInDown.duration(600).delay(430)}>
           <F label="Email Address" field="email" errors={errors}>
             <View style={inputWrap(!!errors.email)}>
               <Mail
@@ -290,8 +299,10 @@ export default function SignupScreen() {
               />
             </View>
           </F>
+          </Animated.View>
 
           {/* Wealth Preference Dropdown */}
+          <Animated.View entering={FadeInDown.duration(600).delay(480)}>
           <View style={{ marginBottom: 14 }}>
             <Text
               style={{
@@ -366,7 +377,9 @@ export default function SignupScreen() {
               </Text>
             ) : null}
           </View>
+          </Animated.View>
 
+          <Animated.View entering={FadeInDown.duration(600).delay(530)}>
           <F label="Password" field="password" errors={errors}>
             <View style={inputWrap(!!errors.password)}>
               <TextInput
@@ -390,7 +403,9 @@ export default function SignupScreen() {
               </TouchableOpacity>
             </View>
           </F>
+          </Animated.View>
 
+          <Animated.View entering={FadeInDown.duration(600).delay(570)}>
           <F label="Confirm Password" field="confirmPassword" errors={errors}>
             <View style={inputWrap(!!errors.confirmPassword)}>
               <TextInput
@@ -415,7 +430,9 @@ export default function SignupScreen() {
               </TouchableOpacity>
             </View>
           </F>
+          </Animated.View>
 
+          <Animated.View entering={FadeInDown.duration(600).delay(610)}>
           <F
             label="Referral Code (Optional)"
             field="referralCode"
@@ -432,8 +449,10 @@ export default function SignupScreen() {
               />
             </View>
           </F>
+          </Animated.View>
 
           {/* T&C Checkbox */}
+          <Animated.View entering={FadeInDown.duration(600).delay(650)}>
           <TouchableOpacity
             onPress={() => {
               setAgreeToTerms(!agreeToTerms);
@@ -494,8 +513,10 @@ export default function SignupScreen() {
               {errors.terms}
             </Text>
           ) : null}
+          </Animated.View>
 
           {/* Register Button */}
+          <Animated.View entering={FadeInDown.duration(600).delay(700)}>
           {(() => {
             const isFormValid =
               firstName &&
@@ -527,8 +548,10 @@ export default function SignupScreen() {
               </TouchableOpacity>
             );
           })()}
+          </Animated.View>
 
           {/* Already have account */}
+          <Animated.View entering={FadeInDown.duration(600).delay(750)}>
           <View
             style={{
               flexDirection: "row",
@@ -594,6 +617,7 @@ export default function SignupScreen() {
               Sign In with Google
             </Text>
           </TouchableOpacity>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

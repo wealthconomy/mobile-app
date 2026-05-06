@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface ProfileFormData {
@@ -118,7 +119,7 @@ export default function ProfileScreen() {
         contentContainerStyle={{ paddingTop: 10, paddingBottom: 40 }}
       >
         {/* Profile Pic Section */}
-        <View className="items-center mb-8">
+        <Animated.View entering={FadeInUp.duration(700).delay(100)} className="items-center mb-8">
           <TouchableOpacity
             onPress={handlePhotoUpdate}
             activeOpacity={0.8}
@@ -142,10 +143,10 @@ export default function ProfileScreen() {
               KYC level 3
             </Text>
           </View>
-        </View>
+        </Animated.View>
 
         {/* Form Fields */}
-        <View className="gap-y-5 mb-10">
+        <Animated.View entering={FadeInDown.duration(600).delay(300)} className="gap-y-5 mb-10">
           <EditableField
             control={control}
             name="firstName"
@@ -176,9 +177,10 @@ export default function ProfileScreen() {
             label="Email Address"
             isEditing={isEditing}
           />
-        </View>
+        </Animated.View>
 
         {/* Actions */}
+        <Animated.View entering={FadeInDown.duration(600).delay(500)}>
         {!isEditing ? (
           <TouchableOpacity
             onPress={() => setIsEditing(true)}
@@ -204,6 +206,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         )}
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );

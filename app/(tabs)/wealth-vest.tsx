@@ -1,5 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import { Dimensions, Image, Text, View } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
@@ -25,7 +26,7 @@ export default function WealthVestScreen() {
 
       <View className="flex-1 items-center justify-center px-8">
       {/* Coming Soon Graphic */}
-<View style={{ position: "relative", width: 280, height: 260, marginBottom: -15 }}>
+<Animated.View entering={FadeInUp.duration(700).delay(100)} style={{ position: "relative", width: 280, height: 260, marginBottom: -15 }}>
   <Image
     source={require("../../assets/images/coming.png")}
     style={{ width: 280, height: 260 }}
@@ -60,19 +61,21 @@ export default function WealthVestScreen() {
       />
     </Svg>
   </View>
-</View>
+</Animated.View>
 
+      <Animated.View entering={FadeInDown.duration(600).delay(350)}>
       <Text className="text-[#323232] text-[28px] font-bold text-center mb-5">
   The Future of{"\n"}Wealth is Vesting 🥳
 </Text>
+      </Animated.View>
 
-        <View className="space-y-6">
+        <Animated.View entering={FadeInDown.duration(600).delay(500)} className="space-y-6">
           <Text className="text-[#484848] text-[14px] text-center font-bold leading-6">
             Move beyond saving. Start owning. WealthVest is coming to help you
             invest confidently in vetted, high-growth opportunities.
           </Text>
 
-        </View>
+        </Animated.View>
       </View>
     </SafeAreaView>
   );

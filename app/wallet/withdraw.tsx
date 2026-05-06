@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type Step =
@@ -158,7 +159,7 @@ export default function WithdrawScreen() {
   };
 
   const renderSelectRecipient = () => (
-    <View className="px-5">
+    <Animated.View entering={FadeInDown.duration(600).delay(150)} className="px-5">
       <Text className="text-[#6B7280] text-[13px] mb-1 mt-4">
         Send to a recipient
       </Text>
@@ -224,11 +225,11 @@ export default function WithdrawScreen() {
           ),
         )}
       </View>
-    </View>
+    </Animated.View>
   );
 
   const renderRecipientDetails = () => (
-    <View className="px-5">
+    <Animated.View entering={FadeInDown.duration(600).delay(150)} className="px-5">
       <Text className="text-[#6B7280] text-[13px] mb-8 mt-4">
         Amount(₦) <Text className="font-bold">₦3,500,000.00 max</Text>
       </Text>
@@ -347,7 +348,7 @@ export default function WithdrawScreen() {
           />
         );
       })()}
-    </View>
+    </Animated.View>
   );
 
   const getFilteredBanks = () => {
@@ -420,7 +421,7 @@ export default function WithdrawScreen() {
   );
 
   const renderPreview = () => (
-    <View className="px-5">
+    <Animated.View entering={FadeInDown.duration(600).delay(150)} className="px-5">
       <Text className="text-[#6B7280] text-[13px] mb-8 mt-4">
         Please, recheck and confirm before making the transaction.
       </Text>
@@ -555,7 +556,7 @@ export default function WithdrawScreen() {
         loading={loading}
         className="mt-14"
       />
-    </View>
+    </Animated.View>
   );
 
   return (

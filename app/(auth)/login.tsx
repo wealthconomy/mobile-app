@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SvgXml } from "react-native-svg";
 import { useDispatch } from "react-redux";
@@ -120,7 +121,8 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Logo */}
-          <View
+          <Animated.View
+            entering={FadeInUp.duration(600).delay(100)}
             style={{ alignItems: "center", marginTop: 40, marginBottom: 28 }}
           >
             <Image
@@ -149,11 +151,12 @@ export default function LoginScreen() {
             >
               Please Log in to Continue your Wealth{"\n"}Building Journey
             </Text>
-          </View>
+          </Animated.View>
 
           {/* General Error Banner */}
           {generalError ? (
-            <View
+            <Animated.View
+              entering={FadeInDown.duration(400)}
               style={{
                 backgroundColor: "#FEF2F2",
                 borderWidth: 1,
@@ -165,11 +168,11 @@ export default function LoginScreen() {
               }}
             >
               <Text style={{ color: ERROR, fontSize: 13 }}>{generalError}</Text>
-            </View>
+            </Animated.View>
           ) : null}
 
           {/* Email */}
-          <View style={{ marginBottom: 14 }}>
+          <Animated.View entering={FadeInDown.duration(600).delay(250)} style={{ marginBottom: 14 }}>
             <Text
               style={{
                 color: DARK,
@@ -201,10 +204,10 @@ export default function LoginScreen() {
                 {emailError}
               </Text>
             ) : null}
-          </View>
+          </Animated.View>
 
           {/* Password */}
-          <View style={{ marginBottom: 10 }}>
+          <Animated.View entering={FadeInDown.duration(600).delay(350)} style={{ marginBottom: 10 }}>
             <Text
               style={{
                 color: DARK,
@@ -242,19 +245,22 @@ export default function LoginScreen() {
                 {passwordError}
               </Text>
             ) : null}
-          </View>
+          </Animated.View>
 
           {/* Forgot Password */}
-          <TouchableOpacity
-            style={{ marginBottom: 24, alignSelf: "flex-start" }}
-            onPress={() => router.push("/(auth)/forgot-password" as any)}
-          >
-            <Text style={{ color: PRIMARY, fontWeight: "500", fontSize: 13 }}>
-              Forgot password?
-            </Text>
-          </TouchableOpacity>
+          <Animated.View entering={FadeInDown.duration(600).delay(420)}>
+            <TouchableOpacity
+              style={{ marginBottom: 24, alignSelf: "flex-start" }}
+              onPress={() => router.push("/(auth)/forgot-password" as any)}
+            >
+              <Text style={{ color: PRIMARY, fontWeight: "500", fontSize: 13 }}>
+                Forgot password?
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
 
           {/* Login Button */}
+          <Animated.View entering={FadeInDown.duration(600).delay(500)}>
           {(() => {
             const isFormValid = email.length > 0 && password.length > 0;
             return (
@@ -278,8 +284,10 @@ export default function LoginScreen() {
               </TouchableOpacity>
             );
           })()}
+          </Animated.View>
 
           {/* Divider */}
+          <Animated.View entering={FadeInDown.duration(600).delay(600)}>
           <View
             style={{
               flexDirection: "row",
@@ -353,6 +361,7 @@ export default function LoginScreen() {
               Sign In with Google
             </Text>
           </TouchableOpacity>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

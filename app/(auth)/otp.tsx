@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { authApi } from "../../api/auth";
 
@@ -139,7 +140,8 @@ export default function OtpScreen() {
       >
         <View style={{ flex: 1, paddingHorizontal: 24 }}>
           {/* Image */}
-          <View
+          <Animated.View
+            entering={FadeInUp.duration(600).delay(100)}
             style={{ alignItems: "center", marginTop: 32, marginBottom: 28 }}
           >
             <Image
@@ -147,9 +149,10 @@ export default function OtpScreen() {
               style={{ width: 69, height: 73 }}
               resizeMode="contain"
             />
-          </View>
+          </Animated.View>
 
           {/* Title */}
+          <Animated.View entering={FadeInDown.duration(600).delay(200)}>
           <Text
             style={{
               fontSize: 22,
@@ -177,9 +180,11 @@ export default function OtpScreen() {
               {maskedEmail}
             </Text>
           </Text>
+          </Animated.View>
 
           {/* OTP Inputs */}
-          <View
+          <Animated.View
+            entering={FadeInDown.duration(600).delay(350)}
             style={{
               flexDirection: "row",
               justifyContent: "space-between",
@@ -211,10 +216,11 @@ export default function OtpScreen() {
                 }}
               />
             ))}
-          </View>
+          </Animated.View>
 
           {/* Resend */}
-          <View
+          <Animated.View
+            entering={FadeInDown.duration(600).delay(450)}
             style={{
               flexDirection: "row",
               justifyContent: "center",
@@ -240,9 +246,10 @@ export default function OtpScreen() {
                   : "Send again"}
               </Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
 
           {/* Continue / Verify Button */}
+          <Animated.View entering={FadeInDown.duration(600).delay(550)}>
           <TouchableOpacity
             onPress={handleVerify}
             disabled={isVerifying || otp.join("").length < 6}
@@ -258,6 +265,7 @@ export default function OtpScreen() {
               {isVerifying ? "Verifying..." : "Continue"}
             </Text>
           </TouchableOpacity>
+          </Animated.View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

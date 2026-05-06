@@ -17,6 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch } from "react-redux";
 
@@ -77,7 +78,7 @@ export default function KYCLevel3Screen() {
         <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
           <View className="px-5 py-6">
             {/* 1. Progress Step Indicator */}
-            <View className="mb-8">
+            <Animated.View entering={FadeInDown.duration(600).delay(100)} className="mb-8">
               <View className="flex-row items-center justify-between mb-3">
                 <View className="flex-row items-center">
                   <View className="w-8 h-8 bg-[#155D5F] rounded-full items-center justify-center mr-3">
@@ -116,10 +117,10 @@ export default function KYCLevel3Screen() {
                   }}
                 />
               </View>
-            </View>
+            </Animated.View>
 
             {/* 2. Address Details Form */}
-            <View className="mb-8">
+            <Animated.View entering={FadeInDown.duration(600).delay(250)} className="mb-8">
               <Text className="text-[#1A1A1A] font-extrabold text-[15px] mb-4">
                 Residential Address
               </Text>
@@ -157,10 +158,10 @@ export default function KYCLevel3Screen() {
                   />
                 </View>
               </View>
-            </View>
+            </Animated.View>
 
             {/* 3. Proof of Address Type */}
-            <View className="mb-8">
+            <Animated.View entering={FadeInDown.duration(600).delay(400)} className="mb-8">
               <Text className="text-[#1A1A1A] font-extrabold text-[15px] mb-4">
                 Proof of Address
               </Text>
@@ -201,10 +202,10 @@ export default function KYCLevel3Screen() {
                   ))}
                 </View>
               )}
-            </View>
+            </Animated.View>
 
             {/* 4. Proof Upload */}
-            <View className="mb-10">
+            <Animated.View entering={FadeInDown.duration(600).delay(530)} className="mb-10">
               <Text className="text-[#1A1A1A] font-extrabold text-[15px] mb-4">
                 Upload Document
               </Text>
@@ -253,9 +254,9 @@ export default function KYCLevel3Screen() {
                   </View>
                 )}
               </TouchableOpacity>
-            </View>
+            </Animated.View>
 
-            <View className="mt-4 mb-12">
+            <Animated.View entering={FadeInDown.duration(600).delay(650)} className="mt-4 mb-12">
               <ThemedButton
                 title="Complete Verification"
                 onPress={handleSubmit}
@@ -272,7 +273,7 @@ export default function KYCLevel3Screen() {
                   elevation: 8,
                 }}
               />
-            </View>
+            </Animated.View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -287,7 +288,7 @@ function SuccessState({ onDone }: { onDone: () => void }) {
       edges={["top", "bottom"]}
     >
       <View className="flex-1 px-5 items-center justify-center">
-        <View className="w-72 h-72 relative items-center justify-center mb-10">
+        <Animated.View entering={FadeInUp.duration(700).delay(100)} className="w-72 h-72 relative items-center justify-center mb-10">
           <Image
             source={require("../../assets/images/success.png")}
             className="w-full h-full absolute opacity-40"
@@ -298,50 +299,54 @@ function SuccessState({ onDone }: { onDone: () => void }) {
               <Ionicons name="checkmark" size={60} color={THEME_TEAL} />
             </View>
           </View>
-        </View>
+        </Animated.View>
 
-        <Text
-          style={{
-            fontSize: 32,
-            fontWeight: "800",
-            color: "#1A1A1A",
-            textAlign: "center",
-            marginBottom: 16,
-            paddingHorizontal: 16,
-          }}
-        >
-          All Done!
-        </Text>
-        <Text
-          style={{
-            color: "#64748B",
-            textAlign: "center",
-            fontSize: 15,
-            lineHeight: 26,
-            marginBottom: 48,
-            paddingHorizontal: 32,
-            fontWeight: "500",
-          }}
-        >
-          Your address verification documents have been submitted successfully.
-          We'll review them and update your status within 24 hours.
-        </Text>
+        <Animated.View entering={FadeInDown.duration(600).delay(300)}>
+          <Text
+            style={{
+              fontSize: 32,
+              fontWeight: "800",
+              color: "#1A1A1A",
+              textAlign: "center",
+              marginBottom: 16,
+              paddingHorizontal: 16,
+            }}
+          >
+            All Done!
+          </Text>
+          <Text
+            style={{
+              color: "#64748B",
+              textAlign: "center",
+              fontSize: 15,
+              lineHeight: 26,
+              marginBottom: 48,
+              paddingHorizontal: 32,
+              fontWeight: "500",
+            }}
+          >
+            Your address verification documents have been submitted successfully.
+            We'll review them and update your status within 24 hours.
+          </Text>
+        </Animated.View>
 
-        <ThemedButton
-          title="Return to Dashboard"
-          onPress={onDone}
-          style={{
-            backgroundColor: THEME_TEAL,
-            width: "100%",
-            height: 60,
-            borderRadius: 20,
-            shadowColor: THEME_TEAL,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.2,
-            shadowRadius: 15,
-            elevation: 8,
-          }}
-        />
+        <Animated.View entering={FadeInDown.duration(600).delay(550)} style={{ width: "100%" }}>
+          <ThemedButton
+            title="Return to Dashboard"
+            onPress={onDone}
+            style={{
+              backgroundColor: THEME_TEAL,
+              width: "100%",
+              height: 60,
+              borderRadius: 20,
+              shadowColor: THEME_TEAL,
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.2,
+              shadowRadius: 15,
+              elevation: 8,
+            }}
+          />
+        </Animated.View>
       </View>
     </SafeAreaView>
   );

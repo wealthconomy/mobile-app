@@ -17,6 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch } from "react-redux";
 
@@ -109,7 +110,7 @@ export default function KYCLevel2Screen() {
         <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 20, paddingVertical: 24 }}>
             {/* 1. Progress Step Indicator */}
-            <View style={{ marginBottom: 32 }}>
+            <Animated.View entering={FadeInDown.duration(600).delay(100)} style={{ marginBottom: 32 }}>
               <View
                 style={{
                   flexDirection: "row",
@@ -167,10 +168,10 @@ export default function KYCLevel2Screen() {
                   }}
                 />
               </View>
-            </View>
+            </Animated.View>
 
             {/* 2. Document Selection */}
-            <View style={{ marginBottom: 32 }}>
+            <Animated.View entering={FadeInDown.duration(600).delay(250)} style={{ marginBottom: 32 }}>
               <Text
                 style={{
                   color: "#1A1A1A",
@@ -242,10 +243,10 @@ export default function KYCLevel2Screen() {
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
+            </Animated.View>
 
             {/* 3. ID Number Input */}
-            <View style={{ marginBottom: 32 }}>
+            <Animated.View entering={FadeInDown.duration(600).delay(400)} style={{ marginBottom: 32 }}>
               <Text
                 style={{
                   color: "#1A1A1A",
@@ -281,10 +282,10 @@ export default function KYCLevel2Screen() {
                   }}
                 />
               </View>
-            </View>
+            </Animated.View>
 
             {/* 4. Upload Section */}
-            <View style={{ marginBottom: 32 }}>
+            <Animated.View entering={FadeInDown.duration(600).delay(500)} style={{ marginBottom: 32 }}>
               <Text
                 style={{
                   color: "#1A1A1A",
@@ -311,10 +312,10 @@ export default function KYCLevel2Screen() {
                 onPress={() => pickImage(setBackImage)}
                 onClear={() => setBackImage(null)}
               />
-            </View>
+            </Animated.View>
 
             {/* 5. Selfie / Personal Verification */}
-            <View style={{ marginBottom: 32 }}>
+            <Animated.View entering={FadeInDown.duration(600).delay(580)} style={{ marginBottom: 32 }}>
               <Text
                 style={{
                   color: "#1A1A1A",
@@ -438,10 +439,10 @@ export default function KYCLevel2Screen() {
                   </View>
                 )}
               </TouchableOpacity>
-            </View>
+            </Animated.View>
 
             {/* 6. Submit Button */}
-            <View style={{ marginTop: 8, marginBottom: 48 }}>
+            <Animated.View entering={FadeInDown.duration(600).delay(650)} style={{ marginTop: 8, marginBottom: 48 }}>
               <ThemedButton
                 title="Submit for Verification"
                 onPress={handleSubmit}
@@ -471,7 +472,7 @@ export default function KYCLevel2Screen() {
                 Your data is encrypted and secure. By proceeding, you agree to
                 our verification terms.
               </Text>
-            </View>
+            </Animated.View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -493,7 +494,8 @@ function SuccessState({ onDone }: { onDone: () => void }) {
           justifyContent: "center",
         }}
       >
-        <View
+        <Animated.View
+          entering={FadeInUp.duration(700).delay(100)}
           style={{
             width: 288,
             height: 288,
@@ -536,8 +538,9 @@ function SuccessState({ onDone }: { onDone: () => void }) {
               <Ionicons name="checkmark" size={60} color={THEME_TEAL} />
             </View>
           </View>
-        </View>
+        </Animated.View>
 
+        <Animated.View entering={FadeInDown.duration(600).delay(300)}>
         <Text
           style={{
             fontSize: 32,
@@ -564,7 +567,9 @@ function SuccessState({ onDone }: { onDone: () => void }) {
           Your identity verification has been submitted. You can now return to
           the dashboard while we process your request.
         </Text>
+        </Animated.View>
 
+        <Animated.View entering={FadeInDown.duration(600).delay(550)} style={{ width: "100%" }}>
         <ThemedButton
           title="Return to HomeScreen"
           onPress={onDone}
@@ -576,6 +581,7 @@ function SuccessState({ onDone }: { onDone: () => void }) {
             elevation: 8,
           }}
         />
+        </Animated.View>
       </View>
     </SafeAreaView>
   );
