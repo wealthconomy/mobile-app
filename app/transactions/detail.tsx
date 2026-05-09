@@ -130,7 +130,7 @@ export default function TransactionDetailScreen() {
 
             <View className="p-5">
               <View className="bg-[#F9FAFB] p-4 rounded-xl mb-6">
-                <Text className="text-[11px] text-[#6B7280] leading-[16px]">
+                <Text className="text-[12px] font-bold text-[#4B5563] leading-[18px]">
                   98237648905489789043597289021435794Simonpeterjoshua
                 </Text>
               </View>
@@ -161,8 +161,8 @@ export default function TransactionDetailScreen() {
             disabled={sharingImage || sharingPdf}
             className="flex-1 bg-white border border-[#E5E7EB] h-14 rounded-2xl flex-row items-center justify-center gap-x-2"
           >
-            <Ionicons name="image-outline" size={20} color="#6B7280" />
-            <Text className="text-[#6B7280] font-bold">
+            <Ionicons name="image-outline" size={20} color="#374151" />
+            <Text className="text-[#374151] font-extrabold">
               {sharingImage ? "Sharing..." : "Share as Image"}
             </Text>
           </TouchableOpacity>
@@ -171,8 +171,8 @@ export default function TransactionDetailScreen() {
             disabled={sharingImage || sharingPdf}
             className="flex-1 bg-white border border-[#E5E7EB] h-14 rounded-2xl flex-row items-center justify-center gap-x-2"
           >
-            <Ionicons name="document-text-outline" size={20} color="#6B7280" />
-            <Text className="text-[#6B7280] font-bold">
+            <Ionicons name="document-text-outline" size={20} color="#374151" />
+            <Text className="text-[#374151] font-extrabold">
               {sharingPdf ? "Sharing..." : "Share as Pdf"}
             </Text>
           </TouchableOpacity>
@@ -192,7 +192,7 @@ const DetailRow = ({
   isSuccess?: boolean;
 }) => (
   <View className="flex-row justify-between items-center">
-    <Text className="text-[13px] text-[#9CA3AF] font-medium">{label}</Text>
+    <Text className="text-[14px] text-[#4B5563] font-bold">{label}</Text>
     <View className="flex-row items-center">
       {isSuccess && (
         <Ionicons

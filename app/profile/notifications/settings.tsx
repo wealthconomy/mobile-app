@@ -31,7 +31,7 @@ export default function NotificationSettingsScreen() {
             onToggle={() => toggleSwitch("mute")}
           />
           <SettingItem
-            label="Wise Up Notifications"
+            label="WiseUp Notifications"
             value={settings.wiseUp}
             onToggle={() => toggleSwitch("wiseUp")}
           />
