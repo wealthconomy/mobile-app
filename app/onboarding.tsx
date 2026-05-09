@@ -45,7 +45,7 @@ const SLIDES: SlideData[] = [
     type: "slide",
     image: require("../assets/images/onboarding-1.png"),
     highlight: "Win",
-    rest: " Up",
+    rest: "Up",
     segments: [{ t: "Save Purposefully & Win Financially. " }],
   },
   {
@@ -53,7 +53,7 @@ const SLIDES: SlideData[] = [
     type: "slide",
     image: require("../assets/images/onboarding-2.png"),
     highlight: "Wise",
-    rest: " Up",
+    rest: "Up",
     segments: [{ t: "Learn & Get Smart About Money" }],
   },
   {
@@ -61,7 +61,7 @@ const SLIDES: SlideData[] = [
     type: "slide",
     image: require("../assets/images/onboarding-3.png"),
     highlight: "Wealth",
-    rest: " Up",
+    rest: "Up",
     segments: [{ t: " Build Wealth Confidently &\n Be Boundless " }],
   },
 ];

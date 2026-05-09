@@ -197,7 +197,7 @@ export default function WealthGroupScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
       <StatusBar style="dark" />
-      <Header title="Wealth Group" onBack={() => router.back()} />
+      <Header title="WealthGroup" onBack={() => router.back()} />
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         <View className="px-5 py-2">
@@ -237,7 +237,7 @@ export default function WealthGroupScreen() {
 
             <View style={{ padding: 24 }}>
               <View className="flex-row items-center justify-between mb-1">
-                <Text className="text-[#64748B] text-[13px] font-bold">
+                <Text className="text-[#4B5563] text-[14px] font-extrabold">
                   Total Savings
                 </Text>
                 <TouchableOpacity
@@ -267,7 +267,7 @@ export default function WealthGroupScreen() {
               </View>
 
               <View className="flex-row items-center space-x-1">
-                <Text className="text-[#64748B] text-[12px] font-bold">
+                <Text className="text-[#4B5563] text-[13px] font-extrabold">
                   Your wealth grew by N230.00 today
                 </Text>
                 <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
@@ -518,13 +518,13 @@ export default function WealthGroupScreen() {
                           {g.name}
                         </Text>
                         <View className="flex-row items-center justify-between mb-2">
-                          <Text className="text-[12px] text-[#64748B]">
+                          <Text className="text-[14px] font-bold text-[#4B5563]">
                             Progress:{" "}
-                            <Text className="text-[#155D5F] font-bold">
+                            <Text className="text-[#155D5F] font-black">
                               ₦{g.currentSavings}
                             </Text>
                           </Text>
-                          <Text className="text-[11px] text-[#64748B]">
+                          <Text className="text-[13px] font-bold text-[#4B5563]">
                             {g.membersCount} members
                           </Text>
                         </View>
@@ -619,7 +619,7 @@ function DiscoverySection({
           {title}
         </Text>
         <TouchableOpacity onPress={onViewAll}>
-          <Text className="text-[13px] font-bold text-[#64748B]">View all</Text>
+          <Text className="text-[14px] font-extrabold text-[#374151]">View all</Text>
         </TouchableOpacity>
       </View>
       {data.length > 0 ? (
@@ -636,7 +636,7 @@ function DiscoverySection({
       ) : (
         <View className="w-full h-32 items-center justify-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
           <Ionicons name="search-outline" size={32} color="#94A3B8" />
-          <Text className="text-[#64748B] text-[12px] font-bold mt-2">
+          <Text className="text-[#374151] text-[14px] font-extrabold mt-2">
             No tribes found matching your search
           </Text>
         </View>
@@ -675,7 +675,7 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
         </Text>
         <Text
           numberOfLines={1}
-          className="text-[8px] text-[#64748B] font-bold mb-1"
+          className="text-[10px] text-[#4B5563] font-extrabold mb-1"
         >
           {item.category}
         </Text>
@@ -684,7 +684,7 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
           <Text className="text-[10px] text-[#1A1A1A] font-black font-bold">
             {item.dailyAmount}
           </Text>
-          <Text className="text-[10px] text-[#64748B] font-medium">
+          <Text className="text-[11px] text-[#4B5563] font-bold">
             Ends: {item.endDate}
           </Text>
         </View>

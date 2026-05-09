@@ -58,8 +58,9 @@ export default function TopUpScreen() {
           </Text>
           <Text
             style={{
-              color: "#6B7280",
-              fontSize: 13,
+              color: "#4B5563",
+              fontSize: 14,
+              fontWeight: "600",
               textAlign: "center",
               marginTop: 12,
               lineHeight: 20,
@@ -214,8 +215,9 @@ export default function TopUpScreen() {
       </Text>
       <Text
         style={{
-          fontSize: 13,
-          color: "#6B7280",
+          fontSize: 14,
+          color: "#4B5563",
+          fontWeight: "600",
           textAlign: "center",
           marginBottom: 40,
           lineHeight: 20,
@@ -332,8 +334,9 @@ export default function TopUpScreen() {
 
       <Text
         style={{
-          color: "#6B7280",
-          fontSize: 13,
+          color: "#4B5563",
+          fontSize: 14,
+          fontWeight: "600",
           textAlign: "center",
           lineHeight: 21,
           marginBottom: 40,

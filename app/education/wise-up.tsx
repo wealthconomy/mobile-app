@@ -60,7 +60,7 @@ export default function WiseUpScreen() {
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
       <StatusBar style="dark" />
       <Header
-        title="Wise Up Blog"
+        title="WiseUp Blog"
         rightElement={
           <TouchableOpacity
             onPress={() => router.push("/support/reading-list")}

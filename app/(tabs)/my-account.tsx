@@ -68,7 +68,7 @@ const MenuItem = ({
         {label}
       </Text>
       {subtitle && (
-        <Text className="text-[10px] text-[#6B7280]">{subtitle}</Text>
+        <Text className="text-[12px] font-semibold text-[#4B5563]">{subtitle}</Text>
       )}
     </View>
     <Ionicons
@@ -154,7 +154,7 @@ export default function MyAccountScreen() {
         {/* Savings Info */}
         <Animated.View entering={FadeInDown.duration(600).delay(250)} className="mb-8">
           <View className="flex-row items-center mb-1">
-            <Text className="text-sm font-medium text-[#6B7280] mr-2">
+            <Text className="text-sm font-bold text-[#4B5563] mr-2">
               Total Savings
             </Text>
             <TouchableOpacity
@@ -181,7 +181,7 @@ export default function MyAccountScreen() {
               )}
             </Text>
           )}
-          <Text className="text-[12px] text-[#6B7280] mt-1">
+          <Text className="text-[14px] font-semibold text-[#4B5563] mt-1">
             Your wealth grew to{" "}
             <Text className="text-[#10B981]">N230.00 today ↑</Text>
           </Text>
@@ -300,7 +300,7 @@ export default function MyAccountScreen() {
                   Confirm Logout!
                 </Text>
 
-                <Text className="text-[14px] text-[#6B7280] text-center leading-[20px] mb-8">
+                <Text className="text-[15px] font-medium text-[#4B5563] text-center leading-[22px] mb-8">
                   To keep your portfolios secure, we will sign you out of this
                   session. You will need your password or Biometrics to jump
                   back in.

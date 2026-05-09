@@ -32,7 +32,7 @@ const MUTED = "#F7F7F7";
 const ERROR = "#DC2626";
 
 const WEALTH_PREFERENCES = [
-  "Impact Wealth (Power initiatives)",
+  "Impact Wealth (Impact/Halal Savings)",
   "Mixed Wealth (Split/Donate)",
 ];
 

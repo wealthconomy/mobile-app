@@ -160,7 +160,7 @@ export default function WithdrawScreen() {
 
   const renderSelectRecipient = () => (
     <Animated.View entering={FadeInDown.duration(600).delay(150)} className="px-5">
-      <Text className="text-[#6B7280] text-[13px] mb-1 mt-4">
+      <Text className="text-[#4B5563] text-[14px] font-extrabold mb-1 mt-4">
         Send to a recipient
       </Text>
 
@@ -180,7 +180,7 @@ export default function WithdrawScreen() {
             <Text className="text-[#1A1A1A] font-bold text-[15px]">
               Send to new recipient
             </Text>
-            <Text className="text-[#6B7280] text-[11px] mt-0.5">
+            <Text className="text-[#4B5563] text-[13px] font-bold mt-1">
               Transfer funds to a bank account not in your recent list
             </Text>
           </View>
@@ -217,7 +217,7 @@ export default function WithdrawScreen() {
                 <Text className="text-[#1A1A1A] font-bold text-sm">
                   {item.name}
                 </Text>
-                <Text className="text-[#6B7280] text-[11px]">
+                <Text className="text-[#4B5563] text-[13px] font-bold">
                   {item.bankName} - {item.accountNumber}
                 </Text>
               </View>
@@ -230,8 +230,8 @@ export default function WithdrawScreen() {
 
   const renderRecipientDetails = () => (
     <Animated.View entering={FadeInDown.duration(600).delay(150)} className="px-5">
-      <Text className="text-[#6B7280] text-[13px] mb-8 mt-4">
-        Amount(₦) <Text className="font-bold">₦3,500,000.00 max</Text>
+      <Text className="text-[#374151] text-[14px] font-extrabold mb-8 mt-4">
+        Amount(₦) <Text className="font-extrabold">₦3,500,000.00 max</Text>
       </Text>
 
       <View className="space-y-6 gap-5">
@@ -456,7 +456,7 @@ export default function WithdrawScreen() {
 
         <View className="flex-row justify-between mb-8 mt-2 items-start">
           <View>
-            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
+            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
               Amount To Transfer
             </Text>
             <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -464,7 +464,7 @@ export default function WithdrawScreen() {
             </Text>
           </View>
           <View className="items-end">
-            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
+            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
               Account No.
             </Text>
             <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -475,7 +475,7 @@ export default function WithdrawScreen() {
 
         <View className="flex-row justify-between mb-8">
           <View>
-            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
+            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
               Account Name
             </Text>
             <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -483,7 +483,7 @@ export default function WithdrawScreen() {
             </Text>
           </View>
           <View className="items-end">
-            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
+            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
               Bank Name
             </Text>
             <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -494,7 +494,7 @@ export default function WithdrawScreen() {
 
         <View className="flex-row justify-between">
           <View>
-            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
+            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
               Wealth Send to
             </Text>
             <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -582,7 +582,7 @@ export default function WithdrawScreen() {
             <Text className="text-[#1A1A1A] font-bold text-[20px] text-center mb-2">
               Funds Transferred Successfully ✅
             </Text>
-            <Text className="text-[#6B7280] text-[12px] text-center mb-8 px-4">
+            <Text className="text-[#4B5563] text-[14px] font-semibold text-center mb-8 px-4 leading-[20px]">
               Congratulations, WealthBuilder! You have successfully transferred
               ₦{amount || "0.00"} from your {wealthPlan} account to{" "}
               {userName || "Simon John"} ({selectedBank} -{" "}

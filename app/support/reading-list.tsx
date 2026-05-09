@@ -34,7 +34,7 @@ export default function ReadingListScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
       <StatusBar style="dark" />
-      <Header title="Your Reading List" />
+      <Header title="Your WiseUp List" />
 
       <ScrollView
         className="flex-1 px-5 mt-4"

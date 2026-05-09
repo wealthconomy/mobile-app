@@ -135,7 +135,7 @@ export default function DepositScreen() {
         {icon}
       </View>
       <View className="flex-1">
-        <Text className="text-[#6B7280] text-[13px] mb-0.5">{label}</Text>
+        <Text className="text-[#4B5563] text-[14px] font-extrabold mb-0.5">{label}</Text>
         <Text className="text-[#1A1A1A] font-bold text-[16px]">{value}</Text>
       </View>
       {showCopy && (
@@ -156,7 +156,7 @@ export default function DepositScreen() {
 
   const renderSelectMethod = () => (
     <View className="px-5">
-      <Text className="text-[#6B7280] text-[13px] mb- mt-4">
+      <Text className="text-[#4B5563] text-[14px] font-extrabold mb-1 mt-4">
         Select your digital payment method
       </Text>
 
@@ -180,7 +180,7 @@ export default function DepositScreen() {
             <Text className="text-[#1A1A1A] font-bold text-[15px]">
               Top-up with Card
             </Text>
-            <Text className="text-[#6B7280] text-[11px] mt-0.5">
+            <Text className="text-[#4B5563] text-[13px] font-bold mt-1">
               Add funds directly from your ATM card
             </Text>
           </View>
@@ -203,7 +203,7 @@ export default function DepositScreen() {
             <Text className="text-[#1A1A1A] font-bold text-[15px]">
               Add via bank transfer
             </Text>
-            <Text className="text-[#6B7280] text-[11px] mt-0.5">
+            <Text className="text-[#4B5563] text-[13px] font-bold mt-1">
               Fund your wallet by sending money from your NG bank account
             </Text>
           </View>
@@ -212,7 +212,7 @@ export default function DepositScreen() {
       </View>
 
       <View className="px-1 mt-8">
-        <Text className="text-[#6B7280] text-[13px] mb-6">Saved cards</Text>
+        <Text className="text-[#374151] text-[15px] font-extrabold mb-6">Saved cards</Text>
 
         {savedCards
           .sort((a, b) => b.usageCount - a.usageCount)
@@ -250,7 +250,7 @@ export default function DepositScreen() {
                 <Text className="text-[#1A1A1A] font-bold text-sm">
                   **** {card.last4}
                 </Text>
-                <Text className="text-[#6B7280] text-[11px]">
+                <Text className="text-[#4B5563] text-[13px] font-bold">
                   {card.id === defaultCardId ? "Default card" : "Saved card"}
                 </Text>
               </View>
@@ -281,7 +281,7 @@ export default function DepositScreen() {
             <Text className="text-[#1A1A1A] font-extrabold text-[24px] mb-2 leading-tight">
               Bank Transfer
             </Text>
-            <Text className="text-[#6B7280] text-[13px] mb-8">
+            <Text className="text-[#4B5563] text-[14px] font-bold mb-8">
               Here is the bank details for the transfer
             </Text>
 
@@ -445,7 +445,7 @@ export default function DepositScreen() {
 
   const renderPreview = () => (
     <View className="px-5">
-      <Text className="text-[#6B7280] text-[13px] mb-8 mt-4">
+      <Text className="text-[#374151] text-[14px] font-extrabold mb-8 mt-4">
         Please, recheck and confirm before making the transaction.
       </Text>
 
@@ -478,7 +478,7 @@ export default function DepositScreen() {
 
         <View className="flex-row justify-between mb-8 mt-2 items-start">
           <View>
-            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
+            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
               Amount To Deposit
             </Text>
             <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -486,7 +486,7 @@ export default function DepositScreen() {
             </Text>
           </View>
           <View className="items-end">
-            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
+            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
               Account No.
             </Text>
             <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -497,7 +497,7 @@ export default function DepositScreen() {
 
         <View className="flex-row justify-between mb-8">
           <View>
-            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
+            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
               Account Name
             </Text>
             <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -505,7 +505,7 @@ export default function DepositScreen() {
             </Text>
           </View>
           <View className="items-end">
-            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
+            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
               Bank Name
             </Text>
             <Text className="text-[#1A1A1A] font-bold text-[16px]">Opay</Text>
@@ -514,7 +514,7 @@ export default function DepositScreen() {
 
         <View className="flex-row justify-between">
           <View>
-            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
+            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
               Wealth Send Into
             </Text>
             <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -573,7 +573,7 @@ export default function DepositScreen() {
             <Text className="text-[#1A1A1A] font-bold text-[20px] text-center mb-2">
               Funds Deposited Successfully ✅
             </Text>
-            <Text className="text-[#6B7280] text-[12px] text-center mb-8 px-4">
+            <Text className="text-[#4B5563] text-[14px] font-semibold text-center mb-8 px-4 leading-[20px]">
               Congratulations, WealthBuilder! You have successfully deposited ₦
               {formatAmount(amount)} into your WinUp account.
             </Text>

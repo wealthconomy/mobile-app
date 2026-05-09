@@ -214,7 +214,7 @@ export default function ProfileScreen() {
 
 const EditableField = ({ control, name, label, isEditing }: any) => (
   <View className="gap-y-2">
-    <Text className="text-[14px] font-medium text-[#6B7280]">{label}</Text>
+    <Text className="text-[15px] font-bold text-[#4B5563]">{label}</Text>
     <Controller
       control={control}
       name={name}
