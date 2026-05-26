@@ -11,7 +11,7 @@ export default function WinUpScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
       <StatusBar style="dark" />
-      <Header title="Win Up" />
+      <Header title="WinUp" />
 
       <ScrollView
         className="flex-1 px-5"

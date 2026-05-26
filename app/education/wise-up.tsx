@@ -71,12 +71,23 @@ export default function WiseUpScreen() {
       />
 
       <View className="px-5 pb-4">
-        <Text className="text-[#1A1A1A] font-extrabold text-[24px]">
-          Hi Good Day!
-        </Text>
-        <Text className="text-[#6B7280] text-sm mb-6">
-          Welcome to WiseUp Blog
-        </Text>
+        <View className="flex-row justify-between items-center mb-6">
+          <View>
+            <Text className="text-[#1A1A1A] font-extrabold text-[24px]">
+              Hi Good Day!
+            </Text>
+            <Text className="text-[#6B7280] text-sm">
+              Welcome to WiseUp Blog
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => router.push("/education/library" as any)}
+            className="bg-[#155D5F] px-3 py-2 rounded-lg flex-row items-center"
+          >
+            <Ionicons name="library-outline" size={16} color="white" />
+            <Text className="text-white ml-1 text-xs font-bold">Library</Text>
+          </TouchableOpacity>
+        </View>
 
         <View className="flex-row items-center bg-[#F8F8F8] px-4 py-2 rounded-xl mb-6">
           <Ionicons name="search-outline" size={20} color="#9CA3AF" />

@@ -135,7 +135,9 @@ export default function DepositScreen() {
         {icon}
       </View>
       <View className="flex-1">
-        <Text className="text-[#4B5563] text-[14px] font-extrabold mb-0.5">{label}</Text>
+        <Text className="text-[#4B5563] text-[14px] font-extrabold mb-0.5">
+          {label}
+        </Text>
         <Text className="text-[#1A1A1A] font-bold text-[16px]">{value}</Text>
       </View>
       {showCopy && (
@@ -212,7 +214,9 @@ export default function DepositScreen() {
       </View>
 
       <View className="px-1 mt-8">
-        <Text className="text-[#374151] text-[15px] font-extrabold mb-6">Saved cards</Text>
+        <Text className="text-[#374151] text-[15px] font-extrabold mb-6">
+          Saved cards
+        </Text>
 
         {savedCards
           .sort((a, b) => b.usageCount - a.usageCount)
@@ -515,11 +519,9 @@ export default function DepositScreen() {
         <View className="flex-row justify-between">
           <View>
             <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
-              Wealth Send Into
+              Transfer Method{" "}
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              {wealthPlan}
-            </Text>
+            <Text className="text-[#1A1A1A] font-bold text-[16px]">Card</Text>
           </View>
         </View>
 
@@ -571,7 +573,7 @@ export default function DepositScreen() {
               resizeMode="contain"
             />
             <Text className="text-[#1A1A1A] font-bold text-[20px] text-center mb-2">
-              Funds Deposited Successfully ✅
+              Wealth Deposited Successfully ✅
             </Text>
             <Text className="text-[#4B5563] text-[14px] font-semibold text-center mb-8 px-4 leading-[20px]">
               Congratulations, WealthBuilder! You have successfully deposited ₦

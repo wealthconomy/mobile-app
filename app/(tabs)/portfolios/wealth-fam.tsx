@@ -10,6 +10,8 @@ import { Eye, EyeOff } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSelector } from "react-redux";
+import { RootState } from "@/src/store";
 
 const THEME = "#560FF1";
 const THEME_BG = "#F3EEFF";
@@ -58,6 +60,11 @@ const SUGGESTIONS = [
 export default function WealthFamScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [loading, setLoading] = useState(true);
+  const { user } = useSelector((state: RootState) => state.auth);
+
+  const showInterest = user?.wealthPreference?.toLowerCase().includes("impact")
+    ? false
+    : true;
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000);
@@ -285,12 +292,14 @@ export default function WealthFamScreen() {
                 )}
               </View>
 
-              <View className="flex-row items-center space-x-1">
-                <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-80">
-                  Your wealth grew to ₦230.00 today
-                </Text>
-                <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
-              </View>
+              {showInterest && (
+                <View className="flex-row items-center space-x-1">
+                  <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-80">
+                    Your wealth grew to ₦230.00 today
+                  </Text>
+                  <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
+                </View>
+              )}
             </View>
 
             <TouchableOpacity
@@ -613,25 +622,18 @@ function FamListItem({
             alignItems: "center",
           }}
         >
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
-              {plan.subtitle} |{" "}
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <Text style={{ fontSize: 10, color: "#9CA3AF" }}>
+              {plan.subtitle}
             </Text>
-            <Text style={{ fontSize: 9, color: "#4CAF50", fontWeight: "700" }}>
-              ₦{plan.saved}
-            </Text>
-            <Text style={{ fontSize: 10, color: "#4CAF50", marginLeft: 2 }}>
-              ↑
-            </Text>
-            <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
-              {" "}
-              | Progressive: ₦50,000.00
+            <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
+              Wealth growth ₦{plan.saved} ↑ | Progressive: ₦50,000.00 ℹ️
             </Text>
           </View>
 
           <View
             style={{
-              width: 129,
+              width: 80,
               height: 4,
               borderRadius: 20,
               backgroundColor: THEME_BG,
@@ -663,7 +665,7 @@ function FamListItem({
             style={{
               flexDirection: "row",
               alignItems: "center",
-              width: 129,
+              width: 80,
               justifyContent: "space-between",
             }}
           >

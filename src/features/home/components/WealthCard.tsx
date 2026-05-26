@@ -4,10 +4,18 @@ import { Eye, EyeOff } from "lucide-react-native";
 import { useState } from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 import Svg, { ClipPath, Defs, G, Path } from "react-native-svg";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../store";
 
 export const WealthCard = () => {
   const [showBalance, setShowBalance] = useState(true);
   const router = useRouter();
+  const { user } = useSelector((state: RootState) => state.auth);
+
+  // Users with "Impact Wealth" preference don't see "interest" (wealth growth)
+  const showInterest = user?.wealthPreference?.toLowerCase().includes("impact")
+    ? false
+    : true;
 
   return (
     <View
@@ -102,12 +110,14 @@ export const WealthCard = () => {
             </Text>
           </TouchableOpacity>
 
-          <View className="flex-row items-center space-x-1 mt-1">
-            <Text className="text-white text-[12px] font-medium">
-              Your wealth grew by N230.00 today
-            </Text>
-            <Text className="text-[#95F370] text-[14px] font-bold">↑</Text>
-          </View>
+          {showInterest && (
+            <View className="flex-row items-center space-x-1 mt-1">
+              <Text className="text-white text-[12px] font-medium">
+                Your wealth grew by N230.00 today
+              </Text>
+              <Text className="text-[#95F370] text-[14px] font-bold">↑</Text>
+            </View>
+          )}
         </View>
 
         {/* View Wealth Button - Navigates to Portfolio */}
