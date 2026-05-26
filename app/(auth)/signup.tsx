@@ -33,6 +33,7 @@ const ERROR = "#DC2626";
 
 const WEALTH_PREFERENCES = [
   "Impact Wealth (Impact/Halal Savings)",
+  "Interest Wealth (Conventional Savings)",
   "Mixed Wealth (Split/Donate)",
 ];
 

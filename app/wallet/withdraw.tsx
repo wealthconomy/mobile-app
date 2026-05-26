@@ -7,7 +7,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -25,7 +25,8 @@ type Step =
   | "select-recipient"
   | "recipient-details"
   | "select-bank"
-  | "preview";
+  | "preview"
+  | "pin";
 
 const INITIAL_RECIPIENTS = [
   {
@@ -54,6 +55,8 @@ export default function WithdrawScreen() {
   const { plan } = useLocalSearchParams<{ plan: string }>();
   const [recipients, setRecipients] = useState(INITIAL_RECIPIENTS);
   const [step, setStep] = useState<Step>("select-recipient");
+  const pinRefs = useRef<Array<TextInput | null>>([]);
+  const [pinValues, setPinValues] = useState(["", "", "", ""]);
 
   // Load recipients from storage on mount
   useEffect(() => {
@@ -144,7 +147,8 @@ export default function WithdrawScreen() {
   });
 
   const handleBack = () => {
-    if (step === "preview") setStep("recipient-details");
+    if (step === "pin") setStep("preview");
+    else if (step === "preview") setStep("recipient-details");
     else if (step === "select-bank") setStep("recipient-details");
     else if (step === "recipient-details") setStep("select-recipient");
     else router.back();
@@ -155,6 +159,7 @@ export default function WithdrawScreen() {
     if (step === "recipient-details") return "Wealth Withdrawal";
     if (step === "select-bank") return "Select Bank";
     if (step === "preview") return `${wealthPlan} Preview`;
+    if (step === "pin") return "";
     return "";
   };
 
@@ -427,10 +432,10 @@ export default function WithdrawScreen() {
       </Text>
 
       <View
-        className="bg-[#F6F6F6] p-6 rounded-t-[24px] relative self-center"
+        className="bg-[#F8F8F8] p-6 rounded-t-[24px] relative self-center"
         style={{
-          width: 365,
-          height: 250,
+          width: 350,
+          minHeight: 220,
           borderColor: "#fefcfc40",
           borderWidth: 0.8,
           borderBottomWidth: 0,
@@ -441,64 +446,51 @@ export default function WithdrawScreen() {
           elevation: 2,
         }}
       >
-        {/* Wealthconomy Logo */}
-        {/* <Image
-          source={require("../../assets/images/wealth.png")}
-          style={{
-            width: 80,
-            height: 20,
-            position: "absolute",
-            right: 20,
-            top: 20,
-          }}
-          resizeMode="contain"
-        /> */}
-
-        <View className="flex-row justify-between mb-8 mt-2 items-start">
-          <View>
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
-              Amount To Transfer
+        <View className="flex-row mb-6 mt-2">
+          <View className="flex-1">
+            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
+              Wealth to Withdraw
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
+            <Text className="text-[#1A1A1A] font-bold text-[15px]">
               ₦{formatAmount(amount)}
             </Text>
           </View>
-          <View className="items-end">
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
+          <View className="flex-1">
+            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
               Account No.
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
+            <Text className="text-[#1A1A1A] font-bold text-[15px]">
               {accountNumber || "0000000000"}
             </Text>
           </View>
         </View>
 
-        <View className="flex-row justify-between mb-8">
-          <View>
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
+        <View className="flex-row mb-6">
+          <View className="flex-1">
+            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
               Account Name
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              {userName || "Unknown Recipient"}
+            <Text className="text-[#1A1A1A] font-bold text-[15px] pr-2">
+              {userName || "Unknown"}
             </Text>
           </View>
-          <View className="items-end">
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
+          <View className="flex-1">
+            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
               Bank Name
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
+            <Text className="text-[#1A1A1A] font-bold text-[15px] pr-2">
               {selectedBank === "Select bank" ? "---" : selectedBank}
             </Text>
           </View>
         </View>
 
-        <View className="flex-row justify-between">
-          <View>
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
-              Wealth Send to
+        <View className="flex-row">
+          <View className="flex-1">
+            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
+              Narrative
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              {wealthPlan}
+            <Text className="text-[#1A1A1A] font-bold text-[15px]">
+              {narrative || "---"}
             </Text>
           </View>
         </View>
@@ -506,9 +498,9 @@ export default function WithdrawScreen() {
         {/* Jagged Edge Components */}
         <View
           className="flex-row absolute -bottom-[10px] left-0 right-0 overflow-hidden"
-          style={{ width: 365.1 }}
+          style={{ width: 350.1 }}
         >
-          {Array.from({ length: 40 }).map((_, i) => (
+          {Array.from({ length: 38 }).map((_, i) => (
             <View
               key={i}
               style={{
@@ -525,6 +517,53 @@ export default function WithdrawScreen() {
 
       <ThemedButton
         title="Confirm"
+        onPress={() => setStep("pin")}
+        className="mt-14"
+      />
+    </Animated.View>
+  );
+
+  const renderPin = () => (
+    <Animated.View entering={FadeInDown.duration(600).delay(150)} className="px-5 items-center mt-6">
+      <Image
+        source={require("@/assets/images/change-pin.png")}
+        style={{ width: 120, height: 120, marginBottom: 10 }}
+        resizeMode="contain"
+      />
+      <Text className="text-[#155D5F] font-extrabold text-[24px] mb-2 mt-4">
+        Insert your Pin
+      </Text>
+      <Text className="text-[#6B7280] text-[13px] mb-8 text-center">
+        Please insert pin to complete transaction
+      </Text>
+
+      <View className="flex-row justify-center mb-8 w-full px-2" style={{ gap: 16 }}>
+        {[0, 1, 2, 3].map((i) => (
+          <TextInput
+            key={i}
+            value={pinValues[i]}
+            ref={(el) => { pinRefs.current[i] = el; }}
+            className="w-[55px] h-[55px] bg-[#F8F8F8] rounded-xl text-center text-[24px] font-bold text-[#1A1A1A]"
+            keyboardType="numeric"
+            maxLength={1}
+            secureTextEntry
+            onChangeText={(val) => {
+              const newPins = [...pinValues];
+              newPins[i] = val;
+              setPinValues(newPins);
+              if (val && i < 3) {
+                pinRefs.current[i + 1]?.focus();
+              }
+            }}
+          />
+        ))}
+      </View>
+
+      <ThemedButton
+        title="Confirm"
+        disabled={pinValues.join("").length !== 4 || loading}
+        loading={loading}
+        className="mt-6 w-full"
         onPress={async () => {
           setLoading(true);
           await paymentService.transferFunds({
@@ -534,7 +573,6 @@ export default function WithdrawScreen() {
             narrative,
           });
 
-          // Add to recent recipients if not already there
           const exists = recipients.some(
             (r) => r.accountNumber === accountNumber,
           );
@@ -553,8 +591,6 @@ export default function WithdrawScreen() {
           setLoading(false);
           setShowSuccess(true);
         }}
-        loading={loading}
-        className="mt-14"
       />
     </Animated.View>
   );
@@ -569,25 +605,22 @@ export default function WithdrawScreen() {
         {step === "recipient-details" && renderRecipientDetails()}
         {step === "select-bank" && renderSelectBank()}
         {step === "preview" && renderPreview()}
+        {step === "pin" && renderPin()}
       </ScrollView>
 
       <Modal visible={showSuccess} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 justify-center items-center px-10">
-          <View className="bg-white rounded-[32px] p-8 items-center w-full">
+        <View className="flex-1 bg-black/50 justify-center items-center px-6">
+          <View className="bg-white rounded-[32px] p-8 items-center w-full max-w-[340px]">
             <Image
               source={require("@/assets/images/funds.png")}
-              style={{ width: 120, height: 120, marginBottom: 20 }}
+              style={{ width: 140, height: 140, marginBottom: 20 }}
               resizeMode="contain"
             />
-            <Text className="text-[#1A1A1A] font-bold text-[20px] text-center mb-2">
-              Funds Transferred Successfully ✅
+            <Text className="text-[#1A1A1A] font-extrabold text-[22px] text-center mb-4 leading-[28px]">
+              Wealth Withdrawal Successful! ✅
             </Text>
-            <Text className="text-[#4B5563] text-[14px] font-semibold text-center mb-8 px-4 leading-[20px]">
-              Congratulations, WealthBuilder! You have successfully transferred
-              ₦{amount || "0.00"} from your {wealthPlan} account to{" "}
-              {userName || "Simon John"} ({selectedBank} -{" "}
-              {accountNumber || "1234567890"}).
-              {"\n\n"}Current Balance: ₦XX,XXX.XX
+            <Text className="text-[#4B5563] text-[14px] text-center mb-8 leading-[22px]">
+              Dear WealthBuilder, you have successfully withdrawn ₦{formatAmount(amount)} from your {wealthPlan} savings portfolio. Keep building!
             </Text>
             <ThemedButton
               title="Confirm"

@@ -9,6 +9,8 @@ import { Eye, EyeOff } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSelector } from "react-redux";
+import { RootState } from "@/src/store";
 import Svg, { Path } from "react-native-svg";
 
 const UnlockedPadlock = () => (
@@ -54,6 +56,11 @@ import { PortfolioDetailSkeleton } from "@/src/features/home/components/Dashboar
 export default function WealthFixScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [loading, setLoading] = useState(true);
+  const { user } = useSelector((state: RootState) => state.auth);
+
+  const showInterest = user?.wealthPreference?.toLowerCase().includes("impact")
+    ? false
+    : true;
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000);
@@ -282,12 +289,14 @@ export default function WealthFixScreen() {
                 )}
               </View>
 
-              <View className="flex-row items-center space-x-1">
-                <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-80">
-                  Your wealth grew to N230.00 today
-                </Text>
-                <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
-              </View>
+              {showInterest && (
+                <View className="flex-row items-center space-x-1">
+                  <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-80">
+                    Your wealth grew to N230.00 today
+                  </Text>
+                  <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
+                </View>
+              )}
             </View>
 
             <TouchableOpacity
@@ -644,26 +653,19 @@ function FixListItem({ goal, themeColor, isUnlocked }: any) {
             alignItems: "center",
           }}
         >
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
-              {goal.subtitle} |{" "}
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <Text style={{ fontSize: 10, color: "#9CA3AF" }}>
+              {goal.subtitle}
             </Text>
-            <Text style={{ fontSize: 9, color: "#4CAF50", fontWeight: "700" }}>
-              ₦{goal.saved}
-            </Text>
-            <Text style={{ fontSize: 10, color: "#4CAF50", marginLeft: 2 }}>
-              ↑
-            </Text>
-            <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
-              {" "}
-              | Progressive: ₦50,000.00
+            <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
+              Wealth growth ₦{goal.saved} ↑ | Progressive: ₦50,000.00 ℹ️
             </Text>
           </View>
 
-          {/* Progress Bar (Width 129) */}
+          {/* Progress Bar */}
           <View
             style={{
-              width: 129,
+              width: 80,
               height: 4,
               borderRadius: 20,
               backgroundColor: "#FFF7E1",
@@ -695,7 +697,7 @@ function FixListItem({ goal, themeColor, isUnlocked }: any) {
             style={{
               flexDirection: "row",
               alignItems: "center",
-              width: 129,
+              width: 80,
               justifyContent: "space-between",
             }}
           >

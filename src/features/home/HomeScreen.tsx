@@ -62,13 +62,6 @@ export default function HomeScreen() {
               >
                 <View className="mr-4">
                   <PortfolioCard
-                    type="flex"
-                    title="WealthFlex"
-                    description="Smart flexible savings; earn interest, access anytime."
-                  />
-                </View>
-                <View className="mr-4">
-                  <PortfolioCard
                     type="goal"
                     title="WealthGoal"
                     description="Save with focus and smash every target."
@@ -76,9 +69,37 @@ export default function HomeScreen() {
                 </View>
                 <View className="mr-4">
                   <PortfolioCard
+                    type="flow"
+                    title="WealthFlow"
+                    description="Automated savings for a continuous wealth flow."
+                  />
+                </View>
+                <View className="mr-4">
+                  <PortfolioCard
+                    type="flex"
+                    title="WealthFlex"
+                    description="Smart flexible savings; earn interest, access anytime."
+                  />
+                </View>
+                <View className="mr-4">
+                  <PortfolioCard
                     type="fix"
                     title="WealthFix"
                     description="Lock it in, block temptation, and watch your money grow."
+                  />
+                </View>
+                <View className="mr-4">
+                  <PortfolioCard
+                    type="fam"
+                    title="WealthFam"
+                    description="Build a wealthy family; save for kids, spouse, and loved ones."
+                  />
+                </View>
+                <View className="mr-4">
+                  <PortfolioCard
+                    type="group"
+                    title="WealthGroup"
+                    description="Save together, grow together and win together."
                   />
                 </View>
               </ScrollView>

@@ -10,6 +10,8 @@ import { Eye, EyeOff } from "lucide-react-native";
 import { useCallback, useEffect, useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSelector } from "react-redux";
+import { RootState } from "@/src/store";
 
 const THEME = "#005F61"; // Dark teal for text/buttons
 const THEME_BG = "#D5EDFF"; // Theme light blue
@@ -74,6 +76,11 @@ const CATEGORIES: Category[] = [
 export default function WealthFlowScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [loading, setLoading] = useState(true);
+  const { user } = useSelector((state: RootState) => state.auth);
+
+  const showInterest = user?.wealthPreference?.toLowerCase().includes("impact")
+    ? false
+    : true;
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000);
@@ -298,12 +305,14 @@ export default function WealthFlowScreen() {
                 )}
               </View>
 
-              <View className="flex-row items-center space-x-1">
-                <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-70">
-                  Your wealth grew to ₦230.00 today
-                </Text>
-                <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
-              </View>
+              {showInterest && (
+                <View className="flex-row items-center space-x-1">
+                  <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-70">
+                    Your wealth grew to ₦230.00 today
+                  </Text>
+                  <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
+                </View>
+              )}
             </View>
 
             <TouchableOpacity
