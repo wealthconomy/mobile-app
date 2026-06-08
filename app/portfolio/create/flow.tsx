@@ -46,6 +46,7 @@ export default function CreateFlowScreen() {
   const [anytimeWithdrawal, setAnytimeWithdrawal] = useState(false);
   const [fundingSource, setFundingSource] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [wealthPreference, setWealthPreference] = useState<"Interest Based" | "Impact Wealth">("Interest Based");
 
   // Dropdown state
   const [showSourceDropdown, setShowSourceDropdown] = useState(false);
@@ -111,6 +112,27 @@ export default function CreateFlowScreen() {
           </Text>
         </View>
       )}
+
+      {/* Wealth Preference Selector */}
+      <View style={{ marginBottom: 18 }}>
+        <Text style={{ color: TEXT_DARK, fontWeight: "700", fontSize: 13, marginBottom: 8 }}>
+          Wealth Preference
+        </Text>
+        <View style={{ flexDirection: "row", backgroundColor: "#F3F4F6", borderRadius: 12, padding: 4 }}>
+          <TouchableOpacity 
+            onPress={() => setWealthPreference("Interest Based")}
+            style={{ flex: 1, backgroundColor: wealthPreference === "Interest Based" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: wealthPreference === "Interest Based" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: wealthPreference === "Interest Based" ? 2 : 0 }}
+          >
+            <Text style={{ color: wealthPreference === "Interest Based" ? TEXT_DARK : "#6B7280", fontWeight: wealthPreference === "Interest Based" ? "700" : "500", fontSize: 13 }}>Interest Based</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => setWealthPreference("Impact Wealth")}
+            style={{ flex: 1, backgroundColor: wealthPreference === "Impact Wealth" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: wealthPreference === "Impact Wealth" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: wealthPreference === "Impact Wealth" ? 2 : 0 }}
+          >
+            <Text style={{ color: wealthPreference === "Impact Wealth" ? TEXT_DARK : "#6B7280", fontWeight: wealthPreference === "Impact Wealth" ? "700" : "500", fontSize: 13 }}>Impact Wealth</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Wealth Title */}
       <View style={{ marginBottom: 18 }}>
@@ -574,21 +596,39 @@ export default function CreateFlowScreen() {
             marginBottom: 20,
           }}
         >
-          <View>
-            <Text
-              style={{
-                color: "#6B7280",
-                fontSize: 11,
-                marginBottom: 6,
-                fontWeight: "500",
-              }}
-            >
-              Wealth Interest
-            </Text>
-            <Text style={{ color: TEXT_DARK, fontWeight: "700", fontSize: 16 }}>
-              ₦{formatAmount(calculateGrowth())}
-            </Text>
-          </View>
+          {wealthPreference === "Interest Based" ? (
+            <View>
+              <Text
+                style={{
+                  color: "#6B7280",
+                  fontSize: 11,
+                  marginBottom: 6,
+                  fontWeight: "500",
+                }}
+              >
+                Wealth Interest
+              </Text>
+              <Text style={{ color: TEXT_DARK, fontWeight: "700", fontSize: 16 }}>
+                ₦{formatAmount(calculateGrowth())}
+              </Text>
+            </View>
+          ) : (
+            <View>
+              <Text
+                style={{
+                  color: "#6B7280",
+                  fontSize: 11,
+                  marginBottom: 6,
+                  fontWeight: "500",
+                }}
+              >
+                Preference
+              </Text>
+              <Text style={{ color: TEXT_DARK, fontWeight: "700", fontSize: 16 }}>
+                Impact Wealth
+              </Text>
+            </View>
+          )}
           <View style={{ alignItems: "flex-end" }}>
             <Text
               style={{

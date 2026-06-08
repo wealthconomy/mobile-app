@@ -1,6 +1,7 @@
 import { WealthGoal } from "@/src/api/goalService";
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
+import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -60,11 +61,10 @@ const SUGGESTIONS = [
 export default function WealthFamScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [loading, setLoading] = useState(true);
-  const { user } = useSelector((state: RootState) => state.auth);
-
-  const showInterest = user?.wealthPreference?.toLowerCase().includes("impact")
-    ? false
-    : true;
+  const portfolioPreference = useSelector(
+    (state: RootState) => state.portfolioPreference.fam
+  );
+  const showInterest = portfolioPreference !== "Impact Wealth";
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000);
@@ -216,7 +216,11 @@ export default function WealthFamScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
       <StatusBar style="dark" />
-      <Header title="WealthFam" onBack={() => router.back()} />
+      <Header
+        title="WealthFam"
+        onBack={() => router.back()}
+        rightElement={<PortfolioPreferenceMenu portfolioType="fam" />}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         <View className="px-5 py-2">

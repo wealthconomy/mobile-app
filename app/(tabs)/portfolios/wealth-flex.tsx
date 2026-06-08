@@ -1,5 +1,6 @@
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
+import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -14,6 +15,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSelector } from "react-redux";
+import { RootState } from "@/src/store";
 import Svg, { Path, Rect } from "react-native-svg";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -61,6 +64,10 @@ export default function WealthFlexScreen() {
   const [showTips, setShowTips] = useState(true);
   const [loading, setLoading] = useState(true);
   const amount = "₦300,735.42";
+  const portfolioPreference = useSelector(
+    (state: RootState) => state.portfolioPreference.flex
+  );
+  const showInterest = portfolioPreference !== "Impact Wealth";
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000);
@@ -71,7 +78,11 @@ export default function WealthFlexScreen() {
     return (
       <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
         <StatusBar style="dark" />
-        <Header title="WealthFlex" onBack={() => router.back()} />
+        <Header
+          title="WealthFlex"
+          onBack={() => router.back()}
+          rightElement={<PortfolioPreferenceMenu portfolioType="flex" />}
+        />
         <PortfolioDetailSkeleton />
       </SafeAreaView>
     );
@@ -80,7 +91,11 @@ export default function WealthFlexScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
       <StatusBar style="dark" />
-      <Header title="WealthFlex" />
+      <Header
+        title="WealthFlex"
+        onBack={() => router.back()}
+        rightElement={<PortfolioPreferenceMenu portfolioType="flex" />}
+      />
 
       <ScrollView
         className="flex-1 px-5"
@@ -157,6 +172,7 @@ export default function WealthFlexScreen() {
                   ••••••••
                 </Text>
               )}
+              {showInterest && (
               <View className="flex-row items-center space-x-1 mt-1">
                 <Text className="text-[#64748B] text-[13px] font-medium opacity-80">
                   Your wealth grew by N230.00 today
@@ -165,6 +181,7 @@ export default function WealthFlexScreen() {
                   ↑
                 </Text>
               </View>
+              )}
             </View>
           </View>
         </View>

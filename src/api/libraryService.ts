@@ -18,6 +18,7 @@ const MOCK_LIBRARY_MATERIALS: LibraryMaterial[] = [
     fileSize: "2.4 MB",
     isDownloadable: true,
     likesCount: 124,
+    downloadsCount: 856,
     commentsCount: 12,
     comments: [
       {
@@ -82,6 +83,7 @@ const MOCK_LIBRARY_MATERIALS: LibraryMaterial[] = [
     fileSize: "3.2 MB",
     isDownloadable: true,
     likesCount: 256,
+    downloadsCount: 1240,
     commentsCount: 45,
   },
   {
@@ -117,6 +119,7 @@ const MOCK_LIBRARY_MATERIALS: LibraryMaterial[] = [
     fileSize: "4.1 MB",
     isDownloadable: true,
     likesCount: 512,
+    downloadsCount: 3251,
     commentsCount: 88,
   },
   {

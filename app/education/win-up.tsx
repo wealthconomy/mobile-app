@@ -1,13 +1,17 @@
 import Header from "@/src/components/common/Header";
 import { RecentActivityList } from "@/src/features/home/components/RecentActivityList";
 import { SubWealthCard } from "@/src/features/home/components/SubWealthCard";
+import { TransferToPortfolioSheet } from "@/src/features/home/components/TransferToPortfolioSheet";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function WinUpScreen() {
+  const [showTransferSheet, setShowTransferSheet] = useState(false);
+
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
       <StatusBar style="dark" />
@@ -20,7 +24,10 @@ export default function WinUpScreen() {
       >
         {/* Total Savings Card */}
         <View className="mb-10">
-          <SubWealthCard description="WinUp!. Save Smarter, Build Faster." />
+          <SubWealthCard
+            description="WinUp!. Save Smarter, Build Faster."
+            onTransferPress={() => setShowTransferSheet(true)}
+          />
         </View>
 
         {/* Action Buttons */}
@@ -83,6 +90,12 @@ export default function WinUpScreen() {
           <RecentActivityList />
         </View>
       </ScrollView>
+
+      {/* Transfer to Portfolio Bottom Sheet */}
+      <TransferToPortfolioSheet
+        visible={showTransferSheet}
+        onClose={() => setShowTransferSheet(false)}
+      />
     </SafeAreaView>
   );
 }

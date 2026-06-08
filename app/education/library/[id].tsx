@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { StatusBar } from "expo-status-bar";
-import React, { useState } from "react";
+import { Audio } from "expo-av";
+import React, { useState, useEffect } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -29,6 +30,37 @@ export default function LibraryMaterialDetailScreen() {
     queryFn: () => libraryService.getMaterialById(id as string),
     enabled: !!id,
   });
+
+  const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
+
+  useEffect(() => {
+    if (material) {
+      setLikesCount(material.likesCount);
+    }
+  }, [material]);
+
+  const handleLike = async () => {
+    const newIsLiked = !isLiked;
+    setIsLiked(newIsLiked);
+    setLikesCount((prev) => (newIsLiked ? prev + 1 : prev - 1));
+
+    if (newIsLiked) {
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          require("../../assets/like.mp3")
+        );
+        await sound.playAsync();
+        sound.setOnPlaybackStatusUpdate(async (status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            await sound.unloadAsync();
+          }
+        });
+      } catch (error) {
+        console.log("Error playing sound:", error);
+      }
+    }
+  };
 
   const handleReadInApp = async () => {
     if (!material?.documentUrl) return;
@@ -176,10 +208,18 @@ export default function LibraryMaterialDetailScreen() {
             {material.contentType === "document" && (
               <>
                 <View className="flex-row items-center justify-between border-y border-gray-100 py-4 mb-6">
-                  <TouchableOpacity className="flex-row items-center bg-gray-50 px-4 py-2 rounded-full">
-                    <Ionicons name="heart-outline" size={20} color="#155D5F" />
-                    <Text className="text-gray-700 font-bold ml-2">{material.likesCount}</Text>
+                  <TouchableOpacity onPress={handleLike} className="flex-row items-center bg-gray-50 px-4 py-2 rounded-full">
+                    <Ionicons name={isLiked ? "heart" : "heart-outline"} size={20} color={isLiked ? "#EF4444" : "#155D5F"} />
+                    <Text className="text-gray-700 font-bold ml-2">{likesCount}</Text>
                   </TouchableOpacity>
+
+                  {material.isDownloadable && (
+                    <View className="flex-row items-center px-4 py-2">
+                      <Ionicons name="download-outline" size={20} color="#9CA3AF" />
+                      <Text className="text-gray-500 font-bold ml-2">{material.downloadsCount || 0}</Text>
+                    </View>
+                  )}
+
                   <View className="flex-row items-center px-4 py-2">
                     <Ionicons name="chatbubble-outline" size={20} color="#9CA3AF" />
                     <Text className="text-gray-500 font-bold ml-2">{material.commentsCount} Comments</Text>

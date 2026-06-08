@@ -2,6 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 
+export type BadgeType = "topup" | "daysLeft" | "matured";
+
 interface PortfolioCardProps {
   title: string;
   description: string;
@@ -9,6 +11,11 @@ interface PortfolioCardProps {
   type: "flex" | "goal" | "fix" | "fam" | "flow" | "group";
   showEarnTag?: boolean;
   interestRate?: string;
+  // New dynamic badge props
+  hideInterest?: boolean;
+  hasNotification?: boolean;
+  badgeType?: BadgeType;
+  badgeValue?: string;
 }
 
 export const PortfolioCard = ({
@@ -18,6 +25,10 @@ export const PortfolioCard = ({
   type,
   showEarnTag,
   interestRate,
+  hideInterest = false,
+  hasNotification = false,
+  badgeType,
+  badgeValue,
 }: PortfolioCardProps) => {
   const getStyles = () => {
     switch (type) {
@@ -30,6 +41,7 @@ export const PortfolioCard = ({
           iconName: "wallet-outline",
           route: "/portfolios/wealth-flex",
           image: require("../../../../assets/images/wallet.png"),
+          imageStyle: { position: "absolute", width: 90, height: 90, top: 15, left: 95, opacity: 0.25, transform: [{ rotate: "-5deg" }] },
           interest: interestRate || "5% Interest",
         };
       case "goal":
@@ -41,6 +53,7 @@ export const PortfolioCard = ({
           iconName: "rocket-outline",
           route: "/portfolios/wealth-goal",
           image: require("../../../../assets/images/arrow.png"),
+          imageStyle: { position: "absolute", width: 100, height: 100, top: 15, left: 90, opacity: 0.25, transform: [{ rotate: "-5deg" }] },
           interest: interestRate || "12% Interest",
         };
       case "fix":
@@ -52,6 +65,7 @@ export const PortfolioCard = ({
           iconName: "lock-closed-outline",
           route: "/portfolios/wealth-fix",
           image: require("../../../../assets/images/fix.png"),
+          imageStyle: { position: "absolute", width: 90, height: 90, top: 15, left: 95, opacity: 0.25, transform: [{ rotate: "-5deg" }] },
           interest: interestRate || "15% Interest",
         };
       case "fam":
@@ -63,6 +77,7 @@ export const PortfolioCard = ({
           iconName: "people-outline",
           route: "/portfolios/wealth-fam",
           image: require("../../../../assets/images/fam.png"),
+          imageStyle: { position: "absolute", width: 85, height: 95, top: 25, left: 85, opacity: 0.25, transform: [{ rotate: "-1deg" }] },
           interest: interestRate || "10% Interest",
         };
       case "flow":
@@ -74,6 +89,7 @@ export const PortfolioCard = ({
           iconName: "refresh-outline",
           route: "/portfolios/wealth-flow",
           image: require("../../../../assets/images/auto.png.png"),
+          imageStyle: { position: "absolute", width: 90, height: 90, top: 25, left: 95, opacity: 0.25, transform: [{ rotate: "-1deg" }] },
           interest: interestRate || "10% Interest",
         };
       case "group":
@@ -85,6 +101,7 @@ export const PortfolioCard = ({
           iconName: "people-circle-outline",
           route: "/portfolios/wealth-group",
           image: require("../../../../assets/images/group.png"),
+          imageStyle: { position: "absolute", width: 90, height: 90, top: 15, left: 90, opacity: 0.25, transform: [{ rotate: "-1deg" }] },
           interest: interestRate || "8% Interest",
         };
       default:
@@ -95,6 +112,7 @@ export const PortfolioCard = ({
           iconColor: "#374151",
           iconName: "help-circle-outline",
           route: "/",
+          imageStyle: { position: "absolute" },
           interest: interestRate || "5% Interest",
         };
     }
@@ -102,11 +120,25 @@ export const PortfolioCard = ({
 
   const styles = getStyles();
 
+  // Badge pill styling
+  const getBadgeStyle = () => {
+    if (badgeType === "topup") {
+      return { bg: "#EF4444", text: "#FFFFFF" };
+    } else if (badgeType === "matured") {
+      return { bg: "#22C55E", text: "#FFFFFF" };
+    } else {
+      // daysLeft
+      return { bg: "#155D5F", text: "#FFFFFF" };
+    }
+  };
+
+  const badgeStyle = getBadgeStyle();
+
   return (
     <TouchableOpacity
       onPress={() => router.push(styles.route as any)}
       activeOpacity={0.85}
-      className="relative overflow-hidden p-4 border-[0.7px]"
+      className="relative overflow-visible p-4 border-[0.7px]"
       style={{
         width: 179,
         height: 119,
@@ -120,37 +152,79 @@ export const PortfolioCard = ({
     >
       {/* Decorative Background Image */}
       {styles.image && (
-        <Image
-          source={styles.image}
-          className="absolute"
-          resizeMode="cover"
+        <View style={styles.imageStyle as any} pointerEvents="none">
+          <Image
+            source={styles.image}
+            resizeMode="contain"
+            style={{ width: "100%", height: "100%" }}
+          />
+        </View>
+      )}
+
+      {/* Interest Badge OR Dynamic Badge */}
+      <View
+        style={{
+          position: "absolute",
+          top: 10,
+          right: 10,
+          zIndex: 10,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 4,
+        }}
+      >
+        {/* Interest tag — hidden if Impact Wealth */}
+        {!hideInterest && (
+          <View
+            style={{
+              backgroundColor: "white",
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 20,
+            }}
+          >
+            <Text style={{ color: "#155D5F", fontWeight: "600", fontSize: 9 }}>
+              {styles.interest}
+            </Text>
+          </View>
+        )}
+
+        {/* Dynamic badge (Top Up / Days Left / Matured) */}
+        {badgeType && badgeValue && (
+          <View
+            style={{
+              backgroundColor: badgeStyle.bg,
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 20,
+            }}
+          >
+            <Text
+              style={{ color: badgeStyle.text, fontWeight: "700", fontSize: 9 }}
+            >
+              {badgeValue}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Red Notification Dot */}
+      {hasNotification && (
+        <View
           style={{
-            width: 127.78,
-            height: 127.78,
-            top: -12,
-            left: 86,
-            opacity: 0.3,
-            transform: [{ rotate: "-0.35deg" }],
+            position: "absolute",
+            top: -4,
+            right: -4,
+            width: 12,
+            height: 12,
+            borderRadius: 6,
+            backgroundColor: "#EF4444",
+            borderWidth: 1.5,
+            borderColor: "white",
+            zIndex: 20,
           }}
         />
       )}
-
-      {/* Interest Tag */}
-      <View
-        className="absolute bg-white items-center justify-center"
-        style={{
-          width: 82,
-          height: 21,
-          top: 11,
-          left: 91,
-          borderRadius: 20,
-          zIndex: 10,
-        }}
-      >
-        <Text className="text-[#155D5F] font-medium text-[9px]">
-          {styles.interest}
-        </Text>
-      </View>
 
       {/* Icon Container */}
       <View
@@ -173,7 +247,7 @@ export const PortfolioCard = ({
           {title}
         </Text>
         <Text
-          className="text-[#64748B] text-[9px] leading-[12px] font-medium pr-1"
+          className="text-[#64748B] text-[9px] leading-[12px] font-bold pr-1"
           numberOfLines={2}
         >
           {description}
