@@ -43,6 +43,7 @@ export default function CreateGoalScreen() {
   const [frequency, setFrequency] = useState("");
   const [isManual, setIsManual] = useState(false);
   const [endDate, setEndDate] = useState("");
+  const [wealthPreference, setWealthPreference] = useState<"Interest Based" | "Impact Wealth">("Interest Based");
   const [pin, setPin] = useState("");
   const pinInputRef = useRef<TextInput>(null);
 
@@ -137,20 +138,22 @@ export default function CreateGoalScreen() {
             Important "Need to Know" Rules
           </Text>
           <View className="space-y-5 gap-5">
-            <Text
-              style={{ color: "#F3007A" }}
-              className="text-[10px] leading-[15px]"
-            >
-              👉{" "}
+            {wealthPreference === "Interest Based" && (
               <Text
                 style={{ color: "#F3007A" }}
-                className="font-bold text-[12px]"
+                className="text-[10px] leading-[15px]"
               >
-                Interest Rate:
-              </Text>{" "}
-              Currently, Target Savings offers around 12% per annum, paid daily
-              into your Flex account.
-            </Text>
+                👉{" "}
+                <Text
+                  style={{ color: "#F3007A" }}
+                  className="font-bold text-[12px]"
+                >
+                  Interest Rate:
+                </Text>{" "}
+                Currently, Target Savings offers around 12% per annum, paid daily
+                into your Flex account.
+              </Text>
+            )}
             <Text
               style={{ color: "#F3007A" }}
               className="text-[10px] leading-[15px]"
@@ -187,6 +190,26 @@ export default function CreateGoalScreen() {
       )}
 
       <View className="space-y-6 gap-6 mb-10">
+        <View>
+          <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
+            Wealth Preference
+          </Text>
+          <View style={{ flexDirection: "row", backgroundColor: "#F3F4F6", borderRadius: 12, padding: 4 }}>
+            <TouchableOpacity 
+              onPress={() => setWealthPreference("Interest Based")}
+              style={{ flex: 1, backgroundColor: wealthPreference === "Interest Based" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: wealthPreference === "Interest Based" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: wealthPreference === "Interest Based" ? 2 : 0 }}
+            >
+              <Text style={{ color: wealthPreference === "Interest Based" ? "#1A1A1A" : "#6B7280", fontWeight: wealthPreference === "Interest Based" ? "700" : "500", fontSize: 13 }}>Interest Based</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => setWealthPreference("Impact Wealth")}
+              style={{ flex: 1, backgroundColor: wealthPreference === "Impact Wealth" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: wealthPreference === "Impact Wealth" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: wealthPreference === "Impact Wealth" ? 2 : 0 }}
+            >
+              <Text style={{ color: wealthPreference === "Impact Wealth" ? "#1A1A1A" : "#6B7280", fontWeight: wealthPreference === "Impact Wealth" ? "700" : "500", fontSize: 13 }}>Impact Wealth</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View className="mb-6">
           <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
             Wealth Goal
@@ -445,14 +468,25 @@ export default function CreateGoalScreen() {
         </View>
 
         <View className="flex-row justify-between mb-8">
-          <View>
-            <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-              Wealth Growth
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              ₦2,463.00
-            </Text>
-          </View>
+          {wealthPreference === "Interest Based" ? (
+            <View>
+              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                Wealth Growth
+              </Text>
+              <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                ₦2,463.00
+              </Text>
+            </View>
+          ) : (
+            <View>
+              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                Preference
+              </Text>
+              <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                Impact Wealth
+              </Text>
+            </View>
+          )}
           <View className="items-end">
             <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
               Method

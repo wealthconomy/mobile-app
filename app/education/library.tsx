@@ -83,7 +83,8 @@ export default function LibraryScreen() {
           <View className="flex-row bg-[#F8F8F8] p-1 rounded-lg">
             <TouchableOpacity
               onPress={() => setViewMode("list")}
-              className={viewMode === "list" ? "p-1.5 rounded-md bg-white shadow-sm" : "p-1.5 rounded-md"}
+              className="p-1.5 rounded-md"
+              style={viewMode === "list" ? { backgroundColor: "#fff", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 } : undefined}
             >
               <Ionicons
                 name="list"
@@ -93,7 +94,8 @@ export default function LibraryScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setViewMode("grid")}
-              className={viewMode === "grid" ? "p-1.5 rounded-md bg-white shadow-sm" : "p-1.5 rounded-md"}
+              className="p-1.5 rounded-md"
+              style={viewMode === "grid" ? { backgroundColor: "#fff", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 } : undefined}
             >
               <Ionicons
                 name="grid"
@@ -116,7 +118,7 @@ export default function LibraryScreen() {
           </View>
         ) : filteredMaterials.length > 0 ? (
           <View
-            className={viewMode === "grid" ? "flex-row flex-wrap justify-between" : ""}
+            style={viewMode === "grid" ? { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" } : undefined}
           >
             {filteredMaterials.map((material) => (
               <LibraryItem

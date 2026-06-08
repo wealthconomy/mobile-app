@@ -1,6 +1,7 @@
 import { goalService, WealthGoal } from "@/src/api/goalService";
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
+import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -23,11 +24,10 @@ const CATEGORIES = [
 export default function WealthGoalScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [loading, setLoading] = useState(true);
-  const { user } = useSelector((state: RootState) => state.auth);
-
-  const showInterest = user?.wealthPreference?.toLowerCase().includes("impact")
-    ? false
-    : true;
+  const portfolioPreference = useSelector(
+    (state: RootState) => state.portfolioPreference.goal
+  );
+  const showInterest = portfolioPreference !== "Impact Wealth";
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000);
@@ -191,7 +191,11 @@ export default function WealthGoalScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
       <StatusBar style="dark" />
-      <Header title="WealthGoal" />
+      <Header
+        title="WealthGoal"
+        onBack={() => router.back()}
+        rightElement={<PortfolioPreferenceMenu portfolioType="goal" />}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         <View className="px-5 py-2">

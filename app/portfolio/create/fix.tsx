@@ -38,6 +38,7 @@ export default function CreateFixScreen() {
   const [isConsent, setIsConsent] = useState(false);
   const [agreedPenalty, setAgreedPenalty] = useState(false);
   const [acknowledgedTemptation, setAcknowledgedTemptation] = useState(false);
+  const [wealthPreference, setWealthPreference] = useState<"Interest Based" | "Impact Wealth">("Interest Based");
 
   // Dropdown state
   const [showSourceDropdown, setShowSourceDropdown] = useState(false);
@@ -68,18 +69,20 @@ export default function CreateFixScreen() {
           <Text className="text-[#1A1A1A] font-bold text-[24px]">
             {lockType === "WealthFix" ? "Create a WealthFix" : lockType}
           </Text>
-          <View
-            style={{
-              backgroundColor: "#FFF9EC",
-              paddingHorizontal: 10,
-              paddingVertical: 4,
-              borderRadius: 20,
-            }}
-          >
-            <Text style={{ color: "#AB7600", fontSize: 10, fontWeight: "700" }}>
-              Earn ₦{formatAmount(calculateInterest())}
-            </Text>
-          </View>
+          {wealthPreference === "Interest Based" && (
+            <View
+              style={{
+                backgroundColor: "#FFF9EC",
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 20,
+              }}
+            >
+              <Text style={{ color: "#AB7600", fontSize: 10, fontWeight: "700" }}>
+                Earn ₦{formatAmount(calculateInterest())}
+              </Text>
+            </View>
+          )}
         </View>
         <Text className="text-[#6B7280] text-[13px] mt-1">
           {lockType === "WealthFix"
@@ -89,7 +92,7 @@ export default function CreateFixScreen() {
       </View>
 
       {/* How Interest Works Card */}
-      {showInterestCard && (
+      {showInterestCard && wealthPreference === "Interest Based" && (
         <View
           style={{
             backgroundColor: "#FFF9EC",
@@ -142,6 +145,27 @@ export default function CreateFixScreen() {
           </Text>
         </View>
       )}
+
+      {/* Wealth Preference Selector */}
+      <View style={{ marginBottom: 18 }}>
+        <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 13, marginBottom: 8 }}>
+          Wealth Preference
+        </Text>
+        <View style={{ flexDirection: "row", backgroundColor: "#F3F4F6", borderRadius: 12, padding: 4 }}>
+          <TouchableOpacity 
+            onPress={() => setWealthPreference("Interest Based")}
+            style={{ flex: 1, backgroundColor: wealthPreference === "Interest Based" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: wealthPreference === "Interest Based" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: wealthPreference === "Interest Based" ? 2 : 0 }}
+          >
+            <Text style={{ color: wealthPreference === "Interest Based" ? "#1A1A1A" : "#6B7280", fontWeight: wealthPreference === "Interest Based" ? "700" : "500", fontSize: 13 }}>Interest Based</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => setWealthPreference("Impact Wealth")}
+            style={{ flex: 1, backgroundColor: wealthPreference === "Impact Wealth" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: wealthPreference === "Impact Wealth" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: wealthPreference === "Impact Wealth" ? 2 : 0 }}
+          >
+            <Text style={{ color: wealthPreference === "Impact Wealth" ? "#1A1A1A" : "#6B7280", fontWeight: wealthPreference === "Impact Wealth" ? "700" : "500", fontSize: 13 }}>Impact Wealth</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Title field */}
       <View style={{ marginBottom: 18 }}>
@@ -521,29 +545,47 @@ export default function CreateFixScreen() {
           </View>
         </View>
 
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            marginBottom: 28,
-          }}
-        >
-          <View>
-            <Text
-              style={{
-                color: "#6B7280",
-                fontSize: 11,
-                marginBottom: 6,
-                fontWeight: "500",
-              }}
-            >
-              Wealth Growth
-            </Text>
-            <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
-              ₦{formatAmount(calculateInterest())}
-            </Text>
-          </View>
-          <View style={{ alignItems: "flex-end" }}>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              marginBottom: 28,
+            }}
+          >
+            {wealthPreference === "Interest Based" ? (
+              <View>
+                <Text
+                  style={{
+                    color: "#6B7280",
+                    fontSize: 11,
+                    marginBottom: 6,
+                    fontWeight: "500",
+                  }}
+                >
+                  Wealth Growth
+                </Text>
+                <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
+                  ₦{formatAmount(calculateInterest())}
+                </Text>
+              </View>
+            ) : (
+              <View>
+                <Text
+                  style={{
+                    color: "#6B7280",
+                    fontSize: 11,
+                    marginBottom: 6,
+                    fontWeight: "500",
+                  }}
+                >
+                  Preference
+                </Text>
+                <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
+                  Impact Wealth
+                </Text>
+              </View>
+            )}
+            <View style={{ alignItems: "flex-end" }}>
             <Text
               style={{
                 color: "#6B7280",

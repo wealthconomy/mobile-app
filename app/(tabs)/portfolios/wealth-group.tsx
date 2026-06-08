@@ -1,5 +1,6 @@
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
+import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { RootState } from "@/src/store";
 import { WealthGroup } from "@/src/store/slices/wealthGroupSlice";
@@ -145,6 +146,10 @@ export default function WealthGroupScreen() {
   const groupsFromRedux = useSelector(
     (state: RootState) => state.wealthGroup.groups,
   );
+  const portfolioPreference = useSelector(
+    (state: RootState) => state.portfolioPreference.group
+  );
+  const showInterest = portfolioPreference !== "Impact Wealth";
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000);
@@ -188,7 +193,11 @@ export default function WealthGroupScreen() {
     return (
       <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
         <StatusBar style="dark" />
-        <Header title="WealthGroup" onBack={() => router.back()} />
+      <Header
+        title="WealthGroup"
+        onBack={() => router.back()}
+        rightElement={<PortfolioPreferenceMenu portfolioType="group" />}
+      />
         <PortfolioDetailSkeleton />
       </SafeAreaView>
     );
@@ -197,7 +206,11 @@ export default function WealthGroupScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
       <StatusBar style="dark" />
-      <Header title="WealthGroup" onBack={() => router.back()} />
+      <Header
+        title="WealthGroup"
+        onBack={() => router.back()}
+        rightElement={<PortfolioPreferenceMenu portfolioType="group" />}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         <View className="px-5 py-2">
@@ -266,12 +279,14 @@ export default function WealthGroupScreen() {
                 )}
               </View>
 
-              <View className="flex-row items-center space-x-1">
-                <Text className="text-[#4B5563] text-[13px] font-extrabold">
-                  Your wealth grew by N230.00 today
-                </Text>
-                <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
-              </View>
+              {showInterest && (
+                <View className="flex-row items-center space-x-1">
+                  <Text className="text-[#4B5563] text-[13px] font-extrabold">
+                    Your wealth grew by N230.00 today
+                  </Text>
+                  <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
+                </View>
+              )}
             </View>
           </View>
 
