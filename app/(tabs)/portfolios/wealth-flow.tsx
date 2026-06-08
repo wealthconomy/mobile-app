@@ -1,6 +1,7 @@
 import { WealthGoal } from "@/src/api/goalService";
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
+import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -76,11 +77,10 @@ const CATEGORIES: Category[] = [
 export default function WealthFlowScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [loading, setLoading] = useState(true);
-  const { user } = useSelector((state: RootState) => state.auth);
-
-  const showInterest = user?.wealthPreference?.toLowerCase().includes("impact")
-    ? false
-    : true;
+  const portfolioPreference = useSelector(
+    (state: RootState) => state.portfolioPreference.flow
+  );
+  const showInterest = portfolioPreference !== "Impact Wealth";
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000);
@@ -224,7 +224,11 @@ export default function WealthFlowScreen() {
     return (
       <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
         <StatusBar style="dark" />
-        <Header title="WealthFlow" onBack={() => router.back()} />
+        <Header
+          title="WealthFlow"
+          onBack={() => router.back()}
+          rightElement={<PortfolioPreferenceMenu portfolioType="flow" />}
+        />
         <PortfolioDetailSkeleton />
       </SafeAreaView>
     );
@@ -233,7 +237,11 @@ export default function WealthFlowScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
       <StatusBar style="dark" />
-      <Header title="WealthFlow" onBack={() => router.back()} />
+      <Header
+        title="WealthFlow"
+        onBack={() => router.back()}
+        rightElement={<PortfolioPreferenceMenu portfolioType="flow" />}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         <View className="px-5 py-2">

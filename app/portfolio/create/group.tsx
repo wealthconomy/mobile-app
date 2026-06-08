@@ -42,6 +42,7 @@ type GroupData = {
   exitRule: boolean;
   emergencyWithdrawal: boolean;
   agreed: boolean;
+  wealthPreference: "Interest Based" | "Impact Wealth";
 };
 
 // ── Main Component ──────────────────────────────────────────────────────────
@@ -69,6 +70,7 @@ export default function CreateGroupScreen() {
     exitRule: false,
     emergencyWithdrawal: false,
     agreed: false,
+    wealthPreference: "Interest Based",
   });
 
   const updateFormData = (field: string, value: any) => {
@@ -380,20 +382,24 @@ function Step2Financial({ data, update }: any) {
         )}
       </View>
 
-      <View className="flex-row items-center justify-between mb-4">
-        <View className="flex-1 pr-4">
-          <Text className="text-[#64748B] text-[13px] font-bold">
-            Member Interest
-          </Text>
-          <Text className="text-gray-400 text-[10px]">
-            Enable this allow each member to earn interest from the group
-            savings
-          </Text>
+      <View style={{ marginBottom: 18 }}>
+        <Text style={{ color: "#64748B", fontWeight: "700", fontSize: 13, marginBottom: 8 }}>
+          Wealth Preference
+        </Text>
+        <View style={{ flexDirection: "row", backgroundColor: "#F3F4F6", borderRadius: 12, padding: 4 }}>
+          <TouchableOpacity 
+            onPress={() => update("wealthPreference", "Interest Based")}
+            style={{ flex: 1, backgroundColor: data.wealthPreference === "Interest Based" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: data.wealthPreference === "Interest Based" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: data.wealthPreference === "Interest Based" ? 2 : 0 }}
+          >
+            <Text style={{ color: data.wealthPreference === "Interest Based" ? "#1A1A1A" : "#6B7280", fontWeight: data.wealthPreference === "Interest Based" ? "700" : "500", fontSize: 13 }}>Interest Based</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => update("wealthPreference", "Impact Wealth")}
+            style={{ flex: 1, backgroundColor: data.wealthPreference === "Impact Wealth" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: data.wealthPreference === "Impact Wealth" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: data.wealthPreference === "Impact Wealth" ? 2 : 0 }}
+          >
+            <Text style={{ color: data.wealthPreference === "Impact Wealth" ? "#1A1A1A" : "#6B7280", fontWeight: data.wealthPreference === "Impact Wealth" ? "700" : "500", fontSize: 13 }}>Impact Wealth</Text>
+          </TouchableOpacity>
         </View>
-        <CustomSwitch
-          value={data.hasInterest}
-          onValueChange={(v) => update("hasInterest", v)}
-        />
       </View>
 
       <FormField
@@ -413,10 +419,12 @@ function Step2Financial({ data, update }: any) {
         maxLength={14}
       />
 
-      <Text className="text-[10px] text-gray-400 italic">
-        Note: To earn the full interest, you must meet your target amount and
-        reach this date.
-      </Text>
+      {data.wealthPreference === "Interest Based" && (
+        <Text className="text-[10px] text-gray-400 italic">
+          Note: To earn the full interest, you must meet your target amount and
+          reach this date.
+        </Text>
+      )}
     </View>
   );
 }
@@ -595,7 +603,7 @@ function Step4Risk({ data, update }: any) {
         </View>
         <CustomSwitch
           value={data.exitRule}
-          onValueChange={(v) => update("exitRule", v)}
+          onValueChange={(v: boolean) => update("exitRule", v)}
         />
       </View>
 
@@ -610,7 +618,7 @@ function Step4Risk({ data, update }: any) {
         </View>
         <CustomSwitch
           value={data.emergencyWithdrawal}
-          onValueChange={(v) => update("emergencyWithdrawal", v)}
+          onValueChange={(v: boolean) => update("emergencyWithdrawal", v)}
         />
       </View>
     </View>

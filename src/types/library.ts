@@ -27,6 +27,7 @@ export interface LibraryMaterial {
   // Video-specific fields (optional for document type)
   youtubeUrl?: string;
   likesCount: number;
+  downloadsCount?: number;
   commentsCount: number;
   comments?: LibraryComment[];
 }

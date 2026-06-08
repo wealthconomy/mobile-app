@@ -15,7 +15,10 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function BlogDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -117,14 +120,18 @@ export default function BlogDetailScreen() {
   }
 
   return (
-    <View className="flex-1 bg-white">
+    <SafeAreaView style={{ flex: 1 }} className="bg-white">
       <StatusBar style="light" />
 
-      <ScrollView
-        className="flex-1"
-        showsVerticalScrollIndicator={false}
-        bounces={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
       >
+        <ScrollView
+          className="flex-1"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
         <View className="relative h-80">
           <Image
             source={{ uri: blog.image }}
@@ -218,24 +225,23 @@ export default function BlogDetailScreen() {
               className="flex-row items-center"
             >
               <Ionicons
-                name={blog.isLiked ? "thumbs-up" : "thumbs-up-outline"}
+                name={blog.isLiked ? "heart" : "heart-outline"}
                 size={20}
-                color={blog.isLiked ? "#155D5F" : "#6B7280"}
+                color={blog.isLiked ? "#EF4444" : "#6B7280"}
               />
               <Text className="text-[#6B7280] text-xs ml-2 font-bold">
                 {blog.likesCount}
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setIsCommenting(!isCommenting)}
+            <View
               className="flex-row items-center"
             >
               <Ionicons name="chatbubble-outline" size={20} color="#6B7280" />
               <Text className="text-[#6B7280] text-xs ml-2 font-bold">
                 {blog.commentsCount}
               </Text>
-            </TouchableOpacity>
+            </View>
 
             <TouchableOpacity
               onPress={handleShare}
@@ -262,40 +268,7 @@ export default function BlogDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {isCommenting && (
-            <View className="mb-8 p-4 bg-gray-50 rounded-2xl">
-              <TextInput
-                placeholder="Write a comment..."
-                placeholderTextColor="#9CA3AF"
-                className="text-[#1A1A1A] text-sm mb-4 min-h-[80px]"
-                multiline
-                value={commentText}
-                onChangeText={setCommentText}
-                autoFocus
-              />
-              <View className="flex-row justify-end space-x-3">
-                <TouchableOpacity
-                  onPress={() => setIsCommenting(false)}
-                  className="px-4 py-2"
-                >
-                  <Text className="text-[#6B7280] font-bold">Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleCommentSubmit}
-                  className="bg-[#155D5F] px-4 py-2 rounded-lg"
-                  disabled={!commentText.trim() || commentMutation.isPending}
-                >
-                  {commentMutation.isPending ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <Text className="text-white font-bold">Post Comment</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          <View className="h-[1px] bg-gray-100 w-full mb-5" />
+          <View className="h-[1px] bg-gray-100 w-full mb-5 mt-6" />
 
           <Text className="text-[#4B5563] text-base leading-relaxed mb-10">
             {blog.content}
@@ -346,7 +319,31 @@ export default function BlogDetailScreen() {
             )}
           </View>
         </View>
-      </ScrollView>
-    </View>
+        </ScrollView>
+        <View className="px-5 py-3 border-t border-gray-100 bg-white flex-row items-center">
+          <View className="flex-1 bg-gray-50 rounded-full px-4 py-2 flex-row items-center border border-gray-200">
+            <TextInput
+              className="flex-1 text-gray-900 py-1"
+              placeholder="Add a comment..."
+              placeholderTextColor="#9CA3AF"
+              value={commentText}
+              onChangeText={setCommentText}
+              multiline
+            />
+          </View>
+          <TouchableOpacity
+            onPress={handleCommentSubmit}
+            className={`ml-3 p-2.5 rounded-full ${commentText.trim() && !commentMutation.isPending ? "bg-[#155D5F]" : "bg-gray-200"}`}
+            disabled={!commentText.trim() || commentMutation.isPending}
+          >
+            {commentMutation.isPending ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Ionicons name="send" size={18} color="#FFFFFF" />
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

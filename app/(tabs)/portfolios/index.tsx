@@ -1,10 +1,48 @@
 import Header from "@/src/components/common/Header";
 import { PortfolioCard } from "@/src/features/home/components/PortfolioCard";
 import { SubWealthCard } from "@/src/features/home/components/SubWealthCard";
+import { TransferToPortfolioSheet } from "@/src/features/home/components/TransferToPortfolioSheet";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { FlatList, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSelector } from "react-redux";
+import { RootState } from "@/src/store";
+
+// ─── Mock portfolio activity data (replace with API when ready) ───────────────
+// This simulates what would come from the backend based on user saving plans
+const PORTFOLIO_ACTIVITY = {
+  flex: {
+    hasNotification: false,
+    badgeType: undefined as any,
+    badgeValue: undefined as any,
+  },
+  fix: {
+    hasNotification: false,
+    badgeType: "daysLeft" as const,
+    badgeValue: "4 days left", // driven by nearest-maturing WealthFix saving plan
+  },
+  goal: {
+    hasNotification: false,
+    badgeType: "topup" as const,
+    badgeValue: "Top Up", // driven by goal that hasn't been funded in a while
+  },
+  fam: {
+    hasNotification: true, // a family member has updated their contribution
+    badgeType: "topup" as const,
+    badgeValue: "Top Up",
+  },
+  flow: {
+    hasNotification: false,
+    badgeType: undefined as any,
+    badgeValue: undefined as any,
+  },
+  group: {
+    hasNotification: true, // new group activity notification
+    badgeType: undefined as any,
+    badgeValue: undefined as any,
+  },
+};
 
 const PORTFOLIOS = [
   {
@@ -29,8 +67,7 @@ const PORTFOLIOS = [
     id: "4",
     type: "fam" as const,
     title: "WealthFam",
-    description:
-      "Build a wealthy family; save for kids, spouse, and loved ones.",
+    description: "Build a wealthy family; save for kids, spouse, and loved ones.",
   },
   {
     id: "5",
@@ -51,7 +88,10 @@ import { PortfolioCardSkeleton } from "@/src/features/home/components/DashboardS
 
 export default function WealthPortfolioScreen() {
   const [loading, setLoading] = useState(true);
-  const [showPortfolioBalance, setShowPortfolioBalance] = useState(true);
+  const [showTransferSheet, setShowTransferSheet] = useState(false);
+  const preferences = useSelector(
+    (state: RootState) => state.portfolioPreference
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 1500);
@@ -72,6 +112,10 @@ export default function WealthPortfolioScreen() {
           title={item.title}
           description={item.description}
           showEarnTag={false}
+          hideInterest={preferences[item.type] === "Impact Wealth"}
+          hasNotification={PORTFOLIO_ACTIVITY[item.type].hasNotification}
+          badgeType={PORTFOLIO_ACTIVITY[item.type].badgeType}
+          badgeValue={PORTFOLIO_ACTIVITY[item.type].badgeValue}
         />
       )}
     </View>
@@ -115,6 +159,7 @@ export default function WealthPortfolioScreen() {
                 <SubWealthCard
                   amount="₦350,000.00"
                   description="Discipline Today, Wealth Tomorrow"
+                  onTransferPress={() => setShowTransferSheet(true)}
                 />
               )}
             </View>
@@ -130,6 +175,12 @@ export default function WealthPortfolioScreen() {
           </>
         }
         renderItem={renderPortfolioItem as any}
+      />
+
+      {/* Transfer to Portfolio Bottom Sheet */}
+      <TransferToPortfolioSheet
+        visible={showTransferSheet}
+        onClose={() => setShowTransferSheet(false)}
       />
     </SafeAreaView>
   );

@@ -28,7 +28,7 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
 
   if (viewMode === "grid") {
     return (
-      <View className="w-[48%] mb-4">
+      <View style={{ width: "48%" }} className="mb-4">
         <TouchableOpacity
           onPress={onPress}
           className="bg-white rounded-lg border border-gray-100 p-2"

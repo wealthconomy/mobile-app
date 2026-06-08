@@ -8,6 +8,7 @@ interface SubWealthCardProps {
   description: string;
   amount?: string;
   onButtonPress?: () => void;
+  onTransferPress?: () => void;
   showButton?: boolean;
 }
 
@@ -15,12 +16,15 @@ export const SubWealthCard = ({
   description,
   amount = "₦300,735.42",
   onButtonPress,
+  onTransferPress,
   showButton = true,
 }: SubWealthCardProps) => {
   const [showBalance, setShowBalance] = useState(true);
 
   const handleButtonPress = () => {
-    if (onButtonPress) {
+    if (onTransferPress) {
+      onTransferPress();
+    } else if (onButtonPress) {
       onButtonPress();
     } else {
       router.push("/portfolios/" as any);
