@@ -1,4 +1,4 @@
-import Skeleton from "@/src/components/common/Skeleton";
+import { Skeleton } from "@/src/components/common/skeletons";
 import { ScrollView, View } from "react-native";
 
 export const PortfolioCardSkeleton = () => (

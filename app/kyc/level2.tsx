@@ -1,702 +1,384 @@
-import Header from "@/src/components/common/Header";
-import { ThemedButton } from "@/src/components/ThemedButton";
-import { updateKycLevel } from "@/src/store/slices/authSlice";
-import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
+import React, { useState, useEffect } from "react";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Camera, FileText, IdCard, Upload, X } from "lucide-react-native";
-import { useState } from "react";
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { updateKycLevel } from "@/src/store/slices/authSlice";
+import { RootState } from "@/src/store";
+import {
+  useSubmitLevel2InfoMutation,
+  useScanIdMutation,
+  useFaceVerifyMutation,
+  useGetKycDocumentsQuery,
+} from "@/src/store/api/kycApi";
+import { useImageUpload } from "@/src/hooks/useImageUpload";
 
-const THEME_TEAL = "#155D5F";
-const SOFT_TEAL = "#F2FFFF";
+import {
+  Step1PersonalData,
+  FormData,
+  Step2ScanId,
+  Step3ScanSuccessful,
+  ScannedData,
+  Step4FaceIntro,
+  Step5FaceLive,
+  Step6FaceCompleted,
+  Step7Congratulation,
+} from "@/src/features/kyc/components/level2";
 
 export default function KYCLevel2Screen() {
   const router = useRouter();
   const dispatch = useDispatch();
-  const [docType, setDocType] = useState("");
-  const [idNumber, setIdNumber] = useState("");
-  const [frontImage, setFrontImage] = useState<string | null>(null);
-  const [backImage, setBackImage] = useState<string | null>(null);
-  const [selfieImage, setSelfieImage] = useState<string | null>(null);
+  const user = useSelector((state: RootState) => state.auth.user);
 
-  const [isSuccess, setIsSuccess] = useState(false);
+  const { data: kycDocsResponse } = useGetKycDocumentsQuery();
+  const [submitLevel2Info, { isLoading: isSubmittingInfo, error: submitInfoError }] =
+    useSubmitLevel2InfoMutation();
+  const [scanId, { isLoading: isScanningId, error: scanIdError }] =
+    useScanIdMutation();
+  const [faceVerify, { isLoading: isVerifyingFace, error: faceVerifyError }] =
+    useFaceVerifyMutation();
+  const { uploadImage } = useImageUpload();
 
-  const docOptions = [
-    {
-      id: "nin",
-      label: "National ID (NIN)",
-      icon: <IdCard size={24} color={THEME_TEAL} />,
-    },
-    {
-      id: "passport",
-      label: "International Passport",
-      icon: <FileText size={24} color={THEME_TEAL} />,
-    },
-    {
-      id: "license",
-      label: "Driver's License",
-      icon: <IdCard size={24} color={THEME_TEAL} />,
-    },
-    {
-      id: "voter",
-      label: "Voter's Card",
-      icon: <FileText size={24} color={THEME_TEAL} />,
-    },
-  ];
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7>(1);
+  const [capturedSelfie, setCapturedSelfie] = useState<string | undefined>(undefined);
+  const [capturedSelfieBase64, setCapturedSelfieBase64] = useState<string | undefined>(undefined);
+  const [capturedIdPhoto, setCapturedIdPhoto] = useState<string | undefined>(undefined);
 
-  const pickImage = async (setter: (uri: string | null) => void) => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-    if (!result.canceled) {
-      setter(result.assets[0].uri);
+  // Form data for Step 1
+  const [formData, setFormData] = useState<FormData>({
+    firstName: user?.firstName || "",
+    lastName: user?.lastName || "",
+    dateOfBirth: "",
+    bvn: "",
+    nextOfKinName: user?.nextOfKinName || "",
+    nextOfKinRelationship: user?.nextOfKinRelationship || "",
+    nextOfKinPhone: user?.nextOfKinPhone || "",
+  });
+
+  // Helper to format ISO date to DD / MM / YYYY for display
+  const formatFromISO = (dateStr?: string): string => {
+    if (!dateStr) return "";
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day} / ${month} / ${year}`;
+    } catch {
+      return dateStr;
     }
   };
 
-  const takeSelfie = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      alert("Sorry, we need camera permissions to make this work!");
+  // Pre-populate user profile data and existing KYC documents data if available
+  useEffect(() => {
+    if (kycDocsResponse !== undefined) {
+      console.log("\n================ [KYC 2 DEBUG - GET KYC DOCUMENTS RESPONSE] ================");
+      console.log(JSON.stringify(kycDocsResponse, null, 2));
+      console.log("============================================================================\n");
+    }
+
+    const isLevel2Complete =
+      (user?.kycLevel !== undefined && user.kycLevel >= 2) ||
+      kycDocsResponse?.data?.faceVerified === true;
+
+    if (isLevel2Complete && step < 7) {
+      router.replace("/kyc/level3-intro");
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
-    });
-    if (!result.canceled) {
-      setSelfieImage(result.assets[0].uri);
+
+    const kycData = kycDocsResponse?.data;
+    if (user || kycData) {
+      setFormData((prev) => {
+        const newFirstName = user?.firstName !== undefined && user.firstName !== null ? user.firstName : prev.firstName;
+        const newLastName = user?.lastName !== undefined && user.lastName !== null ? user.lastName : prev.lastName;
+        const newBvn = kycData?.bvn ? String(kycData.bvn) : prev.bvn;
+        const newDob = kycData?.dateOfBirth
+          ? formatFromISO(kycData.dateOfBirth)
+          : prev.dateOfBirth;
+
+        const newNokName = user?.nextOfKinName !== undefined && user.nextOfKinName !== null ? user.nextOfKinName : prev.nextOfKinName;
+        const newNokRel = user?.nextOfKinRelationship !== undefined && user.nextOfKinRelationship !== null ? user.nextOfKinRelationship : prev.nextOfKinRelationship;
+        const newNokPhone = user?.nextOfKinPhone !== undefined && user.nextOfKinPhone !== null ? user.nextOfKinPhone : prev.nextOfKinPhone;
+
+        return {
+          ...prev,
+          firstName: newFirstName || "",
+          lastName: newLastName || "",
+          bvn: newBvn || "",
+          dateOfBirth: newDob || "",
+          nextOfKinName: newNokName || "",
+          nextOfKinRelationship: newNokRel || "",
+          nextOfKinPhone: newNokPhone || "",
+        };
+      });
+
+      setScannedData((prev) => {
+        const newFirstName = `${user?.firstName || prev.firstName.split(" ")[0] || ""} ${
+          user?.lastName || prev.firstName.split(" ")[1] || ""
+        }`.trim();
+        const newDob = kycData?.dateOfBirth
+          ? formatFromISO(kycData.dateOfBirth)
+          : prev.dateOfBirth;
+
+        return {
+          ...prev,
+          firstName: newFirstName || "",
+          dateOfBirth: newDob || "",
+          idType: kycData?.idType || prev.idType || "",
+          nin: kycData?.idNumber || prev.nin || "",
+        };
+      });
+
+      if (kycData?.idImageUrl) {
+        setCapturedIdPhoto((prev) => prev || kycData.idImageUrl);
+      }
+    }
+  }, [user, kycDocsResponse]);
+
+  // Scanned data for Step 3
+  const [scannedData, setScannedData] = useState<ScannedData>({
+    firstName: `${user?.firstName || ""} ${user?.lastName || ""}`.trim(),
+    dateOfBirth: "",
+    idType: "",
+    nin: "",
+    expires: "",
+  });
+
+  const handleFormChange = (key: keyof FormData, value: string) => {
+    setFormData((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleBack = () => {
+    if (step > 1) {
+      setStep((prev) => (prev - 1) as any);
+    } else {
+      router.back();
     }
   };
 
-  const isFormValid =
-    docType && idNumber && frontImage && backImage && selfieImage;
+  const formatToISO8601 = (dateStr: string): string => {
+    if (!dateStr) return "";
 
-  const handleSubmit = () => {
-    dispatch(updateKycLevel(2));
-    setIsSuccess(true);
+    const parts = dateStr.split("/").map((part) => part.trim());
+    if (parts.length === 3) {
+      let day = parseInt(parts[0], 10);
+      let month = parseInt(parts[1], 10);
+      let year = parseInt(parts[2], 10);
+
+      if (year < 100 && parts[0].length === 4) {
+        year = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10);
+        day = parseInt(parts[2], 10);
+      }
+
+      if (
+        !isNaN(day) &&
+        !isNaN(month) &&
+        !isNaN(year) &&
+        year > 1900 &&
+        month >= 1 &&
+        month <= 12 &&
+        day >= 1 &&
+        day <= 31
+      ) {
+        return new Date(Date.UTC(year, month - 1, day)).toISOString();
+      }
+    }
+
+    const fallback = new Date(dateStr);
+    if (!isNaN(fallback.getTime())) {
+      return fallback.toISOString();
+    }
+
+    return "";
   };
 
-  if (isSuccess) {
-    return <SuccessState onDone={() => router.replace("/(tabs)")} />;
-  }
+  // Step 1 Submission
+  const handleStep1Continue = async () => {
+    try {
+      const isoDateOfBirth = formatToISO8601(formData.dateOfBirth);
+      const payload = {
+        bvn: formData.bvn,
+        dateOfBirth: isoDateOfBirth,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        nextOfKinName: formData.nextOfKinName || user?.nextOfKinName || "",
+        nextOfKinRelationship: formData.nextOfKinRelationship || user?.nextOfKinRelationship || "",
+        nextOfKinPhone: formData.nextOfKinPhone || user?.nextOfKinPhone || "",
+      };
+      console.log("\n================ [KYC 2 DEBUG - SUBMIT INFO PAYLOAD] ================");
+      console.log(JSON.stringify(payload, null, 2));
+      console.log("=====================================================================\n");
 
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }} edges={["top"]}>
-      <StatusBar style="dark" />
-      <Header title="Identity Verification" onBack={() => router.back()} />
+      const response = await submitLevel2Info(payload).unwrap();
+      console.log("\n================ [KYC 2 DEBUG - SUBMIT INFO RESPONSE] ================");
+      console.log(JSON.stringify(response, null, 2));
+      console.log("======================================================================\n");
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: 20, paddingVertical: 24 }}>
-            {/* 1. Progress Step Indicator */}
-            <Animated.View entering={FadeInDown.duration(600).delay(100)} style={{ marginBottom: 32 }}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: 12,
-                }}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <View
-                    style={{
-                      width: 32,
-                      height: 32,
-                      backgroundColor: THEME_TEAL,
-                      borderRadius: 16,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      marginRight: 12,
-                    }}
-                  >
-                    <Text style={{ color: "white", fontWeight: "bold" }}>
-                      1
-                    </Text>
-                  </View>
-                  <Text
-                    style={{
-                      color: "#1A1A1A",
-                      fontWeight: "700",
-                      fontSize: 18,
-                    }}
-                  >
-                    Identity Info
-                  </Text>
-                </View>
-                <Text
-                  style={{ color: "#64748B", fontWeight: "700", fontSize: 13 }}
-                >
-                  Level 2 Verification
-                </Text>
-              </View>
-              <View
-                style={{
-                  height: 6,
-                  backgroundColor: "#F1F5F9",
-                  borderRadius: 999,
-                  overflow: "hidden",
-                }}
-              >
-                <View
-                  style={{
-                    height: "100%",
-                    width: "100%",
-                    backgroundColor: THEME_TEAL,
-                    borderRadius: 999,
-                  }}
-                />
-              </View>
-            </Animated.View>
+      setScannedData((prev) => ({
+        ...prev,
+        firstName: `${formData.firstName} ${formData.lastName}`.trim(),
+        dateOfBirth: formData.dateOfBirth,
+      }));
+      setStep(2);
+    } catch (err) {
+      console.log("\n❌ [KYC 2 DEBUG - SUBMIT INFO ERROR]:", err);
+      console.log("=====================================================================\n");
+    }
+  };
 
-            {/* 2. Document Selection */}
-            <Animated.View entering={FadeInDown.duration(600).delay(250)} style={{ marginBottom: 32 }}>
-              <Text
-                style={{
-                  color: "#1A1A1A",
-                  fontWeight: "600",
-                  fontSize: 15,
-                  marginBottom: 16,
-                }}
-              >
-                Select Document Type
-              </Text>
-              <View
-                style={{
-                  flexDirection: "row",
-                  flexWrap: "wrap",
-                  justifyContent: "space-between",
-                }}
-              >
-                {docOptions.map((opt) => (
-                  <TouchableOpacity
-                    key={opt.id}
-                    onPress={() => setDocType(opt.label)}
-                    style={{
-                      width: "48%",
-                      padding: 20,
-                      borderRadius: 16,
-                      marginBottom: 16,
-                      borderWidth: 2,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      height: 110,
-                      borderColor:
-                        docType === opt.label ? THEME_TEAL : "#F1F5F9",
-                      backgroundColor:
-                        docType === opt.label ? SOFT_TEAL : "#F9FAFB",
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: 24,
-                        backgroundColor: "white",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        marginBottom: 10,
-                      }}
-                    >
-                      {opt.icon}
-                    </View>
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        fontWeight: "600",
-                        textAlign: "center",
-                        color: docType === opt.label ? THEME_TEAL : "#64748B",
-                      }}
-                    >
-                      {opt.label}
-                    </Text>
-                    {docType === opt.label && (
-                      <View style={{ position: "absolute", top: 8, right: 8 }}>
-                        <Ionicons
-                          name="checkmark-circle"
-                          size={20}
-                          color={THEME_TEAL}
-                        />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </Animated.View>
+  // Step 3 Submission
+  const handleStep3Confirm = async (data: ScannedData) => {
+    try {
+      const fallbackPhoto = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=80";
+      const imageUrl = await uploadImage(capturedIdPhoto || fallbackPhoto, { name: "id_card.jpg" });
 
-            {/* 3. ID Number Input */}
-            <Animated.View entering={FadeInDown.duration(600).delay(400)} style={{ marginBottom: 32 }}>
-              <Text
-                style={{
-                  color: "#1A1A1A",
-                  fontWeight: "600",
-                  fontSize: 15,
-                  marginBottom: 16,
-                }}
-              >
-                Document Number
-              </Text>
-              <View
-                style={{
-                  height: 64,
-                  backgroundColor: "#F9FAFB",
-                  borderWidth: 1,
-                  borderColor: "#F1F5F9",
-                  borderRadius: 16,
-                  paddingHorizontal: 20,
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-              >
-                <TextInput
-                  placeholder="Enter Government ID Number"
-                  placeholderTextColor="#adb5bd"
-                  value={idNumber}
-                  onChangeText={setIdNumber}
-                  style={{
-                    flex: 1,
-                    color: "#1A1A1A",
-                    fontWeight: "600",
-                    fontSize: 15,
-                  }}
-                />
-              </View>
-            </Animated.View>
+      const payload = {
+        idType: data.idType,
+        idNumber: data.nin,
+        idImageUrl: imageUrl,
+      };
+      console.log("\n================ [KYC 2 DEBUG - SCAN ID PAYLOAD] ================");
+      console.log(JSON.stringify(payload, null, 2));
+      console.log("=================================================================\n");
 
-            {/* 4. Upload Section */}
-            <Animated.View entering={FadeInDown.duration(600).delay(500)} style={{ marginBottom: 32 }}>
-              <Text
-                style={{
-                  color: "#1A1A1A",
-                  fontWeight: "600",
-                  fontSize: 15,
-                  marginBottom: 16,
-                }}
-              >
-                Upload ID Photos
-              </Text>
+      const response = await scanId(payload).unwrap();
+      console.log("\n================ [KYC 2 DEBUG - SCAN ID RESPONSE] ================");
+      console.log(JSON.stringify(response, null, 2));
+      console.log("==================================================================\n");
 
-              {/* Front View - Full Width */}
-              <FullWidthUploadBox
-                label="Front View"
-                image={frontImage}
-                onPress={() => pickImage(setFrontImage)}
-                onClear={() => setFrontImage(null)}
-              />
+      setScannedData(data);
+      setStep(4);
+    } catch (err) {
+      console.log("\n❌ [KYC 2 DEBUG - SCAN ID ERROR]:", err);
+      console.log("=================================================================\n");
+    }
+  };
 
-              {/* Back View - Full Width */}
-              <FullWidthUploadBox
-                label="Back View"
-                image={backImage}
-                onPress={() => pickImage(setBackImage)}
-                onClear={() => setBackImage(null)}
-              />
-            </Animated.View>
+  // Step 5 Capture
+  const handleFaceScanComplete = (photoUri?: string, base64?: string) => {
+    if (photoUri) {
+      setCapturedSelfie(photoUri);
+    }
+    if (base64) {
+      setCapturedSelfieBase64(base64);
+    }
+    setStep(6);
+  };
 
-            {/* 5. Selfie / Personal Verification */}
-            <Animated.View entering={FadeInDown.duration(600).delay(580)} style={{ marginBottom: 32 }}>
-              <Text
-                style={{
-                  color: "#1A1A1A",
-                  fontWeight: "600",
-                  fontSize: 15,
-                  marginBottom: 16,
-                }}
-              >
-                Personal Verification
-              </Text>
+  // Step 6 Submission
+  const handleStep6Continue = async () => {
+    try {
+      const sessionId = `session_${Date.now()}`;
+      const payload = {
+        biometricSessionId: sessionId,
+        imageBase64: capturedSelfieBase64 || "mock_base64_string",
+      };
+      console.log("\n================ [KYC 2 DEBUG - FACE VERIFY PAYLOAD] ================");
+      console.log(JSON.stringify({
+        ...payload,
+        imageBase64: payload.imageBase64 ? `${payload.imageBase64.substring(0, 40)}... [Length: ${payload.imageBase64.length}]` : null,
+      }, null, 2));
+      console.log("=====================================================================\n");
 
-              <TouchableOpacity
-                onPress={takeSelfie}
-                activeOpacity={0.8}
-                style={{
-                  width: "100%",
-                  height: 220,
-                  backgroundColor: "#F9FAFB",
-                  borderWidth: 2,
-                  borderStyle: "dashed",
-                  borderColor: selfieImage ? THEME_TEAL : "#D1D5DB",
-                  borderRadius: 24,
-                  overflow: "hidden",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {selfieImage ? (
-                  <View style={{ width: "100%", height: "100%" }}>
-                    <Image
-                      source={{ uri: selfieImage }}
-                      style={{ width: "100%", height: "100%" }}
-                      resizeMode="cover"
-                    />
-                    {/* Clear button */}
-                    <TouchableOpacity
-                      style={{
-                        position: "absolute",
-                        top: 12,
-                        right: 12,
-                        backgroundColor: "#EF4444",
-                        width: 36,
-                        height: 36,
-                        borderRadius: 18,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderWidth: 3,
-                        borderColor: "white",
-                        zIndex: 10,
-                      }}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        setSelfieImage(null);
-                      }}
-                    >
-                      <X size={18} color="white" />
-                    </TouchableOpacity>
-                    {/* Retake overlay */}
-                    <View
-                      style={{
-                        position: "absolute",
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        backgroundColor: "rgba(0,0,0,0.5)",
-                        paddingVertical: 10,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: "white",
-                          textAlign: "center",
-                          fontSize: 12,
-                          fontWeight: "600",
-                        }}
-                      >
-                        Tap to Retake Selfie
-                      </Text>
-                    </View>
-                  </View>
-                ) : (
-                  <View style={{ alignItems: "center", paddingHorizontal: 32 }}>
-                    <View
-                      style={{
-                        width: 72,
-                        height: 72,
-                        backgroundColor: "white",
-                        borderRadius: 36,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        marginBottom: 16,
-                        shadowColor: "#000",
-                        shadowOpacity: 0.08,
-                        shadowRadius: 8,
-                        elevation: 3,
-                      }}
-                    >
-                      <Camera size={32} color={THEME_TEAL} />
-                    </View>
+      const response = await faceVerify(payload).unwrap();
+      console.log("\n================ [KYC 2 DEBUG - FACE VERIFY RESPONSE] ================");
+      console.log(JSON.stringify(response, null, 2));
+      console.log("======================================================================\n");
 
-                    <Text
-                      style={{
-                        color: "#1A1A1A",
-                        fontWeight: "600",
-                        fontSize: 16,
-                        marginBottom: 8,
-                      }}
-                    >
-                      Snap a Selfie
-                    </Text>
-                    <Text
-                      style={{
-                        color: "#64748B",
-                        fontSize: 12,
-                        textAlign: "center",
-                        lineHeight: 18,
-                      }}
-                    >
-                      Ensure your face is within the frame and clearly lit
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </Animated.View>
+      setStep(7);
+    } catch (err) {
+      console.log("\n❌ [KYC 2 DEBUG - FACE VERIFY ERROR]:", err);
+      console.log("=====================================================================\n");
+    }
+  };
 
-            {/* 6. Submit Button */}
-            <Animated.View entering={FadeInDown.duration(600).delay(650)} style={{ marginTop: 8, marginBottom: 48 }}>
-              <ThemedButton
-                title="Submit for Verification"
-                onPress={handleSubmit}
-                disabled={!isFormValid}
-                style={{
-                  backgroundColor: THEME_TEAL,
-                  opacity: !isFormValid ? 0.6 : 1,
-                  height: 60,
-                  borderRadius: 20,
-                  shadowColor: THEME_TEAL,
-                  shadowOffset: { width: 0, height: 8 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 15,
-                  elevation: 8,
-                }}
-              />
-              <Text
-                style={{
-                  color: "#64748B",
-                  fontSize: 11,
-                  textAlign: "center",
-                  marginTop: 20,
-                  lineHeight: 18,
-                  paddingHorizontal: 24,
-                }}
-              >
-                Your data is encrypted and secure. By proceeding, you agree to
-                our verification terms.
-              </Text>
-            </Animated.View>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
-}
+  const handleFinishAll = () => {
+    dispatch(updateKycLevel(2));
+    router.replace("/(tabs)");
+  };
 
-function SuccessState({ onDone }: { onDone: () => void }) {
+  const formatErrorMessage = (errorObj: any): string | undefined => {
+    if (!errorObj) return undefined;
+    if (typeof errorObj.data?.message === "string") return errorObj.data.message;
+    if (typeof errorObj.message === "string") return errorObj.message;
+    if (typeof errorObj.error === "string") return errorObj.error;
+    return "An error occurred during verification. Please try again.";
+  };
+
   return (
     <SafeAreaView
-      style={{ flex: 1, backgroundColor: "white" }}
-      edges={["top", "bottom"]}
-    >
-      <View
-        style={{
-          flex: 1,
-          paddingHorizontal: 20,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Animated.View
-          entering={FadeInUp.duration(700).delay(100)}
-          style={{
-            width: 288,
-            height: 288,
-            position: "relative",
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: 40,
-          }}
-        >
-          <Image
-            source={require("../../assets/images/success.png")}
-            style={{
-              width: "100%",
-              height: "100%",
-              position: "absolute",
-              opacity: 0.4,
-            }}
-            resizeMode="contain"
-          />
-          <View
-            style={{
-              width: 144,
-              height: 144,
-              backgroundColor: "#F2FFFF",
-              borderRadius: 72,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <View
-              style={{
-                width: 96,
-                height: 96,
-                backgroundColor: "white",
-                borderRadius: 48,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="checkmark" size={60} color={THEME_TEAL} />
-            </View>
-          </View>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.duration(600).delay(300)}>
-        <Text
-          style={{
-            fontSize: 32,
-            fontWeight: "600",
-            color: "#1A1A1A",
-            textAlign: "center",
-            marginBottom: 16,
-            paddingHorizontal: 16,
-          }}
-        >
-          Level 2 Complete!
-        </Text>
-        <Text
-          style={{
-            color: "#64748B",
-            textAlign: "center",
-            fontSize: 15,
-            lineHeight: 26,
-            marginBottom: 48,
-            paddingHorizontal: 32,
-            fontWeight: "500",
-          }}
-        >
-          Your identity verification has been submitted. You can now return to
-          the dashboard while we process your request.
-        </Text>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.duration(600).delay(550)} style={{ width: "100%" }}>
-        <ThemedButton
-          title="Return to HomeScreen"
-          onPress={onDone}
-          style={{
-            backgroundColor: THEME_TEAL,
-            width: "100%",
-            height: 60,
-            borderRadius: 20,
-            elevation: 8,
-          }}
-        />
-        </Animated.View>
-      </View>
-    </SafeAreaView>
-  );
-}
-
-// ✅ Full width upload box used for both Front and Back
-function FullWidthUploadBox({
-  label,
-  image,
-  onPress,
-  onClear,
-}: {
-  label: string;
-  image: string | null;
-  onPress: () => void;
-  onClear: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.8}
       style={{
-        width: "100%",
-        height: 160,
-        borderRadius: 20,
-        borderWidth: 2,
-        borderStyle: "dashed",
-        borderColor: image ? THEME_TEAL : "#D1D5DB",
-        backgroundColor: image ? "#F2FFFF" : "#F9FAFB",
-        overflow: "hidden",
-        alignItems: "center",
-        justifyContent: "center",
-        marginBottom: 16, // 👈 gap between front and back
+        flex: 1,
+        backgroundColor: step === 5 || step === 6 ? "#0F172A" : "white",
       }}
+      edges={step === 5 || step === 6 ? [] : ["top", "bottom"]}
     >
-      {image ? (
-        <View style={{ width: "100%", height: "100%" }}>
-          <Image
-            source={{ uri: image }}
-            style={{ width: "100%", height: "100%" }}
-            resizeMode="cover"
-          />
-          {/* Clear button */}
-          <TouchableOpacity
-            style={{
-              position: "absolute",
-              top: 10,
-              right: 10,
-              backgroundColor: "#EF4444",
-              width: 30,
-              height: 30,
-              borderRadius: 15,
-              alignItems: "center",
-              justifyContent: "center",
-              borderWidth: 2,
-              borderColor: "white",
-              zIndex: 10,
-            }}
-            onPress={(e) => {
-              e.stopPropagation();
-              onClear();
-            }}
-          >
-            <X size={14} color="white" />
-          </TouchableOpacity>
-          {/* Label overlay */}
-          <View
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              backgroundColor: "rgba(0,0,0,0.45)",
-              paddingVertical: 8,
-            }}
-          >
-            <Text
-              style={{
-                color: "white",
-                textAlign: "center",
-                fontSize: 12,
-                fontWeight: "700",
-              }}
-            >
-              {label}
-            </Text>
-          </View>
-        </View>
-      ) : (
-        <View style={{ alignItems: "center" }}>
-          <View
-            style={{
-              width: 48,
-              height: 48,
-              backgroundColor: "white",
-              borderRadius: 14,
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 10,
-              shadowColor: "#000",
-              shadowOpacity: 0.06,
-              shadowRadius: 6,
-              elevation: 2,
-            }}
-          >
-            <Upload size={22} color={THEME_TEAL} />
-          </View>
-          <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 14 }}>
-            {label}
-          </Text>
-          <Text style={{ color: "#64748B", fontSize: 11, marginTop: 4 }}>
-            Tap to upload
-          </Text>
-        </View>
+      <StatusBar
+        style={step === 5 || step === 6 ? "light" : "dark"}
+        translucent={true}
+      />
+
+      {step === 1 && (
+        <Step1PersonalData
+          formData={formData}
+          onChange={handleFormChange}
+          onContinue={handleStep1Continue}
+          onBack={handleBack}
+          isLoading={isSubmittingInfo}
+          error={formatErrorMessage(submitInfoError)}
+        />
       )}
-    </TouchableOpacity>
+
+      {step === 2 && (
+        <Step2ScanId
+          onStartScanning={(photoUri) => {
+            if (photoUri) setCapturedIdPhoto(photoUri);
+            setStep(3);
+          }}
+          onBack={handleBack}
+        />
+      )}
+
+      {step === 3 && (
+        <Step3ScanSuccessful
+          initialData={scannedData}
+          photoUri={capturedIdPhoto}
+          onConfirm={handleStep3Confirm}
+          onBack={handleBack}
+          isLoading={isScanningId}
+          error={formatErrorMessage(scanIdError)}
+        />
+      )}
+
+      {step === 4 && (
+        <Step4FaceIntro
+          onStartScanning={() => setStep(5)}
+          onBack={handleBack}
+        />
+      )}
+
+      {step === 5 && (
+        <Step5FaceLive
+          onScanComplete={handleFaceScanComplete}
+          onBack={handleBack}
+        />
+      )}
+
+      {step === 6 && (
+        <Step6FaceCompleted
+          photoUri={capturedSelfie}
+          onContinue={handleStep6Continue}
+          isLoading={isVerifyingFace}
+          error={formatErrorMessage(faceVerifyError)}
+        />
+      )}
+
+      {step === 7 && (
+        <Step7Congratulation onFinish={handleFinishAll} />
+      )}
+    </SafeAreaView>
   );
 }

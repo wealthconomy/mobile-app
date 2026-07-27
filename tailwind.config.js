@@ -9,6 +9,14 @@ module.exports = {
   presets: [require("nativewind/preset")],
   theme: {
     extend: {
+      fontFamily: {
+        kumbh: ["KumbhSans_400Regular"],
+        "kumbh-light": ["KumbhSans_300Light"],
+        "kumbh-medium": ["KumbhSans_500Medium"],
+        "kumbh-semibold": ["KumbhSans_600SemiBold"],
+        "kumbh-bold": ["KumbhSans_700Bold"],
+        "kumbh-extrabold": ["KumbhSans_800ExtraBold"],
+      },
       colors: {
         primary: "#155D5F", // Wealthconomy teal
         gold: "#FFCF65", // Wealthconomy gold/yellow

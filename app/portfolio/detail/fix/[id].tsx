@@ -3,7 +3,7 @@ import { ThemedButton } from "@/src/components/ThemedButton";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Image,
   ScrollView,
@@ -13,98 +13,18 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-export interface WealthFix {
-  id: string;
-  title: string;
-  subtitle: string;
-  amount: string;
-  saved: string;
-  progress: number;
-  daysLeft: number;
-  endDate: string;
-  automationFrequency: "Daily" | "Weekly" | "Monthly" | "Manual" | "One-time";
-  source: string;
-  lockDuration: string;
-  wealthGrowth: string;
-  wealthGrowsInto: string;
-  progressiveAmount: string;
-}
-
-const fixService = {
-  getFixes: async (): Promise<WealthFix[]> => {
-    const base = {
-      automationFrequency: "Manual" as const,
-      source: "WealthFlex",
-      lockDuration: "365 days",
-      wealthGrowth: "₦2,453.00",
-      wealthGrowsInto: "WinUp",
-      endDate: "31th Dec 2023",
-      progressiveAmount: "₦50,000.00",
-    };
-    return [
-      {
-        ...base,
-        id: "fix-1",
-        title: "House Rent",
-        subtitle: "Business",
-        amount: "3,000,000.00",
-        saved: "2,400,000.00",
-        progress: 0.8,
-        daysLeft: 54,
-      },
-      {
-        ...base,
-        id: "fix-2",
-        title: "Wedding Clothes",
-        subtitle: "Personal",
-        amount: "1,234,144.00",
-        saved: "863,900.00",
-        progress: 0.7,
-        daysLeft: 54,
-      },
-      {
-        ...base,
-        id: "fix-3",
-        title: "House Rent",
-        subtitle: "Business",
-        amount: "3,000,000.00",
-        saved: "1,800,000.00",
-        progress: 0.6,
-        daysLeft: 54,
-      },
-      {
-        ...base,
-        id: "fix-u1",
-        title: "Wedding Clothes",
-        subtitle: "Personal",
-        amount: "3,000,000.00",
-        saved: "3,000,000.00",
-        progress: 1.0,
-        daysLeft: 0,
-      },
-    ];
-  },
-};
+import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
 
 export default function FixDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [fix, setFix] = useState<WealthFix | null>(null);
-  const [loading, setLoading] = useState(true);
   const [showTerminateModal, setShowTerminateModal] = useState(false);
+
+  const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthfix" });
+  const allFixes = data?.items || [];
+  const fix = allFixes.find((f) => f.id === id);
 
   const THEME_COLOR = "#D48E00";
   const TEAL = "#0B575B";
-
-  useEffect(() => {
-    const loadFix = async () => {
-      const allFixes = await fixService.getFixes();
-      const found = allFixes.find((f) => f.id === id);
-      setFix(found || null);
-      setLoading(false);
-    };
-    loadFix();
-  }, [id]);
 
   if (loading) {
     return (
@@ -137,7 +57,29 @@ export default function FixDetailScreen() {
     );
   }
 
-  const isUnlocked = fix.progress >= 1;
+  const isUnlocked = fix.status === "COMPLETED" || parseFloat(fix.balance) >= parseFloat(fix.targetAmount);
+
+  const progress = parseFloat(fix.targetAmount) > 0 ? parseFloat(fix.balance) / parseFloat(fix.targetAmount) : 0;
+  
+  const getDaysLeft = () => {
+    const end = new Date(fix.maturityDate).getTime();
+    const now = new Date().getTime();
+    const diff = end - now;
+    if (diff <= 0) return 0;
+    return Math.ceil(diff / (1000 * 3600 * 24));
+  };
+  
+  const formattedDate = new Date(fix.maturityDate).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+
+  const formatAmount = (val?: string) => {
+    if (!val) return "0.00";
+    const amountNum = parseFloat(val) / 100;
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
 
   const handleTerminate = () => {
     setShowTerminateModal(false);
@@ -163,16 +105,16 @@ export default function FixDetailScreen() {
               marginBottom: 4,
             }}
           >
-            {fix.title}
+            {fix.name}
           </Text>
           <Text style={{ color: "#6B7280", fontSize: 14, marginBottom: 16 }}>
-            {fix.subtitle}
+            {fix.metadata?.category || "Fix"}
           </Text>
           <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 28 }}>
-            ₦{fix.saved}
+            ₦{formatAmount(fix.balance)}
           </Text>
           <Text style={{ color: "#9CA3AF", fontSize: 11, marginTop: 2 }}>
-            of ₦{fix.amount} target
+            of ₦{formatAmount(fix.targetAmount)} target
           </Text>
         </View>
         <Image
@@ -194,7 +136,7 @@ export default function FixDetailScreen() {
         >
           <View
             style={{
-              width: `${Math.max(fix.progress * 100, 2)}%`,
+              width: `${Math.max(Math.min(progress * 100, 100), 2)}%`,
               height: 10,
               borderRadius: 20,
               backgroundColor: THEME_COLOR,
@@ -209,10 +151,10 @@ export default function FixDetailScreen() {
           }}
         >
           <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
-            {Math.round(fix.progress * 100)}%
+            {Math.round(Math.min(progress * 100, 100))}%
           </Text>
           <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
-            {fix.daysLeft} days Left
+            {getDaysLeft()} days Left
           </Text>
         </View>
       </View>
@@ -282,9 +224,9 @@ export default function FixDetailScreen() {
         </Text>
         , your{" "}
         <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-          "₦{fix.amount}"
+          "₦{formatAmount(fix.targetAmount)}"
         </Text>{" "}
-        is sent into your Wealth Save account by {fix.endDate}.
+        is sent into your Wealth Save account by {formattedDate}.
       </Text>
     </View>
   );
@@ -319,11 +261,11 @@ export default function FixDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Amount To Fix</Text>
-                <Text style={styles.value}>₦{fix.amount}</Text>
+                <Text style={styles.value}>₦{formatAmount(fix.targetAmount)}</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Lock Duration</Text>
-                <Text style={styles.value}>{fix.lockDuration}</Text>
+                <Text style={styles.value}>{fix.metadata?.lockDuration || "365 days"}</Text>
               </View>
             </View>
 
@@ -337,11 +279,11 @@ export default function FixDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Wealth Growth</Text>
-                <Text style={styles.value}>{fix.wealthGrowth}</Text>
+                <Text style={styles.value}>₦0.00</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Progressive Amount</Text>
-                <Text style={styles.value}>{fix.progressiveAmount}</Text>
+                <Text style={styles.value}>₦0.00</Text>
               </View>
             </View>
 
@@ -356,14 +298,12 @@ export default function FixDetailScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Method</Text>
                 <Text style={styles.value}>
-                  {fix.automationFrequency === "Manual"
-                    ? "Manual"
-                    : "Automation"}
+                  {fix.metadata?.autoSave ? "Automation" : "Manual"}
                 </Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>End Date</Text>
-                <Text style={styles.value}>{fix.endDate}</Text>
+                <Text style={styles.value}>{formattedDate}</Text>
               </View>
             </View>
 
@@ -377,11 +317,11 @@ export default function FixDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Wealth grows Into</Text>
-                <Text style={styles.value}>{fix.wealthGrowsInto}</Text>
+                <Text style={styles.value}>WinUp</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Wealth from:</Text>
-                <Text style={styles.value}>{fix.source}</Text>
+                <Text style={styles.value}>Wealth Flex</Text>
               </View>
             </View>
 
@@ -510,7 +450,7 @@ export default function FixDetailScreen() {
             >
               You are about to close the{" "}
               <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-                {fix.title}
+                {fix.name}
               </Text>{" "}
               portfolio. This fund was created to secure a future legacy.
               {"\n\n"}

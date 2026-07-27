@@ -3,7 +3,7 @@ import { ThemedButton } from "@/src/components/ThemedButton";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Image,
   ScrollView,
@@ -13,159 +13,19 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
 
 const PURPLE = "#560FF1";
 const PURPLE_LIGHT = "#F3EEFF";
 const TEAL = "#0B575B";
 
-interface FamPlan {
-  id: string;
-  title: string;
-  subtitle: string;
-  members: string;
-  category: string;
-  amount: string;
-  saved: string;
-  progress: number;
-  daysLeft: number;
-  endDate: string;
-  automationFrequency: "Manual" | "Automation";
-  source: string;
-  wealthGrowth: string;
-  wealthGrowsInto: string;
-  progressiveAmount: string;
-}
-
-const famService = {
-  getPlans: async (): Promise<FamPlan[]> => {
-    const base = {
-      automationFrequency: "Manual" as const,
-      source: "WealthFlex",
-      wealthGrowth: "₦2,463.00",
-      wealthGrowsInto: "WinUp",
-      endDate: "31st Dec 2026",
-      members: "Adeyemi, Juliet and Joy",
-      category: "Kids",
-      progressiveAmount: "₦50,000.00",
-    };
-    return [
-      {
-        ...base,
-        id: "fam-1",
-        title: "Wealth for Kids",
-        subtitle: "Kids",
-        amount: "50,373.28",
-        saved: "40,298.00",
-        progress: 0.8,
-        daysLeft: 54,
-      },
-      {
-        ...base,
-        id: "fam-2",
-        title: "Wealth for Kids",
-        subtitle: "Kids",
-        amount: "50,373.28",
-        saved: "30,223.00",
-        progress: 0.6,
-        daysLeft: 80,
-      },
-      {
-        ...base,
-        id: "fam-3",
-        title: "Spouse Savings",
-        subtitle: "Spouse",
-        members: "Precious Grace",
-        category: "Spouse",
-        amount: "50,373.28",
-        saved: "40,298.00",
-        progress: 0.8,
-        daysLeft: 54,
-      },
-      {
-        ...base,
-        id: "fam-4",
-        title: "Spouse Savings",
-        subtitle: "Spouse",
-        members: "Precious Grace",
-        category: "Spouse",
-        amount: "50,373.28",
-        saved: "30,223.00",
-        progress: 0.6,
-        daysLeft: 120,
-      },
-      {
-        ...base,
-        id: "fam-5",
-        title: "Care for Parents",
-        subtitle: "Parents",
-        members: "Baba & Mama Adeyemi",
-        category: "Parents",
-        amount: "75,000.00",
-        saved: "25,000.00",
-        progress: 0.33,
-        daysLeft: 200,
-      },
-      {
-        ...base,
-        id: "fam-c1",
-        title: "Wealth for Kids",
-        subtitle: "Kids",
-        amount: "143,736.00",
-        saved: "143,736.00",
-        progress: 1.0,
-        daysLeft: 0,
-      },
-      {
-        ...base,
-        id: "fam-c2",
-        title: "Spouse Savings",
-        subtitle: "Spouse",
-        members: "Precious Grace",
-        category: "Spouse",
-        amount: "104,736.00",
-        saved: "104,736.00",
-        progress: 1.0,
-        daysLeft: 0,
-      },
-      {
-        ...base,
-        id: "fam-c3",
-        title: "Wealth for Kids",
-        subtitle: "Kids",
-        amount: "143,736.00",
-        saved: "143,736.00",
-        progress: 1.0,
-        daysLeft: 0,
-      },
-      {
-        ...base,
-        id: "fam-c4",
-        title: "Sibling Support",
-        subtitle: "Siblings",
-        members: "Tunde Adeyemi",
-        category: "Siblings",
-        amount: "80,000.00",
-        saved: "80,000.00",
-        progress: 1.0,
-        daysLeft: 0,
-      },
-    ];
-  },
-};
-
 export default function FamDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [plan, setPlan] = useState<FamPlan | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    famService.getPlans().then((plans) => {
-      setPlan(plans.find((p) => p.id === id) || null);
-      setLoading(false);
-    });
-  }, [id]);
-
   const [showTerminateModal, setShowTerminateModal] = useState(false);
+
+  const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthfam" });
+  const allPlans = data?.items || [];
+  const plan = allPlans.find((p) => p.id === id);
 
   if (loading) {
     return (
@@ -198,8 +58,30 @@ export default function FamDetailScreen() {
     );
   }
 
-  const isCompleted = plan.progress >= 1.0;
-  const progressPct = Math.round((plan.progress || 0) * 100);
+  const isCompleted = plan.status === "COMPLETED" || parseFloat(plan.balance) >= parseFloat(plan.targetAmount);
+
+  const progress = parseFloat(plan.targetAmount) > 0 ? parseFloat(plan.balance) / parseFloat(plan.targetAmount) : 0;
+  const progressPct = Math.round(Math.min(progress * 100, 100));
+
+  const getDaysLeft = () => {
+    const end = new Date(plan.maturityDate).getTime();
+    const now = new Date().getTime();
+    const diff = end - now;
+    if (diff <= 0) return 0;
+    return Math.ceil(diff / (1000 * 3600 * 24));
+  };
+  
+  const formattedDate = new Date(plan.maturityDate).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+
+  const formatAmount = (val?: string) => {
+    if (!val) return "0.00";
+    const amountNum = parseFloat(val) / 100;
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
 
   const handleTerminate = () => {
     setShowTerminateModal(false);
@@ -227,16 +109,16 @@ export default function FamDetailScreen() {
               marginBottom: 4,
             }}
           >
-            {plan.title}
+            {plan.name}
           </Text>
           <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 16 }}>
-            {plan.members}
+            {plan.metadata?.members || "Family"}
           </Text>
           <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 28 }}>
-            ₦{plan.saved}
+            ₦{formatAmount(plan.balance)}
           </Text>
           <Text style={{ color: "#9CA3AF", fontSize: 11, marginTop: 2 }}>
-            of ₦{plan.amount} target
+            of ₦{formatAmount(plan.targetAmount)} target
           </Text>
         </View>
         <Image
@@ -277,7 +159,7 @@ export default function FamDetailScreen() {
             {progressPct}%
           </Text>
           <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
-            {plan.daysLeft} days Left
+            {getDaysLeft()} days Left
           </Text>
         </View>
       </View>
@@ -343,11 +225,11 @@ export default function FamDetailScreen() {
         <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>WealthFam</Text>{" "}
         plan for{" "}
         <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-          {plan.members}
+          {plan.metadata?.members || "Family"}
         </Text>{" "}
         has matured. Your{" "}
         <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-          ₦{plan.amount}
+          ₦{formatAmount(plan.targetAmount)}
         </Text>{" "}
         has been sent to your WinUp wallet! 🏆
       </Text>
@@ -385,11 +267,11 @@ export default function FamDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Family Category</Text>
-                <Text style={styles.value}>{plan.category}</Text>
+                <Text style={styles.value}>{plan.metadata?.category || "Fam"}</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Target Amount</Text>
-                <Text style={styles.value}>₦{plan.amount}</Text>
+                <Text style={styles.value}>₦{formatAmount(plan.targetAmount)}</Text>
               </View>
             </View>
 
@@ -403,11 +285,11 @@ export default function FamDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Wealth Growth</Text>
-                <Text style={styles.value}>{plan.wealthGrowth}</Text>
+                <Text style={styles.value}>₦0.00</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Progressive Amount</Text>
-                <Text style={styles.value}>{plan.progressiveAmount}</Text>
+                <Text style={styles.value}>₦0.00</Text>
               </View>
             </View>
 
@@ -421,11 +303,11 @@ export default function FamDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Family Members</Text>
-                <Text style={styles.value}>{plan.members}</Text>
+                <Text style={styles.value}>{plan.metadata?.members || "Family"}</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>End Date</Text>
-                <Text style={styles.value}>{plan.endDate}</Text>
+                <Text style={styles.value}>{formattedDate}</Text>
               </View>
             </View>
 
@@ -439,18 +321,18 @@ export default function FamDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Method</Text>
-                <Text style={styles.value}>{plan.automationFrequency}</Text>
+                <Text style={styles.value}>{plan.metadata?.autoSave ? "Automation" : "Manual"}</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Wealth from</Text>
-                <Text style={styles.value}>{plan.source}</Text>
+                <Text style={styles.value}>WealthFlex</Text>
               </View>
             </View>
 
             {/* Row 5: Wealth grows Into */}
             <View style={{ marginBottom: 8 }}>
               <Text style={styles.label}>Wealth grows Into</Text>
-              <Text style={styles.value}>{plan.wealthGrowsInto}</Text>
+              <Text style={styles.value}>WinUp</Text>
             </View>
 
             {/* Jagged Edge */}
@@ -580,7 +462,7 @@ export default function FamDetailScreen() {
             >
               You are about to close the{" "}
               <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-                {plan.title}
+                {plan.name}
               </Text>{" "}
               portfolio. This fund was created to secure a future legacy.
               {"\n\n"}

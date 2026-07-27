@@ -1,12 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Text, TouchableOpacity, View } from "react-native";
+import { TouchableOpacity, View } from "react-native";
+import { Text } from "@/src/components/common/ui/Text";
 
 interface HeaderProps {
   title: string;
   showBack?: boolean;
   rightElement?: React.ReactNode;
   onBack?: () => void;
+  align?: "center" | "left";
 }
 
 const Header = ({
@@ -14,6 +16,7 @@ const Header = ({
   showBack = true,
   rightElement,
   onBack,
+  align = "center",
 }: HeaderProps) => {
   const router = useRouter();
 
@@ -32,7 +35,10 @@ const Header = ({
 
       <Text
         numberOfLines={1}
-        className="text-xl font-extrabold text-[#323232] text-center flex-1 px-2"
+        variant="h2"
+        className={`font-kumbh-extrabold flex-1 px-2 ${
+          align === "left" ? "text-left" : "text-center"
+        }`}
       >
         {title}
       </Text>

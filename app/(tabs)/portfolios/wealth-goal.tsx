@@ -1,18 +1,18 @@
-import { goalService, WealthGoal } from "@/src/api/goalService";
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
 import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Eye, EyeOff } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
+import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
+import { Portfolio } from "@/src/types/portfolio";
 
 const CATEGORIES = [
   { id: "1", title: "Rent", subtitle: "Stay ahead of your landlord" },
@@ -23,160 +23,27 @@ const CATEGORIES = [
 
 export default function WealthGoalScreen() {
   const [showBalance, setShowBalance] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [showTips, setShowTips] = useState(true);
+  const [activeTab, setActiveTab] = useState("tracking"); // 'tracking' or 'completed'
+
   const portfolioPreference = useSelector(
     (state: RootState) => state.portfolioPreference.goal
   );
   const showInterest = portfolioPreference !== "Impact Wealth";
 
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(timer);
-  }, []);
+  const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthgoal" });
+  const allGoals = data?.items || [];
 
-  const [showTips, setShowTips] = useState(true);
-  const [activeTab, setActiveTab] = useState("tracking"); // 'tracking' or 'completed'
-  const [activeGoals, setActiveGoals] = useState<WealthGoal[]>([]);
-  const [completedGoals, setCompletedGoals] = useState<WealthGoal[]>([]);
+  const activeGoals = allGoals.filter((g) => g.status === "ACTIVE");
+  const completedGoals = allGoals.filter((g) => g.status === "COMPLETED" || (parseFloat(g.balance) >= parseFloat(g.targetAmount)));
 
-  useFocusEffect(
-    useCallback(() => {
-      const loadGoals = async () => {
-        const realGoals = await goalService.getGoals();
+  const formatAmount = (val?: string) => {
+    if (!val) return "0.00";
+    const amountNum = parseFloat(val) / 100;
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
 
-        const mockActive: WealthGoal[] = [
-          {
-            id: "mock-1",
-            title: "Buy a Mac",
-            subtitle: "Business",
-            amount: "1,500,000.00",
-            saved: "250,500.00",
-            progress: 0.16,
-            daysLeft: 120,
-            endDate: "24th July 2026",
-            automationFrequency: "Monthly",
-            source: "Wealth Flex",
-          },
-          {
-            id: "mock-3",
-            title: "New Laptop",
-            subtitle: "Education",
-            amount: "500,000.00",
-            saved: "350,000.00",
-            progress: 0.7,
-            daysLeft: 45,
-            endDate: "15th May 2026",
-            automationFrequency: "Weekly",
-            source: "Bank Account",
-          },
-          {
-            id: "mock-4",
-            title: "Emergency Fund",
-            subtitle: "Savings",
-            amount: "2,000,000.00",
-            saved: "1,200,000.00",
-            progress: 0.6,
-            daysLeft: 200,
-            endDate: "30th Oct 2026",
-            automationFrequency: "Monthly",
-            source: "Wealth Save",
-          },
-          {
-            id: "mock-5",
-            title: "Wedding Prep",
-            subtitle: "Personal",
-            amount: "5,000,000.00",
-            saved: "500,000.00",
-            progress: 0.1,
-            daysLeft: 300,
-            endDate: "12th Feb 2027",
-            automationFrequency: "Monthly",
-            source: "Wealth Flex",
-          },
-          {
-            id: "mock-6",
-            title: "Car Downpayment",
-            subtitle: "Personal",
-            amount: "3,000,000.00",
-            saved: "1,500,000.00",
-            progress: 0.5,
-            daysLeft: 90,
-            endDate: "30th June 2026",
-            automationFrequency: "Monthly",
-            source: "Wealth Save",
-          },
-        ];
-
-        const mockCompleted: WealthGoal[] = [
-          {
-            id: "mock-2",
-            title: "Summer Vacation",
-            subtitle: "Vacation",
-            amount: "800,000.00",
-            saved: "800,000.00",
-            progress: 1,
-            daysLeft: 0,
-            endDate: "12th Dec 2025",
-            automationFrequency: "Monthly",
-            source: "Wealth Save",
-            isCompleted: true,
-          },
-          {
-            id: "mock-7",
-            title: "Rent 2025",
-            subtitle: "Rent",
-            amount: "1,200,000.00",
-            saved: "1,200,000.00",
-            progress: 1,
-            daysLeft: 0,
-            endDate: "1st Jan 2025",
-            automationFrequency: "Monthly",
-            source: "Wealth Flex",
-            isCompleted: true,
-          },
-          {
-            id: "mock-8",
-            title: "Side Project",
-            subtitle: "Business",
-            amount: "200,000.00",
-            saved: "200,000.00",
-            progress: 1,
-            daysLeft: 0,
-            endDate: "15th Nov 2024",
-            automationFrequency: "One-time",
-            source: "Wealth Save",
-            isCompleted: true,
-          },
-          {
-            id: "mock-9",
-            title: "Courses",
-            subtitle: "Education",
-            amount: "50,000.00",
-            saved: "50,000.00",
-            progress: 1,
-            daysLeft: 0,
-            endDate: "10th Oct 2024",
-            automationFrequency: "Daily",
-            source: "Wealth Flex",
-            isCompleted: true,
-          },
-        ];
-
-        const allActive = [
-          ...mockActive,
-          ...realGoals.filter((g) => !g.isCompleted),
-        ];
-        const allCompleted = [
-          ...mockCompleted,
-          ...realGoals.filter((g) => g.isCompleted),
-        ];
-
-        setActiveGoals(allActive);
-        setCompletedGoals(allCompleted);
-      };
-      loadGoals();
-    }, []),
-  );
+  const totalBalance = allGoals.reduce((sum, g) => sum + parseFloat(g.balance || "0"), 0);
 
   if (loading) {
     return (
@@ -264,7 +131,7 @@ export default function WealthGoalScreen() {
               >
                 {showBalance ? (
                   <BalanceText
-                    amount="₦300,735.42"
+                    amount={`₦${formatAmount(totalBalance.toString())}`}
                     fontSize={31}
                     color="#1A1A1A"
                   />
@@ -281,7 +148,7 @@ export default function WealthGoalScreen() {
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
                   <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-80">
-                    Your wealth grew by N230.00 today
+                    Your wealth grew by N0.00 today
                   </Text>
                   <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
                 </View>
@@ -487,7 +354,7 @@ export default function WealthGoalScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Goal List (PIXEL PERFECT) */}
+          {/* Goal List */}
           <View style={{ width: 355, alignSelf: "center" }}>
             {activeTab === "tracking" ? (
               activeGoals.length === 0 ? (
@@ -527,8 +394,30 @@ export default function WealthGoalScreen() {
   );
 }
 
-function GoalListItem({ goal }: any) {
-  const isCompleted = goal.isCompleted;
+function GoalListItem({ goal }: { goal: Portfolio }) {
+  const isCompleted = goal.status === "COMPLETED" || parseFloat(goal.balance) >= parseFloat(goal.targetAmount);
+
+  const formatAmount = (val: string) => {
+    if (!val) return "0.00";
+    const amountNum = parseFloat(val) / 100; // kobo to naira
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
+
+  const progress = parseFloat(goal.targetAmount) > 0 ? parseFloat(goal.balance) / parseFloat(goal.targetAmount) : 0;
+  
+  const formattedDate = new Date(goal.maturityDate).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+
+  const getDaysLeft = () => {
+    const end = new Date(goal.maturityDate).getTime();
+    const now = new Date().getTime();
+    const diff = end - now;
+    if (diff <= 0) return 0;
+    return Math.ceil(diff / (1000 * 3600 * 24));
+  };
 
   return (
     <TouchableOpacity
@@ -558,11 +447,7 @@ function GoalListItem({ goal }: any) {
           justifyContent: "center",
         }}
       >
-        {goal.subtitle === "Business" ? (
-          <Text style={{ fontSize: 20 }}>💼</Text>
-        ) : (
-          <Text style={{ fontSize: 20 }}>🚗</Text>
-        )}
+        <Text style={{ fontSize: 20 }}>🎯</Text>
       </View>
 
       {/* Text Area (Width 292) */}
@@ -576,14 +461,14 @@ function GoalListItem({ goal }: any) {
           }}
         >
           <Text style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A" }}>
-            {goal.title}
+            {goal.name}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Text style={{ fontSize: 12, marginRight: 2 }}>
               {isCompleted ? "🏆" : "🎯"}
             </Text>
             <Text style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}>
-              ₦{goal.amount}
+              ₦{formatAmount(goal.targetAmount)}
             </Text>
           </View>
         </View>
@@ -598,10 +483,10 @@ function GoalListItem({ goal }: any) {
         >
           <View style={{ flex: 1, marginRight: 8 }}>
             <Text style={{ fontSize: 10, color: "#9CA3AF" }}>
-              {goal.subtitle}
+              {goal.metadata?.category || "Goal"}
             </Text>
             <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
-              Wealth growth ₦{goal.saved} ↑ | Progressive: ₦50,000.00 ℹ️
+              Wealth growth ₦{formatAmount(goal.balance)} ↑
             </Text>
           </View>
 
@@ -617,7 +502,7 @@ function GoalListItem({ goal }: any) {
           >
             <View
               style={{
-                width: `${goal.progress * 100}%`,
+                width: `${Math.min(progress * 100, 100)}%`,
                 height: 4,
                 backgroundColor: isCompleted ? "#4CAF50" : "#F3007A",
               }}
@@ -634,7 +519,7 @@ function GoalListItem({ goal }: any) {
           }}
         >
           <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
-            End Date: {goal.endDate}
+            End Date: {formattedDate}
           </Text>
           <View
             style={{
@@ -645,7 +530,7 @@ function GoalListItem({ goal }: any) {
             }}
           >
             <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
-              {Math.round(goal.progress * 100)}%
+              {Math.round(Math.min(progress * 100, 100))}%
             </Text>
             <Text
               style={{
@@ -654,7 +539,7 @@ function GoalListItem({ goal }: any) {
                 fontWeight: isCompleted ? "700" : "normal",
               }}
             >
-              {isCompleted ? "Goal Achieved" : `${goal.daysLeft} days Left`}
+              {isCompleted ? "Goal Achieved" : `${getDaysLeft()} days Left`}
             </Text>
           </View>
         </View>

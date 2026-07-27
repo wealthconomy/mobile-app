@@ -2,6 +2,14 @@ import { useColorScheme } from "@/components/useColorScheme";
 import { DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
+import {
+  KumbhSans_300Light,
+  KumbhSans_400Regular,
+  KumbhSans_500Medium,
+  KumbhSans_600SemiBold,
+  KumbhSans_700Bold,
+  KumbhSans_800ExtraBold,
+} from "@expo-google-fonts/kumbh-sans";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
@@ -11,6 +19,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider, useDispatch, useSelector } from "react-redux";
 import "../global.css";
 import { AppDispatch, RootState, store } from "../src/store";
+import { loadAuthFromStorage } from "../src/store/slices/authSlice";
 import { loadGroupsFromStorage } from "../src/store/slices/wealthGroupSlice";
 
 const queryClient = new QueryClient();
@@ -26,6 +35,12 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
+    KumbhSans_300Light,
+    KumbhSans_400Regular,
+    KumbhSans_500Medium,
+    KumbhSans_600SemiBold,
+    KumbhSans_700Bold,
+    KumbhSans_800ExtraBold,
   });
 
   useEffect(() => {
@@ -55,20 +70,27 @@ function RootLayoutNav() {
   );
 
   useEffect(() => {
+    dispatch(loadAuthFromStorage());
     dispatch(loadGroupsFromStorage());
   }, [dispatch]);
 
+
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading) {
+      return;
+    }
 
     const inAuthGroup = segments[0] === "(auth)";
     const inOnboarding = segments[0] === "onboarding";
-    const inTabs = segments[0] === "(tabs)";
 
     if (!hasCompletedOnboarding) {
-      if (!inOnboarding) router.replace("/onboarding" as any);
+      if (!inOnboarding) {
+        router.replace("/onboarding" as any);
+      }
     } else if (!isAuthenticated) {
-      if (!inAuthGroup) router.replace("/(auth)/login" as any);
+      if (!inAuthGroup) {
+        router.replace("/(auth)/login" as any);
+      }
     } else if (inAuthGroup || inOnboarding) {
       router.replace("/(tabs)" as any);
     }

@@ -1,39 +1,41 @@
-export interface Author {
-  id: string;
-  name: string;
-  image: string;
-}
-
-export type Category =
-  | "WealthFlex"
-  | "WealthFix"
-  | "WealthGoal"
-  | "WealthFlow"
-  | "WealthFam";
-
 export interface BlogComment {
   id: string;
-  author: Author;
-  text: string;
-  timePosted: string;
+  userId?: string;
+  userName?: string;
+  userImage?: string;
+  content?: string;
+  text?: string;
+  timePosted?: string;
+  timeAgo?: string;
 }
+
+export type Category = string;
 
 export interface Blog {
   id: string;
   title: string;
-  description: string;
+  author: string;
+  authorAvatar: string;
   content: string;
-  image: string;
-  author: Author;
   category: Category;
-  timePosted: string;
-  readingDuration: string;
-  isBookmarked: boolean;
-  isLiked: boolean;
-  likesCount: number;
-  commentsCount: number;
-  sharesCount: number;
-  bookmarkCount: number;
+  categoryColor: string;
+  image: string;
+  status: string;
+  timeAgo: string;
+  bookmarks: number;
   views: number;
-  comments: BlogComment[];
+  publishToApp: boolean;
+  publishToWeb: boolean;
+  createdAt: string;
+  updatedAt: string;
+
+  // Optional fields (populated in detailed views or not supported by API yet)
+  likesCount?: number;
+  commentsCount?: number;
+  sharesCount?: number;
+  isBookmarked?: boolean;
+  isLiked?: boolean;
+  readingDuration?: string;
+  description?: string;
+  comments?: BlogComment[];
 }

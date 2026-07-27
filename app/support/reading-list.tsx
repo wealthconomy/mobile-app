@@ -1,9 +1,7 @@
-import { blogService } from "@/src/api/blogService";
-import Header from "@/src/components/common/Header";
+import { useGetBookmarkedBlogsQuery, useToggleBookmarkMutation } from "@/src/store/api/blogApi";
 import { BlogListItem } from "@/src/features/wise-up/components/BlogListItem";
 import { BlogSkeleton } from "@/src/features/wise-up/components/BlogSkeleton";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ScrollView, Text, View } from "react-native";
@@ -11,30 +9,33 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ReadingListScreen() {
   const router = useRouter();
-  const queryClient = useQueryClient();
 
-  const { data: bookmarkedBlogs, isLoading } = useQuery({
-    queryKey: ["bookmarked-blogs"],
-    queryFn: blogService.getBookmarkedBlogs,
-  });
+  const { data: response, isLoading } = useGetBookmarkedBlogsQuery();
+  const bookmarkedBlogs = response?.data;
 
-  const toggleBookmarkMutation = useMutation({
-    mutationFn: (id: string) => blogService.toggleBookmark(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["blogs"] });
-      queryClient.invalidateQueries({ queryKey: ["bookmarked-blogs"] });
-      queryClient.invalidateQueries({ queryKey: ["blog"] });
-    },
-  });
+  const [toggleBookmark] = useToggleBookmarkMutation();
 
   const handleBookmark = (id: string) => {
-    toggleBookmarkMutation.mutate(id);
+    toggleBookmark(id);
   };
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
       <StatusBar style="dark" />
-      <Header title="Your WiseUp List" />
+      
+      <View className="px-5 pt-2 pb-2">
+        <TouchableOpacity
+          onPress={() => router.back()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          className="mb-6"
+        >
+          <Ionicons name="chevron-back" size={28} color="#1A1A1A" />
+        </TouchableOpacity>
+        
+        <Text className="text-[#1A1A1A] font-extrabold text-[28px]">
+          Your Reading List
+        </Text>
+      </View>
 
       <ScrollView
         className="flex-1 px-5 mt-4"

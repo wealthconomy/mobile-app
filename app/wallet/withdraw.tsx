@@ -1,10 +1,13 @@
-import { Bank, bankService } from "@/src/api/bankService";
-import { paymentService } from "@/src/api/paymentService";
+import {
+  useAddPayoutAccountMutation,
+  useGetSupportedBanksQuery,
+  useGetUserPayoutAccountsQuery,
+  useResolveBankAccountMutation,
+} from "@/src/store/api/payoutAccountApi";
+import { useInitiateWithdrawalMutation } from "@/src/store/api/withdrawalApi";
 import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
@@ -18,7 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type Step =
@@ -28,58 +31,11 @@ type Step =
   | "preview"
   | "pin";
 
-const INITIAL_RECIPIENTS = [
-  {
-    id: 1,
-    name: "James Jackson",
-    bankName: "Opay",
-    accountNumber: "62345278396",
-  },
-  {
-    id: 2,
-    name: "Gem Mike",
-    bankName: "First Bank of Nigeria Limited",
-    accountNumber: "03638265782",
-  },
-  {
-    id: 3,
-    name: "Sarah Simon",
-    bankName: "Kuda Bank",
-    accountNumber: "1234567890",
-  },
-];
-
-const STORAGE_KEY = "@recent_recipients";
-
 export default function WithdrawScreen() {
   const { plan } = useLocalSearchParams<{ plan: string }>();
-  const [recipients, setRecipients] = useState(INITIAL_RECIPIENTS);
   const [step, setStep] = useState<Step>("select-recipient");
   const pinRefs = useRef<Array<TextInput | null>>([]);
   const [pinValues, setPinValues] = useState(["", "", "", ""]);
-
-  // Load recipients from storage on mount
-  useEffect(() => {
-    const loadRecipients = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          setRecipients(JSON.parse(stored));
-        }
-      } catch (e) {
-        console.error("Failed to load recipients", e);
-      }
-    };
-    loadRecipients();
-  }, []);
-
-  const saveRecipients = async (newRecipients: typeof INITIAL_RECIPIENTS) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newRecipients));
-    } catch (e) {
-      console.error("Failed to save recipients", e);
-    }
-  };
 
   const [showSuccess, setShowSuccess] = useState(false);
   const [amount, setAmount] = useState("");
@@ -87,17 +43,31 @@ export default function WithdrawScreen() {
   const [selectedBankCode, setSelectedBankCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [userName, setUserName] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
   const [narrative, setNarrative] = useState("");
   const [bankSearchQuery, setBankSearchQuery] = useState("");
-  const [loading, setLoading] = useState(false);
   const [wealthPlan] = useState(plan || "WealthFlex");
+
+  // Selected existing payout account id (if any)
+  const [selectedPayoutAccountId, setSelectedPayoutAccountId] = useState<string | null>(null);
+
+  // RTK Query Hooks
+  const { data: payoutAccountsData } = useGetUserPayoutAccountsQuery();
+  const recipients = payoutAccountsData?.items || [];
+
+  const { data: banksData, isLoading: isLoadingBanks, isError: isBankError, refetch: refetchBanks } = useGetSupportedBanksQuery();
+  const banks = banksData?.items || [];
+
+  const [resolveAccount, { isLoading: isVerifying }] = useResolveBankAccountMutation();
+  const [addPayoutAccount] = useAddPayoutAccountMutation();
+  const [initiateWithdrawal, { isLoading: isWithdrawing }] = useInitiateWithdrawalMutation();
+
+  const loading = isWithdrawing;
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
     const cleaned = val.replace(/[^\d.]/g, "");
-    const amount = parseFloat(cleaned) || 0;
-    return amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+    const amountNum = parseFloat(cleaned) || 0;
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
   const clearInputs = () => {
@@ -107,44 +77,36 @@ export default function WithdrawScreen() {
     setSelectedBankCode("");
     setUserName("");
     setNarrative("");
+    setSelectedPayoutAccountId(null);
   };
 
   // Auto-fetch account name
   useEffect(() => {
     const resolveName = async () => {
+      // If we already selected an existing payout account, we don't need to resolve
+      if (selectedPayoutAccountId) return;
+      
       if (accountNumber.length === 10 && selectedBankCode) {
-        setIsVerifying(true);
         try {
-          const resolvedName = await bankService.resolveAccount(
+          const res = await resolveAccount({
             accountNumber,
-            selectedBankCode,
-          );
-          setUserName(resolvedName);
+            bankCode: selectedBankCode,
+          }).unwrap();
+          setUserName(res.accountName);
         } catch (error) {
           console.error("Verification failed:", error);
-        } finally {
-          setIsVerifying(false);
+          setUserName(""); // Clear on failure
         }
       }
     };
     resolveName();
-  }, [accountNumber, selectedBankCode]);
+  }, [accountNumber, selectedBankCode, resolveAccount, selectedPayoutAccountId]);
 
   useEffect(() => {
     if (accountNumber.length === 10 && selectedBank === "Select bank") {
       setStep("select-bank");
     }
   }, [accountNumber, selectedBank]);
-
-  const {
-    data: banks,
-    isLoading: isLoadingBanks,
-    isError: isBankError,
-    refetch: refetchBanks,
-  } = useQuery({
-    queryKey: ["banks"],
-    queryFn: bankService.fetchBanks,
-  });
 
   const handleBack = () => {
     if (step === "pin") setStep("preview");
@@ -193,43 +155,46 @@ export default function WithdrawScreen() {
         </TouchableOpacity>
       </View>
 
-      <Text className="text-[#1A1A1A] font-extrabold text-[16px] mb-5 mt-6">
-        Recent Recipients
-      </Text>
+      {recipients.length > 0 && (
+        <>
+          <Text className="text-[#1A1A1A] font-extrabold text-[16px] mb-5 mt-6">
+            Recent Recipients
+          </Text>
 
-      <View className="space-y-4 gap-4">
-        {recipients.map(
-          (item: (typeof INITIAL_RECIPIENTS)[0], index: number) => (
-            <TouchableOpacity
-              key={index}
-              className="flex-row items-center"
-              onPress={() => {
-                setAccountNumber(item.accountNumber);
-                setSelectedBank(item.bankName);
-                // In a real app, we'd find the bank code too
-                setUserName(item.name);
-                setStep("recipient-details");
-              }}
-            >
-              <View className="w-10 h-10 bg-[#E6F4F4] rounded-full items-center justify-center mr-4">
-                <MaterialCommunityIcons
-                  name="bank-outline"
-                  size={20}
-                  color="#155D5F"
-                />
-              </View>
-              <View>
-                <Text className="text-[#1A1A1A] font-bold text-sm">
-                  {item.name}
-                </Text>
-                <Text className="text-[#4B5563] text-[13px] font-bold">
-                  {item.bankName} - {item.accountNumber}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ),
-        )}
-      </View>
+          <View className="space-y-4 gap-4">
+            {recipients.map((item, index) => (
+              <TouchableOpacity
+                key={item.id || index}
+                className="flex-row items-center"
+                onPress={() => {
+                  setSelectedPayoutAccountId(item.id);
+                  setAccountNumber(item.accountNumber);
+                  setSelectedBank(item.bankName);
+                  setSelectedBankCode(item.bankCode);
+                  setUserName(item.accountName);
+                  setStep("recipient-details");
+                }}
+              >
+                <View className="w-10 h-10 bg-[#E6F4F4] rounded-full items-center justify-center mr-4">
+                  <MaterialCommunityIcons
+                    name="bank-outline"
+                    size={20}
+                    color="#155D5F"
+                  />
+                </View>
+                <View>
+                  <Text className="text-[#1A1A1A] font-bold text-sm">
+                    {item.accountName}
+                  </Text>
+                  <Text className="text-[#4B5563] text-[13px] font-bold">
+                    {item.bankName} - {item.accountNumber}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
     </Animated.View>
   );
 
@@ -262,7 +227,10 @@ export default function WithdrawScreen() {
             keyboardType="numeric"
             maxLength={10}
             value={accountNumber}
-            onChangeText={setAccountNumber}
+            onChangeText={(val) => {
+              setAccountNumber(val);
+              setSelectedPayoutAccountId(null); // Clear selected account if they edit
+            }}
           />
         </View>
 
@@ -271,10 +239,7 @@ export default function WithdrawScreen() {
             Select Bank
           </Text>
           <TouchableOpacity
-            onPress={async () => {
-              setLoading(true);
-              await new Promise((res) => setTimeout(res, 600)); // Mock transition lag
-              setLoading(false);
+            onPress={() => {
               setStep("select-bank");
             }}
             className="bg-[#F8F8F8] p-4 rounded-xl flex-row justify-between items-center"
@@ -304,7 +269,7 @@ export default function WithdrawScreen() {
               className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] pr-12"
               value={userName}
               onChangeText={setUserName}
-              editable={!isVerifying}
+              editable={!isVerifying && !selectedPayoutAccountId}
             />
             {isVerifying && (
               <View className="absolute right-4 top-4">
@@ -337,17 +302,11 @@ export default function WithdrawScreen() {
         return (
           <ThemedButton
             title="Proceed"
-            onPress={async () => {
-              setLoading(true);
-              await new Promise((res) => setTimeout(res, 800));
-              setLoading(false);
-              setStep("preview");
-            }}
-            loading={loading}
-            disabled={!isFormValid || loading}
+            onPress={() => setStep("preview")}
+            disabled={!isFormValid || isVerifying}
             style={{
-              backgroundColor: !isFormValid || loading ? "#E0E0E0" : "#155D5F",
-              opacity: !isFormValid || loading ? 0.45 : 1,
+              backgroundColor: !isFormValid || isVerifying ? "#E0E0E0" : "#155D5F",
+              opacity: !isFormValid || isVerifying ? 0.45 : 1,
             }}
             className="mt-10"
           />
@@ -359,7 +318,7 @@ export default function WithdrawScreen() {
   const getFilteredBanks = () => {
     if (!banks) return [];
     if (!bankSearchQuery) return banks;
-    return banks.filter((bank: Bank) =>
+    return banks.filter((bank) =>
       bank.name.toLowerCase().includes(bankSearchQuery.toLowerCase()),
     );
   };
@@ -399,13 +358,14 @@ export default function WithdrawScreen() {
           </View>
 
           <View className="space-y-4 gap-4">
-            {getFilteredBanks().map((bank: Bank) => (
+            {getFilteredBanks().map((bank) => (
               <TouchableOpacity
-                key={bank.id}
+                key={bank.code}
                 onPress={() => {
                   setSelectedBank(bank.name);
                   setSelectedBankCode(bank.code);
                   setStep("recipient-details");
+                  setSelectedPayoutAccountId(null);
                 }}
                 className="bg-[#F8F8F8] p-4 rounded-xl"
               >
@@ -565,31 +525,31 @@ export default function WithdrawScreen() {
         loading={loading}
         className="mt-6 w-full"
         onPress={async () => {
-          setLoading(true);
-          await paymentService.transferFunds({
-            amount,
-            accountNumber,
-            bankName: selectedBank,
-            narrative,
-          });
+          try {
+            // First ensure we have a payout account ID
+            let accountId = selectedPayoutAccountId;
 
-          const exists = recipients.some(
-            (r) => r.accountNumber === accountNumber,
-          );
-          if (!exists && accountNumber && userName) {
-            const newRes = {
-              id: Date.now(),
-              name: userName,
-              bankName: selectedBank,
-              accountNumber: accountNumber,
-            };
-            const updated = [newRes, ...recipients];
-            setRecipients(updated);
-            await saveRecipients(updated);
+            if (!accountId) {
+              const newAccount = await addPayoutAccount({
+                accountNumber,
+                bankCode: selectedBankCode,
+                bankName: selectedBank,
+              }).unwrap();
+              accountId = newAccount.id;
+            }
+
+            // Clean amount string to a valid number in kobo (assuming user typed naira)
+            const cleanAmount = parseFloat(amount.replace(/[^\d.]/g, "")) * 100;
+            
+            await initiateWithdrawal({
+              amount: cleanAmount,
+              payoutAccountId: accountId,
+            }).unwrap();
+
+            setShowSuccess(true);
+          } catch (e) {
+            console.error("Failed to withdraw:", e);
           }
-
-          setLoading(false);
-          setShowSuccess(true);
         }}
       />
     </Animated.View>
@@ -626,7 +586,7 @@ export default function WithdrawScreen() {
               title="Confirm"
               onPress={() => {
                 setShowSuccess(false);
-                router.replace("/education/win-up");
+                router.replace("/education/win-up"); // Standard success redirect, adjust as needed
               }}
               className="w-full"
             />

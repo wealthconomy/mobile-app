@@ -16,7 +16,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAvoidingView, Platform } from "react-native";
 import Svg, { Path } from "react-native-svg";
+import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 
 type Step = "select-method" | "use-card" | "preview";
 
@@ -42,25 +44,10 @@ export default function DepositScreen() {
   const [cvv, setCvv] = useState("");
   const [nameOnCard, setNameOnCard] = useState("");
   const [pin, setPin] = useState("");
+  
+  const { data: wallet } = useGetWalletSummaryQuery();
 
-  const [savedCards, setSavedCards] = useState<SavedCard[]>([
-    {
-      id: "1",
-      last4: "4252",
-      brand: "Mastercard",
-      expiryDate: "12/25",
-      nameOnCard: "SIMON PETER",
-      usageCount: 10,
-    },
-    {
-      id: "2",
-      last4: "8372",
-      brand: "Visa",
-      expiryDate: "09/24",
-      nameOnCard: "SIMON PETER",
-      usageCount: 5,
-    },
-  ]);
+  const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
 
   const defaultCardId = [...savedCards].sort(
     (a, b) => b.usageCount - a.usageCount,
@@ -213,54 +200,56 @@ export default function DepositScreen() {
         </TouchableOpacity>
       </View>
 
-      <View className="px-1 mt-8">
-        <Text className="text-[#374151] text-[15px] font-extrabold mb-6">
-          Saved cards
-        </Text>
+      {savedCards.length > 0 && (
+        <View className="px-1 mt-8">
+          <Text className="text-[#374151] text-[15px] font-extrabold mb-6">
+            Saved cards
+          </Text>
 
-        {savedCards
-          .sort((a, b) => b.usageCount - a.usageCount)
-          .map((card) => (
-            <TouchableOpacity
-              key={card.id}
-              onPress={() => handleCardSelect(card)}
-              className="flex-row items-center mb-6"
-            >
-              {card.brand === "Mastercard" ? (
-                <Image
-                  source={{
-                    uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/1280px-Mastercard-logo.svg.png",
-                  }}
-                  style={{ width: 32, height: 20, resizeMode: "contain" }}
-                  className="mr-4"
-                />
-              ) : (
-                <Svg
-                  width={32}
-                  height={20}
-                  viewBox="0 0 20 16"
-                  fill="none"
-                  className="mr-4"
-                >
-                  <Path
-                    fillRule="evenodd"
-                    clipRule="evenodd"
-                    d="M0 2C0 0.9 0.9 0 2 0H18C18.5304 0 19.0391 0.210714 19.4142 0.585786C19.7893 0.960859 20 1.46957 20 2V14C20 14.5304 19.7893 15.0391 19.4142 15.4142C19.0391 15.7893 18.5304 16 18 16H2C1.46957 16 0.960859 15.7893 0.585786 15.4142C0.210714 15.0391 0 14.5304 0 14V2ZM12.5 5.2C12.9 5.2 13.3 5.2 13.6 5.4L13.5 6.4H13.4C13.0991 6.21323 12.754 6.1097 12.4 6.1C11.9 6.1 11.7 6.4 11.7 6.6C11.7 6.8 11.9 6.9 12.4 7.1C13.1 7.5 13.4 7.9 13.4 8.4C13.4 9.4 12.6 10.1 11.2 10.1C10.6 10.1 10.1 9.9 9.8 9.8L10 8.8H10.1C10.5 9 10.8 9.1 11.3 9.1C11.7 9.1 12.1 8.9 12.1 8.6C12.1 8.4 11.9 8.3 11.4 8C10.9 7.8 10.3 7.4 10.3 6.7C10.3 5.8 11.3 5.2 12.5 5.2ZM16 5.2H17L18 10H16.8L16.6 9.3H15L14.7 10H13.4L15.3 5.6C15.4 5.3 15.6 5.3 16 5.3V5.2ZM9.8 5.2H8.5L7.7 10H9L9.8 5.2ZM5.3 8.5L5.2 7.8L4.7 5.6C4.7 5.3 4.4 5.3 4.1 5.2H2.1V5.3L3.3 5.8L3.4 6L4.5 10H6L8 5.3H6.7L5.4 8.5H5.3Z"
-                    fill="#1A1A1A"
+          {savedCards
+            .sort((a, b) => b.usageCount - a.usageCount)
+            .map((card) => (
+              <TouchableOpacity
+                key={card.id}
+                onPress={() => handleCardSelect(card)}
+                className="flex-row items-center mb-6"
+              >
+                {card.brand === "Mastercard" ? (
+                  <Image
+                    source={{
+                      uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/1280px-Mastercard-logo.svg.png",
+                    }}
+                    style={{ width: 32, height: 20, resizeMode: "contain" }}
+                    className="mr-4"
                   />
-                </Svg>
-              )}
-              <View>
-                <Text className="text-[#1A1A1A] font-bold text-sm">
-                  **** {card.last4}
-                </Text>
-                <Text className="text-[#4B5563] text-[13px] font-bold">
-                  {card.id === defaultCardId ? "Default card" : "Saved card"}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-      </View>
+                ) : (
+                  <Svg
+                    width={32}
+                    height={20}
+                    viewBox="0 0 20 16"
+                    fill="none"
+                    className="mr-4"
+                  >
+                    <Path
+                      fillRule="evenodd"
+                      clipRule="evenodd"
+                      d="M0 2C0 0.9 0.9 0 2 0H18C18.5304 0 19.0391 0.210714 19.4142 0.585786C19.7893 0.960859 20 1.46957 20 2V14C20 14.5304 19.7893 15.0391 19.4142 15.4142C19.0391 15.7893 18.5304 16 18 16H2C1.46957 16 0.960859 15.7893 0.585786 15.4142C0.210714 15.0391 0 14.5304 0 14V2ZM12.5 5.2C12.9 5.2 13.3 5.2 13.6 5.4L13.5 6.4H13.4C13.0991 6.21323 12.754 6.1097 12.4 6.1C11.9 6.1 11.7 6.4 11.7 6.6C11.7 6.8 11.9 6.9 12.4 7.1C13.1 7.5 13.4 7.9 13.4 8.4C13.4 9.4 12.6 10.1 11.2 10.1C10.6 10.1 10.1 9.9 9.8 9.8L10 8.8H10.1C10.5 9 10.8 9.1 11.3 9.1C11.7 9.1 12.1 8.9 12.1 8.6C12.1 8.4 11.9 8.3 11.4 8C10.9 7.8 10.3 7.4 10.3 6.7C10.3 5.8 11.3 5.2 12.5 5.2ZM16 5.2H17L18 10H16.8L16.6 9.3H15L14.7 10H13.4L15.3 5.6C15.4 5.3 15.6 5.3 16 5.3V5.2ZM9.8 5.2H8.5L7.7 10H9L9.8 5.2ZM5.3 8.5L5.2 7.8L4.7 5.6C4.7 5.3 4.4 5.3 4.1 5.2H2.1V5.3L3.3 5.8L3.4 6L4.5 10H6L8 5.3H6.7L5.4 8.5H5.3Z"
+                      fill="#1A1A1A"
+                    />
+                  </Svg>
+                )}
+                <View>
+                  <Text className="text-[#1A1A1A] font-bold text-sm">
+                    **** {card.last4}
+                  </Text>
+                  <Text className="text-[#4B5563] text-[13px] font-bold">
+                    {card.id === defaultCardId ? "Default card" : "Saved card"}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+        </View>
+      )}
 
       <TouchableOpacity
         onPress={() => {
@@ -293,7 +282,7 @@ export default function DepositScreen() {
 
             <InfoRow
               label="Bank Acct Number"
-              value="Paystack7374w88q8w"
+              value={wallet?.accountNumber || "Generating..."}
               icon={
                 <MaterialCommunityIcons
                   name="pound"
@@ -301,20 +290,20 @@ export default function DepositScreen() {
                   color="#155D5F"
                 />
               }
-              showCopy
+              showCopy={!!wallet?.accountNumber}
             />
             <InfoRow
               label="Bank"
-              value="Palmpay"
+              value={wallet?.bankName || "N/A"}
               icon={
                 <MaterialCommunityIcons name="bank" size={20} color="#155D5F" />
               }
             />
             <InfoRow
               label="Account Name"
-              value="SIMON PETER"
+              value={wallet?.accountName || "N/A"}
               icon={<Ionicons name="person" size={20} color="#155D5F" />}
-              showCopy
+              showCopy={!!wallet?.accountName}
             />
 
             <ThemedButton
@@ -359,7 +348,12 @@ export default function DepositScreen() {
             className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
             keyboardType="numeric"
             value={cardNumber}
-            onChangeText={setCardNumber}
+            onChangeText={(text) => {
+              const cleaned = text.replace(/\D/g, "");
+              const formatted = cleaned.match(/.{1,4}/g)?.join(" ") || cleaned;
+              setCardNumber(formatted.substring(0, 19));
+            }}
+            maxLength={19}
           />
         </View>
 
@@ -369,11 +363,20 @@ export default function DepositScreen() {
               Expiry Date
             </Text>
             <TextInput
-              placeholder="MM / YY"
+              placeholder="MM/YY"
               placeholderTextColor="#9CA3AF"
               className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
+              keyboardType="numeric"
               value={expiryDate}
-              onChangeText={setExpiryDate}
+              onChangeText={(text) => {
+                const cleaned = text.replace(/\D/g, "");
+                if (cleaned.length >= 3) {
+                  setExpiryDate(`${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}`);
+                } else {
+                  setExpiryDate(cleaned);
+                }
+              }}
+              maxLength={5}
             />
           </View>
           <View className="flex-1">
@@ -385,7 +388,8 @@ export default function DepositScreen() {
               keyboardType="numeric"
               secureTextEntry
               value={cvv}
-              onChangeText={setCvv}
+              onChangeText={(text) => setCvv(text.replace(/\D/g, "").substring(0, 4))}
+              maxLength={4}
             />
           </View>
         </View>
@@ -400,6 +404,7 @@ export default function DepositScreen() {
             className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
             value={nameOnCard}
             onChangeText={setNameOnCard}
+            autoCapitalize="words"
           />
         </View>
 
@@ -412,14 +417,15 @@ export default function DepositScreen() {
             keyboardType="numeric"
             secureTextEntry
             value={pin}
-            onChangeText={setPin}
+            onChangeText={(text) => setPin(text.replace(/\D/g, "").substring(0, 4))}
+            maxLength={4}
           />
         </View>
       </View>
 
       {(() => {
         const isFormValid =
-          amount && cardNumber && expiryDate && cvv && nameOnCard && pin;
+          amount && cardNumber.length >= 16 && expiryDate.length === 5 && cvv.length >= 3 && nameOnCard && pin.length >= 4;
         return (
           <ThemedButton
             title="Confirm"
@@ -494,7 +500,7 @@ export default function DepositScreen() {
               Account No.
             </Text>
             <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              8736123335
+              {wallet?.accountNumber || "N/A"}
             </Text>
           </View>
         </View>
@@ -505,14 +511,14 @@ export default function DepositScreen() {
               Account Name
             </Text>
             <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              Simon Peter
+              {wallet?.accountName || "N/A"}
             </Text>
           </View>
           <View className="items-end">
             <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
               Bank Name
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">Opay</Text>
+            <Text className="text-[#1A1A1A] font-bold text-[16px]">{wallet?.bankName || "N/A"}</Text>
           </View>
         </View>
 
@@ -558,11 +564,21 @@ export default function DepositScreen() {
       <StatusBar style="dark" />
       <Header title={getTitle()} onBack={handleBack} />
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {step === "select-method" && renderSelectMethod()}
-        {step === "use-card" && renderUseCard()}
-        {step === "preview" && renderPreview()}
-      </ScrollView>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          className="flex-1"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 40 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {step === "select-method" && renderSelectMethod()}
+          {step === "use-card" && renderUseCard()}
+          {step === "preview" && renderPreview()}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <Modal visible={showSuccess} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-10">

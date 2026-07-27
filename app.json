@@ -13,7 +13,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Wealthconomy needs access to your photo library so you can select and upload profile photos and KYC verification documents.",
+        "NSCameraUsageDescription": "Wealthconomy needs access to your camera so you can take profile photos and capture identification documents for secure KYC verification."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +26,12 @@
         "backgroundImage": "./assets/images/icon.png",
         "monochromeImage": "./assets/images/icon.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -30,7 +39,14 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Wealthconomy needs access to your photo library so you can select and upload profile photos and KYC verification documents.",
+          "cameraPermission": "Wealthconomy needs access to your camera so you can take profile photos and capture identification documents for secure KYC verification."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

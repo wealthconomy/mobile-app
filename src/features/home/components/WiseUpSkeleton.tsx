@@ -1,11 +1,11 @@
 import { View } from "react-native";
-import Skeleton from "../../../components/common/Skeleton";
+import { Skeleton } from "@/src/components/common/skeletons";
 
 export const WiseUpSkeleton = () => {
   return (
     <View className="flex-row">
       {[1, 2, 3].map((i) => (
-        <View key={i} className="mr-4" style={{ width: 170, height: 162 }}>
+        <View key={i} className="mr-4" style={{ width: 170 }}>
           <Skeleton
             width={169}
             height={107}

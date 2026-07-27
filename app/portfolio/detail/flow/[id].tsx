@@ -3,7 +3,7 @@ import { ThemedButton } from "@/src/components/ThemedButton";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Image,
   ScrollView,
@@ -13,86 +13,18 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
 
 const THEME_BLUE = "#D5EDFF";
 const TEAL = "#0B575B";
 
-interface AutoPlan {
-  id: string;
-  title: string;
-  subtitle: string;
-  category: string;
-  amount: string;
-  saved: string;
-  progress: number;
-  daysLeft: number;
-  endDate: string;
-  automationFrequency: string;
-  source: string;
-  wealthGrowth: string;
-  wealthGrowsInto: string;
-  progressiveAmount: string;
-}
-
-const autoService = {
-  getPlans: async (): Promise<AutoPlan[]> => {
-    const base = {
-      automationFrequency: "Daily",
-      source: "WinUp",
-      wealthGrowth: "₦2,463.00",
-      wealthGrowsInto: "WinUp",
-      endDate: "24th Dec 2026",
-      category: "Investment",
-      progressiveAmount: "₦50,000.00",
-    };
-    return [
-      {
-        ...base,
-        id: "auto-1",
-        title: "Investment",
-        subtitle: "Daily(₦5,000)",
-        amount: "50,373.28",
-        saved: "20,149.31",
-        progress: 0.4,
-        daysLeft: 70,
-      },
-      {
-        ...base,
-        id: "auto-2",
-        title: "Investment",
-        subtitle: "Daily(₦5,000)",
-        amount: "50,373.28",
-        saved: "46,343.42",
-        progress: 0.92,
-        daysLeft: 7,
-      },
-      {
-        ...base,
-        id: "auto-c1",
-        title: "Investment",
-        subtitle: "Daily(₦5,000)",
-        amount: "143,736.00",
-        saved: "143,736.00",
-        progress: 1.0,
-        daysLeft: 0,
-        endDate: "24th Dec 2024",
-      },
-    ];
-  },
-};
-
 export default function FlowDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [plan, setPlan] = useState<AutoPlan | null>(null);
-  const [loading, setLoading] = useState(true);
   const [showTerminateModal, setShowTerminateModal] = useState(false);
 
-  useEffect(() => {
-    autoService.getPlans().then((plans) => {
-      setPlan(plans.find((p) => p.id === id) || null);
-      setLoading(false);
-    });
-  }, [id]);
+  const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthflow" });
+  const allPlans = data?.items || [];
+  const plan = allPlans.find((p) => p.id === id);
 
   if (loading) {
     return (
@@ -125,8 +57,30 @@ export default function FlowDetailScreen() {
     );
   }
 
-  const isCompleted = plan.progress >= 1.0;
-  const progressPct = Math.round((plan.progress || 0) * 100);
+  const isCompleted = plan.status === "COMPLETED" || parseFloat(plan.balance) >= parseFloat(plan.targetAmount);
+
+  const progress = parseFloat(plan.targetAmount) > 0 ? parseFloat(plan.balance) / parseFloat(plan.targetAmount) : 0;
+  const progressPct = Math.round(Math.min(progress * 100, 100));
+
+  const getDaysLeft = () => {
+    const end = new Date(plan.maturityDate).getTime();
+    const now = new Date().getTime();
+    const diff = end - now;
+    if (diff <= 0) return 0;
+    return Math.ceil(diff / (1000 * 3600 * 24));
+  };
+  
+  const formattedDate = new Date(plan.maturityDate).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+
+  const formatAmount = (val?: string) => {
+    if (!val) return "0.00";
+    const amountNum = parseFloat(val) / 100;
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
 
   const handleTerminate = () => {
     setShowTerminateModal(false);
@@ -153,16 +107,16 @@ export default function FlowDetailScreen() {
               marginBottom: 4,
             }}
           >
-            {plan.title}
+            {plan.name}
           </Text>
           <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 16 }}>
-            {plan.subtitle}
+            {plan.metadata?.category || "Flow"}
           </Text>
           <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 28 }}>
-            ₦{plan.saved}
+            ₦{formatAmount(plan.balance)}
           </Text>
           <Text style={{ color: "#9CA3AF", fontSize: 11, marginTop: 2 }}>
-            of ₦{plan.amount} target
+            of ₦{formatAmount(plan.targetAmount)} target
           </Text>
         </View>
         <Image
@@ -202,7 +156,7 @@ export default function FlowDetailScreen() {
             {progressPct}%
           </Text>
           <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
-            {plan.daysLeft} days Left
+            {getDaysLeft()} days Left
           </Text>
         </View>
       </View>
@@ -267,11 +221,11 @@ export default function FlowDetailScreen() {
         <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>WealthFlow</Text>{" "}
         plan for{" "}
         <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-          {plan.title}
+          {plan.name}
         </Text>{" "}
         has been successfully sent into your Wealth Save account.{"\n"}
         Current Wealth Save Balance:{" "}
-        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>₦XX,XXX.XX</Text>
+        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>₦{formatAmount(plan.balance)}</Text>
       </Text>
     </View>
   );
@@ -305,11 +259,11 @@ export default function FlowDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Title</Text>
-                <Text style={styles.value}>{plan.title}</Text>
+                <Text style={styles.value}>{plan.name}</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Target Amount</Text>
-                <Text style={styles.value}>₦{plan.amount}</Text>
+                <Text style={styles.value}>₦{formatAmount(plan.targetAmount)}</Text>
               </View>
             </View>
 
@@ -323,11 +277,11 @@ export default function FlowDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Wealth Growth</Text>
-                <Text style={styles.value}>{plan.wealthGrowth}</Text>
+                <Text style={styles.value}>₦0.00</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Progressive Amount</Text>
-                <Text style={styles.value}>{plan.progressiveAmount}</Text>
+                <Text style={styles.value}>₦0.00</Text>
               </View>
             </View>
 
@@ -341,11 +295,11 @@ export default function FlowDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Frequency</Text>
-                <Text style={styles.value}>{plan.automationFrequency}</Text>
+                <Text style={styles.value}>{plan.metadata?.autoSaveFrequency || "Daily"}</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>End Date</Text>
-                <Text style={styles.value}>{plan.endDate}</Text>
+                <Text style={styles.value}>{formattedDate}</Text>
               </View>
             </View>
 
@@ -363,7 +317,7 @@ export default function FlowDetailScreen() {
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Wealth from</Text>
-                <Text style={styles.value}>{plan.source}</Text>
+                <Text style={styles.value}>WealthFlex</Text>
               </View>
             </View>
 
@@ -492,7 +446,7 @@ export default function FlowDetailScreen() {
             >
               You are about to close the{" "}
               <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-                {plan.title}
+                {plan.name}
               </Text>{" "}
               portfolio. This fund was created to secure a future legacy.
               {"\n\n"}

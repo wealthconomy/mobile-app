@@ -57,22 +57,33 @@ const TransferMoneyIcon = () => (
   </Svg>
 );
 
+import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
+import { useGetWalletTransactionsQuery } from "@/src/store/api/walletApi";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
+import { WalletTransaction } from "@/src/types/wallet";
 
 export default function WealthFlexScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [showTips, setShowTips] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const amount = "₦300,735.42";
+  
+  const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthflex", limit: 1 });
+  const flexPortfolio = data?.items?.[0];
+
+  const { data: txData } = useGetWalletTransactionsQuery({ limit: 3 });
+  const transactions = txData?.items || [];
+
+  const formatAmount = (val?: string) => {
+    if (!val) return "0.00";
+    const amountNum = parseFloat(val) / 100; // kobo to naira
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
+
+  const amount = `₦${formatAmount(flexPortfolio?.balance)}`;
+  
   const portfolioPreference = useSelector(
     (state: RootState) => state.portfolioPreference.flex
   );
   const showInterest = portfolioPreference !== "Impact Wealth";
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(timer);
-  }, []);
 
   if (loading) {
     return (
@@ -343,27 +354,11 @@ export default function WealthFlexScreen() {
               gap: 10,
             }}
           >
-            <TransactionItem
-              title="Card Deposit - Simon Peter"
-              date="April 12, 2023"
-              amount="-N68,000.00"
-              status="Successful"
-              type="deposit"
-            />
-            <TransactionItem
-              title="Received from Oluwatope"
-              date="April 12, 2023"
-              amount="+₦68,000.00"
-              status="Successful"
-              type="received"
-            />
-            <TransactionItem
-              title="Transfer to Wealth Save"
-              date="April 12, 2023"
-              amount="-N68,000.00"
-              status="Successful"
-              type="transfer"
-            />
+            {transactions.length === 0 ? (
+              <Text className="text-center text-gray-500 py-4">No transactions found</Text>
+            ) : (
+              transactions.map((tx) => <TransactionItem key={tx.id} item={tx} />)
+            )}
           </View>
         </View>
       </ScrollView>
@@ -371,18 +366,42 @@ export default function WealthFlexScreen() {
   );
 }
 
-function TransactionItem({ title, date, amount, status, type }: any) {
-  const isCredit = amount.includes("+");
+function TransactionItem({ item }: { item: WalletTransaction }) {
+  const isCredit = item.type === "CREDIT";
 
   const getIcon = () => {
-    if (type === "deposit") return <CardDepositIcon />;
-    if (type === "received") return <ReceivedMoneyIcon />;
-    return <TransferMoneyIcon />;
+    switch (item.reason) {
+      case "WALLET_TOPUP": return <CardDepositIcon />;
+      case "WITHDRAWAL": return <TransferMoneyIcon />;
+      default: return isCredit ? <ReceivedMoneyIcon /> : <TransferMoneyIcon />;
+    }
   };
 
   const getIconBg = () => {
-    if (type === "deposit") return "bg-[#FFF5F5]";
+    if (item.reason === "WALLET_TOPUP") return "bg-[#FFF5F5]";
     return "bg-transparent"; // Handled by SVG rect for others
+  };
+
+  const formatAmount = (val: string) => {
+    if (!val) return "0.00";
+    const amountNum = parseFloat(val) / 100;
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
+
+  const formattedDate = new Date(item.createdAt).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+
+  const getTitle = () => {
+    if (item.description) return item.description;
+    switch (item.reason) {
+      case "WALLET_TOPUP": return "Wallet Topup";
+      case "WITHDRAWAL": return "Withdrawal";
+      case "REFERRAL_CREDIT": return "Referral Bonus";
+      default: return item.reason;
+    }
   };
 
   return (
@@ -397,7 +416,7 @@ function TransactionItem({ title, date, amount, status, type }: any) {
         alignItems: "center",
       }}
       activeOpacity={0.9}
-      onPress={() => router.push("/transactions/detail")}
+      onPress={() => router.push({ pathname: "/transactions/detail", params: { id: item.id } } as any)}
     >
       <View
         className={`w-11 h-11 items-center justify-center mr-3 ${getIconBg()} rounded-full`}
@@ -409,18 +428,18 @@ function TransactionItem({ title, date, amount, status, type }: any) {
           className="text-[#1A1A1A] font-bold text-[13px] mb-1"
           numberOfLines={1}
         >
-          {title}
+          {getTitle()}
         </Text>
-        <Text className="text-[#9CA3AF] text-[10px] font-medium">{date}</Text>
+        <Text className="text-[#9CA3AF] text-[10px] font-medium">{formattedDate}</Text>
       </View>
       <View className="items-end">
         <Text
           className={`font-bold text-[13px] mb-1.5 ${isCredit ? "text-[#4CAF50]" : "text-[#1A1A1A]"}`}
         >
-          {amount}
+          {isCredit ? "+" : "-"}₦{formatAmount(item.amount)}
         </Text>
         <View className="bg-[#E7F5F5] px-2 py-0.5 rounded-md">
-          <Text className="text-[#155D5F] text-[9px] font-bold">{status}</Text>
+          <Text className="text-[#155D5F] text-[9px] font-bold">Success</Text>
         </View>
       </View>
     </TouchableOpacity>

@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import React from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useSelector } from "react-redux";
+import { useGetKycDocumentsQuery } from "@/src/store/api/kycApi";
 
 interface TodoCardProps {
   title: string;
@@ -58,9 +59,16 @@ const TodoCard = ({
 
 export const TodoSection = () => {
   const user = useSelector((state: RootState) => state.auth.user);
+  const { data: kycDocsResponse } = useGetKycDocumentsQuery();
+
+  const isLevel2Complete =
+    (user?.kycLevel !== undefined && user.kycLevel >= 2) ||
+    kycDocsResponse?.data?.faceVerified === true;
+
+  const currentKycLevel = Math.max(user?.kycLevel || 1, isLevel2Complete ? 2 : 1);
 
   const userState = {
-    kycLevel: user?.kycLevel || 1,
+    kycLevel: currentKycLevel,
     isEmailVerified: true,
     hasFirstGoal: false,
     hasJoinedTribe: false,

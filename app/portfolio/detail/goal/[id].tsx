@@ -5,7 +5,7 @@ import { PortfolioDetailSkeleton } from "@/src/features/home/components/Dashboar
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Image,
   ScrollView,
@@ -15,172 +15,18 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-// Re-defining interface for local use
-export interface WealthGoal {
-  id: string;
-  title: string;
-  subtitle: string;
-  amount: string;
-  saved: string;
-  progress: number;
-  daysLeft: number;
-  endDate: string;
-  hasUpdate?: boolean;
-  isCompleted?: boolean;
-  automationFrequency: "Daily" | "Weekly" | "Monthly" | "Manual" | "One-time";
-  source: string;
-  progressiveAmount?: string;
-}
-
-// Minimal in-memory service for the detail page
-const goalService = {
-  getGoals: async (): Promise<WealthGoal[]> => {
-    // Including same mocks for detail lookup
-    const mockActive: WealthGoal[] = [
-      {
-        id: "mock-1",
-        title: "Buy a Mac",
-        subtitle: "Business",
-        amount: "1,500,000.00",
-        saved: "250,500.00",
-        progress: 0.16,
-        daysLeft: 120,
-        endDate: "24th July 2026",
-        automationFrequency: "Monthly",
-        source: "Wealth Flex",
-      },
-      {
-        id: "mock-3",
-        title: "New Laptop",
-        subtitle: "Education",
-        amount: "500,000.00",
-        saved: "350,000.00",
-        progress: 0.7,
-        daysLeft: 45,
-        endDate: "15th May 2026",
-        automationFrequency: "Weekly",
-        source: "Bank Account",
-        progressiveAmount: "₦50,000.00",
-      },
-      {
-        id: "mock-4",
-        title: "Emergency Fund",
-        subtitle: "Savings",
-        amount: "2,000,000.00",
-        saved: "1,200,000.00",
-        progress: 0.6,
-        daysLeft: 200,
-        endDate: "30th Oct 2026",
-        automationFrequency: "Monthly",
-        source: "Wealth Save",
-      },
-      {
-        id: "mock-5",
-        title: "Wedding Prep",
-        subtitle: "Personal",
-        amount: "5,000,000.00",
-        saved: "500,000.00",
-        progress: 0.1,
-        daysLeft: 300,
-        endDate: "12th Feb 2027",
-        automationFrequency: "Monthly",
-        source: "Wealth Flex",
-      },
-      {
-        id: "mock-6",
-        title: "Car Downpayment",
-        subtitle: "Personal",
-        amount: "3,000,000.00",
-        saved: "1,500,000.00",
-        progress: 0.5,
-        daysLeft: 90,
-        endDate: "30th June 2026",
-        automationFrequency: "Monthly",
-        source: "Wealth Save",
-      },
-    ];
-    const mockCompleted: WealthGoal[] = [
-      {
-        id: "mock-2",
-        title: "Summer Vacation",
-        subtitle: "Vacation",
-        amount: "800,000.00",
-        saved: "800,000.00",
-        progress: 1,
-        daysLeft: 0,
-        endDate: "12th Dec 2025",
-        automationFrequency: "Monthly",
-        source: "Wealth Save",
-        isCompleted: true,
-      },
-      {
-        id: "mock-7",
-        title: "Rent 2025",
-        subtitle: "Rent",
-        amount: "1,200,000.00",
-        saved: "1,200,000.00",
-        progress: 1,
-        daysLeft: 0,
-        endDate: "1st Jan 2025",
-        automationFrequency: "Monthly",
-        source: "Wealth Flex",
-        isCompleted: true,
-      },
-      {
-        id: "mock-8",
-        title: "Side Project",
-        subtitle: "Business",
-        amount: "200,000.00",
-        saved: "200,000.00",
-        progress: 1,
-        daysLeft: 0,
-        endDate: "15th Nov 2024",
-        automationFrequency: "One-time",
-        source: "Wealth Save",
-        isCompleted: true,
-      },
-      {
-        id: "mock-9",
-        title: "Courses",
-        subtitle: "Education",
-        amount: "50,000.00",
-        saved: "50,000.00",
-        progress: 1,
-        daysLeft: 0,
-        endDate: "10th Oct 2024",
-        automationFrequency: "Daily",
-        progressiveAmount: "₦50,000.00",
-        source: "Wealth Flex",
-        isCompleted: true,
-      },
-    ];
-    // Apply dummy progressiveAmount to all mocks
-    return [...mockActive, ...mockCompleted].map((g) => ({
-      ...g,
-      progressiveAmount: "₦50,000.00",
-    }));
-  },
-};
+import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
 
 export default function GoalDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [goal, setGoal] = useState<WealthGoal | null>(null);
-  const [loading, setLoading] = useState(true);
   const [showTerminateModal, setShowTerminateModal] = useState(false);
+
+  const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthgoal" });
+  const allGoals = data?.items || [];
+  const goal = allGoals.find((g) => g.id === id);
 
   const PINK = "#FA85C0";
   const TEAL = "#0B575B";
-
-  useEffect(() => {
-    const loadGoal = async () => {
-      const allGoals = await goalService.getGoals();
-      const found = allGoals.find((g) => g.id === id);
-      setGoal(found || null);
-      setLoading(false);
-    };
-    loadGoal();
-  }, [id]);
 
   if (loading) {
     return (
@@ -218,7 +64,29 @@ export default function GoalDetailScreen() {
     );
   }
 
-  const isCompleted = goal.isCompleted;
+  const isCompleted = goal.status === "COMPLETED" || parseFloat(goal.balance) >= parseFloat(goal.targetAmount);
+  
+  const progress = parseFloat(goal.targetAmount) > 0 ? parseFloat(goal.balance) / parseFloat(goal.targetAmount) : 0;
+  
+  const getDaysLeft = () => {
+    const end = new Date(goal.maturityDate).getTime();
+    const now = new Date().getTime();
+    const diff = end - now;
+    if (diff <= 0) return 0;
+    return Math.ceil(diff / (1000 * 3600 * 24));
+  };
+  
+  const formattedDate = new Date(goal.maturityDate).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+
+  const formatAmount = (val?: string) => {
+    if (!val) return "0.00";
+    const amountNum = parseFloat(val) / 100;
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
 
   const handleTerminate = () => {
     setShowTerminateModal(false);
@@ -244,13 +112,13 @@ export default function GoalDetailScreen() {
               marginBottom: 4,
             }}
           >
-            {goal.title}
+            {goal.name}
           </Text>
           <Text style={{ color: "#6B7280", fontSize: 14, marginBottom: 16 }}>
-            {goal.subtitle}
+            {goal.metadata?.category || "Goal"}
           </Text>
           <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 28 }}>
-            ₦{goal.saved}
+            ₦{formatAmount(goal.balance)}
           </Text>
         </View>
         <Image
@@ -272,7 +140,7 @@ export default function GoalDetailScreen() {
         >
           <View
             style={{
-              width: `${Math.max(goal.progress * 100, 2)}%`,
+              width: `${Math.max(Math.min(progress * 100, 100), 2)}%`,
               height: 10,
               borderRadius: 20,
               backgroundColor: PINK,
@@ -287,10 +155,10 @@ export default function GoalDetailScreen() {
           }}
         >
           <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
-            {Math.round(goal.progress * 100)}%
+            {Math.round(Math.min(progress * 100, 100))}%
           </Text>
           <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
-            {goal.daysLeft} days Left
+            {getDaysLeft()} days Left
           </Text>
         </View>
       </View>
@@ -356,17 +224,12 @@ export default function GoalDetailScreen() {
         </Text>
         , your{" "}
         <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-          "₦{goal.amount}"
+          "₦{formatAmount(goal.targetAmount)}"
         </Text>{" "}
-        has been deposited into your Wealth Save account by {goal.endDate}.
+        has been deposited into your Wealth Save account by {formattedDate}.
       </Text>
     </View>
   );
-
-  const formatAmount = (val: string | number) => {
-    if (!val) return "0.00";
-    return val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "white" }} edges={["top"]}>
@@ -398,11 +261,11 @@ export default function GoalDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Target Amount</Text>
-                <Text style={styles.value}>₦{formatAmount(goal.amount)}</Text>
+                <Text style={styles.value}>₦{formatAmount(goal.targetAmount)}</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Category</Text>
-                <Text style={styles.value}>{goal.subtitle}</Text>
+                <Text style={styles.value}>{goal.metadata?.category || "Goal"}</Text>
               </View>
             </View>
 
@@ -416,11 +279,11 @@ export default function GoalDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Wealth Growth</Text>
-                <Text style={styles.value}>₦2,463,00</Text>
+                <Text style={styles.value}>₦0.00</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Progressive Amount</Text>
-                <Text style={styles.value}>{goal.progressiveAmount}</Text>
+                <Text style={styles.value}>₦0.00</Text>
               </View>
             </View>
 
@@ -434,11 +297,11 @@ export default function GoalDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Funding Source</Text>
-                <Text style={styles.value}>{goal.source || "WinUp"}</Text>
+                <Text style={styles.value}>Wealth Flex</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>End Date</Text>
-                <Text style={styles.value}>{goal.endDate}</Text>
+                <Text style={styles.value}>{formattedDate}</Text>
               </View>
             </View>
 
@@ -453,15 +316,13 @@ export default function GoalDetailScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Automation Frequency</Text>
                 <Text style={styles.value}>
-                  {goal.automationFrequency || "Monthly"}
+                  {goal.metadata?.autoSaveFrequency || "Monthly"}
                 </Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Method</Text>
                 <Text style={styles.value}>
-                  {goal.automationFrequency === "Manual"
-                    ? "Manual"
-                    : "Automation"}
+                  {goal.metadata?.autoSave ? "Automation" : "Manual"}
                 </Text>
               </View>
             </View>
@@ -591,7 +452,7 @@ export default function GoalDetailScreen() {
             >
               You are about to close the{" "}
               <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-                {goal.title}
+                {goal.name}
               </Text>{" "}
               portfolio. This fund was created to secure a future legacy.
               {"\n\n"}
@@ -652,20 +513,6 @@ export default function GoalDetailScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  label: {
-    color: "#6B7280",
-    fontSize: 11,
-    marginBottom: 6,
-    fontWeight: "500",
-  },
-  value: {
-    color: "#1A1A1A",
-    fontWeight: "700",
-    fontSize: 16,
-  },
-});
 
 function ActivityItem({ title, date, amount, type, isSuccess }: any) {
   const color = isSuccess || type === "deposit" ? "#4CAF50" : "#F3007A";

@@ -13,63 +13,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path, Rect } from "react-native-svg";
+import { useGetWalletTransactionsQuery } from "@/src/store/api/walletApi";
+import { WalletTransaction } from "@/src/types/wallet";
+import { InfiniteScrollList } from "@/src/components/common/ui/InfiniteScrollList";
 
-const ACTIVITIES = [
-  {
-    id: "1",
-    type: "Card Deposit - Simon Peter",
-    date: "April 12, 2023",
-    amount: "68,000.00",
-    status: "Successful",
-    category: "deposit",
-    isCredit: false,
-  },
-  {
-    id: "2",
-    type: "Received from Oluwatope",
-    date: "April 12, 2023",
-    amount: "68,000.00",
-    status: "Successful",
-    category: "received",
-    isCredit: true,
-  },
-  {
-    id: "3",
-    type: "Transfer to Wealth Save",
-    date: "April 12, 2023",
-    amount: "68,000.00",
-    status: "Successful",
-    category: "transfer",
-    isCredit: false,
-  },
-  {
-    id: "4",
-    type: "Transfer to Olaniyi",
-    date: "April 12, 2023",
-    amount: "68,000.00",
-    status: "Failed",
-    category: "transfer",
-    isCredit: false,
-  },
-  {
-    id: "5",
-    type: "Received from Oluwatope",
-    date: "April 12, 2023",
-    amount: "68,000.00",
-    status: "Pending",
-    category: "received",
-    isCredit: true,
-  },
-  {
-    id: "6",
-    type: "Card Deposit - John Doe",
-    date: "April 11, 2023",
-    amount: "15,000.00",
-    status: "Successful",
-    category: "deposit",
-    isCredit: false,
-  },
-];
 
 const MONTHS = [
   "January",
@@ -126,6 +73,19 @@ export default function FlexTransactionsScreen() {
   const [date, setDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
   const [viewDate, setViewDate] = useState(new Date());
+  
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const { data, isLoading, isFetching } = useGetWalletTransactionsQuery({ limit: 20, after: cursor });
+
+  const transactions = data?.items || [];
+  const hasNextPage = data?.hasNext ?? false;
+  const nextCursor = data?.nextCursor;
+
+  const loadMore = () => {
+    if (hasNextPage && nextCursor && !isFetching) {
+      setCursor(nextCursor);
+    }
+  };
 
   const isToday = (d: Date) => {
     const today = new Date();
@@ -229,12 +189,16 @@ export default function FlexTransactionsScreen() {
           className="flex-1 mx-2.5 mb-4 bg-[#F6F6F6] rounded-[20px] p-[10px]"
           style={{ width: 383, alignSelf: "center" }}
         >
-          <FlatList
-            data={ACTIVITIES}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <FlexTransactionItem item={item} />}
+          <InfiniteScrollList
+            data={transactions}
+            keyExtractor={(item: WalletTransaction) => item.id}
+            renderItem={({ item }) => <FlexTransactionItem item={item as WalletTransaction} />}
             ItemSeparatorComponent={() => <View className="h-[10px]" />}
             showsVerticalScrollIndicator={false}
+            isFetchingNextPage={isFetching && !!cursor}
+            hasNextPage={hasNextPage}
+            fetchNextPage={loadMore}
+            isLoadingInitial={isLoading}
             contentContainerStyle={{ paddingBottom: 40 }}
           />
         </View>
@@ -301,16 +265,42 @@ export default function FlexTransactionsScreen() {
   );
 }
 
-function FlexTransactionItem({ item }: any) {
+function FlexTransactionItem({ item }: { item: WalletTransaction }) {
+  const isCredit = item.type === "CREDIT";
+
   const getIcon = () => {
-    if (item.category === "deposit") return <CardDepositIcon />;
-    if (item.category === "received") return <ReceivedMoneyIcon />;
-    return <TransferMoneyIcon />;
+    switch (item.reason) {
+      case "WALLET_TOPUP": return <CardDepositIcon />;
+      case "WITHDRAWAL": return <TransferMoneyIcon />;
+      default: return isCredit ? <ReceivedMoneyIcon /> : <TransferMoneyIcon />;
+    }
   };
 
   const getIconBg = () => {
-    if (item.category === "deposit") return "bg-[#FFF5F5]";
+    if (item.reason === "WALLET_TOPUP") return "bg-[#FFF5F5]";
     return "bg-transparent"; // Handled by SVG rect for others
+  };
+
+  const formatAmount = (val: string) => {
+    if (!val) return "0.00";
+    const amountNum = parseFloat(val) / 100;
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
+
+  const formattedDate = new Date(item.createdAt).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+
+  const getTitle = () => {
+    if (item.description) return item.description;
+    switch (item.reason) {
+      case "WALLET_TOPUP": return "Wallet Topup";
+      case "WITHDRAWAL": return "Withdrawal";
+      case "REFERRAL_CREDIT": return "Referral Bonus";
+      default: return item.reason;
+    }
   };
 
   return (
@@ -325,7 +315,7 @@ function FlexTransactionItem({ item }: any) {
         alignItems: "center",
       }}
       activeOpacity={0.9}
-      onPress={() => router.push("/transactions/detail")}
+      onPress={() => router.push({ pathname: "/transactions/detail", params: { id: item.id } } as any)}
     >
       <View
         className={`w-11 h-11 items-center justify-center mr-3 ${getIconBg()} rounded-full`}
@@ -337,21 +327,21 @@ function FlexTransactionItem({ item }: any) {
           className="text-[#1A1A1A] font-bold text-[13px] mb-1"
           numberOfLines={1}
         >
-          {item.type}
+          {getTitle()}
         </Text>
         <Text className="text-[#9CA3AF] text-[10px] font-medium">
-          {item.date}
+          {formattedDate}
         </Text>
       </View>
       <View className="items-end">
         <Text
-          className={`font-bold text-[13px] mb-1.5 ${item.isCredit ? "text-[#4CAF50]" : "text-[#1A1A1A]"}`}
+          className={`font-bold text-[13px] mb-1.5 ${isCredit ? "text-[#4CAF50]" : "text-[#1A1A1A]"}`}
         >
-          {item.isCredit ? "+" : "-"}₦{item.amount}
+          {isCredit ? "+" : "-"}₦{formatAmount(item.amount)}
         </Text>
         <View className="bg-[#E7F5F5] px-2 py-0.5 rounded-md">
           <Text className="text-[#155D5F] text-[9px] font-bold">
-            {item.status}
+            Success
           </Text>
         </View>
       </View>

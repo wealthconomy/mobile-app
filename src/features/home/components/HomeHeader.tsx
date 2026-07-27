@@ -1,8 +1,10 @@
 import { useRouter } from "expo-router";
+import { useMemo } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../store";
+import { useListNotificationsQuery } from "../../../store/api/notificationApi";
 
 export const NotificationIcon = () => (
   <Svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -25,7 +27,14 @@ export const CustomerSupportIcon = () => (
 export const HomeHeader = () => {
   const router = useRouter();
   const { user } = useSelector((state: RootState) => state.auth);
-  const notificationCount = 3;
+  const { data: notificationsData } = useListNotificationsQuery({ limit: 20 });
+  const notificationCount = useMemo(() => {
+    const items =
+      notificationsData?.data?.items ||
+      (notificationsData as any)?.items ||
+      [];
+    return items.filter((item: any) => !item.isRead).length;
+  }, [notificationsData]);
 
   return (
     <View className="flex-row justify-between items-center mb-5 ml-[10px]">

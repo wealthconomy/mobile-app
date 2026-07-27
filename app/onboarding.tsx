@@ -151,15 +151,6 @@ export default function OnboardingScreen() {
     router.replace("/(auth)/login");
   };
 
-  const handleSkipToHome = () => {
-    dispatch(completeOnboarding());
-    // Directly set mock credentials to bypass login
-    dispatch(
-      setCredentials({ user: { name: "Developer Mode" }, token: "dev-token" }),
-    );
-    router.replace("/(tabs)");
-  };
-
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
     setCurrentIndex(index);
@@ -204,25 +195,6 @@ export default function OnboardingScreen() {
       >
         <Text style={{ fontWeight: "800" }}>Build Wealth...The Smart Way</Text>
       </Text>
-
-      {/* Skip Button (Temporary for development) */}
-      <TouchableOpacity
-        onPress={handleSkipToHome}
-        style={{
-          position: "absolute",
-          top: sy(55),
-          right: sx(28),
-          zIndex: 100,
-          backgroundColor: "rgba(255,255,255,0.2)",
-          paddingHorizontal: 12,
-          paddingVertical: 6,
-          borderRadius: 20,
-        }}
-      >
-        <Text style={{ color: "#fff", fontWeight: "600", fontSize: sx(13) }}>
-          Skip to Home
-        </Text>
-      </TouchableOpacity>
 
       {/* Next Button */}
       <TouchableOpacity

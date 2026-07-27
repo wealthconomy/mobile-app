@@ -17,7 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
 export default function MembershipRolesScreen() {
-  const { id } = useLocalSearchParams();
+  const id = useLocalSearchParams().id as string;
   const groups = useSelector((state: RootState) => state.wealthGroup.groups);
 
   const group = useMemo(() => {

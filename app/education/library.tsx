@@ -1,8 +1,7 @@
-import { libraryService } from "@/src/api/libraryService";
+import { useGetLibraryMaterialsQuery } from "@/src/store/api/libraryApi";
 import Header from "@/src/components/common/Header";
-import { LibraryItem } from "@/src/features/wise-up/components/LibraryItem";
+import { LibraryItem } from "@/src/features/library/components/LibraryItem";
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { StatusBar } from "expo-status-bar";
@@ -23,10 +22,14 @@ export default function LibraryScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
-  const { data: materials, isLoading } = useQuery({
-    queryKey: ["library-materials"],
-    queryFn: () => libraryService.getMaterials(),
-  });
+  const { data: response, isLoading } = useGetLibraryMaterialsQuery({ publishToApp: true });
+  
+  if (response) {
+    console.log("=== ALL LIBRARY API RESPONSE ===");
+    console.log(JSON.stringify(response, null, 2));
+  }
+
+  const materials = response?.data || [];
 
   const filteredMaterials =
     materials?.filter((material) =>

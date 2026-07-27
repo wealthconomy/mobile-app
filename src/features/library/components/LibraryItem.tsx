@@ -61,7 +61,7 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
           <View className="flex-row items-center justify-between mt-2">
             <View>
               <Text className="text-gray-400 text-xs font-medium">
-                {material.timePosted} • {material.readingDuration}
+                {material.timeAgo || material.timePosted}{material.readingDuration ? ` • ${material.readingDuration}` : ""}
               </Text>
               <View className="flex-row items-center mt-1">
                 <View className="flex-row items-center">
@@ -169,7 +169,7 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
             <View className="flex-row items-center">
               <View>
                 <Text className="text-gray-400 text-xs font-medium">
-                  {material.timePosted} • {material.readingDuration}
+                  {material.timeAgo || material.timePosted}{material.readingDuration ? ` • ${material.readingDuration}` : ""}
                 </Text>
                 <View className="flex-row items-center mt-1">
                   <View className="flex-row items-center mr-3">

@@ -1,6 +1,7 @@
 import Header from "@/src/components/common/Header";
 import { Ionicons } from "@expo/vector-icons";
 import { FileText, MailCheck, Wallet } from "lucide-react-native";
+import React from "react";
 import {
   Image,
   ScrollView,
@@ -11,16 +12,28 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSelector } from "react-redux";
+import { RootState } from "@/src/store";
+import { useGetMyProfileQuery } from "@/src/store/api/userApi";
 
 export default function InviteScreen() {
+  const { user: authUser } = useSelector((state: RootState) => state.auth);
+  const { data: profileResponse } = useGetMyProfileQuery();
+  const activeUser = profileResponse?.data || authUser;
+
   const onShare = async () => {
     try {
-      const result = await Share.share({
-        message:
-          "Join me on Wealthconomy and get ₦5,000! Use my referral link: https://wealthconomy.com/invite/REF123",
+      const referralCode =
+        activeUser?.referralCode ||
+        activeUser?.id?.slice(0, 8)?.toUpperCase() ||
+        "REF123";
+      const referralLink = `https://wealthconomy.org/invite/${referralCode}`;
+
+      await Share.share({
+        message: `Join me on Wealthconomy and get ₦5,000! Use my referral link: ${referralLink}`,
       });
     } catch (error: any) {
-      alert(error.message);
+      // ignore cancelled share
     }
   };
 

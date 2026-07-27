@@ -1,90 +1,148 @@
 import Header from "@/src/components/common/Header";
-import KycIcon from "@/src/components/common/KycIcon";
-import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
-import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { ProfileAvatarSection } from "@/src/features/profile/components/ProfileAvatarSection";
+import { ProfileEditableField } from "@/src/features/profile/components/ProfileEditableField";
+import { useImageUpload } from "@/src/hooks/useImageUpload";
+import { RootState } from "@/src/store";
+import { useGetKycStatusQuery } from "@/src/store/api/kycApi";
 import {
+  useGetMyProfileQuery,
+  useUpdateMyProfileMutation,
+} from "@/src/store/api/userApi";
+import { setCredentials } from "@/src/store/slices/authSlice";
+import { imageService } from "@/src/utils/imageService";
+import * as ImagePicker from "expo-image-picker";
+import { useCallback, useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import {
+  ActivityIndicator,
   Alert,
-  Image,
   ScrollView,
   StatusBar,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useDispatch, useSelector } from "react-redux";
 
 interface ProfileFormData {
   firstName: string;
   lastName: string;
-  dob: string;
   phone: string;
   email: string;
 }
 
+const stripCountryCode = (phone?: string) => {
+  if (!phone) return "";
+  let cleaned = String(phone).replace(/[^0-9]/g, "");
+  if (cleaned.startsWith("234")) {
+    cleaned = cleaned.slice(3);
+  }
+  if (cleaned.startsWith("0")) {
+    cleaned = cleaned.slice(1);
+  }
+  return cleaned;
+};
+
 export default function ProfileScreen() {
+  const dispatch = useDispatch();
   const [isEditing, setIsEditing] = useState(false);
-  const [profileImage, setProfileImage] = useState(
-    "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=200&auto=format&fit=crop",
-  );
+
+  // Redux auth user
+  const {
+    user: authUser,
+    token,
+    refreshToken,
+  } = useSelector((state: RootState) => state.auth);
+
+  // RTK Query API
+  const { data: profileResponse, isLoading: queryLoading } =
+    useGetMyProfileQuery();
+  const { data: kycResponse } = useGetKycStatusQuery();
+  const [updateProfile, { isLoading: updatingProfile }] =
+    useUpdateMyProfileMutation();
+  const { uploadImage, isLoading: uploadingFile } = useImageUpload();
+
+  const activeUser = profileResponse?.data || authUser;
+  const isLoading = queryLoading && !activeUser;
 
   const { control, handleSubmit, reset } = useForm<ProfileFormData>({
     defaultValues: {
-      firstName: "Olabiran",
-      lastName: "Simon",
-      dob: "18 / 12 / 1731",
-      phone: "0901234567890",
-      email: "simon@gmail.com",
+      firstName: "",
+      lastName: "",
+      phone: "",
+      email: "",
     },
   });
 
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission Denied",
-        "We need access to your gallery to change your profile photo.",
-      );
-      return;
-    }
+  // Sync form values whenever user data arrives
+  useEffect(() => {
+    if (activeUser) {
+      const rawPhone =
+        activeUser.phone ||
+        activeUser.phoneNumber ||
+        activeUser.phone_number ||
+        activeUser.mobile ||
+        "";
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
+      reset({
+        firstName: activeUser.firstName || activeUser.name?.split(" ")[0] || "",
+        lastName:
+          activeUser.lastName ||
+          activeUser.name?.split(" ").slice(1).join(" ") ||
+          "",
+        phone: stripCountryCode(rawPhone),
+        email: activeUser.email || "",
+      });
+    }
+  }, [activeUser, reset]);
+
+  const handleProcessPhoto = useCallback(
+    async (fileAsset: ImagePicker.ImagePickerAsset) => {
+      try {
+        const newImageUrl = await uploadImage(fileAsset.uri, {
+          name: fileAsset.fileName || "avatar.jpg",
+          type: fileAsset.mimeType || "image/jpeg",
+        });
+
+        await updateProfile({ imageUrl: newImageUrl }).unwrap();
+        Alert.alert("Success", "Profile photo updated successfully!");
+      } catch {
+        // Fallback: update local credentials if server upload fails during dev
+        if (activeUser && token) {
+          const updatedUser = { ...activeUser, imageUrl: fileAsset.uri };
+          dispatch(
+            setCredentials({
+              user: updatedUser,
+              token,
+              refreshToken: refreshToken || undefined,
+            }),
+          );
+          Alert.alert("Success", "Profile photo updated!");
+        }
+      }
+    },
+    [uploadImage, updateProfile, activeUser, token, refreshToken, dispatch],
+  );
+
+  const pickImage = useCallback(async () => {
+    const result = await imageService.pickImageFromLibrary({ aspect: [1, 1] });
+    if (result) {
+      handleProcessPhoto(result as any);
+    }
+  }, [handleProcessPhoto]);
+
+  const takePhoto = useCallback(async () => {
+    const result = await imageService.captureImageWithCamera({
       aspect: [1, 1],
-      quality: 0.8,
     });
-
-    if (!result.canceled) {
-      setProfileImage(result.assets[0].uri);
+    if (result) {
+      handleProcessPhoto(result as any);
     }
-  };
+  }, [handleProcessPhoto]);
 
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission Denied",
-        "We need access to your camera to take a photo.",
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setProfileImage(result.assets[0].uri);
-    }
-  };
-
-  const handlePhotoUpdate = () => {
+  const handlePhotoUpdate = useCallback(() => {
     Alert.alert(
       "Update Profile Photo",
       "Choose a source for your photo",
@@ -95,147 +153,173 @@ export default function ProfileScreen() {
       ],
       { cancelable: true },
     );
-  };
+  }, [takePhoto, pickImage]);
 
-  const onSubmit = (data: ProfileFormData) => {
-    console.log("Saving data:", data);
-    // API call would go here
-    setIsEditing(false);
-  };
+  const onSubmit = useCallback(
+    async (data: ProfileFormData) => {
+      try {
+        const payload: Record<string, any> = {
+          firstName: (data.firstName || "").trim(),
+          lastName: (data.lastName || "").trim(),
+        };
 
-  const handleCancel = () => {
-    reset();
+        const cleanedPhone = stripCountryCode(data.phone);
+        if (cleanedPhone.length > 0) {
+          payload.phone = `+234${cleanedPhone}`;
+        }
+
+        const res = await updateProfile(payload).unwrap();
+
+        // Update local Redux state with verified API response or payload
+        if (activeUser && token) {
+          const updatedUser = {
+            ...activeUser,
+            ...(res?.data || payload),
+          };
+          dispatch(
+            setCredentials({
+              user: updatedUser,
+              token,
+              refreshToken: refreshToken || undefined,
+            }),
+          );
+        }
+
+        setIsEditing(false);
+        Alert.alert("Success", "Personal information updated successfully!");
+      } catch (error: any) {
+        console.log("Profile update error details:", JSON.stringify(error, null, 2));
+        const errMsg = Array.isArray(error?.data?.message)
+          ? error.data.message[0]
+          : error?.data?.message ||
+            error?.message ||
+            "Failed to update profile. Please verify your details.";
+        Alert.alert("Update Failed", errMsg);
+      }
+    },
+    [updateProfile, activeUser, token, refreshToken, dispatch],
+  );
+
+  const handleCancel = useCallback(() => {
+    if (activeUser) {
+      const rawPhone =
+        activeUser.phone ||
+        activeUser.phoneNumber ||
+        activeUser.phone_number ||
+        activeUser.mobile ||
+        "";
+      reset({
+        firstName: activeUser.firstName || activeUser.name?.split(" ")[0] || "",
+        lastName:
+          activeUser.lastName ||
+          activeUser.name?.split(" ").slice(1).join(" ") ||
+          "",
+        phone: stripCountryCode(rawPhone),
+        email: activeUser.email || "",
+      });
+    }
     setIsEditing(false);
-  };
+  }, [activeUser, reset]);
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
       <StatusBar barStyle="dark-content" />
-      <Header title="Settings" />
+      <Header title="Personal Information" />
 
       <ScrollView
         className="flex-1 px-5"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: 10, paddingBottom: 40 }}
       >
-        {/* Profile Pic Section */}
-        <Animated.View entering={FadeInUp.duration(700).delay(100)} className="items-center mb-8">
-          <TouchableOpacity
-            onPress={handlePhotoUpdate}
-            activeOpacity={0.8}
-            className="relative"
-          >
-            <View className="w-24 h-24 rounded-full border-4 border-white shadow-sm overflow-hidden bg-gray-100">
-              <Image source={{ uri: profileImage }} className="w-full h-full" />
-            </View>
-            <View className="absolute bottom-0 right-0 bg-[#155D5F] w-8 h-8 rounded-full items-center justify-center border-2 border-white">
-              <Ionicons name="camera-outline" size={16} color="white" />
-            </View>
-          </TouchableOpacity>
-
-          <Text className="text-[20px] font-extrabold text-[#323232] mt-4">
-            Olabiran Simon
-          </Text>
-
-          <View className="flex-row items-center bg-[#FFF1D6] px-3 py-1.5 rounded-full mt-2 gap-x-1.5">
-            <KycIcon />
-            <Text className="text-[12px] font-bold text-[#D97706]">
-              KYC level 3
-            </Text>
-          </View>
-        </Animated.View>
+        {/* Avatar Section */}
+        <ProfileAvatarSection
+          user={activeUser}
+          kycLevel={kycResponse?.data?.currentLevel}
+          loading={isLoading}
+          uploading={uploadingFile}
+          onPressPhoto={handlePhotoUpdate}
+        />
 
         {/* Form Fields */}
-        <Animated.View entering={FadeInDown.duration(600).delay(300)} className="gap-y-5 mb-10">
-          <EditableField
+        <Animated.View
+          entering={FadeInDown.duration(600).delay(300)}
+          className="gap-y-10 mb-10"
+        >
+          <ProfileEditableField
             control={control}
             name="firstName"
             label="First Name"
+            placeholder="Enter first name"
             isEditing={isEditing}
           />
-          <EditableField
+          <ProfileEditableField
             control={control}
             name="lastName"
             label="Last Name"
+            placeholder="Enter last name"
             isEditing={isEditing}
           />
-          <EditableField
-            control={control}
-            name="dob"
-            label="Date of Birth"
-            isEditing={isEditing}
-          />
-          <EditableField
-            control={control}
-            name="phone"
-            label="Phone Number"
-            isEditing={isEditing}
-          />
-          <EditableField
+          <ProfileEditableField
             control={control}
             name="email"
             label="Email Address"
+            placeholder="Enter email address"
+            keyboardType="email-address"
+            isEditing={isEditing}
+            editable={false} // Email is usually read-only / managed via security settings
+          />
+          <ProfileEditableField
+            control={control}
+            name="phone"
+            label="Phone Number"
+            placeholder="e.g. 802 696 0604"
+            keyboardType="phone-pad"
+            prefix="+234"
             isEditing={isEditing}
           />
         </Animated.View>
 
-        {/* Actions */}
+        {/* Action Buttons */}
         <Animated.View entering={FadeInDown.duration(600).delay(500)}>
-        {!isEditing ? (
-          <TouchableOpacity
-            onPress={() => setIsEditing(true)}
-            className="bg-[#155D5F] h-14 rounded-2xl items-center justify-center"
-          >
-            <Text className="text-white text-base font-bold">Edit Profile</Text>
-          </TouchableOpacity>
-        ) : (
-          <View className="flex-row gap-x-3">
+          {!isEditing ? (
             <TouchableOpacity
-              onPress={handleCancel}
-              className="flex-1 h-14 border border-[#E5E7EB] rounded-2xl items-center justify-center"
-            >
-              <Text className="text-base font-bold text-[#323232]">Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleSubmit(onSubmit)}
-              className="flex-1 bg-[#155D5F] h-14 rounded-2xl items-center justify-center"
+              onPress={() => setIsEditing(true)}
+              activeOpacity={0.8}
+              className="bg-[#155D5F] h-14 rounded-2xl items-center justify-center shadow-sm"
             >
               <Text className="text-white text-base font-bold">
-                Save Changes
+                Edit Profile
               </Text>
             </TouchableOpacity>
-          </View>
-        )}
+          ) : (
+            <View className="flex-row gap-x-3">
+              <TouchableOpacity
+                onPress={handleCancel}
+                disabled={updatingProfile}
+                activeOpacity={0.8}
+                className="flex-1 h-14 border border-[#E5E7EB] rounded-2xl items-center justify-center"
+              >
+                <Text className="text-base font-bold text-[#323232]">
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSubmit(onSubmit)}
+                disabled={updatingProfile}
+                activeOpacity={0.8}
+                className="flex-1 bg-[#155D5F] h-14 rounded-2xl items-center justify-center flex-row gap-x-2"
+              >
+                {updatingProfile && (
+                  <ActivityIndicator color="white" size="small" />
+                )}
+                <Text className="text-white text-base font-bold">
+                  {updatingProfile ? "Saving..." : "Save Changes"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-const EditableField = ({ control, name, label, isEditing }: any) => (
-  <View className="gap-y-2">
-    <Text className="text-[15px] font-bold text-[#4B5563]">{label}</Text>
-    <Controller
-      control={control}
-      name={name}
-      render={({ field: { onChange, onBlur, value } }) => (
-        <View
-          className={`h-14 rounded-xl px-4 justify-center border ${isEditing ? "bg-white border-[#155D5F]" : "bg-[#F8F8F8] border-[#F0F0F0]"}`}
-        >
-          {isEditing ? (
-            <TextInput
-              onBlur={onBlur}
-              onChangeText={onChange}
-              value={value}
-              className="text-[15px] font-semibold text-[#323232] h-full"
-            />
-          ) : (
-            <Text className="text-[15px] font-semibold text-[#323232] opacity-40">
-              {value}
-            </Text>
-          )}
-        </View>
-      )}
-    />
-  </View>
-);

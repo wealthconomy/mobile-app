@@ -2,21 +2,29 @@ import { BalanceText } from "@/src/components/common/BalanceText";
 import { useRouter } from "expo-router";
 import { Eye, EyeOff } from "lucide-react-native";
 import { useState } from "react";
-import { Image, Text, TouchableOpacity, View } from "react-native";
+import { Image, Text, TouchableOpacity, View, ActivityIndicator } from "react-native";
 import Svg, { ClipPath, Defs, G, Path } from "react-native-svg";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../store";
+import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 
 export const WealthCard = () => {
   const [showBalance, setShowBalance] = useState(true);
   const router = useRouter();
   const { user } = useSelector((state: RootState) => state.auth);
+  
+  const { data: walletData, isLoading } = useGetWalletSummaryQuery();
 
   // Users with "Impact Wealth" preference don't see "interest" (wealth growth)
   const showInterest = user?.wealthPreference?.toLowerCase().includes("impact")
     ? false
     : true;
 
+  const formatAmount = (val?: string) => {
+    if (!val) return "0.00";
+    const amount = parseFloat(val) / 100; // kobo to naira
+    return amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
   return (
     <View
       className="relative overflow-hidden"
@@ -99,7 +107,11 @@ export const WealthCard = () => {
             activeOpacity={0.8}
           >
             {showBalance ? (
-              <BalanceText amount="₦300,735.42" fontSize={32} color="white" />
+              isLoading ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <BalanceText amount={`₦${formatAmount(walletData?.currentBalance)}`} fontSize={32} color="white" />
+              )
             ) : (
               <Text className="text-white text-[32px] font-extrabold tracking-tight">
                 ••••••••

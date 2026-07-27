@@ -1,6 +1,5 @@
-import { libraryService } from "@/src/api/libraryService";
+import { useGetLibraryMaterialsQuery, useRecordDownloadMutation, useAddLibraryCommentMutation } from "@/src/store/api/libraryApi";
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { StatusBar } from "expo-status-bar";
@@ -8,6 +7,7 @@ import { Audio } from "expo-av";
 import React, { useState, useEffect } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -25,11 +25,22 @@ export default function LibraryMaterialDetailScreen() {
   const router = useRouter();
   const [newComment, setNewComment] = useState("");
 
-  const { data: material, isLoading } = useQuery({
-    queryKey: ["library-material", id],
-    queryFn: () => libraryService.getMaterialById(id as string),
-    enabled: !!id,
-  });
+  const { data: response, isLoading } = useGetLibraryMaterialsQuery({ publishToApp: true });
+  const material = response?.data?.find(m => m.id === id);
+
+  const [recordDownload] = useRecordDownloadMutation();
+  const [addLibraryComment, { isLoading: isCommenting }] = useAddLibraryCommentMutation();
+
+  const handleCommentSubmit = async () => {
+    if (!id || !newComment.trim()) return;
+    try {
+      await addLibraryComment({ id: id as string, content: newComment }).unwrap();
+      setNewComment("");
+      Alert.alert("Success", "Comment added successfully!");
+    } catch (error) {
+      Alert.alert("Error", "Failed to add comment.");
+    }
+  };
 
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
@@ -77,6 +88,7 @@ export default function LibraryMaterialDetailScreen() {
       const supported = await Linking.canOpenURL(material.documentUrl);
       if (supported) {
         await Linking.openURL(material.documentUrl);
+        recordDownload(id as string);
       } else {
         console.error("Don't know how to open this URL: " + material.documentUrl);
       }
@@ -161,7 +173,7 @@ export default function LibraryMaterialDetailScreen() {
             
             <View className="flex-row items-center mb-4">
               <Text className="text-gray-500 text-sm">
-                By {material.author.name} • {material.timePosted} • {material.readingDuration}
+                By {material.author} • {material.timeAgo || material.timePosted}{material.readingDuration ? ` • ${material.readingDuration}` : ""}
               </Text>
             </View>
 
@@ -239,7 +251,7 @@ export default function LibraryMaterialDetailScreen() {
                           <Text className="font-bold text-gray-900">{comment.userName}</Text>
                           <Text className="text-xs text-gray-400">{comment.timePosted}</Text>
                         </View>
-                        <Text className="text-gray-600 text-sm leading-relaxed">{comment.text}</Text>
+                        <Text className="text-gray-600 text-sm leading-relaxed">{comment.content || comment.text}</Text>
                       </View>
                     </View>
                   ))
@@ -268,10 +280,15 @@ export default function LibraryMaterialDetailScreen() {
               />
             </View>
             <TouchableOpacity
-              className={`ml-3 p-2.5 rounded-full ${newComment.trim() ? "bg-[#155D5F]" : "bg-gray-200"}`}
-              disabled={!newComment.trim()}
+              onPress={handleCommentSubmit}
+              className={`ml-3 p-2.5 rounded-full ${newComment.trim() && !isCommenting ? "bg-[#155D5F]" : "bg-gray-200"}`}
+              disabled={!newComment.trim() || isCommenting}
             >
-              <Ionicons name="send" size={18} color="#FFFFFF" />
+              {isCommenting ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Ionicons name="send" size={18} color="#FFFFFF" />
+              )}
             </TouchableOpacity>
           </View>
         )}

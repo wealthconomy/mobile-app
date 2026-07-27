@@ -1,18 +1,18 @@
-import { WealthGoal } from "@/src/api/goalService";
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
 import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Eye, EyeOff } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
+import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
+import { Portfolio } from "@/src/types/portfolio";
 
 const THEME = "#560FF1";
 const THEME_BG = "#F3EEFF";
@@ -60,148 +60,29 @@ const SUGGESTIONS = [
 
 export default function WealthFamScreen() {
   const [showBalance, setShowBalance] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [showTips, setShowTips] = useState(true);
+  const [activeTab, setActiveTab] = useState<"ongoing" | "completed">(
+    "ongoing",
+  );
+
   const portfolioPreference = useSelector(
     (state: RootState) => state.portfolioPreference.fam
   );
   const showInterest = portfolioPreference !== "Impact Wealth";
 
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(timer);
-  }, []);
+  const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthfam" });
+  const allGoals = data?.items || [];
 
-  const [showTips, setShowTips] = useState(true);
-  const [activeTab, setActiveTab] = useState<"ongoing" | "completed">(
-    "ongoing",
-  );
-  const [ongoingPlans, setOngoingPlans] = useState<WealthGoal[]>([]);
-  const [completedPlans, setCompletedPlans] = useState<WealthGoal[]>([]);
+  const ongoingPlans = allGoals.filter((g) => g.status === "ACTIVE" && parseFloat(g.balance) < parseFloat(g.targetAmount));
+  const completedPlans = allGoals.filter((g) => g.status === "COMPLETED" || (parseFloat(g.balance) >= parseFloat(g.targetAmount)));
 
-  useFocusEffect(
-    useCallback(() => {
-      const mockOngoing: WealthGoal[] = [
-        {
-          id: "fam-1",
-          title: "Wealth for Kids",
-          subtitle: "Adeyemi, Juliet and Joy",
-          amount: "50,373.28",
-          saved: "40,298.00",
-          progress: 0.8,
-          daysLeft: 54,
-          endDate: "2nd Dec 2026",
-          automationFrequency: "Monthly",
-          source: "WealthFlex",
-        },
-        {
-          id: "fam-2",
-          title: "Wealth for Kids",
-          subtitle: "Adeyemi, Juliet and Joy",
-          amount: "50,373.28",
-          saved: "30,223.00",
-          progress: 0.6,
-          daysLeft: 80,
-          endDate: "2nd Dec 2026",
-          automationFrequency: "Monthly",
-          source: "WealthFlex",
-        },
-        {
-          id: "fam-3",
-          title: "Spouse Savings",
-          subtitle: "Precious Grace",
-          amount: "50,373.28",
-          saved: "40,298.00",
-          progress: 0.8,
-          daysLeft: 54,
-          endDate: "2nd Dec 2026",
-          automationFrequency: "Monthly",
-          source: "WealthFlex",
-        },
-        {
-          id: "fam-4",
-          title: "Spouse Savings",
-          subtitle: "Precious Grace",
-          amount: "50,373.28",
-          saved: "30,223.00",
-          progress: 0.6,
-          daysLeft: 120,
-          endDate: "2nd Dec 2026",
-          automationFrequency: "Monthly",
-          source: "WealthFlex",
-        },
-        {
-          id: "fam-5",
-          title: "Care for Parents",
-          subtitle: "Baba & Mama Adeyemi",
-          amount: "75,000.00",
-          saved: "25,000.00",
-          progress: 0.33,
-          daysLeft: 200,
-          endDate: "1st Jun 2027",
-          automationFrequency: "Monthly",
-          source: "WealthFlex",
-        },
-      ];
+  const formatAmount = (val?: string) => {
+    if (!val) return "0.00";
+    const amountNum = parseFloat(val) / 100;
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
 
-      const mockCompleted: WealthGoal[] = [
-        {
-          id: "fam-c1",
-          title: "Wealth for Kids",
-          subtitle: "Adeyemi, Juliet and Joy",
-          amount: "143,736.00",
-          saved: "143,736.00",
-          progress: 1.0,
-          daysLeft: 0,
-          endDate: "2nd Dec 2024",
-          automationFrequency: "Monthly",
-          source: "WealthFlex",
-          isCompleted: true,
-        },
-        {
-          id: "fam-c2",
-          title: "Spouse Savings",
-          subtitle: "Precious Grace",
-          amount: "104,736.00",
-          saved: "104,736.00",
-          progress: 1.0,
-          daysLeft: 0,
-          endDate: "2nd Dec 2024",
-          automationFrequency: "Monthly",
-          source: "WealthFlex",
-          isCompleted: true,
-        },
-        {
-          id: "fam-c3",
-          title: "Wealth for Kids",
-          subtitle: "Adeyemi, Juliet and Joy",
-          amount: "143,736.00",
-          saved: "143,736.00",
-          progress: 1.0,
-          daysLeft: 0,
-          endDate: "2nd Dec 2024",
-          automationFrequency: "Monthly",
-          source: "WealthFlex",
-          isCompleted: true,
-        },
-        {
-          id: "fam-c4",
-          title: "Sibling Support",
-          subtitle: "Tunde Adeyemi",
-          amount: "80,000.00",
-          saved: "80,000.00",
-          progress: 1.0,
-          daysLeft: 0,
-          endDate: "15th Aug 2024",
-          automationFrequency: "Monthly",
-          source: "WealthFlex",
-          isCompleted: true,
-        },
-      ];
-
-      setOngoingPlans(mockOngoing);
-      setCompletedPlans(mockCompleted);
-    }, []),
-  );
+  const totalBalance = allGoals.reduce((sum, g) => sum + parseFloat(g.balance || "0"), 0);
 
   if (loading) {
     return (
@@ -285,7 +166,7 @@ export default function WealthFamScreen() {
               <View className="flex-row items-baseline mb-1">
                 {showBalance ? (
                   <BalanceText
-                    amount="₦300,735.42"
+                    amount={`₦${formatAmount(totalBalance.toString())}`}
                     fontSize={31}
                     color="#1A1A1A"
                   />
@@ -299,7 +180,7 @@ export default function WealthFamScreen() {
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
                   <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-80">
-                    Your wealth grew to ₦230.00 today
+                    Your wealth grew to ₦0.00 today
                   </Text>
                   <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
                 </View>
@@ -548,16 +429,38 @@ function FamListItem({
   plan,
   isCompleted,
 }: {
-  plan: WealthGoal;
+  plan: Portfolio;
   isCompleted: boolean;
 }) {
-  const icon = plan.title.includes("Kids")
+  const icon = (plan.name || "").includes("Kids")
     ? "👨‍👩‍👧‍👦"
-    : plan.title.includes("Spouse")
+    : (plan.name || "").includes("Spouse")
       ? "💑"
-      : plan.title.includes("Parent")
+      : (plan.name || "").includes("Parent")
         ? "👴"
         : "🤝";
+
+  const formatAmount = (val: string) => {
+    if (!val) return "0.00";
+    const amountNum = parseFloat(val) / 100;
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
+
+  const progress = parseFloat(plan.targetAmount) > 0 ? parseFloat(plan.balance) / parseFloat(plan.targetAmount) : 0;
+
+  const formattedDate = new Date(plan.maturityDate).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+
+  const getDaysLeft = () => {
+    const end = new Date(plan.maturityDate).getTime();
+    const now = new Date().getTime();
+    const diff = end - now;
+    if (diff <= 0) return 0;
+    return Math.ceil(diff / (1000 * 3600 * 24));
+  };
 
   return (
     <TouchableOpacity
@@ -606,14 +509,14 @@ function FamListItem({
           }}
         >
           <Text style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A" }}>
-            {plan.title}
+            {plan.name}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Text style={{ fontSize: 12, marginRight: 2 }}>
               {isCompleted ? "🏆" : "🏡"}
             </Text>
             <Text style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}>
-              ₦{plan.amount}
+              ₦{formatAmount(plan.targetAmount)}
             </Text>
           </View>
         </View>
@@ -628,10 +531,10 @@ function FamListItem({
         >
           <View style={{ flex: 1, marginRight: 8 }}>
             <Text style={{ fontSize: 10, color: "#9CA3AF" }}>
-              {plan.subtitle}
+              {plan.metadata?.category || "Fam"}
             </Text>
             <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
-              Wealth growth ₦{plan.saved} ↑ | Progressive: ₦50,000.00 ℹ️
+              Wealth growth ₦{formatAmount(plan.balance)} ↑
             </Text>
           </View>
 
@@ -646,7 +549,7 @@ function FamListItem({
           >
             <View
               style={{
-                width: `${plan.progress * 100}%`,
+                width: `${Math.min(progress * 100, 100)}%`,
                 height: 4,
                 backgroundColor: isCompleted ? "#4CAF50" : THEME,
               }}
@@ -663,7 +566,7 @@ function FamListItem({
           }}
         >
           <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
-            End Date: {plan.endDate}
+            End Date: {formattedDate}
           </Text>
           <View
             style={{
@@ -674,7 +577,7 @@ function FamListItem({
             }}
           >
             <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
-              {Math.round(plan.progress * 100)}%
+              {Math.round(Math.min(progress * 100, 100))}%
             </Text>
             <Text
               style={{
@@ -683,7 +586,7 @@ function FamListItem({
                 fontWeight: isCompleted ? "700" : "normal",
               }}
             >
-              {isCompleted ? "Plan Achieved" : `${plan.daysLeft} days Left`}
+              {isCompleted ? "Plan Achieved" : `${getDaysLeft()} days Left`}
             </Text>
           </View>
         </View>

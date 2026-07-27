@@ -7,11 +7,27 @@ import { CheckCircle2, ShieldCheck, Zap } from "lucide-react-native";
 import { ScrollView, Text, View } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useEffect } from "react";
+import { useSelector } from "react-redux";
+import { RootState } from "@/src/store";
+import { useGetKycDocumentsQuery } from "@/src/store/api/kycApi";
 
 const THEME_TEAL = "#155D5F";
 
 export default function KYCLevel2Intro() {
   const router = useRouter();
+  const user = useSelector((state: RootState) => state.auth.user);
+  const { data: kycDocsResponse } = useGetKycDocumentsQuery();
+
+  useEffect(() => {
+    const isLevel2Complete =
+      (user?.kycLevel !== undefined && user.kycLevel >= 2) ||
+      kycDocsResponse?.data?.faceVerified === true;
+
+    if (isLevel2Complete) {
+      router.replace("/kyc/level3-intro");
+    }
+  }, [user, kycDocsResponse]);
 
   const benefits = [
     {

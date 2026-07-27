@@ -20,7 +20,7 @@ const EXIT_OPTIONS = [
 ];
 
 export default function RiskSettingsScreen() {
-  const { id } = useLocalSearchParams();
+  const id = useLocalSearchParams().id as string;
 
   const [penalty, setPenalty] = useState(PENALTY_OPTIONS[0]);
   const [earlyExit, setEarlyExit] = useState(EXIT_OPTIONS[0]);
