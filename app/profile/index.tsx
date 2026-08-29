@@ -11,6 +11,7 @@ import {
 import { setCredentials } from "@/src/store/slices/authSlice";
 import { imageService } from "@/src/utils/imageService";
 import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
@@ -47,6 +48,7 @@ const stripCountryCode = (phone?: string) => {
 
 export default function ProfileScreen() {
   const dispatch = useDispatch();
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
 
   // Redux auth user
@@ -318,6 +320,29 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
           )}
+
+          {/* TEMPORARY KYC TEST BUTTONS */}
+          <View style={{ marginTop: 20, gap: 10 }}>
+            <TouchableOpacity
+              onPress={() => router.push("/kyc/level2")}
+              activeOpacity={0.8}
+              className="bg-[#3B82F6] h-12 rounded-xl items-center justify-center shadow-sm"
+            >
+              <Text className="text-white text-base font-bold">
+                TEST KYC Level 2
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => router.push("/kyc/level3-intro")}
+              activeOpacity={0.8}
+              className="bg-[#10B981] h-12 rounded-xl items-center justify-center shadow-sm"
+            >
+              <Text className="text-white text-base font-bold">
+                TEST KYC Level 3
+              </Text>
+            </TouchableOpacity>
+          </View>
         </Animated.View>
       </ScrollView>
     </SafeAreaView>

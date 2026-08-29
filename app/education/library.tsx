@@ -1,11 +1,11 @@
-import { useGetLibraryMaterialsQuery } from "@/src/store/api/libraryApi";
 import Header from "@/src/components/common/Header";
 import { LibraryItem } from "@/src/features/library/components/LibraryItem";
+import { useGetLibraryMaterialsQuery } from "@/src/store/api/libraryApi";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import { StatusBar } from "expo-status-bar";
-import React, { useState } from "react";
+import * as WebBrowser from "expo-web-browser";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Linking,
@@ -22,14 +22,11 @@ export default function LibraryScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
-  const { data: response, isLoading } = useGetLibraryMaterialsQuery({ publishToApp: true });
-  
-  if (response) {
-    console.log("=== ALL LIBRARY API RESPONSE ===");
-    console.log(JSON.stringify(response, null, 2));
-  }
+  const { data: response, isLoading } = useGetLibraryMaterialsQuery({
+    publishToApp: true,
+  });
 
-  const materials = response?.data || [];
+  const materials = response?.data?.items || [];
 
   const filteredMaterials =
     materials?.filter((material) =>
@@ -87,7 +84,17 @@ export default function LibraryScreen() {
             <TouchableOpacity
               onPress={() => setViewMode("list")}
               className="p-1.5 rounded-md"
-              style={viewMode === "list" ? { backgroundColor: "#fff", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 } : undefined}
+              style={
+                viewMode === "list"
+                  ? {
+                      backgroundColor: "#fff",
+                      shadowColor: "#000",
+                      shadowOpacity: 0.1,
+                      shadowRadius: 2,
+                      elevation: 2,
+                    }
+                  : undefined
+              }
             >
               <Ionicons
                 name="list"
@@ -98,7 +105,17 @@ export default function LibraryScreen() {
             <TouchableOpacity
               onPress={() => setViewMode("grid")}
               className="p-1.5 rounded-md"
-              style={viewMode === "grid" ? { backgroundColor: "#fff", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 } : undefined}
+              style={
+                viewMode === "grid"
+                  ? {
+                      backgroundColor: "#fff",
+                      shadowColor: "#000",
+                      shadowOpacity: 0.1,
+                      shadowRadius: 2,
+                      elevation: 2,
+                    }
+                  : undefined
+              }
             >
               <Ionicons
                 name="grid"
@@ -121,14 +138,24 @@ export default function LibraryScreen() {
           </View>
         ) : filteredMaterials.length > 0 ? (
           <View
-            style={viewMode === "grid" ? { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" } : undefined}
+            style={
+              viewMode === "grid"
+                ? {
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    justifyContent: "space-between",
+                  }
+                : undefined
+            }
           >
             {filteredMaterials.map((material) => (
               <LibraryItem
                 key={material.id}
                 material={material}
                 viewMode={viewMode}
-                onPress={() => router.push(`/education/library/${material.id}` as any)}
+                onPress={() =>
+                  router.push(`/education/library/${material.id}` as any)
+                }
                 onReadInApp={() => handleReadInApp(material.documentUrl ?? "")}
                 onDownload={() => handleDownload(material.documentUrl ?? "")}
                 onWatchOnYouTube={() => {

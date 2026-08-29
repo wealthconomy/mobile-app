@@ -1,24 +1,28 @@
 import Header from "@/src/components/common/Header";
 import { RemoveConfirmationModal } from "@/src/features/payment/components/PaymentModals";
-import { AppDispatch, RootState } from "@/src/store";
 import {
-  removeBank,
-  removeCard,
-  setDefaultCard,
-} from "@/src/store/slices/paymentSlice";
+  useGetUserPayoutAccountsQuery,
+  useDeletePayoutAccountMutation,
+} from "@/src/store/api/payoutAccountApi";
+import {
+  useListMyMandatesQuery,
+  useSetDefaultMandateMutation,
+  useDeleteMandateMutation,
+} from "@/src/store/api/paymentApi";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   ScrollView,
   StatusBar,
   Text,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Path, Svg } from "react-native-svg";
-import { useDispatch, useSelector } from "react-redux";
 
 const BankSVG = ({
   width = 13,
@@ -39,23 +43,53 @@ const BankSVG = ({
 
 export default function PaymentSettingsScreen() {
   const router = useRouter();
-  const dispatch = useDispatch<AppDispatch>();
-  const { banks, cards } = useSelector((state: RootState) => state.payment);
 
   const [bankToRemove, setBankToRemove] = useState<string | null>(null);
   const [cardToRemove, setCardToRemove] = useState<string | null>(null);
 
-  const handleRemoveBank = () => {
+  // Live Payout Accounts queries/mutations
+  const { data: payoutAccountsData, isLoading: loadingPayouts } = useGetUserPayoutAccountsQuery();
+  const banks = payoutAccountsData?.items || [];
+  const [deletePayoutAccount, { isLoading: isDeletingPayout }] = useDeletePayoutAccountMutation();
+
+  // Live Mandates (Cards) queries/mutations
+  const { data: mandatesResponse, isLoading: loadingMandates } = useListMyMandatesQuery();
+  const cards = mandatesResponse?.data?.items || [];
+  const [setDefaultMandate] = useSetDefaultMandateMutation();
+  const [deleteMandate] = useDeleteMandateMutation();
+
+  const handleRemoveBank = async () => {
     if (bankToRemove) {
-      dispatch(removeBank(bankToRemove));
-      setBankToRemove(null);
+      try {
+        await deletePayoutAccount(bankToRemove).unwrap();
+        Alert.alert("Success", "Bank account removed successfully");
+      } catch (err: any) {
+        Alert.alert("Error", err?.data?.message || err?.message || "Failed to delete bank account");
+      } finally {
+        setBankToRemove(null);
+      }
     }
   };
 
-  const handleRemoveCard = () => {
+  const handleRemoveCard = async () => {
     if (cardToRemove) {
-      dispatch(removeCard(cardToRemove));
-      setCardToRemove(null);
+      try {
+        await deleteMandate(cardToRemove).unwrap();
+        Alert.alert("Success", "Payment method removed successfully");
+      } catch (err: any) {
+        Alert.alert("Error", err?.data?.message || err?.message || "Failed to delete payment method");
+      } finally {
+        setCardToRemove(null);
+      }
+    }
+  };
+
+  const handleSetDefault = async (cardId: string) => {
+    try {
+      await setDefaultMandate(cardId).unwrap();
+      Alert.alert("Success", "Default payment method updated");
+    } catch (err: any) {
+      Alert.alert("Error", err?.data?.message || err?.message || "Failed to set default payment method");
     }
   };
 
@@ -79,17 +113,12 @@ export default function PaymentSettingsScreen() {
           </Text>
 
           <View className="gap-y-4 mb-6">
-            {banks.length > 0 ? (
+            {loadingPayouts ? (
+              <ActivityIndicator size="small" color="#155D5F" className="py-6" />
+            ) : banks.length > 0 ? (
               banks.map((bank) => (
-                <TouchableOpacity
+                <View
                   key={bank.id}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/payment/account-details",
-                      params: { bankId: bank.id },
-                    } as any)
-                  }
-                  activeOpacity={0.7}
                   className="bg-white p-4 rounded-2xl flex-row items-center border border-[#F3F4F6]"
                 >
                   <View className="w-10 h-10 bg-[#EFF7F8] rounded-full items-center justify-center mr-4">
@@ -97,17 +126,14 @@ export default function PaymentSettingsScreen() {
                   </View>
                   <View className="flex-1">
                     <Text className="text-[14px] font-bold text-[#111827]">
-                      {bank.name}
+                      {bank.accountName}
                     </Text>
                     <Text className="text-[12px] text-[#9CA3AF] uppercase">
                       {bank.bankName} - {bank.accountNumber}
                     </Text>
                   </View>
                   <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      setBankToRemove(bank.id);
-                    }}
+                    onPress={() => setBankToRemove(bank.id)}
                     className="flex-row items-center"
                   >
                     <Text className="text-[12px] font-bold text-[#EF4444] mr-1.5">
@@ -115,7 +141,7 @@ export default function PaymentSettingsScreen() {
                     </Text>
                     <Ionicons name="trash" size={16} color="#EF4444" />
                   </TouchableOpacity>
-                </TouchableOpacity>
+                </View>
               ))
             ) : (
               <View className="py-8 items-center justify-center">
@@ -151,23 +177,18 @@ export default function PaymentSettingsScreen() {
           </Text>
 
           <View className="gap-y-4 mb-6">
-            {cards.length > 0 ? (
+            {loadingMandates ? (
+              <ActivityIndicator size="small" color="#155D5F" className="py-6" />
+            ) : cards.length > 0 ? (
               cards.map((card) => (
-                <TouchableOpacity
+                <View
                   key={card.id}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/payment/account-details",
-                      params: { cardId: card.id },
-                    } as any)
-                  }
-                  activeOpacity={0.7}
                   className="bg-white p-4 rounded-2xl flex-row items-center border border-[#F3F4F6]"
                 >
                   <View className="w-10 h-10 bg-[#F9FAFB] rounded-xl items-center justify-center mr-4 border border-[#F3F4F6]">
-                    {card.brand === "visa" ? (
+                    {card.brand?.toLowerCase() === "visa" ? (
                       <FontAwesome name="cc-visa" size={18} color="#1A1F71" />
-                    ) : card.brand === "mastercard" ? (
+                    ) : card.brand?.toLowerCase() === "mastercard" ? (
                       <FontAwesome
                         name="cc-mastercard"
                         size={18}
@@ -177,16 +198,16 @@ export default function PaymentSettingsScreen() {
                       <Ionicons
                         name="card"
                         size={20}
-                        color={card.brand === "verve" ? "#009245" : "#6B7280"}
+                        color={card.brand?.toLowerCase() === "verve" ? "#009245" : "#6B7280"}
                       />
                     )}
                   </View>
                   <View className="flex-1">
                     <Text className="text-[14px] font-bold text-[#111827]">
-                      {card.holderName}
+                      {card.holderName || "Saved Card"}
                     </Text>
                     <Text className="text-[12px] text-[#9CA3AF]">
-                      **** {card.lastFour}
+                      **** {card.lastFour || "xxxx"}
                     </Text>
                   </View>
 
@@ -197,10 +218,7 @@ export default function PaymentSettingsScreen() {
                       </Text>
                     ) : (
                       <TouchableOpacity
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          dispatch(setDefaultCard(card.id));
-                        }}
+                        onPress={() => handleSetDefault(card.id)}
                         className="mr-4"
                       >
                         <Text className="text-[12px] font-bold text-[#6B7280]">
@@ -210,10 +228,7 @@ export default function PaymentSettingsScreen() {
                     )}
 
                     <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        setCardToRemove(card.id);
-                      }}
+                      onPress={() => setCardToRemove(card.id)}
                       className="flex-row items-center"
                     >
                       <Text className="text-[12px] font-bold text-[#EF4444] mr-1.5">
@@ -222,7 +237,7 @@ export default function PaymentSettingsScreen() {
                       <Ionicons name="trash" size={16} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
-                </TouchableOpacity>
+                </View>
               ))
             ) : (
               <View className="py-8 items-center justify-center">

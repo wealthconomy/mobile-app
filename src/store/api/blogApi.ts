@@ -1,9 +1,9 @@
 import { Blog } from "../../types/blog";
-import { ApiResponse, baseApi } from "./baseApi";
+import { ApiResponse, baseApi, PaginatedResponse } from "./baseApi";
 
 export const blogApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getBlogs: builder.query<ApiResponse<Blog[]>, { publishToApp?: boolean; publishToWeb?: boolean } | void>({
+    getBlogs: builder.query<ApiResponse<PaginatedResponse<Blog[]>>, { publishToApp?: boolean; publishToWeb?: boolean } | void>({
       query: (params) => ({
         url: "/client/blogs",
         params: params || {},
@@ -11,7 +11,7 @@ export const blogApi = baseApi.injectEndpoints({
       providesTags: ["Blog"],
     }),
 
-    getBookmarkedBlogs: builder.query<ApiResponse<Blog[]>, void>({
+    getBookmarkedBlogs: builder.query<ApiResponse<PaginatedResponse<Blog[]>>, void>({
       query: () => ({
         url: "/client/blogs/bookmarks",
       }),

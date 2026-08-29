@@ -1,9 +1,10 @@
-import { goalService, WealthGoal } from "@/src/api/goalService";
 import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useCreatePortfolioMutation } from "@/src/store/api/portfolioApi";
+import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
@@ -15,6 +16,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -34,6 +36,23 @@ export default function CreateGoalScreen() {
   const [step, setStep] = useState<Step>("form");
   const [loading, setLoading] = useState(false);
   const [showRules, setShowRules] = useState(true);
+
+  const [createPortfolio] = useCreatePortfolioMutation();
+  const [verifyPin] = useVerifyPinMutation();
+
+  const parseDate = (dateStr: string) => {
+    const parts = dateStr.split("/");
+    if (parts.length === 3) {
+      const day = parseInt(parts[0].trim(), 10);
+      const month = parseInt(parts[1].trim(), 10) - 1;
+      const year = parseInt(parts[2].trim(), 10);
+      const date = new Date(year, month, day, 23, 59, 59);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString();
+      }
+    }
+    return new Date().toISOString();
+  };
 
   // Form State
   const [goalName, setGoalName] = useState("");
@@ -73,26 +92,34 @@ export default function CreateGoalScreen() {
 
   const handleCreate = useCallback(async () => {
     setLoading(true);
-    const newGoal: WealthGoal = {
-      id: Date.now().toString(),
-      title: goalName,
-      subtitle: category,
-      amount: formatAmount(amount),
-      saved: "0.00",
-      progress: 0,
-      daysLeft: 365,
-      endDate: endDate || "N/A",
-      automationFrequency: isManual
-        ? "Manual"
-        : (frequency as any) || "Monthly",
-      source: source || "Wealth Save",
-    };
-
     try {
-      await goalService.saveGoal(newGoal);
+      // 1. Verify transaction PIN
+      await verifyPin({ pin }).unwrap();
+
+      // 2. Perform create portfolio request
+      const body = {
+        name: goalName,
+        amount: 0, // start goal with 0 initial deposit
+        targetAmount: parseFloat(amount.replace(/[^\d.]/g, "")) || 0,
+        maturityDate: parseDate(endDate),
+        autoSaveEnabled: !isManual,
+        autoSaveFrequency: (frequency.toUpperCase() as any) || "MONTHLY",
+        autoSaveAmount: 0,
+        autoSaveSource: source === "Bank Account" ? "CARD" : "WALLET",
+        metadata: {
+          category,
+        },
+      };
+
+      await createPortfolio({ type: "wealthgoal", body }).unwrap();
       setStep("success");
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error("Failed to create portfolio:", err);
+      Alert.alert(
+        "Verification Failed",
+        err?.data?.message || err?.message || "Invalid transaction PIN or request failed."
+      );
+      setPin(""); // Clear invalid PIN
     } finally {
       setLoading(false);
     }
@@ -104,7 +131,9 @@ export default function CreateGoalScreen() {
     isManual,
     frequency,
     source,
-    goalService,
+    pin,
+    verifyPin,
+    createPortfolio,
   ]);
 
   useEffect(() => {

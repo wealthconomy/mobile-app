@@ -8,6 +8,14 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+export interface PaginatedResponse<T> {
+  items: T;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: process.env.EXPO_PUBLIC_API_URL,
   prepareHeaders: (headers, { getState, endpoint }) => {
@@ -107,6 +115,6 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 export const baseApi = createApi({
   reducerPath: "baseApi",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["User", "WealthGroup", "Portfolio", "Payment", "Auth", "Kyc", "File", "Notification", "Referral", "Blog", "Library", "Wallet", "PayoutAccount", "Withdrawal"],
+  tagTypes: ["User", "WealthGroup", "Portfolio", "Payment", "Auth", "Kyc", "File", "Notification", "Referral", "Blog", "Library", "Wallet", "PayoutAccount", "Withdrawal", "Activity"],
   endpoints: () => ({}),
 });

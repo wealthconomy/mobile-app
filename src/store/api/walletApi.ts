@@ -1,5 +1,5 @@
 import { KeysetPagination, WalletHold, WalletSummary, WalletTransaction } from "@/src/types/wallet";
-import { baseApi } from "./baseApi";
+import { ApiResponse, baseApi } from "./baseApi";
 
 export const walletApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -59,8 +59,16 @@ export const walletApi = baseApi.injectEndpoints({
       providesTags: ["Wallet"],
       transformResponse: (response: { data: KeysetPagination<WalletHold> }) => response.data,
     }),
+    transferFunds: builder.mutation<ApiResponse<string>, { recipientId: string; amountKobo: string }>({
+      query: (body) => ({
+        url: "/wallet/transfer",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Wallet"],
+    }),
   }),
-  overrideExisting: false,
+  overrideExisting: true,
 });
 
 export const {
@@ -68,4 +76,5 @@ export const {
   useGetWalletTransactionsQuery,
   useGetWalletTransactionByIdQuery,
   useGetWalletHoldsQuery,
+  useTransferFundsMutation,
 } = walletApi;

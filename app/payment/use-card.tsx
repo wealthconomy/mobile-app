@@ -1,9 +1,7 @@
 import Header from "@/src/components/common/Header";
 import { CardAddedModal } from "@/src/features/payment/components/PaymentModals";
-import { AppDispatch } from "@/src/store";
-import { addCard } from "@/src/store/slices/paymentSlice";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ScrollView,
   StatusBar,
@@ -11,66 +9,100 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
+import { RootState } from "@/src/store";
+import { useLinkMandateMutation, useLazyVerifyPaymentQuery, useListMyMandatesQuery } from "@/src/store/api/paymentApi";
+import * as WebBrowser from "expo-web-browser";
 
 export default function UseCardScreen() {
   const router = useRouter();
-  const dispatch = useDispatch<AppDispatch>();
-
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvv, setCvv] = useState("");
-  const [nameOnCard, setNameOnCard] = useState("");
-  const [pin, setPin] = useState("");
+  const user = useSelector((state: RootState) => state.auth.user);
+  const [email, setEmail] = useState(user?.email || "");
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const handleExpiryChange = (text: string) => {
-    let cleaned = text.replace(/[^0-9]/g, "");
-    if (cleaned.length > 2) {
-      cleaned = cleaned.substring(0, 2) + " / " + cleaned.substring(2, 4);
+  const [linkMandate, { isLoading }] = useLinkMandateMutation();
+  const [verifyPayment] = useLazyVerifyPaymentQuery();
+  const { data: mandatesData, refetch: refetchMandates } = useListMyMandatesQuery();
+  const [verifying, setVerifying] = useState(false);
+
+  useEffect(() => {
+    if (mandatesData) {
+      console.log("=== LINKED MANDATES DATA ===");
+      console.log(JSON.stringify(mandatesData, null, 2));
     }
-    setExpiry(cleaned);
-  };
+  }, [mandatesData]);
 
-  const handleCardNumberChange = (text: string) => {
-    let cleaned = text.replace(/[^0-9]/g, "");
-    if (cleaned.length > 16) cleaned = cleaned.substring(0, 16);
-    setCardNumber(cleaned);
-  };
+  const handleConfirm = async () => {
+    if (!email) {
+      Alert.alert("Error", "Please provide a valid email address.");
+      return;
+    }
 
-  const isFormValid =
-    cardNumber.length === 16 &&
-    expiry.length === 7 &&
-    cvv.length === 3 &&
-    nameOnCard.trim().length > 0 &&
-    pin.length === 4;
+    const idempotencyKey = `mdt_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
 
-  const handleConfirm = () => {
-    if (!isFormValid) return;
+    try {
+      const response = await linkMandate({
+        userId: user?.id || "",
+        email,
+        channel: "WEB",
+        redirectUrl: `${process.env.EXPO_PUBLIC_API_URL}/payments/mandates/me`,
+        idempotencyKey,
+      }).unwrap();
 
-    const getBrand = (number: string): any => {
-      if (number.startsWith("4")) return "visa";
-      if (
-        number.startsWith("506") ||
-        number.startsWith("507") ||
-        number.startsWith("6500")
-      )
-        return "verve";
-      return "mastercard";
-    };
+      const checkoutUrl = response?.data?.checkoutUrl;
+      const paymentRef = response?.data?.providerRef || response?.data?.id;
+      if (checkoutUrl) {
+        await WebBrowser.openBrowserAsync(checkoutUrl);
 
-    dispatch(
-      addCard({
-        id: Math.random().toString(36).substr(2, 9),
-        holderName: nameOnCard,
-        lastFour: cardNumber.slice(-4),
-        brand: getBrand(cardNumber),
-        isDefault: false,
-      }),
-    );
-    setShowSuccess(true);
+        if (paymentRef) {
+          setVerifying(true);
+          let verified = false;
+          for (let i = 0; i < 5; i++) {
+            try {
+              console.log(`Checking card linking status (Attempt ${i + 1}/5)...`);
+              const verifyRes = await verifyPayment(paymentRef).unwrap();
+              console.log("Card verify response:", JSON.stringify(verifyRes, null, 2));
+
+              const status = verifyRes?.data?.status;
+              if (status === "SUCCESSFUL" || status === "SUCCEEDED") {
+                verified = true;
+                break;
+              }
+            } catch (e) {
+              console.warn(`Card verification attempt ${i + 1} failed:`, e);
+            }
+            // Wait 2.5 seconds before retrying
+            await new Promise((resolve) => setTimeout(resolve, 2500));
+          }
+          setVerifying(false);
+
+          if (verified) {
+            try {
+              refetchMandates();
+            } catch (e) {
+              console.warn("Failed to refetch mandates:", e);
+            }
+            setShowSuccess(true);
+          } else {
+            Alert.alert(
+              "Linking Card",
+              "We are still finalizing your card connection. It will reflect in your payment methods shortly."
+            );
+          }
+        } else {
+          setShowSuccess(true);
+        }
+      } else {
+        throw new Error("Checkout URL not found in API response.");
+      }
+    } catch (err: any) {
+      console.error("Link mandate error:", err);
+      Alert.alert("Error", err?.data?.message || err?.message || "Failed to link payment method.");
+    }
   };
 
   const handleSuccessClose = () => {
@@ -81,101 +113,35 @@ export default function UseCardScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
       <StatusBar barStyle="dark-content" />
-      <Header title="Use Card" />
+      <Header title="Add Card / Bank Link" />
 
       <ScrollView
         className="flex-1 px-5 pt-4"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
-        <Text className="text-[14px] text-[#6B7280] mb-8">
-          Input your card details
-        </Text>
+        <View style={{ marginTop: 20, marginBottom: 30 }}>
+          <Text className="text-[15px] font-bold text-[#155D5F] mb-3">
+            Secure Payment Method Linking
+          </Text>
+          <Text className="text-[13px] text-[#4B5563] leading-[20px]">
+            To link your bank card or authorization mandate, you will be redirected to our secure payment gateway (Paga) to complete a verification step.
+          </Text>
+        </View>
 
         <View className="gap-y-6">
-          {/* Card Number */}
           <View>
-            <Text className="text-[14px] font-medium text-[#6B7280] mb-2">
-              Card number
+            <Text className="text-[14px] font-semibold text-[#323232] mb-2">
+              Billing Email Address
             </Text>
             <View className="h-16 bg-[#F9FAFB] border border-[#F3F4F6] rounded-2xl px-4 justify-center">
               <TextInput
-                placeholder="Enter card number"
+                placeholder="email@example.com"
                 placeholderTextColor="#9CA3AF"
-                value={cardNumber}
-                onChangeText={handleCardNumberChange}
-                keyboardType="numeric"
-                maxLength={16}
-                className="text-[15px] font-semibold text-[#111827]"
-              />
-            </View>
-          </View>
-
-          {/* Expiry and CVV */}
-          <View className="flex-row gap-x-4">
-            <View className="flex-1">
-              <Text className="text-[14px] font-medium text-[#6B7280] mb-2">
-                Expiry Date
-              </Text>
-              <View className="h-16 bg-[#F9FAFB] border border-[#F3F4F6] rounded-2xl px-4 justify-center">
-                <TextInput
-                  placeholder="MM / YY"
-                  placeholderTextColor="#9CA3AF"
-                  value={expiry}
-                  onChangeText={handleExpiryChange}
-                  maxLength={7}
-                  className="text-[15px] font-semibold text-[#111827]"
-                />
-              </View>
-            </View>
-            <View className="flex-1">
-              <Text className="text-[14px] font-medium text-[#6B7280] mb-2">
-                CVV
-              </Text>
-              <View className="h-16 bg-[#F9FAFB] border border-[#F3F4F6] rounded-2xl px-4 justify-center">
-                <TextInput
-                  placeholder="Enter Code"
-                  placeholderTextColor="#9CA3AF"
-                  value={cvv}
-                  onChangeText={setCvv}
-                  keyboardType="numeric"
-                  maxLength={3}
-                  className="text-[15px] font-semibold text-[#111827]"
-                />
-              </View>
-            </View>
-          </View>
-
-          {/* Name on Card */}
-          <View>
-            <Text className="text-[14px] font-medium text-[#6B7280] mb-2">
-              Name on card
-            </Text>
-            <View className="h-16 bg-[#F9FAFB] border border-[#F3F4F6] rounded-2xl px-4 justify-center">
-              <TextInput
-                placeholder="Enter name on card"
-                placeholderTextColor="#9CA3AF"
-                value={nameOnCard}
-                onChangeText={setNameOnCard}
-                className="text-[15px] font-semibold text-[#111827]"
-              />
-            </View>
-          </View>
-
-          {/* PIN */}
-          <View>
-            <Text className="text-[14px] font-medium text-[#6B7280] mb-2">
-              Pin
-            </Text>
-            <View className="h-16 bg-[#F9FAFB] border border-[#F3F4F6] rounded-2xl px-4 justify-center">
-              <TextInput
-                placeholder="Enter card PIN"
-                placeholderTextColor="#9CA3AF"
-                value={pin}
-                onChangeText={setPin}
-                secureTextEntry
-                keyboardType="numeric"
-                maxLength={4}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
                 className="text-[15px] font-semibold text-[#111827]"
               />
             </View>
@@ -184,10 +150,17 @@ export default function UseCardScreen() {
 
         <TouchableOpacity
           onPress={handleConfirm}
-          disabled={!isFormValid}
-          className={`mt-10 h-16 rounded-2xl items-center justify-center shadow-sm ${isFormValid ? "bg-[#155D5F]" : "bg-[#155D5F]/50"}`}
+          disabled={isLoading || verifying || !email}
+          className={`mt-10 h-16 rounded-2xl items-center justify-center shadow-sm ${email && !isLoading && !verifying ? "bg-[#155D5F]" : "bg-[#155D5F]/50"}`}
         >
-          <Text className="text-white text-base font-bold">Confirm</Text>
+          {isLoading || verifying ? (
+            <View className="flex-row items-center justify-center">
+              <ActivityIndicator size="small" color="white" className="mr-2" />
+              {verifying && <Text className="text-white font-semibold ml-2">Verifying card...</Text>}
+            </View>
+          ) : (
+            <Text className="text-white text-base font-bold">Link Payment Method</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
 
@@ -195,8 +168,8 @@ export default function UseCardScreen() {
         visible={showSuccess}
         onClose={handleSuccessClose}
         onConfirm={handleSuccessClose}
-        title="Card Added Successfully ✅"
-        description="Your card has been successfully added to your Wealthconomy account. You can now use it for seamless transactions."
+        title="Mandate Linked Successfully ✅"
+        description="Your card or bank authorization has been successfully linked to your account. You can now use it for direct debits and savings."
       />
     </SafeAreaView>
   );

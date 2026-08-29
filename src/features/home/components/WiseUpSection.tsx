@@ -59,7 +59,7 @@ export const WiseUpSection = ({
   scrollClassName = "-mx-5 px-5",
 }: WiseUpSectionProps = {}) => {
   const { data: response, isLoading } = useGetBlogsQuery({ publishToApp: true });
-  const blogs = response?.data;
+  const blogs = response?.data?.items || [];
 
   return (
     <View className={containerClassName}>

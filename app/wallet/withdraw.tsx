@@ -45,6 +45,7 @@ export default function WithdrawScreen() {
   const [userName, setUserName] = useState("");
   const [narrative, setNarrative] = useState("");
   const [bankSearchQuery, setBankSearchQuery] = useState("");
+  const [resolveError, setResolveError] = useState<string | null>(null);
   const [wealthPlan] = useState(plan || "WealthFlex");
 
   // Selected existing payout account id (if any)
@@ -76,30 +77,48 @@ export default function WithdrawScreen() {
     setSelectedBank("Select bank");
     setSelectedBankCode("");
     setUserName("");
+    setResolveError(null);
     setNarrative("");
     setSelectedPayoutAccountId(null);
   };
 
   // Auto-fetch account name
   useEffect(() => {
+    let isMounted = true;
     const resolveName = async () => {
       // If we already selected an existing payout account, we don't need to resolve
       if (selectedPayoutAccountId) return;
       
       if (accountNumber.length === 10 && selectedBankCode) {
+        setResolveError(null);
         try {
           const res = await resolveAccount({
             accountNumber,
             bankCode: selectedBankCode,
           }).unwrap();
-          setUserName(res.accountName);
-        } catch (error) {
-          console.error("Verification failed:", error);
-          setUserName(""); // Clear on failure
+          if (isMounted) {
+            setUserName(res.accountName);
+            setResolveError(null);
+          }
+        } catch (error: any) {
+          console.warn("Verification failed:", error);
+          if (isMounted) {
+            setUserName(""); // Clear on failure
+            setResolveError(
+              error?.data?.message ||
+                error?.message ||
+                "Unable to resolve account details. Please verify your account number."
+            );
+          }
         }
+      } else {
+        setResolveError(null);
       }
     };
     resolveName();
+    return () => {
+      isMounted = false;
+    };
   }, [accountNumber, selectedBankCode, resolveAccount, selectedPayoutAccountId]);
 
   useEffect(() => {
@@ -262,26 +281,35 @@ export default function WithdrawScreen() {
           <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
             Bank User's Name
           </Text>
-          <View className="relative">
+          <View
+            className={`bg-[#F8F8F8] p-4 rounded-xl flex-row items-center justify-between border ${resolveError ? "border-red-300" : userName ? "border-emerald-300" : "border-transparent"}`}
+          >
             <TextInput
-              placeholder="John Doe"
+              placeholder={isVerifying ? "Resolving account name..." : "Account name will appear here"}
               placeholderTextColor="#9CA3AF"
-              className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] pr-12"
+              className="text-[#1A1A1A] flex-1 font-semibold"
               value={userName}
-              onChangeText={setUserName}
-              editable={!isVerifying && !selectedPayoutAccountId}
+              editable={false}
             />
             {isVerifying && (
-              <View className="absolute right-4 top-4">
-                <ActivityIndicator size="small" color="#155D5F" />
-              </View>
+              <ActivityIndicator size="small" color="#155D5F" />
             )}
+            {!isVerifying && userName ? (
+              <View className="w-5 h-5 bg-emerald-100 rounded-full items-center justify-center">
+                <Ionicons name="checkmark" size={12} color="#059669" />
+              </View>
+            ) : null}
           </View>
+          {resolveError && (
+            <Text className="text-[12px] text-red-500 font-medium mt-1.5 px-1">
+              {resolveError}
+            </Text>
+          )}
         </View>
 
         <View>
           <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
-            Narrative
+            Narrative (Optional)
           </Text>
           <TextInput
             placeholder="Purpose (e.g. Rent)"
@@ -295,10 +323,11 @@ export default function WithdrawScreen() {
 
       {(() => {
         const isFormValid =
-          amount &&
+          parseFloat(amount.replace(/[^\d.]/g, "")) > 0 &&
           accountNumber.length === 10 &&
           selectedBank !== "Select bank" &&
-          userName;
+          userName.trim().length > 0 &&
+          !resolveError;
         return (
           <ThemedButton
             title="Proceed"
@@ -358,9 +387,9 @@ export default function WithdrawScreen() {
           </View>
 
           <View className="space-y-4 gap-4">
-            {getFilteredBanks().map((bank) => (
+            {getFilteredBanks().map((bank, index) => (
               <TouchableOpacity
-                key={bank.code}
+                key={`${bank.code || ""}-${index}`}
                 onPress={() => {
                   setSelectedBank(bank.name);
                   setSelectedBankCode(bank.code);

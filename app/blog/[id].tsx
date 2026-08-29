@@ -210,7 +210,7 @@ export default function BlogDetailScreen() {
             />
             <View className="flex-1">
               <Text className="text-[#1A1A1A] font-bold text-xs">
-                {blog.author}
+                {typeof blog.author === 'string' ? blog.author : blog.author?.name}
               </Text>
               <Text className="text-[#6B7280] text-[10px]">
                 {blog.timeAgo}{blog.readingDuration ? ` • ${blog.readingDuration}` : ""}

@@ -38,12 +38,13 @@ export default function KYCLevel2Screen() {
     useScanIdMutation();
   const [faceVerify, { isLoading: isVerifyingFace, error: faceVerifyError }] =
     useFaceVerifyMutation();
-  const { uploadImage } = useImageUpload();
+  const { uploadImage, isLoading: isUploadingImage } = useImageUpload();
 
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7>(1);
   const [capturedSelfie, setCapturedSelfie] = useState<string | undefined>(undefined);
   const [capturedSelfieBase64, setCapturedSelfieBase64] = useState<string | undefined>(undefined);
   const [capturedIdPhoto, setCapturedIdPhoto] = useState<string | undefined>(undefined);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   // Form data for Step 1
   const [formData, setFormData] = useState<FormData>({
@@ -127,7 +128,7 @@ export default function KYCLevel2Screen() {
           firstName: newFirstName || "",
           dateOfBirth: newDob || "",
           idType: kycData?.idType || prev.idType || "",
-          nin: kycData?.idNumber || prev.nin || "",
+          idNumber: kycData?.idNumber || prev.idNumber || "",
         };
       });
 
@@ -142,7 +143,7 @@ export default function KYCLevel2Screen() {
     firstName: `${user?.firstName || ""} ${user?.lastName || ""}`.trim(),
     dateOfBirth: "",
     idType: "",
-    nin: "",
+    idNumber: "",
     expires: "",
   });
 
@@ -158,7 +159,7 @@ export default function KYCLevel2Screen() {
     }
   };
 
-  const formatToISO8601 = (dateStr: string): string => {
+  const formatToYYYYMMDD = (dateStr: string): string => {
     if (!dateStr) return "";
 
     const parts = dateStr.split("/").map((part) => part.trim());
@@ -183,13 +184,16 @@ export default function KYCLevel2Screen() {
         day >= 1 &&
         day <= 31
       ) {
-        return new Date(Date.UTC(year, month - 1, day)).toISOString();
+        return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       }
     }
 
     const fallback = new Date(dateStr);
     if (!isNaN(fallback.getTime())) {
-      return fallback.toISOString();
+      const y = fallback.getFullYear();
+      const m = String(fallback.getMonth() + 1).padStart(2, "0");
+      const d = String(fallback.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
     }
 
     return "";
@@ -198,10 +202,10 @@ export default function KYCLevel2Screen() {
   // Step 1 Submission
   const handleStep1Continue = async () => {
     try {
-      const isoDateOfBirth = formatToISO8601(formData.dateOfBirth);
+      const formattedDateOfBirth = formatToYYYYMMDD(formData.dateOfBirth);
       const payload = {
         bvn: formData.bvn,
-        dateOfBirth: isoDateOfBirth,
+        dateOfBirth: formattedDateOfBirth,
         firstName: formData.firstName,
         lastName: formData.lastName,
         nextOfKinName: formData.nextOfKinName || user?.nextOfKinName || "",
@@ -231,13 +235,17 @@ export default function KYCLevel2Screen() {
 
   // Step 3 Submission
   const handleStep3Confirm = async (data: ScannedData) => {
+    setLocalError(null);
     try {
       const fallbackPhoto = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=80";
-      const imageUrl = await uploadImage(capturedIdPhoto || fallbackPhoto, { name: "id_card.jpg" });
+      const imageUrl = await uploadImage(capturedIdPhoto || fallbackPhoto, {
+        name: "id_card.jpg",
+        allowFallback: false,
+      });
 
       const payload = {
         idType: data.idType,
-        idNumber: data.nin,
+        idNumber: data.idNumber,
         idImageUrl: imageUrl,
       };
       console.log("\n================ [KYC 2 DEBUG - SCAN ID PAYLOAD] ================");
@@ -251,9 +259,10 @@ export default function KYCLevel2Screen() {
 
       setScannedData(data);
       setStep(4);
-    } catch (err) {
+    } catch (err: any) {
       console.log("\n❌ [KYC 2 DEBUG - SCAN ID ERROR]:", err);
       console.log("=================================================================\n");
+      setLocalError(err?.data?.message || err?.message || "Failed to upload ID image. Please try again.");
     }
   };
 
@@ -348,8 +357,8 @@ export default function KYCLevel2Screen() {
           photoUri={capturedIdPhoto}
           onConfirm={handleStep3Confirm}
           onBack={handleBack}
-          isLoading={isScanningId}
-          error={formatErrorMessage(scanIdError)}
+          isLoading={isScanningId || isUploadingImage}
+          error={localError || formatErrorMessage(scanIdError)}
         />
       )}
 

@@ -4,14 +4,14 @@ import { BlogSkeleton } from "@/src/features/wise-up/components/BlogSkeleton";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ReadingListScreen() {
   const router = useRouter();
 
   const { data: response, isLoading } = useGetBookmarkedBlogsQuery();
-  const bookmarkedBlogs = response?.data;
+  const bookmarkedBlogs = response?.data?.items || [];
 
   const [toggleBookmark] = useToggleBookmarkMutation();
 

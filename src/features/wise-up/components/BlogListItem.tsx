@@ -110,7 +110,7 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
             />
             <View>
               <Text className="text-[#6B7280] text-[9px] font-bold leading-tight">
-                {blog.author}
+                {typeof blog.author === 'string' ? blog.author : blog.author?.name}
               </Text>
               <Text className="text-[#9CA3AF] text-[8px] font-medium leading-tight">
                 {blog.timeAgo}{blog.readingDuration ? ` • ${blog.readingDuration}` : ""}

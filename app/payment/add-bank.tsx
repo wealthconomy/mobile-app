@@ -1,7 +1,10 @@
-import { Bank, bankService } from "@/src/api/bankService";
+import {
+  useAddPayoutAccountMutation,
+  useGetSupportedBanksQuery,
+  useResolveBankAccountMutation,
+} from "@/src/store/api/payoutAccountApi";
+import { PayoutBank } from "@/src/types/wallet";
 import Header from "@/src/components/common/Header";
-import { AppDispatch } from "@/src/store";
-import { addBank } from "@/src/store/slices/paymentSlice";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -15,55 +18,103 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useDispatch } from "react-redux";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function AddBankScreen() {
   const router = useRouter();
-  const dispatch = useDispatch<AppDispatch>();
+  const insets = useSafeAreaInsets();
 
   const [accountNumber, setAccountNumber] = useState("");
-  const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
-  const [userName, setUserName] = useState("Simon John"); // Auto-filled for demo
-  const [narrative, setNarrative] = useState("Gift");
+  const [selectedBank, setSelectedBank] = useState<PayoutBank | null>(null);
+  const [userName, setUserName] = useState("");
+  const [resolveError, setResolveError] = useState<string | null>(null);
+  const [narrative, setNarrative] = useState("");
   const [showBankPicker, setShowBankPicker] = useState(false);
-  const [banks, setBanks] = useState<Bank[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [loadingBanks, setLoadingBanks] = useState(false);
 
+  const { data: banksData, isLoading: loadingBanks } = useGetSupportedBanksQuery();
+  const banks = banksData?.items || [];
+
+  const [resolveAccount, { isLoading: isResolving }] = useResolveBankAccountMutation();
+  const [addPayoutAccount, { isLoading: isAdding }] = useAddPayoutAccountMutation();
+
+  // Auto-resolve account name on account number & bank selection
   useEffect(() => {
-    const loadBanks = async () => {
-      setLoadingBanks(true);
-      try {
-        const fetchedBanks = await bankService.fetchBanks();
-        setBanks(fetchedBanks);
-      } catch (error) {
-        console.error("Error loading banks:", error);
-      } finally {
-        setLoadingBanks(false);
+    let isMounted = true;
+    const resolve = async () => {
+      if (accountNumber.length === 10 && selectedBank?.code) {
+        setResolveError(null);
+        try {
+          const payload = {
+            accountNumber,
+            bankCode: selectedBank.code,
+          };
+          console.log("=== API REQUEST ===");
+          console.log("Endpoint: POST /api/v1/payout-accounts/resolve");
+          console.log("Payload:", JSON.stringify(payload, null, 2));
+          
+          const res = await resolveAccount(payload).unwrap();
+          
+          console.log("=== API RESPONSE ===");
+          console.log("Success:", JSON.stringify(res, null, 2));
+          
+          if (isMounted) {
+            setUserName(res.accountName);
+            setResolveError(null);
+          }
+        } catch (error: any) {
+          console.log("=== API ERROR ===");
+          console.log("Error:", JSON.stringify(error, null, 2));
+          console.warn("Bank verification failed:", error);
+          if (isMounted) {
+            setUserName("");
+            setResolveError(
+              error?.data?.message ||
+                error?.message ||
+                "Unable to resolve account details. Please verify your account number."
+            );
+          }
+        }
+      } else {
+        setUserName("");
+        setResolveError(null);
       }
     };
-    loadBanks();
-  }, []);
+    resolve();
+    return () => {
+      isMounted = false;
+    };
+  }, [accountNumber, selectedBank, resolveAccount]);
 
   const filteredBanks = banks.filter((bank) =>
     bank.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const handleAddBank = () => {
-    if (!accountNumber || !selectedBank) return;
+  const handleAddBank = async () => {
+    if (!accountNumber || !selectedBank || !userName) return;
 
-    dispatch(
-      addBank({
-        id: Math.random().toString(36).substr(2, 9),
-        name: userName,
+    try {
+      await addPayoutAccount({
+        accountNumber,
+        bankCode: selectedBank.code,
         bankName: selectedBank.name,
-        accountNumber: accountNumber,
-      }),
-    );
-    router.back();
+      }).unwrap();
+      Alert.alert("Success", "Bank account added successfully!");
+      router.back();
+    } catch (err: any) {
+      console.error("Failed to add payout account:", err);
+      Alert.alert("Error", err?.data?.message || err?.message || "Failed to add bank account");
+    }
   };
+
+  const isFormReady =
+    accountNumber.length === 10 &&
+    !!selectedBank &&
+    !!userName.trim() &&
+    !isAdding &&
+    !isResolving;
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
@@ -86,7 +137,10 @@ export default function AddBankScreen() {
                 placeholder="Enter 10-digit account number"
                 placeholderTextColor="#9CA3AF"
                 value={accountNumber}
-                onChangeText={setAccountNumber}
+                onChangeText={(val) => {
+                  setAccountNumber(val);
+                  setResolveError(null);
+                }}
                 keyboardType="numeric"
                 maxLength={10}
                 className="text-[15px] font-semibold text-[#111827]"
@@ -122,22 +176,41 @@ export default function AddBankScreen() {
             <Text className="text-[14px] font-medium text-[#6B7280] mb-2">
               Bank User's Name
             </Text>
-            <View className="h-16 bg-[#F9FAFB] border border-[#F3F4F6] rounded-2xl px-4 justify-center">
+            <View
+              className={`h-16 bg-[#F9FAFB] border ${resolveError ? "border-red-300" : userName ? "border-emerald-300" : "border-[#F3F4F6]"} rounded-2xl px-4 flex-row items-center justify-between`}
+            >
               <TextInput
                 value={userName}
-                onChangeText={setUserName}
-                className="text-[15px] font-semibold text-[#111827]"
+                placeholder={isResolving ? "Resolving account name..." : "Account name will appear here"}
+                placeholderTextColor="#9CA3AF"
+                editable={false}
+                className="text-[15px] font-semibold text-[#111827] flex-1"
               />
+              {isResolving && (
+                <ActivityIndicator size="small" color="#155D5F" />
+              )}
+              {!isResolving && userName ? (
+                <View className="w-6 h-6 bg-emerald-100 rounded-full items-center justify-center">
+                  <Ionicons name="checkmark" size={14} color="#059669" />
+                </View>
+              ) : null}
             </View>
+            {resolveError && (
+              <Text className="text-[12px] text-red-500 font-medium mt-1.5 px-1">
+                {resolveError}
+              </Text>
+            )}
           </View>
 
           {/* Narrative */}
           <View>
             <Text className="text-[14px] font-medium text-[#6B7280] mb-2">
-              Narrative
+              Narrative (Optional)
             </Text>
             <View className="h-16 bg-[#F9FAFB] border border-[#F3F4F6] rounded-2xl px-4 justify-center">
               <TextInput
+                placeholder="e.g. My primary savings account"
+                placeholderTextColor="#9CA3AF"
                 value={narrative}
                 onChangeText={setNarrative}
                 className="text-[15px] font-semibold text-[#111827]"
@@ -148,10 +221,14 @@ export default function AddBankScreen() {
 
         <TouchableOpacity
           onPress={handleAddBank}
-          disabled={!accountNumber || !selectedBank}
-          className={`mt-10 h-16 rounded-2xl items-center justify-center ${accountNumber && selectedBank ? "bg-[#155D5F]" : "bg-[#155D5F]/50"}`}
+          disabled={!isFormReady}
+          className={`mt-10 h-16 rounded-2xl items-center justify-center ${isFormReady ? "bg-[#155D5F]" : "bg-[#155D5F]/40"}`}
         >
-          <Text className="text-white text-base font-bold">Add Bank</Text>
+          {isAdding ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <Text className="text-white text-base font-bold">Add Bank</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
 
@@ -161,19 +238,15 @@ export default function AddBankScreen() {
         animationType="slide"
         onRequestClose={() => setShowBankPicker(false)}
       >
-        <View className="flex-1 bg-white">
-          <View className="bg-white border-b border-[#F3F4F6]">
-            <SafeAreaView edges={["top"]}>
-              <View className="px-5 h-14 flex-row items-center">
-                <TouchableOpacity
-                  onPress={() => setShowBankPicker(false)}
-                  className="mr-4"
-                >
-                  <Ionicons name="close" size={28} color="#000" />
-                </TouchableOpacity>
-                <Text className="text-lg font-bold">Select Bank</Text>
-              </View>
-            </SafeAreaView>
+        <View style={{ paddingTop: insets.top, flex: 1 }} className="bg-white">
+          <View className="px-5 h-14 flex-row items-center border-b border-[#F3F4F6]">
+            <TouchableOpacity
+              onPress={() => setShowBankPicker(false)}
+              className="mr-4"
+            >
+              <Ionicons name="close" size={28} color="#000" />
+            </TouchableOpacity>
+            <Text className="text-lg font-bold">Select Bank</Text>
           </View>
 
           <View className="px-5 py-4">
@@ -200,7 +273,7 @@ export default function AddBankScreen() {
           ) : (
             <FlatList
               data={filteredBanks}
-              keyExtractor={(item) => item.code}
+              keyExtractor={(item, index) => `${item.code || ""}-${index}`}
               className="px-5"
               renderItem={({ item }) => (
                 <TouchableOpacity

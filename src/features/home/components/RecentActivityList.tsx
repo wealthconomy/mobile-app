@@ -1,5 +1,7 @@
 import { ArrowUpRight, ShieldCheck, UserPlus } from "lucide-react-native";
 import React from "react";
+import { useGetMyActivitiesQuery } from "@/src/store/api/activityApi";
+import { RecentActivitySkeleton } from "./DashboardSkeletons";
 import { Text, View } from "react-native";
 
 interface ActivityItemProps {
@@ -44,49 +46,65 @@ const ActivityItem = ({
 );
 
 export const RecentActivityList = () => {
+  const { data: response, isLoading } = useGetMyActivitiesQuery({ limit: 5 });
+  
+
+  const activities = response?.data?.items || [];
+
+  const getIconData = (type: string) => {
+    switch (type) {
+      case "FINANCIAL":
+        return { icon: <ArrowUpRight size={20} color="#155D5F" />, bg: "#D1F2F2" };
+      case "SECURITY":
+        return { icon: <ShieldCheck size={20} color="#155D5F" />, bg: "#E7EFEF" };
+      case "SYSTEM":
+      default:
+        return { icon: <UserPlus size={20} color="#155D5F" />, bg: "#E7EFEF" };
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + 
+           " | " + 
+           date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  if (isLoading) {
+    return (
+      <View className="mb-4">
+        <RecentActivitySkeleton />
+        <RecentActivitySkeleton />
+        <RecentActivitySkeleton />
+      </View>
+    );
+  }
+
+  if (activities.length === 0) {
+    return (
+      <View className="mb-4 bg-[#F8F8F8] rounded-[40px] p-8 items-center justify-center">
+        <Text className="text-[#9CA3AF] font-medium text-sm">No recent activities</Text>
+      </View>
+    );
+  }
+
   return (
     <View className="mb-4">
       <View className="bg-[#F8F8F8] rounded-[40px] p-4 pt-6">
-        <ActivityItem
-          title="Transfer to Wealth Flex"
-          subtitle="April 12, 2023 | 09:45:00"
-          amount="+N68,000.00"
-          status="Successful"
-          icon={<ArrowUpRight size={20} color="#155D5F" />}
-          iconBg="#D1F2F2"
-        />
-        <ActivityItem
-          title="Account Registered"
-          subtitle="April 12, 2023 | 09:45:00"
-          icon={<UserPlus size={20} color="#155D5F" />}
-          iconBg="#E7EFEF"
-        />
-        <ActivityItem
-          title="Password Changed"
-          subtitle="April 12, 2023 | 09:45:00"
-          icon={<ShieldCheck size={20} color="#155D5F" />}
-          iconBg="#E7EFEF"
-        />
-         <ActivityItem
-          title="Transfer to Wealth Flex"
-          subtitle="April 12, 2023 | 09:45:00"
-          amount="+N68,000.00"
-          status="Successful"
-          icon={<ArrowUpRight size={20} color="#155D5F" />}
-          iconBg="#D1F2F2"
-        />
-        <ActivityItem
-          title="Account Registered"
-          subtitle="April 12, 2023 | 09:45:00"
-          icon={<UserPlus size={20} color="#155D5F" />}
-          iconBg="#E7EFEF"
-        />
-        <ActivityItem
-          title="Password Changed"
-          subtitle="April 12, 2023 | 09:45:00"
-          icon={<ShieldCheck size={20} color="#155D5F" />}
-          iconBg="#E7EFEF"
-        />
+        {activities.map((activity) => {
+          const { icon, bg } = getIconData(activity.type);
+          return (
+            <ActivityItem
+              key={activity.id}
+              title={activity.title}
+              subtitle={formatDate(activity.createdAt)}
+              amount={activity.metadata?.amount ? `+N${activity.metadata.amount}` : undefined}
+              status={activity.metadata?.status || undefined}
+              icon={icon}
+              iconBg={bg}
+            />
+          );
+        })}
       </View>
     </View>
   );

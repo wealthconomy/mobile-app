@@ -26,7 +26,7 @@ export default function LibraryMaterialDetailScreen() {
   const [newComment, setNewComment] = useState("");
 
   const { data: response, isLoading } = useGetLibraryMaterialsQuery({ publishToApp: true });
-  const material = response?.data?.find(m => m.id === id);
+  const material = response?.data?.items?.find(m => m.id === id);
 
   const [recordDownload] = useRecordDownloadMutation();
   const [addLibraryComment, { isLoading: isCommenting }] = useAddLibraryCommentMutation();

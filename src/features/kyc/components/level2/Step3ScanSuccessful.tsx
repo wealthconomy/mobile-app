@@ -33,7 +33,7 @@ export interface ScannedData {
   firstName: string;
   dateOfBirth: string;
   idType: string;
-  nin: string;
+  idNumber: string;
   expires: string;
 }
 
@@ -53,7 +53,7 @@ export const Step3ScanSuccessful: React.FC<Step3ScanSuccessfulProps> = ({
     firstName: "",
     dateOfBirth: "",
     idType: "",
-    nin: "",
+    idNumber: "",
     expires: "",
   },
   photoUri,
@@ -148,11 +148,11 @@ export const Step3ScanSuccessful: React.FC<Step3ScanSuccessfulProps> = ({
               bgVariant="white"
             />
 
-            {/* National Identification Number (NIN) */}
+            {/* Dynamic ID Number Field */}
             <KycFormInput
-              label="National Identification Number (NIN)"
-              value={data.nin}
-              onChangeText={(text) => handleChange("nin", text)}
+              label={data.idType ? `${data.idType} Number` : "ID Number"}
+              value={data.idNumber}
+              onChangeText={(text) => handleChange("idNumber", text)}
               bgVariant="white"
             />
 

@@ -1,4 +1,6 @@
 import Header from "@/src/components/common/Header";
+import { useGetMyActivitiesQuery, activityApi } from "@/src/store/api/activityApi";
+import { UserActivity } from "@/src/types/activity";
 import {
   FontAwesome5,
   Ionicons,
@@ -17,97 +19,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-interface Activity {
-  id: string;
-  type: string;
-  date: string;
-  time: string;
-  amount?: string;
-  status?: "Successful" | "Failed" | "Pending";
-  category:
-    | "account_registered"
-    | "password_changed"
-    | "kyc"
-    | "level_upgrade"
-    | "transfer"
-    | "received"
-    | "wealthflex";
-  isCredit?: boolean;
-}
 
-const ACTIVITIES: Activity[] = [
-  {
-    id: "1",
-    type: "Account Registered",
-    date: "April 12, 2023",
-    time: "09:45:00",
-    category: "account_registered",
-  },
-  {
-    id: "2",
-    type: "Password Changed",
-    date: "April 12, 2023",
-    time: "09:45:00",
-    category: "password_changed",
-  },
-  {
-    id: "3",
-    type: "Transfer to Wealth Flex",
-    date: "April 12, 2023",
-    time: "09:45:00",
-    amount: "68,000.00",
-    status: "Successful",
-    category: "wealthflex",
-    isCredit: true,
-  },
-  {
-    id: "4",
-    type: "Level 3 Completed",
-    date: "April 12, 2023",
-    time: "09:45:00",
-    category: "level_upgrade",
-  },
-  {
-    id: "5",
-    type: "Transfer to Olaniyi",
-    date: "April 12, 2023",
-    time: "09:45:00",
-    amount: "68,000.00",
-    status: "Failed",
-    category: "transfer",
-    isCredit: false,
-  },
-  {
-    id: "6",
-    type: "Received from Oluwatope",
-    date: "April 12, 2023",
-    time: "09:45:00",
-    amount: "68,000.00",
-    status: "Pending",
-    category: "received",
-    isCredit: true,
-  },
-  {
-    id: "7",
-    type: "Transfer to Olaniyi",
-    date: "April 12, 2023",
-    time: "09:45:00",
-    amount: "68,000.00",
-    status: "Successful",
-    category: "transfer",
-    isCredit: false,
-  },
-  {
-    id: "8",
-    type: "Received from Oluwatope",
-    date: "April 12, 2023",
-    time: "09:45:00",
-    amount: "68,000.00",
-    status: "Successful",
-    category: "received",
-    isCredit: true,
-  },
-];
 
 const MONTHS = [
   "January",
@@ -129,6 +41,19 @@ export default function ActivitiesScreen() {
   const [date, setDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
   const [viewDate, setViewDate] = useState(new Date());
+
+  const { data: response, isLoading, isFetching } = useGetMyActivitiesQuery({ limit: 20 });
+  const [fetchMore] = activityApi.endpoints.getMyActivities.useLazyQuery();
+
+  const activities = response?.data?.items || [];
+  const nextCursor = response?.data?.nextCursor;
+  const hasNext = response?.data?.hasNext;
+
+  const handleLoadMore = () => {
+    if (hasNext && nextCursor && !isFetching) {
+      fetchMore({ limit: 20, after: nextCursor, _append: true });
+    }
+  };
 
   const isToday = (d: Date) => {
     const today = new Date();
@@ -231,7 +156,7 @@ export default function ActivitiesScreen() {
           style={{ width: 383, alignSelf: "center" }}
         >
           <FlatList
-            data={ACTIVITIES}
+            data={activities}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <ActivityItem
@@ -243,6 +168,13 @@ export default function ActivitiesScreen() {
             )}
             ItemSeparatorComponent={() => <View className="h-[10px]" />}
             showsVerticalScrollIndicator={false}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            ListEmptyComponent={() => (
+              <View className="py-10 items-center justify-center">
+                <Text className="text-gray-400">No activities found</Text>
+              </View>
+            )}
           />
         </View>
       </View>
@@ -314,66 +246,55 @@ const ActivityItem = ({
   item,
   onPress,
 }: {
-  item: Activity;
+  item: UserActivity;
   onPress: () => void;
 }) => {
+  const isCredit = item.metadata?.isCredit;
+
   const getIcon = () => {
-    switch (item.category) {
-      case "account_registered":
-        return (
-          <MaterialCommunityIcons
-            name="account-check-outline"
-            size={22}
-            color="#155D5F"
-          />
-        );
-      case "password_changed":
-        return (
-          <View className="flex-row items-center justify-center">
-            <Text className="text-[#155D5F] font-bold text-xs">***</Text>
-          </View>
-        );
-      case "wealthflex":
-        return <Ionicons name="people-outline" size={22} color="#155D5F" />;
-      case "level_upgrade":
-        return <FontAwesome5 name="medal" size={18} color="#FF9800" />;
-      case "transfer":
-        return <Ionicons name="arrow-up" size={20} color="white" />;
-      case "received":
-        return <Ionicons name="arrow-down" size={20} color="white" />;
+    switch (item.type) {
+      case "FINANCIAL":
+        return <Ionicons name={isCredit ? "arrow-down" : "arrow-up"} size={20} color="white" />;
+      case "SECURITY":
+        return <Ionicons name="shield-checkmark" size={20} color="#155D5F" />;
+      case "SYSTEM":
       default:
-        return <Ionicons name="help" size={20} color="white" />;
+        return <Ionicons name="person" size={20} color="#155D5F" />;
     }
   };
 
   const getIconBg = () => {
-    switch (item.category) {
-      case "account_registered":
-      case "password_changed":
-        return "bg-[#E7EFEF]";
-      case "wealthflex":
-        return "bg-[#D1F2F2]";
-      case "level_upgrade":
-        return "bg-white border border-gray-100";
-      default:
+    switch (item.type) {
+      case "FINANCIAL":
         return "bg-[#155D5F]";
+      case "SECURITY":
+      case "SYSTEM":
+      default:
+        return "bg-[#E7EFEF]";
     }
   };
 
   const getStatusStyle = (status: string) => {
-    switch (status) {
-      case "Successful":
+    switch (status?.toLowerCase()) {
+      case "successful":
+      case "success":
         return { bg: "bg-[#E7F5F5]", text: "text-[#155D5F]" };
-      case "Failed":
+      case "failed":
         return { bg: "bg-[#FFEBEE]", text: "text-[#FF5252]" };
-      case "Pending":
+      case "pending":
         return { bg: "bg-[#FFF3E0]", text: "text-[#EF6C00]" };
       default:
-        return { bg: "bg-transparent", text: "text-transparent" };
+        return { bg: "bg-[#E7F5F5]", text: "text-[#155D5F]" };
     }
   };
 
-  const statusStyle = item.status ? getStatusStyle(item.status) : null;
+  const status = item.metadata?.status;
+  const amount = item.metadata?.amount;
+  const statusStyle = status ? getStatusStyle(status) : null;
+
+  const dateObj = new Date(item.createdAt);
+  const dateStr = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const timeStr = dateObj.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
   return (
     <TouchableOpacity
@@ -393,24 +314,24 @@ const ActivityItem = ({
           className="text-[15px] font-bold text-[#323232] mb-0.5"
           numberOfLines={1}
         >
-          {item.type}
+          {item.title}
         </Text>
         <Text className="text-[12px] text-[#9CA3AF] font-medium">
-          {item.date} | {item.time}
+          {dateStr} | {timeStr}
         </Text>
       </View>
 
-      {(item.amount || item.status) && (
+      {(amount || status) && (
         <View className="items-end">
-          {item.amount && (
+          {amount && (
             <Text className="text-[15px] font-bold mb-1 text-[#323232]">
-              {item.isCredit ? "+" : "-"}₦{item.amount}
+              {isCredit ? "+" : "-"}₦{amount}
             </Text>
           )}
           {statusStyle && (
             <View className={`${statusStyle.bg} px-3 py-1 rounded-[10px]`}>
               <Text className={`text-[10px] font-bold ${statusStyle.text}`}>
-                {item.status}
+                {status}
               </Text>
             </View>
           )}

@@ -14,7 +14,11 @@ export type Category = string;
 export interface Blog {
   id: string;
   title: string;
-  author: string;
+  author: {
+    id: string;
+    name: string;
+    image: string;
+  };
   authorAvatar: string;
   content: string;
   category: Category;

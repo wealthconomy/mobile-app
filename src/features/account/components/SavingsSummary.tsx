@@ -30,17 +30,16 @@ export const SavingsSummary = React.memo(
       ) {
         return { integerPart: "₦0", decimalPart: ".00" };
       }
-      const numStr =
-        typeof totalSavings === "number"
-          ? totalSavings.toFixed(2)
-          : String(totalSavings);
-      const cleaned = numStr.replace(/[^0-9.]/g, "");
-      const parts = cleaned.split(".");
+      const rawVal = typeof totalSavings === "number" ? totalSavings : parseFloat(String(totalSavings).replace(/[^0-9.]/g, ""));
+      if (isNaN(rawVal)) {
+        return { integerPart: "₦0", decimalPart: ".00" };
+      }
+      const nairaVal = rawVal / 100;
+      const numStr = nairaVal.toFixed(2);
+      const parts = numStr.split(".");
       const integerVal = Number(parts[0] || 0);
       const formattedInt = `₦${integerVal.toLocaleString("en-NG")}`;
-      const decimalVal = parts[1]
-        ? `.${parts[1].slice(0, 2).padEnd(2, "0")}`
-        : ".00";
+      const decimalVal = `.${parts[1] || "00"}`;
       return { integerPart: formattedInt, decimalPart: decimalVal };
     }, [totalSavings]);
 
@@ -52,12 +51,13 @@ export const SavingsSummary = React.memo(
       ) {
         return "₦0.00";
       }
-      const numVal =
+      const rawVal =
         typeof dailyGrowth === "number"
           ? dailyGrowth
-          : Number(String(dailyGrowth).replace(/[^0-9.]/g, ""));
-      if (isNaN(numVal) || numVal === 0) return "₦0.00";
-      return `₦${numVal.toLocaleString("en-NG", {
+          : parseFloat(String(dailyGrowth).replace(/[^0-9.]/g, ""));
+      if (isNaN(rawVal) || rawVal === 0) return "₦0.00";
+      const nairaVal = rawVal / 100;
+      return `₦${nairaVal.toLocaleString("en-NG", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}`;

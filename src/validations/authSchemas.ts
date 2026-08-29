@@ -28,7 +28,7 @@ export const registerSchema = z
       .string()
       .min(10, { message: "Please enter a valid phone number" })
       .optional(),
-    wealthPreference: z.string().optional(),
+    wealthPreference: z.string().min(1, { message: "Wealth preference is required" }),
     agreeToTerms: z
       .boolean()
       .refine((val) => val === true, { message: "You must agree to the Terms and Conditions" }),

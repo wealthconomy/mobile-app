@@ -63,6 +63,15 @@ describe("Authentication Zod Schemas", () => {
       }
     });
 
+    it("should fail when wealthPreference is missing", () => {
+      const { wealthPreference, ...dataWithoutWealthPreference } = validRegistration;
+      const result = registerSchema.safeParse(dataWithoutWealthPreference);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe("Required");
+      }
+    });
+
     it("should fail when passwords do not match", () => {
       const result = registerSchema.safeParse({
         ...validRegistration,

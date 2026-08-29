@@ -29,12 +29,9 @@ export default function WiseUpScreen() {
 
   const { data: response, isLoading } = useGetBlogsQuery({ publishToApp: true });
   
-  if (response) {
-    console.log("=== ALL BLOGS API RESPONSE ===");
-    console.log(JSON.stringify(response, null, 2));
-  }
 
-  const allBlogs = response?.data || [];
+
+  const allBlogs = response?.data?.items || [];
 
   const [toggleBookmark] = useToggleBookmarkMutation();
 
@@ -76,13 +73,22 @@ export default function WiseUpScreen() {
           </TouchableOpacity>
         </View>
         
-        <View className="mb-6">
-          <Text className="text-[#1A1A1A] font-extrabold text-[28px]">
-            Hi WiseUp!
-          </Text>
-          <Text className="text-[#6B7280] text-sm mt-1">
-            Get smart about money and build wealth
-          </Text>
+        <View className="flex-row justify-between items-center mb-6">
+          <View className="flex-1 pr-4">
+            <Text className="text-[#1A1A1A] font-extrabold text-[28px]">
+              Hi WiseUp!
+            </Text>
+            <Text className="text-[#6B7280] text-sm mt-1">
+              Get smart about money and build wealth
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => router.push("/education/library" as any)}
+            className="bg-[#155D5F] px-3 py-2 rounded-lg flex-row items-center"
+          >
+            <Ionicons name="library-outline" size={16} color="white" />
+            <Text className="text-white ml-1 text-xs font-bold">Library</Text>
+          </TouchableOpacity>
         </View>
 
         <View className="flex-row items-center bg-[#F8F8F8] px-4 py-2 rounded-xl mb-6">

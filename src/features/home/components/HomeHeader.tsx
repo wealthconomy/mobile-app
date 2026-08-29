@@ -44,7 +44,7 @@ export const HomeHeader = () => {
           Hello, WealthBuilder!
         </Text>
         <Text className="text-[#323232] text-[20px] font-extrabold tracking-[-0.5px]">
-          {user?.name || "Simon"}
+          {user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : "Wealth Builder"}
         </Text>
       </View>
 

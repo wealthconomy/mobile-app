@@ -6,7 +6,13 @@ export const payoutAccountApi = baseApi.injectEndpoints({
     getSupportedBanks: builder.query<{ items: PayoutBank[] }, void>({
       query: () => "/payout-accounts/banks",
       providesTags: ["PayoutAccount"],
-      transformResponse: (response: { data: { items: PayoutBank[] } }) => response.data,
+      transformResponse: (response: any) => {
+        const data = response?.data;
+        if (Array.isArray(data)) {
+          return { items: data };
+        }
+        return data || { items: [] };
+      },
     }),
     resolveBankAccount: builder.mutation<{ accountName: string; accountNumber: string }, { bankCode: string; accountNumber: string }>({
       query: (body) => ({
@@ -14,7 +20,9 @@ export const payoutAccountApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
-      transformResponse: (response: { data: { accountName: string; accountNumber: string } }) => response.data,
+      transformResponse: (response: any) => {
+        return response?.data || response;
+      },
     }),
     addPayoutAccount: builder.mutation<{ id: string }, { bankCode: string; accountNumber: string; bankName: string }>({
       query: (body) => ({
@@ -23,12 +31,20 @@ export const payoutAccountApi = baseApi.injectEndpoints({
         body,
       }),
       invalidatesTags: ["PayoutAccount"],
-      transformResponse: (response: { data: { id: string } }) => response.data,
+      transformResponse: (response: any) => {
+        return response?.data || response;
+      },
     }),
     getUserPayoutAccounts: builder.query<{ items: PayoutAccount[] }, void>({
       query: () => "/payout-accounts",
       providesTags: ["PayoutAccount"],
-      transformResponse: (response: { data: { items: PayoutAccount[] } }) => response.data,
+      transformResponse: (response: any) => {
+        const data = response?.data;
+        if (Array.isArray(data)) {
+          return { items: data };
+        }
+        return data || { items: [] };
+      },
     }),
     deletePayoutAccount: builder.mutation<{ id: string }, string>({
       query: (id) => ({
@@ -39,7 +55,7 @@ export const payoutAccountApi = baseApi.injectEndpoints({
       transformResponse: (response: { data: { id: string } }) => response.data,
     }),
   }),
-  overrideExisting: false,
+  overrideExisting: true,
 });
 
 export const {

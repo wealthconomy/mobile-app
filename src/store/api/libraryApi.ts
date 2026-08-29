@@ -1,9 +1,9 @@
 import { LibraryMaterial } from "../../types/library";
-import { ApiResponse, baseApi } from "./baseApi";
+import { ApiResponse, baseApi, PaginatedResponse } from "./baseApi";
 
 export const libraryApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getLibraryMaterials: builder.query<ApiResponse<LibraryMaterial[]>, { publishToApp?: boolean; publishToWeb?: boolean } | void>({
+    getLibraryMaterials: builder.query<ApiResponse<PaginatedResponse<LibraryMaterial[]>>, { publishToApp?: boolean; publishToWeb?: boolean } | void>({
       query: (params) => ({
         url: "/client/library",
         params: params || {},

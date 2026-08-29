@@ -86,7 +86,7 @@ export const Step1UploadCredentials: React.FC<Props> = ({
              title="Confirm"
              onPress={onConfirm}
              disabled={!isValid || isLoading}
-             isLoading={isLoading}
+             loading={isLoading}
              style={{
                backgroundColor: THEME_TEAL,
                opacity: !isValid || isLoading ? 0.6 : 1,
