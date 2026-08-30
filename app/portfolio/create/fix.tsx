@@ -1,11 +1,15 @@
 import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
+import { useCreatePortfolioMutation } from "@/src/store/api/portfolioApi";
+import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Check } from "lucide-react-native";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -39,6 +43,11 @@ export default function CreateFixScreen() {
   const [agreedPenalty, setAgreedPenalty] = useState(false);
   const [acknowledgedTemptation, setAcknowledgedTemptation] = useState(false);
   const [wealthPreference, setWealthPreference] = useState<"Interest Based" | "Impact Wealth">("Interest Based");
+
+  // RTK Query
+  const [createPortfolio, { isLoading: isCreating }] = useCreatePortfolioMutation();
+  const [verifyPin, { isLoading: isVerifyingPin }] = useVerifyPinMutation();
+  const loading = isCreating || isVerifyingPin;
 
   // Dropdown state
   const [showSourceDropdown, setShowSourceDropdown] = useState(false);
@@ -773,25 +782,85 @@ export default function CreateFixScreen() {
     </ScrollView>
   );
 
+  const handleCreate = async () => {
+    if (pin.length !== 4) return;
+    try {
+      await verifyPin({ pin }).unwrap();
+
+      const amtNum = parseFloat(initialAmount.replace(/[^\d.]/g, "")) || 0;
+      const amtKobo = Math.max(amtNum * 100, 100);
+      const durDays = parseInt(duration, 10) || 30;
+      const maturity = new Date();
+      maturity.setDate(maturity.getDate() + durDays);
+
+      const body = {
+        name: title.trim() || "WealthFix",
+        amount: amtKobo,
+        maturityDate: maturity.toISOString(),
+        metadata: {
+          durationDays: durDays,
+          fundingSource,
+          wealthPreference,
+        },
+      };
+
+      await createPortfolio({ type: "wealthfix", body }).unwrap();
+      setStep("success");
+    } catch (err: any) {
+      console.error("Failed to create fix portfolio:", err);
+      const rawMsg = err?.data?.message;
+      const errorMsg = Array.isArray(rawMsg) ? rawMsg.join(", ") : rawMsg || err?.message || "Verification Failed";
+      if (typeof errorMsg === "string" && errorMsg.toLowerCase().includes("not set")) {
+        Alert.alert(
+          "Transaction PIN Required",
+          "You have not set up a transaction PIN yet. Would you like to set one now?",
+          [
+            { text: "Set PIN Now", onPress: () => router.push("/profile/security/change-pin" as any) },
+            { text: "Cancel", style: "cancel" },
+          ]
+        );
+      } else {
+        Alert.alert("Failed", errorMsg);
+      }
+      setPin("");
+    }
+  };
+
+  useEffect(() => {
+    if (pin.length === 4 && step === "pin") {
+      handleCreate();
+    }
+  }, [pin, step]);
+
   // ─── PIN STEP ─────────────────────────────────────────────────────────────────
   const renderPinStep = () => (
     <View
       style={{ alignItems: "center", paddingHorizontal: 24, marginTop: 40 }}
     >
-      <Image
-        source={require("../../../assets/images/change-pin.png")}
-        style={{ width: 120, height: 120 }}
-        resizeMode="contain"
-      />
+      <View
+        style={{
+          width: 80,
+          height: 80,
+          borderRadius: 40,
+          backgroundColor: "#E6F0F1",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: 24,
+        }}
+      >
+        <Image
+          source={require("../../../assets/images/fix4.png")}
+          style={{ width: 44, height: 44 }}
+          resizeMode="contain"
+        />
+      </View>
 
       <Text
         style={{
-          fontSize: 24,
+          fontSize: 22,
           fontWeight: "800",
           color: "#1A1A1A",
-          marginTop: 24,
           marginBottom: 8,
-          textAlign: "center",
         }}
       >
         Insert your Pin
@@ -844,12 +913,17 @@ export default function CreateFixScreen() {
         onChangeText={(val) => {
           const numeric = val.replace(/\D/g, "").slice(0, 4);
           setPin(numeric);
-          if (numeric.length === 4) setStep("success");
         }}
         maxLength={4}
         keyboardType="numeric"
         autoFocus
       />
+
+      {loading && (
+        <View style={{ marginBottom: 20 }}>
+          <ActivityIndicator color={TEAL} size="large" />
+        </View>
+      )}
 
       <View style={{ marginBottom: 40, paddingHorizontal: 16 }}>
         <Text

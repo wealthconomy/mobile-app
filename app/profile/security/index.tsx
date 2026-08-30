@@ -72,7 +72,7 @@ export default function SecurityScreen() {
               onPress={() => router.push("/profile/security/change-password")}
             />
             <MenuItem
-              title="Change PIN"
+              title="Transaction PIN"
               icon={
                 <Ionicons name="keypad-outline" size={24} color="#155D5F" />
               }

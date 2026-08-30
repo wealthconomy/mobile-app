@@ -58,7 +58,7 @@ const TransferMoneyIcon = () => (
 );
 
 import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
-import { useGetWalletTransactionsQuery } from "@/src/store/api/walletApi";
+import { useGetWalletSummaryQuery, useGetWalletTransactionsQuery } from "@/src/store/api/walletApi";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { WalletTransaction } from "@/src/types/wallet";
 
@@ -66,6 +66,7 @@ export default function WealthFlexScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [showTips, setShowTips] = useState(true);
   
+  const { data: walletData } = useGetWalletSummaryQuery();
   const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthflex", limit: 1 });
   const flexPortfolio = data?.items?.[0];
 
@@ -78,7 +79,8 @@ export default function WealthFlexScreen() {
     return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
-  const amount = `₦${formatAmount(flexPortfolio?.balance)}`;
+  const balanceValue = flexPortfolio?.balance ?? walletData?.currentBalance;
+  const amount = `₦${formatAmount(balanceValue)}`;
   
   const portfolioPreference = useSelector(
     (state: RootState) => state.portfolioPreference.flex

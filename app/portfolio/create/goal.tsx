@@ -97,17 +97,22 @@ export default function CreateGoalScreen() {
       await verifyPin({ pin }).unwrap();
 
       // 2. Perform create portfolio request
-      const body = {
-        name: goalName,
-        amount: 0, // start goal with 0 initial deposit
-        targetAmount: parseFloat(amount.replace(/[^\d.]/g, "")) || 0,
+      const targetAmountVal = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
+      const targetAmountKobo = targetAmountVal * 100;
+      const autoSaveEnabled = !isManual;
+
+      const body: any = {
+        name: goalName.trim(),
+        amount: 100, // Minimum initial deposit in kobo required by backend
+        targetAmount: targetAmountKobo > 0 ? targetAmountKobo : 100000,
         maturityDate: parseDate(endDate),
-        autoSaveEnabled: !isManual,
+        autoSaveEnabled,
         autoSaveFrequency: (frequency.toUpperCase() as any) || "MONTHLY",
-        autoSaveAmount: 0,
-        autoSaveSource: source === "Bank Account" ? "CARD" : "WALLET",
+        autoSaveAmount: 100, // Minimum 100 kobo
+        autoSaveSource: (source === "Bank Account" ? "CARD" : "WALLET") as "CARD" | "WALLET",
         metadata: {
-          category,
+          category: category.trim(),
+          wealthPreference,
         },
       };
 
@@ -115,10 +120,24 @@ export default function CreateGoalScreen() {
       setStep("success");
     } catch (err: any) {
       console.error("Failed to create portfolio:", err);
-      Alert.alert(
-        "Verification Failed",
-        err?.data?.message || err?.message || "Invalid transaction PIN or request failed."
-      );
+      const rawMsg = err?.data?.message;
+      const errorMsg = Array.isArray(rawMsg) ? rawMsg.join(", ") : rawMsg || err?.message || "Invalid transaction PIN or request failed.";
+      
+      if (typeof errorMsg === "string" && errorMsg.toLowerCase().includes("not set")) {
+        Alert.alert(
+          "Transaction PIN Required",
+          "You have not set up a transaction PIN yet. Would you like to set one now to secure your investments?",
+          [
+            { text: "Set PIN Now", onPress: () => router.push("/profile/security/change-pin" as any) },
+            { text: "Cancel", style: "cancel" },
+          ]
+        );
+      } else {
+        Alert.alert(
+          "Verification Failed",
+          errorMsg
+        );
+      }
       setPin(""); // Clear invalid PIN
     } finally {
       setLoading(false);

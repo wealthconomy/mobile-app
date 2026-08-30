@@ -14,7 +14,7 @@ interface SubWealthCardProps {
 
 export const SubWealthCard = ({
   description,
-  amount = "₦300,735.42",
+  amount = "₦0.00",
   onButtonPress,
   onTransferPress,
   showButton = true,

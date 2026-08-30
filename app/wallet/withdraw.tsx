@@ -5,6 +5,8 @@ import {
   useResolveBankAccountMutation,
 } from "@/src/store/api/payoutAccountApi";
 import { useInitiateWithdrawalMutation } from "@/src/store/api/withdrawalApi";
+import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
+import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -13,6 +15,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   ScrollView,
@@ -52,17 +55,19 @@ export default function WithdrawScreen() {
   const [selectedPayoutAccountId, setSelectedPayoutAccountId] = useState<string | null>(null);
 
   // RTK Query Hooks
-  const { data: payoutAccountsData } = useGetUserPayoutAccountsQuery();
+  const { data: walletData } = useGetWalletSummaryQuery();
+  const { data: payoutAccountsData, refetch: refetchPayoutAccounts } = useGetUserPayoutAccountsQuery();
   const recipients = payoutAccountsData?.items || [];
 
   const { data: banksData, isLoading: isLoadingBanks, isError: isBankError, refetch: refetchBanks } = useGetSupportedBanksQuery();
   const banks = banksData?.items || [];
 
+  const [verifyPin, { isLoading: isVerifyingPin }] = useVerifyPinMutation();
   const [resolveAccount, { isLoading: isVerifying }] = useResolveBankAccountMutation();
-  const [addPayoutAccount] = useAddPayoutAccountMutation();
+  const [addPayoutAccount, { isLoading: isAddingAccount }] = useAddPayoutAccountMutation();
   const [initiateWithdrawal, { isLoading: isWithdrawing }] = useInitiateWithdrawalMutation();
 
-  const loading = isWithdrawing;
+  const loading = isWithdrawing || isVerifyingPin || isAddingAccount;
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
@@ -322,16 +327,34 @@ export default function WithdrawScreen() {
       </View>
 
       {(() => {
+        const enteredAmount = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
         const isFormValid =
-          parseFloat(amount.replace(/[^\d.]/g, "")) > 0 &&
+          enteredAmount > 0 &&
           accountNumber.length === 10 &&
           selectedBank !== "Select bank" &&
           userName.trim().length > 0 &&
           !resolveError;
+
+        const handleProceed = () => {
+          const walletBalanceNaira = (parseFloat(walletData?.currentBalance || "0") / 100);
+          if (enteredAmount > walletBalanceNaira) {
+            Alert.alert(
+              "Insufficient Balance",
+              `Your available balance is ₦${walletBalanceNaira.toLocaleString("en-NG", {
+                minimumFractionDigits: 2,
+              })}. You entered ₦${enteredAmount.toLocaleString("en-NG", {
+                minimumFractionDigits: 2,
+              })}.`
+            );
+            return;
+          }
+          setStep("preview");
+        };
+
         return (
           <ThemedButton
             title="Proceed"
-            onPress={() => setStep("preview")}
+            onPress={handleProceed}
             disabled={!isFormValid || isVerifying}
             style={{
               backgroundColor: !isFormValid || isVerifying ? "#E0E0E0" : "#155D5F",
@@ -554,30 +577,78 @@ export default function WithdrawScreen() {
         loading={loading}
         className="mt-6 w-full"
         onPress={async () => {
+          const pin = pinValues.join("");
+          if (pin.length !== 4) return;
+
           try {
-            // First ensure we have a payout account ID
+            // 1. Verify PIN upfront
+            await verifyPin({ pin }).unwrap();
+
+            // 2. Resolve or create payout account ID
             let accountId = selectedPayoutAccountId;
 
             if (!accountId) {
-              const newAccount = await addPayoutAccount({
-                accountNumber,
-                bankCode: selectedBankCode,
-                bankName: selectedBank,
-              }).unwrap();
-              accountId = newAccount.id;
+              // Check if account already exists in current recipients list
+              const existing = recipients.find(
+                (r) => r.accountNumber === accountNumber
+              );
+              if (existing) {
+                accountId = existing.id;
+              } else {
+                try {
+                  const newAccount = await addPayoutAccount({
+                    accountNumber,
+                    bankCode: selectedBankCode,
+                    bankName: selectedBank,
+                  }).unwrap();
+                  accountId = newAccount.id;
+                } catch (addErr: any) {
+                  // If backend says account already added (400), find it in refreshed list
+                  const refreshed = await refetchPayoutAccounts();
+                  const found = refreshed.data?.items?.find(
+                    (r) => r.accountNumber === accountNumber
+                  );
+                  if (found) {
+                    accountId = found.id;
+                  } else {
+                    throw addErr;
+                  }
+                }
+              }
             }
 
-            // Clean amount string to a valid number in kobo (assuming user typed naira)
+            if (!accountId) {
+              throw new Error("Unable to resolve payout account.");
+            }
+
+            // 3. Clean amount in kobo
             const cleanAmount = parseFloat(amount.replace(/[^\d.]/g, "")) * 100;
-            
+
+            // 4. Initiate withdrawal
             await initiateWithdrawal({
               amount: cleanAmount,
               payoutAccountId: accountId,
             }).unwrap();
 
             setShowSuccess(true);
-          } catch (e) {
+          } catch (e: any) {
             console.error("Failed to withdraw:", e);
+            if (e?.data?.message?.toLowerCase()?.includes("not set")) {
+              Alert.alert(
+                "Transaction PIN Required",
+                "You have not set up a transaction PIN yet. Would you like to set one now to authorize withdrawals?",
+                [
+                  { text: "Set PIN Now", onPress: () => router.push("/profile/security/change-pin" as any) },
+                  { text: "Cancel", style: "cancel" },
+                ]
+              );
+            } else {
+              Alert.alert(
+                "Withdrawal Failed",
+                e?.data?.message || e?.message || "Failed to process withdrawal. Please verify your PIN and try again."
+              );
+            }
+            setPinValues(["", "", "", ""]);
           }
         }}
       />

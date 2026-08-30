@@ -11,6 +11,7 @@ import {
   useGetDashboardSummaryQuery,
   useGetMyProfileQuery,
 } from "@/src/store/api/userApi";
+import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 import { logout } from "@/src/store/slices/authSlice";
 import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
@@ -46,6 +47,12 @@ export default function MyAccountScreen() {
   } = useGetDashboardSummaryQuery();
 
   const {
+    data: walletData,
+    isLoading: walletLoading,
+    refetch: refetchWallet,
+  } = useGetWalletSummaryQuery();
+
+  const {
     data: kycData,
     isLoading: kycLoading,
     refetch: refetchKyc,
@@ -76,13 +83,14 @@ export default function MyAccountScreen() {
       await Promise.all([
         refetchProfile(),
         refetchSummary(),
+        refetchWallet(),
         refetchKyc(),
         refetchNotifications(),
       ]);
     } finally {
       setRefreshing(false);
     }
-  }, [refetchProfile, refetchSummary, refetchKyc, refetchNotifications]);
+  }, [refetchProfile, refetchSummary, refetchWallet, refetchKyc, refetchNotifications]);
 
   // Stable callbacks for child components to prevent unnecessary re-renders
   const handleToggleBalance = useCallback(() => {
@@ -161,13 +169,15 @@ export default function MyAccountScreen() {
           balanceVisible={balanceVisible}
           onToggleBalance={handleToggleBalance}
           totalSavings={
-            (summaryData as any)?.data?.totalSavings ?? activeUser?.totalSavings
+            walletData?.currentBalance ??
+            (summaryData as any)?.data?.totalSavings ??
+            activeUser?.totalSavings
           }
           dailyGrowth={
             (summaryData as any)?.data?.totalInterest ?? activeUser?.totalInterest
           }
           showGrowth={showGrowth}
-          loading={summaryLoading && !(summaryData as any)?.data}
+          loading={(summaryLoading || walletLoading) && !walletData && !(summaryData as any)?.data}
         />
 
         {/* Menu Navigation Sections */}

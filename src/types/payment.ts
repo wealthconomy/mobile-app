@@ -40,6 +40,7 @@ export interface MandateLinkRequest {
 export interface MandateLinkResponse {
   id: string;
   checkoutUrl?: string;
+  providerRef?: string | null;
 }
 
 export interface Mandate {

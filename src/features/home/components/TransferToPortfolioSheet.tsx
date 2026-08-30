@@ -49,7 +49,7 @@ const PORTFOLIO_LIST: PortfolioItem[] = [
     type: "fix",
     title: "WealthFix",
     description: "Lock it in, block temptation, and watch your money grow.",
-    createRoute: "/portfolios/wealth-fix",
+    createRoute: "/portfolio/create/fix",
     iconName: "lock-closed-outline",
     iconColor: "#D48E00",
     iconBg: "#FFF1CC",
@@ -63,7 +63,7 @@ const PORTFOLIO_LIST: PortfolioItem[] = [
     type: "goal",
     title: "WealthGoal",
     description: "Save with discipline and smash every goals.",
-    createRoute: "/portfolios/wealth-goal",
+    createRoute: "/portfolio/create/goal",
     iconName: "rocket-outline",
     iconColor: "#F3007A",
     iconBg: "#FDD7E4",
@@ -77,7 +77,7 @@ const PORTFOLIO_LIST: PortfolioItem[] = [
     type: "fam",
     title: "WealthFam",
     description: "Build a wealthy family; save for kids, spouse, and loved ones.",
-    createRoute: "/portfolios/wealth-fam",
+    createRoute: "/portfolio/create/fam",
     iconName: "people-outline",
     iconColor: "#6366F1",
     iconBg: "#E0E0FF",
@@ -92,7 +92,7 @@ const PORTFOLIO_LIST: PortfolioItem[] = [
     type: "flow",
     title: "WealthFlow",
     description: "Automated savings for a continuous wealth flow.",
-    createRoute: "/portfolios/wealth-flow",
+    createRoute: "/portfolio/create/flow",
     iconName: "refresh-outline",
     iconColor: "#0EA5E9",
     iconBg: "#BAE7FF",
@@ -163,10 +163,7 @@ export const TransferToPortfolioSheet = ({
   const handleSelect = (portfolio: PortfolioItem) => {
     onClose();
     setTimeout(() => {
-      router.push({
-        pathname: "/wallet/deposit",
-        params: { plan: portfolio.title },
-      } as any);
+      router.push(portfolio.createRoute as any);
     }, 260);
   };
 
