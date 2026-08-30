@@ -849,7 +849,7 @@ export default function CreateFixScreen() {
         }}
       >
         <Image
-          source={require("../../../assets/images/fix4.png")}
+          source={require("../../../assets/images/change-pin.png")}
           style={{ width: 44, height: 44 }}
           resizeMode="contain"
         />
