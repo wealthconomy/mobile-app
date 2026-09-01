@@ -1,8 +1,11 @@
 import Header from "@/src/components/common/Header";
+import { useExitGroupMutation } from "@/src/store/api/groupApi";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   ScrollView,
   Text,
   TextInput,
@@ -12,10 +15,33 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ExitGroupScreen() {
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const [reason, setReason] = useState("");
+  const [exitGroup, { isLoading: isExiting }] = useExitGroupMutation();
 
-  const PENALTY_AMOUNT = "XXXX";
+  const handleExit = () => {
+    Alert.alert(
+      "Confirm Exit",
+      "Are you sure you want to exit this tribe? Any active penalties per tribe rules will be applied.",
+      [
+        { text: "Stay with Group", style: "cancel" },
+        {
+          text: "Exit",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await exitGroup(id as string).unwrap();
+              Alert.alert("Exited Tribe", "You have successfully exited this group.");
+              router.replace("/(tabs)/portfolios/wealth-group" as any);
+            } catch (err: any) {
+              const msg = err?.data?.message || err?.message || "Failed to exit group.";
+              Alert.alert("Exit Failed", msg);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-[#F8FAFC]" edges={["top"]}>
@@ -25,56 +51,42 @@ export default function ExitGroupScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         <View className="px-5 py-6">
-          <View className="items-center mb-10">
-            <Text className="text-[28px] font-bold text-[#1A1A1A] mb-3 text-center">
+          <View className="items-center mb-8">
+            <Text className="text-[26px] font-bold text-[#1A1A1A] mb-2 text-center">
               Exiting Group?
             </Text>
             <Text className="text-[14px] text-[#64748B] text-center px-4">
-              Leaving a group affects your community standing.
+              Leaving a group affects your tribe standing and payout schedule.
             </Text>
           </View>
 
-          <View className="w-full mb-10">
-            <Text className="text-[16px] font-bold text-[#1A1A1A] mb-6">
+          <View className="w-full mb-8">
+            <Text className="text-[16px] font-bold text-[#1A1A1A] mb-4">
               Before you go:
             </Text>
 
-            <View className="mb-5">
+            <View className="mb-4">
               <Text className="text-[14px] leading-[22px] text-[#1A1A1A]">
-                <Text className="font-bold">The Team:</Text> Your exit might
-                delay the payout for other members.
+                <Text className="font-bold">The Team:</Text> Your exit might delay the payout cycle for other members.
               </Text>
             </View>
 
-            <View className="mb-5">
+            <View className="mb-4">
               <Text className="text-[14px] leading-[22px] text-[#1A1A1A]">
-                <Text className="font-bold">The Cost:</Text> An exit penalty of
-                ₦{PENALTY_AMOUNT} applies as per group rules.
-              </Text>
-            </View>
-
-            <View className="mb-8">
-              <Text className="text-[14px] leading-[22px] text-[#1A1A1A]">
-                <Text className="font-bold">The Funds:</Text> Your contributions
-                will be moved to your wallet after the current cycle ends (or as
-                per admin approval).
+                <Text className="font-bold">The Funds:</Text> Your settled contributions will be credited back to your main wallet.
               </Text>
             </View>
           </View>
 
-          <View className="w-full mb-10">
-            <Text className="text-[14px] text-[#1A1A1A] mb-8">
-              "Don't leave your team hanging! Why are you leaving?"
-            </Text>
-
+          <View className="w-full mb-8">
             <Text className="text-[14px] text-[#64748B] font-medium mb-3">
-              Reason for leaving
+              Reason for leaving (Optional)
             </Text>
             <TextInput
-              className="bg-[#F6F6F6] rounded-2xl p-4 text-[#1A1A1A] min-h-[140px]"
+              className="bg-[#F6F6F6] rounded-2xl p-4 text-[#1A1A1A] min-h-[120px]"
               multiline
               textAlignVertical="top"
-              placeholder=""
+              placeholder="Tell the admin why you are leaving..."
               value={reason}
               onChangeText={setReason}
             />
@@ -91,15 +103,17 @@ export default function ExitGroupScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => {
-                // Handle exit request
-                router.back();
-              }}
+              onPress={handleExit}
+              disabled={isExiting}
               className="w-full h-14 bg-[#FFE4E4] rounded-2xl items-center justify-center"
             >
-              <Text className="text-[#FF5A5A] font-bold text-base">
-                Request Exit
-              </Text>
+              {isExiting ? (
+                <ActivityIndicator color="#FF5A5A" />
+              ) : (
+                <Text className="text-[#FF5A5A] font-bold text-base">
+                  Exit Group
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>

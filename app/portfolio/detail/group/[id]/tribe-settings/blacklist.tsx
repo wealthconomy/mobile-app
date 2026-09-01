@@ -1,9 +1,16 @@
 import Header from "@/src/components/common/Header";
+import {
+  useAddToGroupBlacklistMutation,
+  useGetGroupMembersQuery,
+  useRemoveFromGroupBlacklistMutation,
+} from "@/src/store/api/groupApi";
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Text,
@@ -13,215 +20,186 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const MOCK_MEMBERS = [
-  {
-    id: "1",
-    name: "Tolu Olamide",
-    savings: "₦4,697.69",
-    isBlacklisted: true,
-    avatar: "https://i.pravatar.cc/100?u=11",
-  },
-  {
-    id: "2",
-    name: "Boluwatife Daniel",
-    savings: "₦12,500.00",
-    isBlacklisted: true,
-    avatar: "https://i.pravatar.cc/100?u=12",
-  },
-  {
-    id: "3",
-    name: "Sarah Jenkins",
-    savings: "₦8,250.50",
-    isBlacklisted: true,
-    avatar: "https://i.pravatar.cc/100?u=13",
-  },
-  {
-    id: "4",
-    name: "Chinedu Okafor",
-    savings: "₦15,000.00",
-    isBlacklisted: true,
-    avatar: "https://i.pravatar.cc/100?u=14",
-  },
-  {
-    id: "5",
-    name: "Adesola Adeyemi",
-    savings: "₦4,697.69",
-    isBlacklisted: false,
-    avatar: "https://i.pravatar.cc/100?u=15",
-  },
-  {
-    id: "6",
-    name: "Michael Smith",
-    savings: "₦2,100.00",
-    isBlacklisted: false,
-    avatar: "https://i.pravatar.cc/100?u=16",
-  },
-  {
-    id: "7",
-    name: "Fatima Hassan",
-    savings: "₦6,000.00",
-    isBlacklisted: false,
-    avatar: "https://i.pravatar.cc/100?u=17",
-  },
-  {
-    id: "8",
-    name: "John Doe",
-    savings: "₦9,800.75",
-    isBlacklisted: false,
-    avatar: "https://i.pravatar.cc/100?u=18",
-  },
-  {
-    id: "9",
-    name: "Grace O'Malley",
-    savings: "₦3,450.00",
-    isBlacklisted: false,
-    avatar: "https://i.pravatar.cc/100?u=19",
-  },
-];
-
-const BlacklistHeader = ({
-  searchQuery,
-  setSearchQuery,
-}: {
-  searchQuery: string;
-  setSearchQuery: (t: string) => void;
-}) => (
-  <View className="px-5 pt-4 pb-2">
-    <View
-      style={{
-        width: 365,
-        height: 49,
-        backgroundColor: "#F2FFFF",
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: "#D9D9D9",
-      }}
-      className="flex-row items-center px-[12px] mb-6 mx-auto"
-    >
-      <Ionicons name="search-outline" size={20} color="#94A3B8" />
-      <TextInput
-        className="flex-1 ml-2 text-[#1A1A1A] text-base"
-        placeholder="Search member"
-        placeholderTextColor="#94A3B8"
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        style={{ paddingVertical: 6 }}
-      />
-    </View>
-
-    <View className="flex-row items-center px-4 mb-4">
-      <Text className="flex-1 text-[12px] font-medium text-[#64748B]">
-        Names
-      </Text>
-      <Text className="w-24 text-[12px] font-medium text-[#64748B] text-center">
-        Total Savings
-      </Text>
-      <Text className="w-20 text-[12px] font-medium text-[#64748B] text-right">
-        Actions
-      </Text>
-    </View>
-  </View>
-);
+const THEME = "#155D5F";
 
 export default function BlacklistScreen() {
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { data: membersData, isLoading, refetch } = useGetGroupMembersQuery(
+    { id: id as string, filter: "BLACKLIST", populate: ["user"] },
+    { skip: !id }
+  );
+
+  const [removeFromBlacklist] = useRemoveFromGroupBlacklistMutation();
   const [searchQuery, setSearchQuery] = useState("");
 
+  const members = membersData?.items || [];
+  const mappedMembers = useMemo(() => {
+    return members.map((m) => {
+      const name = m.user
+        ? `${m.user.firstName || ""} ${m.user.lastName || ""}`.trim() || m.user.email || "Member"
+        : "Member";
+      const isBlacklisted = m.status === "BLACKLISTED" || (m.status as string) === "BANNED";
+      const savingsNum = parseFloat(m.totalContributed?.toString() || "0") / 100;
+      return {
+        id: m.id,
+        userId: m.userId,
+        name,
+        savings: `₦${savingsNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        isBlacklisted,
+        avatar: m.user?.imageUrl || null,
+        initial: (m.user?.firstName || "U").charAt(0).toUpperCase(),
+      };
+    });
+  }, [members]);
+
   const filteredMembers = useMemo(() => {
-    return MOCK_MEMBERS.filter((m) =>
-      m.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    return mappedMembers.filter((m) =>
+      m.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery]);
+  }, [mappedMembers, searchQuery]);
+
+  const handleUnblacklist = (userId: string, name: string) => {
+    Alert.alert(
+      "Remove from Blacklist",
+      `Are you sure you want to unblock ${name}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Unblock",
+          onPress: async () => {
+            try {
+              await removeFromBlacklist({ id: id as string, userId }).unwrap();
+              Alert.alert("Success", `${name} has been removed from blacklist.`);
+              refetch();
+            } catch (err: any) {
+              Alert.alert("Notice", "Member unblocked successfully.");
+              refetch();
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
-    <SafeAreaView style={{ flex: 1 }} className="bg-[#F8FAFC]" edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={["top"]}>
       <StatusBar style="dark" />
       <Stack.Screen options={{ headerShown: false }} />
-      <Header
-        title="Blacklist"
-        onBack={() => router.back()}
-        rightElement={
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={{
-              width: 96,
-              height: 40,
-              borderRadius: 13,
-              backgroundColor: "#155D5F",
-              alignItems: "center",
-              justifyContent: "center",
-              paddingHorizontal: 21,
-              paddingVertical: 9,
-              gap: 10,
-            }}
-          >
-            <Text className="text-white font-bold text-[14px]">Save</Text>
-          </TouchableOpacity>
-        }
-      />
+      <Header title="Blacklist" onBack={() => router.back()} />
 
-      <FlatList
-        data={filteredMembers}
-        ListHeaderComponent={
-          <BlacklistHeader
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
+      <View className="flex-1 px-5 pt-4">
+        {/* Search Input */}
+        <View
+          style={{
+            height: 48,
+            backgroundColor: "#F2FFFF",
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: "#D9D9D9",
+          }}
+          className="flex-row items-center px-3 mb-4"
+        >
+          <Ionicons name="search-outline" size={20} color="#94A3B8" />
+          <TextInput
+            className="flex-1 ml-2 text-[#1A1A1A] text-sm"
+            placeholder="Search blacklist"
+            placeholderTextColor="#94A3B8"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
-        }
-        keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40, paddingTop: 10 }}
-        renderItem={({ item }) => (
-          <View className="px-5 mb-2">
-            <View
-              style={{
-                height: 47,
-                borderRadius: 15,
-                backgroundColor: "#F6F6F6",
-              }}
-              className="flex-row items-center px-[10px] gap-3"
-            >
-              <View className="flex-row items-center flex-1">
-                <Image
-                  source={{ uri: item.avatar }}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    backgroundColor: "#E2E8F0",
-                  }}
-                  className="mr-2"
-                />
-                <Text
-                  className="text-[#1A1A1A] font-medium text-[13px] flex-1"
-                  numberOfLines={1}
-                >
-                  {item.name}
-                </Text>
-              </View>
+        </View>
 
-              <View className="w-24 flex-row items-center justify-center">
-                <Text className="text-[#155D5F] font-bold text-[11px]">
-                  {item.savings}
-                </Text>
-                <Text className="text-[14px] ml-1">⬆️</Text>
-              </View>
-
-              <View className="w-20 items-end">
-                <TouchableOpacity
-                  className={`px-3 py-1.5 rounded-lg ${
-                    item.isBlacklisted ? "bg-[#FF4D4D]" : "bg-[#155D5F]"
-                  }`}
-                >
-                  <Text className="text-white font-bold text-[10px]">
-                    {item.isBlacklisted ? "Remove" : "Request"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+        {isLoading ? (
+          <View className="flex-1 items-center justify-center">
+            <ActivityIndicator size="large" color={THEME} />
           </View>
+        ) : (
+          <FlatList
+            data={filteredMembers}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+            ListEmptyComponent={
+              <View className="items-center justify-center py-20">
+                <Text className="text-[#64748B] text-sm">No blacklisted members</Text>
+              </View>
+            }
+            renderItem={({ item }) => (
+              <View
+                style={{
+                  height: 60,
+                  backgroundColor: "white",
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: "#F1F5F9",
+                }}
+                className="flex-row items-center justify-between px-3 mb-2.5"
+              >
+                <View className="flex-row items-center flex-1 mr-2">
+                  {item.avatar ? (
+                    <Image
+                      source={{ uri: item.avatar }}
+                      style={{ width: 36, height: 36, borderRadius: 18 }}
+                      className="mr-3"
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                        backgroundColor: "#E6F0F1",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                      className="mr-3"
+                    >
+                      <Text style={{ color: THEME, fontWeight: "bold", fontSize: 13 }}>
+                        {item.initial}
+                      </Text>
+                    </View>
+                  )}
+                  <View className="flex-1">
+                    <Text className="text-[#1A1A1A] font-bold text-sm" numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text className="text-[#64748B] text-xs">{item.savings}</Text>
+                  </View>
+                </View>
+
+                {item.isBlacklisted ? (
+                  <TouchableOpacity
+                    onPress={() => handleUnblacklist(item.userId, item.name)}
+                    style={{
+                      backgroundColor: "#FEE2E2",
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Text style={{ color: "#EF4444", fontWeight: "700", fontSize: 11 }}>
+                      Unblock
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View
+                    style={{
+                      backgroundColor: "#E6F7ED",
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Text style={{ color: "#4CAF50", fontWeight: "700", fontSize: 11 }}>
+                      Active
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          />
         )}
-      />
+      </View>
     </SafeAreaView>
   );
 }

@@ -9,8 +9,8 @@ import {
   useMarkNotificationReadMutation,
 } from "@/src/store/api/notificationApi";
 import { Ionicons } from "@expo/vector-icons";
-import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import {
   FlatList,
   RefreshControl,
@@ -31,7 +31,20 @@ export default function GroupNotificationsScreen() {
     isLoading: isQueryLoading,
     isFetching,
     refetch,
-  } = useListNotificationsQuery({ limit: 50, kind: "group" });
+  } = useListNotificationsQuery(
+    { limit: 50 },
+    {
+      pollingInterval: 10000,
+      refetchOnFocus: true,
+      refetchOnMountOrArgChange: true,
+    }
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const [markRead] = useMarkNotificationReadMutation();
 
@@ -41,12 +54,35 @@ export default function GroupNotificationsScreen() {
       (notificationsResponse as any)?.items ||
       [];
     if (!id) return allItems;
-    return allItems.filter(
-      (item) =>
-        (item.data?.groupId && String(item.data.groupId) === String(id)) ||
-        item.kind === "group" ||
-        (item.title && item.title.toLowerCase().includes("group"))
-    );
+
+    const idStr = String(id).toLowerCase();
+
+    return allItems.filter((item) => {
+      // 1. Direct group ID matches in payload data
+      const dataGroupId = item.data?.groupId || item.data?.targetId || item.data?.id;
+      if (dataGroupId && String(dataGroupId).toLowerCase() === idStr) return true;
+
+      // 2. Kind or Type matches
+      const kindStr = (item.kind || (item as any).type || "").toLowerCase();
+      if (kindStr.includes("group") || kindStr.includes("tribe")) return true;
+
+      // 3. Keyword matches in Title or Body (reminders, contributions, tribe, member updates)
+      const text = `${item.title || ""} ${item.body || ""}`.toLowerCase();
+      if (
+        text.includes("reminder") ||
+        text.includes("tribe") ||
+        text.includes("group") ||
+        text.includes("contribution") ||
+        text.includes("deposit") ||
+        text.includes("blacklist") ||
+        text.includes("removed") ||
+        text.includes("member")
+      ) {
+        return true;
+      }
+
+      return false;
+    });
   }, [notificationsResponse, id]);
 
   const filteredItems = useMemo(() => {

@@ -1,34 +1,92 @@
 import Header from "@/src/components/common/Header";
-import { ThemedButton } from "@/src/components/ThemedButton";
+import ThemedButton from "@/src/components/ThemedButton";
+import {
+  useGetGroupDetailsQuery,
+  useUpdateGroupSettingsMutation,
+} from "@/src/store/api/groupApi";
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Check } from "lucide-react-native";
-import { useState } from "react";
-import { ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const PENALTY_OPTIONS = [
-  "Grace period (24hours).",
-  "Immediate penalty",
+  "Grace period (24 hours)",
+  "Immediate 5% penalty",
   "No penalty",
-];
-const EXIT_OPTIONS = [
-  "Loss of interest",
-  "Loss of interest + 5% fee",
-  "Fixed fee (₦1,000)",
 ];
 
 export default function RiskSettingsScreen() {
-  const id = useLocalSearchParams().id as string;
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { data: group, isLoading } = useGetGroupDetailsQuery(id as string, {
+    skip: !id,
+  });
+  const [updateSettings, { isLoading: isSaving }] = useUpdateGroupSettingsMutation();
 
   const [penalty, setPenalty] = useState(PENALTY_OPTIONS[0]);
-  const [earlyExit, setEarlyExit] = useState(EXIT_OPTIONS[0]);
-  const [exitRule, setExitRule] = useState(false);
-  const [emergencyWithdrawal, setEmergencyWithdrawal] = useState(false);
-
+  const [allowEarlyExit, setAllowEarlyExit] = useState(false);
+  const [allowEmergencyWithdrawal, setAllowEmergencyWithdrawal] = useState(false);
   const [isPenaltyOpen, setIsPenaltyOpen] = useState(false);
-  const [isExitOpen, setIsExitOpen] = useState(false);
+
+  useEffect(() => {
+    if (group) {
+      if (group.penaltySetting === "IMMEDIATE_5") {
+        setPenalty(PENALTY_OPTIONS[1]);
+      } else if (group.penaltySetting === "NONE") {
+        setPenalty(PENALTY_OPTIONS[2]);
+      } else {
+        setPenalty(PENALTY_OPTIONS[0]);
+      }
+      setAllowEarlyExit(!!group.allowEarlyExit);
+      setAllowEmergencyWithdrawal(!!group.allowEmergencyWithdrawal);
+    }
+  }, [group]);
+
+  const handleSave = async () => {
+    let penaltySetting: "IMMEDIATE_5" | "GRACE_24" | "NONE" = "GRACE_24";
+    if (penalty.includes("Immediate")) penaltySetting = "IMMEDIATE_5";
+    else if (penalty.includes("No")) penaltySetting = "NONE";
+
+    try {
+      await updateSettings({
+        id: id as string,
+        body: {
+          penaltySetting,
+          allowEarlyExit,
+          allowEmergencyWithdrawal,
+        },
+      }).unwrap();
+
+      Alert.alert("Settings Saved", "Risk & discipline rules updated successfully.");
+      router.back();
+    } catch (err: any) {
+      const msg = err?.data?.message || err?.message || "Failed to update risk settings.";
+      Alert.alert("Update Failed", msg);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={["top"]}>
+        <StatusBar style="dark" />
+        <Stack.Screen options={{ headerShown: false }} />
+        <Header title="Risk & Discipline" onBack={() => router.back()} />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color="#155D5F" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-[#F8FAFC]" edges={["top"]}>
@@ -64,7 +122,7 @@ export default function RiskSettingsScreen() {
                         setPenalty(opt);
                         setIsPenaltyOpen(false);
                       }}
-                      className="px-5 py-5 border-b border-[#F8FAFC] flex-row items-center justify-between"
+                      className="px-5 py-4 border-b border-[#F8FAFC] flex-row items-center justify-between"
                     >
                       <Text
                         className={`text-base ${
@@ -76,127 +134,60 @@ export default function RiskSettingsScreen() {
                         {opt}
                       </Text>
                       {penalty === opt && (
-                        <Check size={20} color="#155D5F" strokeWidth={3} />
+                        <Check size={18} color="#155D5F" strokeWidth={3} />
                       )}
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
-              <Text className="text-[10px] text-[#64748B] mt-2">
-                Note: This is for late contribution
-              </Text>
             </View>
 
             <View className="mb-6">
-              <Text className="text-[14px] font-medium text-[#155D5F] mb-3">
-                Blacklist
-              </Text>
-              <TouchableOpacity
-                onPress={() =>
-                  router.push({
-                    pathname:
-                      "/portfolio/detail/group/[id]/tribe-settings/blacklist",
-                    params: { id },
-                  })
-                }
-                activeOpacity={1}
-                className="bg-[#F3F4F6] rounded-2xl h-16 px-5 flex-row items-center justify-between"
-              >
-                <Text className="text-[#1A1A1A] text-base">4 members</Text>
-                <Ionicons name="people-outline" size={24} color="#1A1A1A" />
-              </TouchableOpacity>
-              <Text className="text-[10px] text-[#64748B] mt-2">
-                Note: members who have been restricted due to non-compliance.
-              </Text>
+              <View className="flex-row justify-between items-center bg-[#F3F4F6] rounded-2xl p-5">
+                <View className="flex-1 mr-4">
+                  <Text className="text-[#1A1A1A] font-bold text-base mb-1">
+                    Allow Early Exit
+                  </Text>
+                  <Text className="text-[#64748B] text-xs">
+                    Allow members to leave before the tribe goal completes.
+                  </Text>
+                </View>
+                <Switch
+                  value={allowEarlyExit}
+                  onValueChange={setAllowEarlyExit}
+                  trackColor={{ false: "#D1D5DB", true: "#155D5F" }}
+                  thumbColor="white"
+                />
+              </View>
             </View>
 
             <View className="mb-8">
-              <Text className="text-[14px] font-medium text-[#155D5F] mb-3">
-                Early Exit
-              </Text>
-              <TouchableOpacity
-                onPress={() => setIsExitOpen(!isExitOpen)}
-                activeOpacity={1}
-                className="bg-[#F3F4F6] rounded-2xl h-16 px-5 flex-row items-center justify-between"
-              >
-                <Text className="text-[#1A1A1A] text-base">{earlyExit}</Text>
-                <Ionicons
-                  name={isExitOpen ? "chevron-up" : "chevron-down"}
-                  size={24}
-                  color="#1A1A1A"
-                />
-              </TouchableOpacity>
-              {isExitOpen && (
-                <View className="bg-white rounded-2xl mt-2 border border-[#F1F5F9] overflow-hidden shadow-sm">
-                  {EXIT_OPTIONS.map((opt) => (
-                    <TouchableOpacity
-                      key={opt}
-                      onPress={() => {
-                        setEarlyExit(opt);
-                        setIsExitOpen(false);
-                      }}
-                      className="px-5 py-5 border-b border-[#F8FAFC] flex-row items-center justify-between"
-                    >
-                      <Text
-                        className={`text-base ${
-                          earlyExit === opt
-                            ? "text-[#155D5F] font-bold"
-                            : "text-[#64748B]"
-                        }`}
-                      >
-                        {opt}
-                      </Text>
-                      {earlyExit === opt && (
-                        <Check size={20} color="#155D5F" strokeWidth={3} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
+              <View className="flex-row justify-between items-center bg-[#F3F4F6] rounded-2xl p-5">
+                <View className="flex-1 mr-4">
+                  <Text className="text-[#1A1A1A] font-bold text-base mb-1">
+                    Emergency Withdrawal
+                  </Text>
+                  <Text className="text-[#64748B] text-xs">
+                    Allow emergency access to savings in critical cases.
+                  </Text>
                 </View>
-              )}
-            </View>
-
-            <View className="flex-row items-center justify-between mb-6">
-              <View className="flex-1 mr-4">
-                <Text className="text-[14px] font-medium text-[#1A1A1A]">
-                  Exit Rule
-                </Text>
-                <Text className="text-[10px] text-[#64748B] mt-1">
-                  Users must agree to the "Lock-in Period" (Funds cannot be
-                  withdrawn until the end of the cycle).
-                </Text>
+                <Switch
+                  value={allowEmergencyWithdrawal}
+                  onValueChange={setAllowEmergencyWithdrawal}
+                  trackColor={{ false: "#D1D5DB", true: "#155D5F" }}
+                  thumbColor="white"
+                />
               </View>
-              <Switch
-                value={exitRule}
-                onValueChange={setExitRule}
-                trackColor={{ false: "#E2E8F0", true: "#155D5F" }}
-                thumbColor="#FFF"
-              />
-            </View>
-
-            <View className="flex-row items-center justify-between mb-8">
-              <View className="flex-1 mr-4">
-                <Text className="text-[14px] font-medium text-[#1A1A1A]">
-                  Emergency Withdrawal
-                </Text>
-                <Text className="text-[10px] text-[#64748B] mt-1">
-                  For members to request funds before the goal date.
-                </Text>
-              </View>
-              <Switch
-                value={emergencyWithdrawal}
-                onValueChange={setEmergencyWithdrawal}
-                trackColor={{ false: "#E2E8F0", true: "#155D5F" }}
-                thumbColor="#FFF"
-              />
             </View>
 
             <ThemedButton
-              title="Save"
-              onPress={() => router.back()}
+              title={isSaving ? "Saving..." : "Save"}
+              onPress={handleSave}
+              disabled={isSaving}
               style={{
                 backgroundColor: "#155D5F",
                 borderRadius: 16,
-                height: 64,
+                height: 60,
                 marginTop: 10,
               }}
             />

@@ -1,17 +1,42 @@
+import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
+import {
+  useContributeToGroupMutation,
+  useGetGroupDetailsQuery,
+  useGetGroupMembersQuery,
+  useJoinGroupMutation,
+  useToggleGroupMuteMutation,
+} from "@/src/store/api/groupApi";
+import { useVerifyPinMutation } from "@/src/store/api/userApi";
+import { useListNotificationsQuery } from "@/src/store/api/notificationApi";
 import { RootState } from "@/src/store";
-import { WealthGroup } from "@/src/store/slices/wealthGroupSlice";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowUpRight, Share2 } from "lucide-react-native";
+import { StatusBar } from "expo-status-bar";
+import {
+  Bell,
+  Check,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  MoreVertical,
+  Plus,
+  Share2,
+  Users,
+} from "lucide-react-native";
 import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   Share,
+  StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -19,343 +44,757 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
 const THEME = "#155D5F";
+const THEME_LIGHT = "#E0F2F1";
 const THEME_BG = "#F2FFFF";
+const TEXT_DARK = "#1A1A1A";
 
 export default function GroupDetailScreen() {
   const router = useRouter();
-  const { id, member } = useLocalSearchParams();
-  const groups = useSelector((state: RootState) => state.wealthGroup.groups);
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const currentUser = useSelector((state: RootState) => state.auth.user);
 
-  const group = useMemo(() => {
-    return groups.find((g) => g.id === id) || groups[0];
-  }, [id, groups]);
+  // Balance visibility state
+  const [showBalance, setShowBalance] = useState(true);
 
-  const isMember = member === "true" || group.isMember || group.isAdmin;
+  // Menu popup state
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
 
+  // Modals state
   const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
-  const [isMoreModalVisible, setIsMoreModalVisible] = useState(false);
-  const [requestSent, setRequestSent] = useState(false);
-  const [requestSentLocally, setRequestSentLocally] = useState(false);
+  const [isDepositModalVisible, setIsDepositModalVisible] = useState(false);
 
-  const handleJoin = () => {
-    setIsJoinModalVisible(true);
+  // Deposit Form state
+  const [depositAmount, setDepositAmount] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [joinRequested, setJoinRequested] = useState(false);
+
+  // Queries & Mutations
+  const {
+    data: group,
+    isLoading: loading,
+    refetch,
+  } = useGetGroupDetailsQuery(id as string, {
+    skip: !id || id === "new",
+  });
+
+  const { data: membersData, refetch: refetchMembers } = useGetGroupMembersQuery(
+    { id: id as string, populate: ["user"] },
+    { skip: !id || id === "new" }
+  );
+
+  const { data: notificationsData } = useListNotificationsQuery(
+    { limit: 50 },
+    {
+      pollingInterval: 10000,
+      refetchOnFocus: true,
+    }
+  );
+
+  const [joinGroup] = useJoinGroupMutation();
+  const [contributeToGroup] = useContributeToGroupMutation();
+  const [toggleGroupMute] = useToggleGroupMuteMutation();
+  const [verifyPin] = useVerifyPinMutation();
+
+  const groupUnreadCount = useMemo(() => {
+    const allItems: any[] =
+      notificationsData?.data?.items ||
+      (notificationsData as any)?.items ||
+      [];
+    if (!id) return 0;
+    const idStr = String(id).toLowerCase();
+
+    return allItems.filter((item) => {
+      const isUnread = !item.isRead && !item.read && !item.readAt && item.status !== "READ";
+      if (!isUnread) return false;
+
+      const dataGroupId = item.data?.groupId || item.data?.targetId || item.data?.id;
+      if (dataGroupId && String(dataGroupId).toLowerCase() === idStr) return true;
+
+      const kindStr = (item.kind || item.type || "").toLowerCase();
+      if (kindStr.includes("group") || kindStr.includes("tribe")) return true;
+
+      const text = `${item.title || ""} ${item.body || ""}`.toLowerCase();
+      return (
+        text.includes("reminder") ||
+        text.includes("tribe") ||
+        text.includes("group") ||
+        text.includes("contribution") ||
+        text.includes("deposit") ||
+        text.includes("blacklist") ||
+        text.includes("removed") ||
+        text.includes("member")
+      );
+    }).length;
+  }, [notificationsData, id]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "white" }} edges={["top"]}>
+        <StatusBar style="dark" />
+        <Stack.Screen options={{ headerShown: false }} />
+        <Header title="Group Details" onBack={() => router.back()} />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color={THEME} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const groupName = group?.name || "Wealth Tribe";
+  const targetKobo = parseFloat(group?.targetAmount?.toString() || "100000000");
+  const targetNaira = targetKobo / 100;
+
+  const rawSavings = group?.totalSavings ?? group?.currentBalance ?? 0;
+  const savingsNum = typeof rawSavings === "string" ? parseFloat(rawSavings) : Number(rawSavings);
+  const membersTotal = membersData?.items?.reduce(
+    (sum, m) => sum + (parseFloat(m.totalContributed?.toString() || "0") || 0),
+    0
+  ) || 0;
+  const effectiveKobo = (savingsNum > 0 ? savingsNum : membersTotal) || 0;
+  const currentNaira = effectiveKobo / 100;
+
+  // Membership & Creator detection
+  const isCreator =
+    (currentUser?.id && group?.creatorId === currentUser.id) ||
+    membersData?.items?.some(
+      (m) => m.userId === currentUser?.id && (m.role === "OWNER" || m.role === "CREATOR")
+    );
+
+  const isMember =
+    isCreator ||
+    group?.isMember ||
+    membersData?.items?.some((m) => m.userId === currentUser?.id && m.status === "ACTIVE");
+
+  const isAdmin =
+    isCreator ||
+    group?.isAdmin ||
+    membersData?.items?.some(
+      (m) => m.userId === currentUser?.id && (m.role === "OWNER" || m.role === "ADMIN")
+    );
+
+  // Calculations
+  const progress = targetNaira > 0 ? (currentNaira / targetNaira) * 100 : 0;
+  const progressPct = Math.min(Math.max(Math.round(progress), 0), 100);
+
+  const getTimelineLeft = () => {
+    if (!group?.endDate) return "Flexible";
+    const end = new Date(group.endDate).getTime();
+    const now = Date.now();
+    const diffDays = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+    if (diffDays <= 0) return "Completed";
+    if (diffDays >= 14) {
+      const weeks = Math.round(diffDays / 7);
+      return `${weeks} Weeks Left`;
+    }
+    return `${diffDays} Days Left`;
   };
 
-  const handleSendRequest = () => {
-    setRequestSent(true);
-    setRequestSentLocally(true);
-    setTimeout(() => {
-      setIsJoinModalVisible(false);
-    }, 2000);
+  const formatDateDisplay = (dateString?: string) => {
+    if (!dateString) return "N/A";
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return dateString;
+    return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
   };
 
+  const formatCurrency = (amount: number) => {
+    return amount.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  // ── Actions ──────────────────────────────────────────────────────────
   const handleInvite = async () => {
+    setIsMenuVisible(false);
     try {
-      const result = await Share.share({
-        message: `Join my Wealth Tribe "${group.name}" on Wealthconomy! 🚀\n\nTarget: ₦${group.amount}\nFrequency: ${group.frequency}\n\nJoin here: wealthconomy://group/join/${group.id}`,
+      await Share.share({
+        message: `Join my Wealth Tribe "${groupName}" on Wealthconomy! 🚀\n\nTarget: ₦${formatCurrency(
+          targetNaira
+        )}\n\nJoin here: wealthconomy://group/join/${id}`,
       });
-      if (result.action === Share.sharedAction) {
-        if (result.activityType) {
-          // shared with activity type of result.activityType
-        } else {
-          // shared
-        }
-      } else if (result.action === Share.dismissedAction) {
-        // dismissed
-      }
     } catch (error: any) {
-      Alert.alert(error.message);
+      console.error(error.message);
     }
   };
 
+  const handleJoinSubmit = async () => {
+    setIsProcessing(true);
+    try {
+      console.log(`👥 [WealthGroup Join Request] POST /api/v1/groups/${id}/join`);
+      await joinGroup(id as string).unwrap();
+      setJoinRequested(true);
+      Alert.alert(
+        "Request Sent",
+        "Your request to join this group has been sent to the group admin for approval."
+      );
+      setIsJoinModalVisible(false);
+      refetch();
+      refetchMembers();
+    } catch (err: any) {
+      console.error("❌ [WealthGroup Join Error]:", err);
+      const msg = err?.data?.message || err?.message || "Failed to join group.";
+      if (msg.toLowerCase().includes("already")) {
+        setJoinRequested(true);
+      }
+      Alert.alert("Notice", msg);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleMuteToggle = async () => {
+    setIsMenuVisible(false);
+    try {
+      await toggleGroupMute({ id: id as string, isMuted: true }).unwrap();
+      Alert.alert("Notifications Muted", "Group notifications have been muted.");
+    } catch (err: any) {
+      Alert.alert("Notice", "Group notification preferences updated.");
+    }
+  };
+
+  const handleReportGroup = () => {
+    setIsMenuVisible(false);
+    router.push("/support/chat" as any);
+  };
+
   return (
-    <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#FAFAFA" }} edges={["top"]}>
+      <StatusBar style="dark" />
       <Stack.Screen options={{ headerShown: false }} />
-      <Header
-        title={group.name}
-        onBack={() => router.back()}
-        rightElement={
-          group.isAdmin ? (
-            <TouchableOpacity onPress={() => setIsMoreModalVisible(true)}>
-              <Ionicons name="ellipsis-vertical" size={24} color="#1A1A1A" />
-            </TouchableOpacity>
-          ) : undefined
-        }
-      />
+
+      {/* ── Top Header ─────────────────────────────────────────────── */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 20,
+          paddingVertical: 14,
+          backgroundColor: "white",
+          borderBottomWidth: 1,
+          borderBottomColor: "#F3F4F6",
+        }}
+      >
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{ width: 40, height: 40, justifyContent: "center" }}
+        >
+          <Ionicons name="chevron-back" size={24} color="#1A1A1A" />
+        </TouchableOpacity>
+
+        <Text
+          numberOfLines={1}
+          style={{
+            flex: 1,
+            textAlign: "center",
+            fontSize: 17,
+            fontWeight: "800",
+            color: "#1A1A1A",
+            paddingHorizontal: 8,
+          }}
+        >
+          {groupName}
+        </Text>
+
+        {isMember ? (
+          <TouchableOpacity
+            onPress={() => setIsMenuVisible(true)}
+            style={{ width: 40, height: 40, alignItems: "flex-end", justifyContent: "center" }}
+          >
+            <Ionicons name="ellipsis-vertical" size={22} color="#1A1A1A" />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-        <View className="px-5 py-6 pb-12">
-          <View className="flex-row items-center justify-between mb-6">
-            <Text className="text-2xl font-extrabold text-[#323232]">
-              Group Details
-            </Text>
-            {group.isAdmin && (
+        <View className="px-5 py-4 pb-16">
+          {/* ── Sub-header: Group Details + Notification Bell ────────── */}
+          <View className="flex-row justify-between items-center mb-4">
+            <Text className="text-[20px] font-black text-[#1A1A1A]">Group Details</Text>
+            {isMember && (
               <TouchableOpacity
                 onPress={() =>
-                  router.push(
-                    `/portfolio/detail/group/${id}/notifications` as any,
-                  )
+                  router.push(`/portfolio/detail/group/${id}/notifications` as any)
                 }
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: "#F0F9F9",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  position: "relative",
+                }}
               >
-                <View>
-                  <Ionicons
-                    name="notifications-outline"
-                    size={24}
-                    color="#1A1A1A"
-                  />
-                  <View className="absolute -top-1 -right-1 bg-red-500 rounded-full h-4 w-4 items-center justify-center border border-white">
-                    <Text className="text-white text-[8px] font-bold">3</Text>
+                <Ionicons name="notifications-outline" size={20} color={THEME} />
+                {groupUnreadCount > 0 && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: -4,
+                      right: -4,
+                      minWidth: 18,
+                      height: 18,
+                      paddingHorizontal: 4,
+                      borderRadius: 9,
+                      backgroundColor: "#EF4444",
+                      borderWidth: 1.5,
+                      borderColor: "white",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text style={{ color: "white", fontSize: 9, fontWeight: "800" }}>
+                      {groupUnreadCount > 99 ? "99+" : groupUnreadCount}
+                    </Text>
                   </View>
-                </View>
+                )}
               </TouchableOpacity>
             )}
           </View>
 
-          <View className="mb-8">
-            <Image
-              source={
-                group.coverImage
-                  ? { uri: group.coverImage }
-                  : require("../../../../assets/images/group_recommended_1.png")
-              }
-              className="w-full h-48 rounded-2xl"
-              resizeMode="cover"
-            />
+          {/* ── Group Cover Image ────────────────────────────────────── */}
+          <View
+            style={{
+              width: "100%",
+              height: 180,
+              borderRadius: 18,
+              overflow: "hidden",
+              marginBottom: 16,
+              backgroundColor: "#E2E8F0",
+            }}
+          >
+            {group?.coverImage ? (
+              <Image
+                source={{ uri: group.coverImage }}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={{ flex: 1, backgroundColor: THEME_BG, alignItems: "center", justifyContent: "center" }}>
+                <Users size={64} color={THEME} />
+              </View>
+            )}
           </View>
 
-          {/* Savings Card */}
+          {/* ── Total Group Savings Card ─────────────────────────────── */}
           <View
-            className="p-6 mb-8 relative overflow-hidden self-center"
+            className="w-full rounded-[20px] bg-white relative overflow-hidden mb-6"
             style={{
-              width: 365,
-              height: 140,
-              backgroundColor: "white",
+              shadowColor: "#323232",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.12,
+              shadowRadius: 9.3,
+              elevation: 4,
               borderWidth: 0.7,
               borderColor: "#D9D9D9",
-              borderTopLeftRadius: 50,
-              borderTopRightRadius: 20,
-              borderBottomRightRadius: 50,
-              borderBottomLeftRadius: 20,
             }}
           >
             <Image
-              source={require("../../../../assets/images/group.png")}
+              source={require("@/assets/images/group.png")}
               className="absolute"
               style={{
-                width: 205.3,
-                height: 205.3,
-                left: 209.5,
-                top: 30,
+                width: 240,
+                height: 240,
+                right: -60,
+                top: 50,
                 opacity: 0.3,
-                transform: [{ rotate: "-20.09deg" }],
+                transform: [{ rotate: "-378.33deg" }],
               }}
               resizeMode="contain"
             />
-            <Text className="text-[13px] font-bold mb-2">
-              Total Group Savings
-            </Text>
-            <View className="flex-row items-baseline mb-2">
-              <Text className="text-[#1A1A1A] text-[32px] font-bold">
-                ₦{group.currentSavings}
-              </Text>
+
+            <View style={{ padding: 22 }}>
+              <View className="flex-row items-center justify-between mb-1">
+                <Text className="text-[#4B5563] text-[14px] font-extrabold">
+                  Total Group Savings
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowBalance(!showBalance)}
+                  className="p-1"
+                >
+                  {showBalance ? (
+                    <EyeOff size={20} color="#1A1A1A" />
+                  ) : (
+                    <Eye size={20} color="#1A1A1A" />
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <View className="flex-row items-baseline mb-2">
+                {showBalance ? (
+                  <BalanceText
+                    amount={`₦${formatCurrency(currentNaira)}`}
+                    fontSize={32}
+                    color="#1A1A1A"
+                  />
+                ) : (
+                  <Text className="text-[#1A1A1A] text-[32px] font-black tracking-tight">
+                    ••••••••
+                  </Text>
+                )}
+              </View>
+
+              <View className="flex-row items-center space-x-1">
+                <Text className="text-[#4B5563] text-[13px] font-extrabold">
+                  Group wealth grew by ₦230.00 today
+                </Text>
+                <Text className="text-[#4CAF50] text-[15px] font-bold"> ↑</Text>
+              </View>
             </View>
-            <View className="flex-row items-center space-x-1">
-              <Text className="text-[#64748B] text-[12px] font-bold">
-                Group wealth grew to ₦{group.growthToday} today
-              </Text>
-              <Text className="text-[#4CAF50] text-[14px] font-bold">↑</Text>
+          </View>
+
+          {/* ── Progress Bar & Timeline Row ──────────────────────────── */}
+          <View style={{ marginBottom: 20 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <Text style={{ fontSize: 18 }}>➡️</Text>
+              <Text style={{ fontSize: 18 }}>🏆</Text>
             </View>
-          </View>
-
-          {/* Conditional (Above Stats) */}
-          <View className="mb-8">
-            <ProgressTracker group={group} />
-            {!group.isAdmin && (
-              <View className="h-[1px] bg-gray-100 w-full mb-6" />
-            )}
-            {isMember && <MemberActions group={group} />}
-          </View>
-
-          {/* Group Info Stats */}
-          <View
-            className="rounded-[20px] p-6 mb-8"
-            style={{ backgroundColor: THEME_BG }}
-          >
-            <StatRow label="Group Name" value={group.name} />
-            <StatRow label="Category" value={group.category} />
-            <StatRow label="Started by" value={group.startDate} />
-            <StatRow label="Ends by" value={group.endDate} />
-            <StatRow
-              label="Target 🎯"
-              value={`₦${group.amount}`}
-              valueColor={THEME}
-            />
-            <StatRow
-              label="Wealth Group"
-              value="Fixed Contribution Groups"
-              valueColor={THEME}
-            />
-            <StatRow
-              label="Daily Wealth Growth"
-              value="₦4,697.69 ⬆️/week"
-              valueColor={THEME}
-            />
-            <StatRow
-              label="Individual Savings"
-              value="₦290,697.69"
-              valueColor={THEME}
-            />
-            <StatRow
-              label="Each Wealth Growth"
-              value="₦697.69 ⬆️/week"
-              valueColor={THEME}
-            />
-            <StatRow
-              label="Contribution Frequency"
-              value={group.frequency}
-              valueColor={THEME}
-            />
-            <StatRow
-              label="Tribe Members"
-              value={`${group.membersCount} members`}
-              valueColor={THEME}
-            />
-          </View>
-
-          {/* Conditional (Below Stats) */}
-          {!isMember && (
-            <TouchableOpacity
-              onPress={handleJoin}
-              disabled={requestSentLocally}
-              className={`w-full h-14 rounded-2xl items-center justify-center mb-6 ${
-                requestSentLocally
-                  ? "bg-gray-100 border border-gray-200"
-                  : "bg-[#155D5F]"
-              }`}
+            <View
+              style={{
+                width: "100%",
+                height: 8,
+                backgroundColor: THEME_LIGHT,
+                borderRadius: 4,
+                overflow: "hidden",
+                marginBottom: 8,
+              }}
             >
-              <Text
-                className={`font-bold text-base ${
-                  requestSentLocally ? "text-gray-400" : "text-white"
-                }`}
-              >
-                {requestSentLocally ? "Request Sent" : "Join Group"}
+              <View
+                style={{
+                  width: `${progressPct}%`,
+                  height: "100%",
+                  backgroundColor: THEME,
+                  borderRadius: 4,
+                }}
+              />
+            </View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#64748B" }}>
+                {progressPct}%
               </Text>
-            </TouchableOpacity>
-          )}
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#64748B" }}>
+                {getTimelineLeft()}
+              </Text>
+            </View>
+          </View>
 
-          {group.isAdmin && (
+          {/* ── Action Buttons for Members (Deposit / Withdraw) ─────── */}
+          {isMember ? (
+            <View style={{ gap: 12, marginBottom: 20 }}>
+              {/* Deposit funds (Works like Top Up) */}
+              <TouchableOpacity
+                onPress={() => setIsDepositModalVisible(true)}
+                activeOpacity={0.85}
+                style={{
+                  backgroundColor: THEME,
+                  height: 52,
+                  borderRadius: 14,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexDirection: "row",
+                  gap: 8,
+                }}
+              >
+                <Plus size={20} color="white" strokeWidth={2.5} />
+                <Text style={{ color: "white", fontWeight: "800", fontSize: 15 }}>
+                  Deposit funds
+                </Text>
+              </TouchableOpacity>
+
+              {/* Withdraw funds (Inactive until maturity) */}
+              <TouchableOpacity
+                disabled={true}
+                activeOpacity={0.9}
+                style={{
+                  backgroundColor: "#F3F4F6",
+                  height: 52,
+                  borderRadius: 14,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexDirection: "row",
+                  gap: 8,
+                }}
+              >
+                <Text style={{ color: "#9CA3AF", fontWeight: "700", fontSize: 15 }}>
+                  ↗ Withdraw funds
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          {/* ── Group Info Specs Card ────────────────────────────────── */}
+          <View
+            style={{
+              backgroundColor: THEME_BG,
+              borderRadius: 20,
+              padding: 20,
+              borderWidth: 1,
+              borderColor: "#D5EAE9",
+              marginBottom: 20,
+            }}
+          >
+            <SpecRow label="Group Name" value={groupName} />
+            <SpecRow label="Category" value={group?.category || "Business"} />
+            <SpecRow label="Started by" value={formatDateDisplay(group?.startDate)} />
+            <SpecRow label="Ends by" value={formatDateDisplay(group?.endDate)} />
+            <SpecRow label="Target 🎯" value={`₦${formatCurrency(targetNaira)}`} />
+            <SpecRow label="Wealth Group" value={`${group?.accessType || "Public"} Group`} />
+            <SpecRow label="Daily Wealth Growth" value="20%" />
+            <SpecRow
+              label="Individual Savings"
+              value={`₦${formatCurrency(
+                (targetNaira / (group?.membersLimit || 10))
+              )}`}
+            />
+            <SpecRow label="Each Wealth Growth" value="15%" />
+            <SpecRow label="Contribution Frequency" value={group?.frequency || "Monthly"} />
+            <SpecRow
+              label="Tribe Members"
+              value={`${membersData?.items?.length || group?.activeMembersCount || 1} members`}
+              isLast
+            />
+          </View>
+
+          {/* ── Bottom CTA ───────────────────────────────────────────── */}
+          {isMember ? (
+            /* Invite Members Button */
             <TouchableOpacity
               onPress={handleInvite}
-              className="w-full h-14 bg-white border border-gray-200 rounded-2xl flex-row items-center justify-center space-x-2 mb-10"
+              activeOpacity={0.85}
+              style={{
+                backgroundColor: "white",
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+                height: 52,
+                borderRadius: 14,
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "row",
+                gap: 8,
+              }}
             >
-              <Share2 size={20} color="#64748B" />
-              <Text className="text-[#64748B] font-bold">Invite Members</Text>
+              <Share2 size={18} color="#64748B" />
+              <Text style={{ color: "#64748B", fontWeight: "700", fontSize: 14 }}>
+                Invite Members
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            /* Join Group Button for Non-Members */
+            <TouchableOpacity
+              onPress={() => (joinRequested ? null : setIsJoinModalVisible(true))}
+              disabled={joinRequested || isProcessing}
+              activeOpacity={0.85}
+              style={{
+                backgroundColor: joinRequested ? "#9CA3AF" : THEME,
+                height: 54,
+                borderRadius: 14,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ color: "white", fontWeight: "800", fontSize: 16 }}>
+                {joinRequested ? "Request Sent" : "Join Group"}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
       </ScrollView>
 
-      {/* More Options Modal */}
-      <Modal
-        visible={isMoreModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsMoreModalVisible(false)}
-      >
+      {/* ─── 3-DOT MENU MODAL / POPUP ──────────────────────────────────── */}
+      <Modal visible={isMenuVisible} transparent animationType="fade">
         <TouchableOpacity
-          className="flex-1 bg-black/20"
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.3)" }}
           activeOpacity={1}
-          onPress={() => setIsMoreModalVisible(false)}
+          onPress={() => setIsMenuVisible(false)}
         >
           <View
-            className="absolute top-24 right-5 w-56 bg-white rounded-2xl shadow-xl overflow-hidden p-2"
             style={{
+              position: "absolute",
+              top: Platform.OS === "ios" ? 85 : 55,
+              right: 18,
+              width: 175,
+              backgroundColor: "white",
+              borderRadius: 16,
+              paddingVertical: 8,
               shadowColor: "#000",
               shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.1,
+              shadowOpacity: 0.15,
               shadowRadius: 10,
-              elevation: 10,
+              elevation: 6,
+              borderWidth: 1,
+              borderColor: "#F3F4F6",
             }}
           >
-            <OptionItem
-              icon="people-outline"
-              label="Tribe Members"
+            <MenuItem
+              title="Member List"
               onPress={() => {
-                setIsMoreModalVisible(false);
+                setIsMenuVisible(false);
                 router.push(
-                  `/portfolio/detail/group/${id}/tribe-settings/members-list` as any,
+                  `/portfolio/detail/group/${id}/tribe-settings/members-list` as any
                 );
               }}
             />
-            <OptionItem
-              icon="settings-outline"
-              label="Tribe Setting"
-              onPress={() => {
-                setIsMoreModalVisible(false);
-                router.push(
-                  `/portfolio/detail/group/${id}/tribe-settings` as any,
-                );
-              }}
-            />
-            <OptionItem
-              icon="chatbubble-ellipses-outline"
-              label="Support Center"
-              onPress={() => {
-                setIsMoreModalVisible(false);
-                router.push("/support/chat");
-              }}
+            {isAdmin && (
+              <MenuItem
+                title="Tribe Settings"
+                onPress={() => {
+                  setIsMenuVisible(false);
+                  router.push(`/portfolio/detail/group/${id}/tribe-settings` as any);
+                }}
+              />
+            )}
+            <MenuItem
+              title="Report Group"
+              textColor="#EF4444"
+              isLast
+              onPress={handleReportGroup}
             />
           </View>
         </TouchableOpacity>
       </Modal>
 
-      {/* Join Request Modal */}
-      <Modal
-        visible={isJoinModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
-          if (!requestSent) setIsJoinModalVisible(false);
-        }}
-      >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-[40px] px-5 pt-8 pb-12 items-center">
-            <View className="w-12 h-1 bg-gray-200 rounded-full mb-8" />
+      {/* ─── STEP 1: CLEAN AMOUNT MODAL ─────────────────────────────── */}
+      <Modal visible={isDepositModalVisible} transparent animationType="slide">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Deposit to Tribe</Text>
+            <Text
+              style={{
+                color: "#64748B",
+                fontSize: 13,
+                textAlign: "center",
+                marginTop: 6,
+                marginBottom: 20,
+              }}
+            >
+              Enter the amount you want to contribute from your wallet.
+            </Text>
 
-            <View className="w-full items-center mb-6 relative">
-              <Image
-                source={require("../../../../assets/images/success.png")}
-                className="w-full h-40 absolute"
-                style={{ opacity: 0.5 }}
-                resizeMode="contain"
-              />
-              <Image
-                source={require("../../../../assets/images/sent.png")}
-                className="w-32 h-32"
-                resizeMode="contain"
+            {/* Clean Amount Input */}
+            <View style={{ width: "100%", marginBottom: 24 }}>
+              <Text style={{ fontSize: 12, fontWeight: "700", color: "#64748B", marginBottom: 8 }}>
+                Amount (₦)
+              </Text>
+              <TextInput
+                style={[styles.textInput, { fontSize: 22, fontWeight: "700", textAlign: "center", height: 56 }]}
+                placeholder="₦0.00"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="numeric"
+                autoFocus
+                value={depositAmount ? `₦${depositAmount}` : ""}
+                onChangeText={(v) => {
+                  const n = v.replace(/\D/g, "");
+                  setDepositAmount(n ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "");
+                }}
               />
             </View>
 
-            <Text className="text-[24px] font-bold text-center mb-4">
-              {requestSent ? "Request Sent! 🎉" : "Join the Tribe! 🚀"}
+            <TouchableOpacity
+              onPress={() => {
+                const num = parseFloat(depositAmount.replace(/,/g, ""));
+                if (!num || num <= 0) {
+                  Alert.alert("Invalid Amount", "Please enter a valid deposit amount.");
+                  return;
+                }
+                const amtStr = num.toString();
+                setIsDepositModalVisible(false);
+                setDepositAmount("");
+                router.push({
+                  pathname: "/payment/insert-pin",
+                  params: {
+                    amount: amtStr,
+                    action: "GROUP_DEPOSIT",
+                    targetId: id as string,
+                    targetName: groupName,
+                    returnUrl: `/portfolio/detail/group/${id}`,
+                  },
+                });
+              }}
+              style={{
+                backgroundColor: THEME,
+                width: "100%",
+                height: 52,
+                borderRadius: 16,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ color: "white", fontWeight: "800", fontSize: 16 }}>
+                Continue
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                setIsDepositModalVisible(false);
+                setDepositAmount("");
+              }}
+              style={{ marginTop: 14 }}
+            >
+              <Text style={{ color: "#64748B", fontWeight: "600", fontSize: 13 }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ─── JOIN MODAL ────────────────────────────────────────────────── */}
+      <Modal visible={isJoinModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Join {groupName}</Text>
+            <Text
+              style={{
+                color: "#64748B",
+                fontSize: 13,
+                textAlign: "center",
+                marginVertical: 14,
+                lineHeight: 20,
+              }}
+            >
+              You are requesting to join this tribe savings circle. The group admin will review and approve your membership.
             </Text>
 
-            <Text className="text-center text-[#64748B] leading-[22px] mb-10 px-4">
-              {requestSentLocally
-                ? "Your request to join the group has been sent to the admin. You'll be notified once approved."
-                : "You're about to request to join this wealth group. Make sure you're ready to commit to the goals!"}
-            </Text>
-
-            {!requestSent && (
+            <View style={{ flexDirection: "row", gap: 12, width: "100%", marginTop: 10 }}>
               <TouchableOpacity
-                onPress={handleSendRequest}
-                className="w-full h-14 bg-[#155D5F] rounded-2xl items-center justify-center"
+                onPress={() => setIsJoinModalVisible(false)}
+                disabled={isProcessing}
+                style={{
+                  flex: 1,
+                  height: 48,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: "#E5E5E5",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
               >
-                <Text className="text-white font-bold text-base">
-                  Send Join Request
-                </Text>
+                <Text style={{ color: "#64748B", fontWeight: "600" }}>Cancel</Text>
               </TouchableOpacity>
-            )}
+              <TouchableOpacity
+                onPress={handleJoinSubmit}
+                disabled={isProcessing}
+                style={{
+                  flex: 1,
+                  height: 48,
+                  borderRadius: 12,
+                  backgroundColor: THEME,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={{ color: "white", fontWeight: "700" }}>Confirm Join</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -363,84 +802,87 @@ export default function GroupDetailScreen() {
   );
 }
 
-function ProgressTracker({ group }: { group: WealthGroup }) {
-  return (
-    <View className="mb-6 px-1">
-      <View className="flex-row justify-between items-center mb-2">
-        <Text className="text-[18px]">➡️</Text>
-        <Text className="text-[20px]">🏆</Text>
-      </View>
-      <View className="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
-        <View className="h-full bg-[#155D5F]" style={{ width: "20%" }} />
-      </View>
-      <View className="flex-row justify-between">
-        <Text className="text-gray-400 text-[12px] font-bold">20%</Text>
-        <Text className="text-gray-400 text-[12px] font-bold">
-          254 Weeks Left
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function MemberActions({ group }: { group: WealthGroup }) {
-  const router = useRouter();
-  return (
-    <View className="mb-4">
-      <TouchableOpacity
-        onPress={() => router.push("/wallet/deposit")}
-        className="w-full h-14 bg-[#155D5F] rounded-2xl items-center justify-center mb-3 flex-row space-x-2"
-      >
-        <Ionicons name="add" size={24} color="white" />
-        <Text className="text-white font-bold text-base">Deposit funds</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        onPress={() => router.push("/wallet/withdraw")}
-        className="w-full h-14 bg-white border border-[#155D5F] rounded-2xl items-center justify-center flex-row space-x-2"
-      >
-        <ArrowUpRight size={20} color="#155D5F" />
-        <Text className="text-[#155D5F] font-bold text-base">
-          Withdraw funds
-        </Text>
-      </TouchableOpacity>
-      <View className="h-[1px] bg-gray-100 w-full mt-6 mb-2" />
-    </View>
-  );
-}
-
-function StatRow({ label, value, valueColor = "#1A1A1A" }: any) {
-  return (
-    <View className="flex-row justify-between items-center py-3 border-b border-gray-100/50">
-      <Text className="text-[#64748B] text-[12px] font-medium">{label}</Text>
-      <Text
-        className="font-bold text-[12px] text-right"
-        style={{ color: valueColor }}
-      >
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function OptionItem({
-  icon,
+// ── Components ──────────────────────────────────────────────────────────
+function SpecRow({
   label,
+  value,
+  isLast = false,
+}: {
+  label: string;
+  value: string;
+  isLast?: boolean;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingVertical: 9,
+        borderBottomWidth: isLast ? 0 : 1,
+        borderBottomColor: "#E0F2F1",
+      }}
+    >
+      <Text style={{ fontSize: 13, fontWeight: "500", color: "#64748B" }}>{label}</Text>
+      <Text style={{ fontSize: 13, fontWeight: "600", color: THEME }}>{value}</Text>
+    </View>
+  );
+}
+
+function MenuItem({
+  title,
+  textColor = "#1A1A1A",
+  isLast = false,
   onPress,
 }: {
-  icon: any;
-  label: string;
+  title: string;
+  textColor?: string;
+  isLast?: boolean;
   onPress: () => void;
 }) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      className="flex-row items-center p-3 hover:bg-gray-50 rounded-xl"
+      style={{
+        paddingHorizontal: 16,
+        paddingVertical: 11,
+        borderBottomWidth: isLast ? 0 : 1,
+        borderBottomColor: "#F3F4F6",
+      }}
     >
-      <Ionicons name={icon} size={20} color="#155D5F" className="mr-3" />
-      <Text className="text-[#1A1A1A] font-medium text-[14px] ml-3">
-        {label}
-      </Text>
+      <Text style={{ fontSize: 13, fontWeight: "600", color: textColor }}>{title}</Text>
     </TouchableOpacity>
   );
 }
+
+const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    alignItems: "center",
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: TEXT_DARK,
+  },
+  textInput: {
+    width: "100%",
+    backgroundColor: "#F3F4F6",
+    height: 48,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    color: TEXT_DARK,
+  },
+});

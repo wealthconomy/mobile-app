@@ -60,3 +60,5 @@ export const ThemedButton = ({
     </TouchableOpacity>
   );
 };
+
+export default ThemedButton;

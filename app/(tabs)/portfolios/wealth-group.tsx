@@ -5,10 +5,10 @@ import { PortfolioDetailSkeleton } from "@/src/features/home/components/Dashboar
 import { RootState } from "@/src/store";
 import { WealthGroup } from "@/src/store/slices/wealthGroupSlice";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { useFocusEffect, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Eye, EyeOff, Search, Users } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Image,
   ScrollView,
@@ -37,92 +37,6 @@ interface DiscoveryGroup {
   category: string;
 }
 
-const DUMMY_TRENDING: DiscoveryGroup[] = [
-  {
-    id: "t1",
-    title: "Wealthy People Savings",
-    category: "Fixed Contribution Groups",
-    dailyAmount: "₦2,000 Daily",
-    endDate: "2/12/2023",
-    growth: "₦3M/day",
-    members: 283,
-    image: require("../../../assets/images/group_trending_1.png"),
-  },
-  {
-    id: "t2",
-    title: "Road to ₦300M",
-    category: "Flex Contribution Group",
-    dailyAmount: "₦2,000 Daily",
-    endDate: "2/12/2023",
-    growth: "₦3M/day",
-    members: 283,
-    image: require("../../../assets/images/advert.jpg"),
-  },
-  {
-    id: "t3",
-    title: "Future Achievers",
-    category: "Fixed Contribution",
-    dailyAmount: "₦5,000 Weekly",
-    endDate: "12/12/2024",
-    growth: "₦500k/day",
-    members: 45,
-    image: require("../../../assets/images/group_trending_1.png"),
-  },
-  {
-    id: "t4",
-    title: "Techies Fund",
-    category: "Flex Contribution",
-    dailyAmount: "₦10,000 Mo",
-    endDate: "1/1/2025",
-    growth: "₦1M/day",
-    members: 120,
-    image: require("../../../assets/images/group_recommended_1.png"),
-  },
-];
-
-const DUMMY_RECOMMENDED: DiscoveryGroup[] = [
-  {
-    id: "r1",
-    title: "Supportive Hands",
-    category: "Flex Contribution Group",
-    dailyAmount: "₦2,000 Daily",
-    endDate: "2/12/2023",
-    growth: "₦3M/day",
-    members: 283,
-    image: require("../../../assets/images/group_recommended_1.png"),
-  },
-  {
-    id: "r2",
-    title: "Future Finance Cooperative",
-    category: "Rotational Savings (Ajo/Esusu model)",
-    dailyAmount: "₦2,000 Daily",
-    endDate: "2/12/2023",
-    growth: "₦3M/day",
-    members: 283,
-    image: require("../../../assets/images/group_trending_1.png"),
-  },
-  {
-    id: "r3",
-    title: "Homeowners 2025",
-    category: "Fixed Contribution",
-    dailyAmount: "₦50k/Monthly",
-    endDate: "2/12/2025",
-    growth: "₦10M/day",
-    members: 500,
-    image: require("../../../assets/images/group_recommended_1.png"),
-  },
-  {
-    id: "r4",
-    title: "Travelers Hub",
-    category: "Rotational",
-    dailyAmount: "₦5,000 Daily",
-    endDate: "1/5/2024",
-    growth: "₦1.2M/day",
-    members: 156,
-    image: require("../../../assets/images/advert.jpg"),
-  },
-];
-
 const CREATE_CATEGORIES = [
   {
     id: "fixed",
@@ -141,53 +55,68 @@ const CREATE_CATEGORIES = [
   },
 ];
 
+import { useListGroupsQuery } from "@/src/store/api/groupApi";
+import { WealthGroupModel } from "@/src/types/group";
+
 export default function WealthGroupScreen() {
-  const [loading, setLoading] = useState(true);
-  const groupsFromRedux = useSelector(
-    (state: RootState) => state.wealthGroup.groups,
-  );
+  const { data: groupsData, isLoading: loading, refetch } = useListGroupsQuery();
   const portfolioPreference = useSelector(
     (state: RootState) => state.portfolioPreference.group
   );
   const showInterest = portfolioPreference !== "Impact Wealth";
 
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(timer);
-  }, []);
-
   const [showBalance, setShowBalance] = useState(true);
   const [showTips, setShowTips] = useState(true);
-  const [activeTab, setActiveTab] = useState<"ongoing" | "completed">(
-    "ongoing",
-  );
+  const [activeTab, setActiveTab] = useState<"ongoing" | "completed">("ongoing");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Map Redux groups to DiscoveryGroup interface
-  const mappedGroups = groupsFromRedux.map((g: WealthGroup) => ({
+  const allGroups: WealthGroupModel[] = groupsData?.items || [];
+
+  // Map API groups to DiscoveryGroup interface
+  const mappedGroups: DiscoveryGroup[] = allGroups.map((g) => ({
     id: g.id,
     title: g.name,
-    category: g.category,
-    dailyAmount: `₦${g.amount} ${g.frequency}`,
-    endDate: g.endDate,
-    growth: `₦${g.growthToday}/day`,
-    members: g.membersCount,
+    category: g.category || "General",
+    dailyAmount: `₦${(parseFloat(g.targetAmount?.toString() || "0") / 100).toLocaleString()} ${g.frequency || "Monthly"}`,
+    endDate: g.endDate ? new Date(g.endDate).toLocaleDateString() : "Flexible",
+    growth: "₦0/day",
+    members: g.membersCount || 1,
     image: g.coverImage
       ? { uri: g.coverImage }
       : require("../../../assets/images/group_trending_1.png"),
   }));
 
-  const trendingGroups = [...mappedGroups, ...DUMMY_TRENDING].filter(
+  const filteredGroups = mappedGroups.filter(
     (g) =>
       g.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       g.category.toLowerCase().includes(searchQuery.toLowerCase()),
   );
-  const recommendedGroups = [...mappedGroups, ...DUMMY_RECOMMENDED].filter(
-    (g) =>
-      g.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      g.category.toLowerCase().includes(searchQuery.toLowerCase()),
+
+  const trendingGroups = filteredGroups;
+  const recommendedGroups = filteredGroups;
+
+  const currentUser = useSelector((state: RootState) => state.auth.user);
+
+  const ongoingGroups = allGroups.filter(
+    (g) => g.isMember || g.isAdmin || (currentUser?.id && g.creatorId === currentUser.id)
   );
-  const ongoingGroups = groupsFromRedux.filter((g: WealthGroup) => g.isMember);
+  const completedGroups = allGroups.filter(
+    (g) =>
+      (g.isMember || g.isAdmin || (currentUser?.id && g.creatorId === currentUser.id)) &&
+      (g.status === "COMPLETED" || g.status === "TERMINATED")
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
+  const totalSavingsKobo = ongoingGroups.reduce((acc, g) => {
+    const rawVal = g.totalSavings ?? g.currentBalance ?? 0;
+    const num = typeof rawVal === "string" ? parseFloat(rawVal) : Number(rawVal);
+    return acc + (isNaN(num) ? 0 : num);
+  }, 0);
 
   if (loading) {
     return (
@@ -268,7 +197,7 @@ export default function WealthGroupScreen() {
               <View className="flex-row items-baseline mb-2">
                 {showBalance ? (
                   <BalanceText
-                    amount="₦300,735.42"
+                    amount={`₦${(totalSavingsKobo / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     fontSize={34}
                     color="#1A1A1A"
                   />
@@ -409,14 +338,24 @@ export default function WealthGroupScreen() {
           <DiscoverySection
             title="Trending Groups"
             data={trendingGroups}
-            onViewAll={() => {}}
+            onViewAll={() =>
+              router.push({
+                pathname: "/portfolio/group/discovery",
+                params: { type: "trending" },
+              })
+            }
           />
 
           {/* ── Recommended Groups ────────────────────────────────── */}
           <DiscoverySection
             title="Recommended Groups"
             data={recommendedGroups}
-            onViewAll={() => {}}
+            onViewAll={() =>
+              router.push({
+                pathname: "/portfolio/group/discovery",
+                params: { type: "recommended" },
+              })
+            }
           />
 
           {/* ── Tabs ─────────────────────────────────────────────── */}
@@ -486,14 +425,11 @@ export default function WealthGroupScreen() {
           {activeTab === "ongoing" ? (
             ongoingGroups.length > 0 ? (
               <View className="space-y-6 mb-10">
-                {ongoingGroups.map((g: WealthGroup) => {
-                  const target = parseFloat(g.amount.replace(/,/g, "")) || 1;
-                  const current =
-                    parseFloat(g.currentSavings.replace(/,/g, "")) || 0;
-                  const progress = Math.min(
-                    Math.max((current / target) * 100, 5),
-                    100,
-                  );
+                {ongoingGroups.map((g: WealthGroupModel) => {
+                  const targetNum = (parseFloat(g.targetAmount?.toString() || "10000000")) / 100;
+                  const rawSavings = g.totalSavings ?? g.currentBalance ?? 0;
+                  const currentNum = (typeof rawSavings === "string" ? parseFloat(rawSavings) : Number(rawSavings)) / 100;
+                  const progress = Math.min(Math.max((currentNum / targetNum) * 100, 2), 100);
 
                   return (
                     <TouchableOpacity
@@ -501,10 +437,10 @@ export default function WealthGroupScreen() {
                       onPress={() =>
                         router.push({
                           pathname: "/portfolio/detail/group/[id]",
-                          params: { id: g.id, member: "true" },
+                          params: { id: g.id },
                         })
                       }
-                      className="flex-row items-center p-4 bg-white rounded-2xl"
+                      className="flex-row items-center p-4 bg-white rounded-2xl mb-4"
                       style={{
                         shadowColor: "#000",
                         shadowOffset: { width: 0, height: 1 },
@@ -533,14 +469,14 @@ export default function WealthGroupScreen() {
                           {g.name}
                         </Text>
                         <View className="flex-row items-center justify-between mb-2">
-                          <Text className="text-[14px] font-bold text-[#4B5563]">
+                          <Text className="text-[13px] font-bold text-[#4B5563]">
                             Progress:{" "}
                             <Text className="text-[#155D5F] font-black">
-                              ₦{g.currentSavings}
+                              ₦{currentNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </Text>
                           </Text>
-                          <Text className="text-[13px] font-bold text-[#4B5563]">
-                            {g.membersCount} members
+                          <Text className="text-[12px] font-bold text-[#4B5563]">
+                            {g.membersCount || 1} members
                           </Text>
                         </View>
                         {/* Progress Bar */}
@@ -581,6 +517,62 @@ export default function WealthGroupScreen() {
                 </Text>
               </View>
             )
+          ) : completedGroups.length > 0 ? (
+            <View className="space-y-6 mb-10">
+              {completedGroups.map((g: WealthGroupModel) => {
+                const targetNum = (parseFloat(g.targetAmount?.toString() || "10000000")) / 100;
+                const rawSavings = g.totalSavings ?? g.currentBalance ?? 0;
+                const currentNum = (typeof rawSavings === "string" ? parseFloat(rawSavings) : Number(rawSavings)) / 100;
+                return (
+                  <TouchableOpacity
+                    key={g.id}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/portfolio/detail/group/[id]",
+                        params: { id: g.id },
+                      })
+                    }
+                    className="flex-row items-center p-4 bg-white rounded-2xl mb-4"
+                    style={{
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.03,
+                      shadowRadius: 5,
+                      elevation: 1,
+                      borderWidth: 1,
+                      borderColor: "#F1F5F9",
+                    }}
+                  >
+                    <View className="w-16 h-16 rounded-xl overflow-hidden mr-4">
+                      {g.coverImage ? (
+                        <Image
+                          source={{ uri: g.coverImage }}
+                          className="w-full h-full"
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View className="w-full h-full bg-[#F2FFFF] items-center justify-center">
+                          <Users size={28} color={THEME} />
+                        </View>
+                      )}
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[16px] font-bold text-[#1A1A1A] mb-1">
+                        {g.name}
+                      </Text>
+                      <View className="flex-row items-center justify-between mb-2">
+                        <Text className="text-[13px] font-bold text-[#10B981]">
+                          Status: Completed
+                        </Text>
+                        <Text className="text-[12px] font-bold text-[#4B5563]">
+                          Total: ₦{currentNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           ) : (
             <View className="items-center justify-center py-10 mb-10">
               <Text className="text-gray-400">No completed groups yet</Text>
@@ -650,9 +642,9 @@ function DiscoverySection({
         </ScrollView>
       ) : (
         <View className="w-full h-32 items-center justify-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-          <Ionicons name="search-outline" size={32} color="#94A3B8" />
-          <Text className="text-[#374151] text-[14px] font-extrabold mt-2">
-            No tribes found matching your search
+          <Ionicons name="people-outline" size={32} color="#94A3B8" />
+          <Text className="text-[#374151] text-[13px] font-bold mt-2 text-center px-4">
+            No groups found yet. Create a tribe or search by name.
           </Text>
         </View>
       )}

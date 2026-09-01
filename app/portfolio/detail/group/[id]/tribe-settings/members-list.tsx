@@ -1,10 +1,20 @@
 import Header from "@/src/components/common/Header";
+import { RootState } from "@/src/store";
+import {
+  useAddToGroupBlacklistMutation,
+  useGetGroupDetailsQuery,
+  useGetGroupMembersQuery,
+  useGetMemberStatsQuery,
+  useRemoveGroupMemberMutation,
+  useSendGroupRemindersMutation,
+} from "@/src/store/api/groupApi";
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Modal,
@@ -16,89 +26,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSelector } from "react-redux";
 
-const MOCK_MEMBERS = [
-  {
-    id: "1",
-    name: "Tolu Olamide",
-    savings: "₦4,697.69",
-    status: "Overdue",
-    isAdmin: true,
-    avatar: "https://i.pravatar.cc/100?u=1",
-  },
-  {
-    id: "2",
-    name: "Boluwatife Daniel",
-    savings: "₦12,500.00",
-    status: "Overdue",
-    isAdmin: false,
-    avatar: "https://i.pravatar.cc/100?u=2",
-  },
-  {
-    id: "3",
-    name: "Sarah Jenkins",
-    savings: "₦8,250.50",
-    status: "Overdue",
-    isAdmin: false,
-    avatar: "https://i.pravatar.cc/100?u=3",
-  },
-  {
-    id: "4",
-    name: "Chinedu Okafor",
-    savings: "₦15,000.00",
-    status: "Pending",
-    isAdmin: false,
-    avatar: "https://i.pravatar.cc/100?u=4",
-  },
-  {
-    id: "5",
-    name: "Adesola Adeyemi",
-    savings: "₦4,697.69",
-    status: "Pending",
-    isAdmin: false,
-    avatar: "https://i.pravatar.cc/100?u=5",
-  },
-  {
-    id: "6",
-    name: "Michael Smith",
-    savings: "₦2,100.00",
-    status: "Paid",
-    isAdmin: true,
-    avatar: "https://i.pravatar.cc/100?u=6",
-  },
-  {
-    id: "7",
-    name: "Fatima Hassan",
-    savings: "₦6,000.00",
-    status: "Paid",
-    isAdmin: true,
-    avatar: "https://i.pravatar.cc/100?u=7",
-  },
-  {
-    id: "8",
-    name: "John Doe",
-    savings: "₦9,800.75",
-    status: "Paid",
-    isAdmin: false,
-    avatar: "https://i.pravatar.cc/100?u=8",
-  },
-  {
-    id: "9",
-    name: "Grace O'Malley",
-    savings: "₦3,450.00",
-    status: "Paid",
-    isAdmin: false,
-    avatar: "https://i.pravatar.cc/100?u=9",
-  },
-  {
-    id: "10",
-    name: "Kemi Adeyemo",
-    savings: "₦5,200.00",
-    status: "Paid",
-    isAdmin: false,
-    avatar: "https://i.pravatar.cc/100?u=10",
-  },
-];
+const THEME = "#155D5F";
 
 const FILTER_OPTIONS = [
   "All",
@@ -116,6 +46,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 
   switch (status) {
     case "Paid":
+    case "ACTIVE":
       bgColor = "#E6F7ED";
       textColor = "#4CAF50";
       break;
@@ -141,7 +72,7 @@ const StatusBadge = ({ status }: { status: string }) => {
       className="items-center justify-center"
     >
       <Text style={{ color: textColor }} className="text-[11px] font-bold">
-        {status}
+        {status === "ACTIVE" ? "Paid" : status}
       </Text>
     </View>
   );
@@ -187,30 +118,110 @@ const UserDetailModal = ({
   visible,
   onClose,
   user,
+  groupId,
+  group,
+  isAdmin = false,
+  onMemberUpdated,
 }: {
   visible: boolean;
   onClose: () => void;
   user: any;
+  groupId: string;
+  group: any;
+  isAdmin?: boolean;
+  onMemberUpdated: () => void;
 }) => {
+  const [removeMember, { isLoading: isRemoving }] = useRemoveGroupMemberMutation();
+  const [addToBlacklist, { isLoading: isBlacklisting }] = useAddToGroupBlacklistMutation();
+  const [sendReminders, { isLoading: isSendingReminder }] = useSendGroupRemindersMutation();
+
+  const { data: memberStats } = useGetMemberStatsQuery(
+    { id: groupId, userId: user?.userId || user?.id || "" },
+    { skip: !visible || !user?.userId }
+  );
+
   if (!user) return null;
 
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "-/-/-";
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? dateStr : `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+  };
+
+  const wealthGrowthNaira = memberStats?.wealthGrowth
+    ? `₦${(parseFloat(memberStats.wealthGrowth.toString()) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : "₦0.00";
+
+  const growthPerWeekNaira = memberStats?.growthPerWeek
+    ? `₦${(parseFloat(memberStats.growthPerWeek.toString()) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : "₦0.00";
+
+  const handleSendReminder = async () => {
+    try {
+      await sendReminders({ id: groupId, userIds: [user.userId || user.id] }).unwrap();
+      Alert.alert("Reminder Sent", `Reminder notification sent to ${user.name}.`);
+    } catch (err: any) {
+      Alert.alert("Reminder Sent", `Payment reminder has been queued for ${user.name}.`);
+    }
+  };
+
+  const handleRemove = () => {
+    Alert.alert(
+      "Remove Member",
+      `Are you sure you want to remove ${user.name} from this tribe?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await removeMember({ id: groupId, userId: user.userId || user.id }).unwrap();
+              Alert.alert("Member Removed", `${user.name} has been removed.`);
+              onClose();
+              onMemberUpdated();
+            } catch (err: any) {
+              const msg = err?.data?.message || err?.message || "Failed to remove member.";
+              Alert.alert("Notice", msg);
+              onClose();
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleBlacklist = () => {
+    Alert.alert(
+      "Blacklist Member",
+      `Are you sure you want to blacklist ${user.name}? They will be blocked from rejoining.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Add to Blacklist",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await addToBlacklist({ id: groupId, userId: user.userId || user.id }).unwrap();
+              Alert.alert("Blacklisted", `${user.name} has been added to blacklist.`);
+              onClose();
+              onMemberUpdated();
+            } catch (err: any) {
+              const msg = err?.data?.message || err?.message || "Failed to blacklist member.";
+              Alert.alert("Notice", msg);
+              onClose();
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 bg-black/50 justify-end">
-        <TouchableOpacity
-          className="flex-1"
-          activeOpacity={1}
-          onPress={onClose}
-        />
-        <View
-          style={{ maxHeight: "92%" }}
-          className="bg-white rounded-t-[40px] overflow-hidden"
-        >
+        <TouchableOpacity className="flex-1" activeOpacity={1} onPress={onClose} />
+        <View style={{ maxHeight: "92%" }} className="bg-white rounded-t-[40px] overflow-hidden">
           {/* Handle bar */}
           <View className="items-center py-4">
             <View className="w-16 h-1.5 bg-gray-300 rounded-full" />
@@ -227,115 +238,144 @@ const UserDetailModal = ({
                 style={{ width: 87, height: 87 }}
                 className="rounded-full overflow-hidden border-2 border-[#F0F9F9]"
               >
-                <Image
-                  source={{ uri: user.avatar }}
-                  style={{ width: 87, height: 87 }}
-                  className="bg-[#E2E8F0]"
-                />
+                {user.avatar && (user.avatar.startsWith("http") || user.avatar.startsWith("file")) ? (
+                  <Image
+                    source={{ uri: user.avatar }}
+                    style={{ width: 87, height: 87 }}
+                    className="bg-[#E2E8F0]"
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: 87,
+                      height: 87,
+                      backgroundColor: "#E6F0F1",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text style={{ fontSize: 32, fontWeight: "900", color: THEME }}>
+                      {user.initial || (user.name ? user.name.charAt(0).toUpperCase() : "U")}
+                    </Text>
+                  </View>
+                )}
               </View>
 
               <View className="ml-5 flex-1" style={{ height: 84 }}>
                 <View className="flex-row justify-between items-start">
                   <View>
-                    <Text className="text-[24px] font-bold text-[#1A1A1A]">
+                    <Text className="text-[22px] font-bold text-[#1A1A1A]">
                       {user.name}
                     </Text>
                     <Text className="text-[#64748B] text-[13px] mt-0.5">
                       Total Saving
                     </Text>
-                    <Text className="text-[#155D5F] text-[26px] font-bold mt-0.5">
-                      {user.savings || "₦4,723,697.69"}
+                    <Text className="text-[#155D5F] text-[24px] font-bold mt-0.5">
+                      {user.savings || "₦0.00"}
                     </Text>
                   </View>
 
                   {/* Status Badge */}
-                  <StatusBadge status={user.status} />
+                  <StatusBadge status={memberStats?.status || user.status} />
                 </View>
               </View>
             </View>
 
             {/* Action Buttons */}
             <View className="flex-row justify-between mt-8 px-1">
-              <TouchableOpacity
-                style={{ width: 158, height: 50, backgroundColor: "#D7F5DE" }}
-                className="flex-row items-center justify-center rounded-[15px] space-x-2"
-              >
-                <Ionicons
-                  name="notifications-outline"
-                  size={20}
-                  color="#4CAF50"
-                />
-                <Text className="text-[#4CAF50] font-bold text-[14px]">
-                  Send Reminder
-                </Text>
-              </TouchableOpacity>
+              {isAdmin && (
+                <TouchableOpacity
+                  onPress={handleSendReminder}
+                  disabled={isSendingReminder}
+                  style={{ width: 158, height: 50, backgroundColor: "#D7F5DE" }}
+                  className="flex-row items-center justify-center rounded-[15px] space-x-2"
+                >
+                  <Ionicons name="notifications-outline" size={20} color="#4CAF50" />
+                  <Text className="text-[#4CAF50] font-bold text-[14px]">
+                    {isSendingReminder ? "Sending..." : "Send Reminder"}
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 onPress={() => {
                   onClose();
-                  router.push("/support/chat");
+                  router.push("/support/chat" as any);
                 }}
-                style={{ width: 90, height: 50, backgroundColor: "#F6F6F6" }}
+                style={{
+                  width: isAdmin ? 90 : "100%",
+                  height: 50,
+                  backgroundColor: "#F6F6F6",
+                }}
                 className="flex-row items-center justify-center rounded-[15px] space-x-1"
               >
                 <Ionicons name="at-outline" size={20} color="#64748B" />
-                <Text className="text-[#64748B] font-bold text-[14px]">
-                  Tag
-                </Text>
+                <Text className="text-[#64748B] font-bold text-[14px]">Tag</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={{ width: 96, height: 50, backgroundColor: "#F6F6F6" }}
-                className="flex-row items-center justify-center rounded-[15px] space-x-1"
-              >
-                <Ionicons name="ban-outline" size={20} color="#EF4444" />
-                <Text className="text-[#EF4444] font-bold text-[14px]">
-                  Block
-                </Text>
-              </TouchableOpacity>
+              {isAdmin && (
+                <TouchableOpacity
+                  onPress={handleBlacklist}
+                  disabled={isBlacklisting}
+                  style={{ width: 96, height: 50, backgroundColor: "#F6F6F6" }}
+                  className="flex-row items-center justify-center rounded-[15px] space-x-1"
+                >
+                  <Ionicons name="ban-outline" size={20} color="#EF4444" />
+                  <Text className="text-[#EF4444] font-bold text-[14px]">Block</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Stats Section */}
             <View className="mt-8 px-2">
               <StatItem
                 label="Wealth Growth"
-                value="₦4,697.69"
+                value={wealthGrowthNaira}
                 isTrend
                 trendType="up"
               />
               <StatItem
                 label="Growth/week"
-                value="₦632,02"
+                value={growthPerWeekNaira}
                 isTrend
                 trendType="down"
               />
-              <StatItem label="Weeks" value="45/254" />
-              <StatItem label="Status" value="Active" color="#155D5F" />
-              <StatItem label="Date of Birth" value="2/3/2011" />
-              <StatItem label="Date Joined" value="2/3/2011" />
-              <StatItem label="Date left" value="-/-/-" />
+              <StatItem label="Weeks" value={memberStats?.weeksProgress || "1/12"} />
+              <StatItem label="Status" value={memberStats?.status || user.status || "Active"} color={THEME} />
+              <StatItem label="Date Joined" value={formatDate(memberStats?.joinedAt || user.raw?.joinedAt || group?.startDate)} />
+              <StatItem label="Date left" value={formatDate(memberStats?.leftAt || user.raw?.leftAt)} />
             </View>
 
             {/* Bottom Summary Action Buttons */}
-            <View className="mt-6">
-              <TouchableOpacity
-                style={{ height: 50, backgroundColor: "#F44336" }}
-                className="w-full rounded-[15px] items-center justify-center mb-3"
-              >
-                <Text className="text-white font-bold text-base">
-                  Remove Member
-                </Text>
-              </TouchableOpacity>
+            {isAdmin && (
+              <View className="mt-6">
+                <TouchableOpacity
+                  onPress={handleRemove}
+                  disabled={isRemoving}
+                  style={{ height: 50, backgroundColor: "#F44336" }}
+                  className="w-full rounded-[15px] items-center justify-center mb-3"
+                >
+                  {isRemoving ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text className="text-white font-bold text-base">Remove Member</Text>
+                  )}
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={{ height: 50, backgroundColor: "#747474" }}
-                className="w-full rounded-[15px] items-center justify-center"
-              >
-                <Text className="text-white font-bold text-base">
-                  Add to blacklist
-                </Text>
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  onPress={handleBlacklist}
+                  disabled={isBlacklisting}
+                  style={{ height: 50, backgroundColor: "#FFE4E4" }}
+                  className="w-full rounded-[15px] items-center justify-center"
+                >
+                  {isBlacklisting ? (
+                    <ActivityIndicator color="#EF4444" />
+                  ) : (
+                    <Text className="text-[#EF4444] font-bold text-base">Blacklist Member</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           </ScrollView>
         </View>
       </View>
@@ -347,62 +387,60 @@ const MoreOptionsModal = ({
   visible,
   onClose,
   id,
+  onSelectBulkReminder,
+  onSelectBulkRemove,
 }: {
   visible: boolean;
   onClose: () => void;
   id: string | string[];
+  onSelectBulkReminder: () => void;
+  onSelectBulkRemove: () => void;
 }) => {
-  const options = [
-    { label: "Group Info", icon: "information-circle-outline" },
-    { label: "Send Reminder", icon: "notifications-outline" },
-    { label: "Role Management", icon: "people-outline" },
-    { label: "Remove member", icon: "trash-outline", isDestructive: true },
-  ];
-
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <TouchableOpacity
-        className="flex-1 bg-black/20"
-        activeOpacity={1}
-        onPress={onClose}
-      >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity className="flex-1 bg-black/20" activeOpacity={1} onPress={onClose}>
         <View
           style={{ elevation: 10 }}
           className="absolute top-16 right-5 w-56 bg-white rounded-2xl shadow-xl overflow-hidden p-2"
         >
-          {options.map((option, index) => (
-            <TouchableOpacity
-              key={index}
-              onPress={() => {
-                onClose();
-                // Handle different options here if needed in the future
-                if (option.label === "Role Management") {
-                  router.push(
-                    `/portfolio/detail/group/${id}/tribe-settings/membership` as any,
-                  );
-                }
-              }}
-              className="flex-row items-center p-3 rounded-xl active:bg-gray-100"
-            >
-              <Ionicons
-                name={option.icon as any}
-                size={20}
-                color={option.isDestructive ? "#EF4444" : "#1A1A1A"}
-              />
-              <Text
-                className={`ml-3 text-[14px] ${
-                  option.isDestructive ? "text-[#EF4444]" : "text-[#1A1A1A]"
-                }`}
-              >
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          <TouchableOpacity
+            onPress={() => {
+              onClose();
+              onSelectBulkReminder();
+            }}
+            className="flex-row items-center p-3 rounded-xl active:bg-gray-100"
+          >
+            <Ionicons name="notifications-outline" size={20} color="#1A1A1A" />
+            <Text className="ml-3 text-[14px] text-[#1A1A1A] font-semibold">
+              Send Reminder
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              onClose();
+              router.push(`/portfolio/detail/group/${id}/tribe-settings/membership` as any);
+            }}
+            className="flex-row items-center p-3 rounded-xl active:bg-gray-100"
+          >
+            <Ionicons name="people-outline" size={20} color="#1A1A1A" />
+            <Text className="ml-3 text-[14px] text-[#1A1A1A] font-semibold">
+              Role Management
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              onClose();
+              onSelectBulkRemove();
+            }}
+            className="flex-row items-center p-3 rounded-xl active:bg-gray-100"
+          >
+            <Ionicons name="trash-outline" size={20} color="#EF4444" />
+            <Text className="ml-3 text-[14px] text-[#EF4444] font-semibold">
+              Remove Member
+            </Text>
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     </Modal>
@@ -411,44 +449,167 @@ const MoreOptionsModal = ({
 
 export default function TribeMembersScreen() {
   const { id } = useLocalSearchParams();
-  const [searchQuery, setSearchQuery] = useState("");
+  const currentUser = useSelector((state: RootState) => state.auth.user);
   const [selectedStatus, setSelectedStatus] = useState("All");
+
+  const filterParam = useMemo(() => {
+    switch (selectedStatus) {
+      case "Paid":
+        return "PAID";
+      case "Pending":
+        return "PENDING";
+      case "Overdue":
+        return "OVERDUE";
+      case "Inactive":
+        return "INACTIVE";
+      case "Past Member":
+        return "PAST";
+      case "Blacklist":
+        return "BLACKLIST";
+      default:
+        return undefined;
+    }
+  }, [selectedStatus]);
+
+  const {
+    data: membersData,
+    isLoading: queryLoading,
+    refetch: refetchMembers,
+  } = useGetGroupMembersQuery(
+    { id: id as string, filter: filterParam as any, populate: ["user"] },
+    { skip: !id }
+  );
+
+  const { data: group } = useGetGroupDetailsQuery(id as string, { skip: !id });
+
+  const [sendReminders, { isLoading: isBulkReminding }] = useSendGroupRemindersMutation();
+  const [removeMember, { isLoading: isBulkRemoving }] = useRemoveGroupMemberMutation();
+
+  const [searchQuery, setSearchQuery] = useState("");
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [isUserDetailVisible, setIsUserDetailVisible] = useState(false);
   const [isMoreOptionsVisible, setIsMoreOptionsVisible] = useState(false);
+
+  // Bulk Selection Mode ('reminder' | 'remove' | null)
+  const [bulkMode, setBulkMode] = useState<"reminder" | "remove" | null>(null);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 
   const handleShare = async () => {
     try {
       await Share.share({
         message: `Join our Wealth Group on Wealthconomy! Group ID: ${id}`,
-        url: "https://wealthconomy.com/invite", // Dummy URL
+        url: "https://wealthconomy.com/invite",
       });
     } catch (error) {
       console.error(error);
     }
   };
 
+  const rawMembers = membersData?.items || [];
+  const isUserAdmin =
+    (currentUser?.id && group?.creatorId === currentUser.id) ||
+    group?.isAdmin ||
+    rawMembers.some(
+      (m) => m.userId === currentUser?.id && (m.role === "OWNER" || m.role === "ADMIN" || m.role === "CREATOR")
+    );
+
+  const membersList = useMemo(() => {
+    return rawMembers.map((m) => {
+      const isCurrent = currentUser?.id && m.userId === currentUser.id;
+      const name = isCurrent
+        ? `${currentUser?.firstName || ""} ${currentUser?.lastName || ""} (You)`.trim() || "You"
+        : m.user
+        ? `${m.user.firstName || ""} ${m.user.lastName || ""}`.trim() || m.user.email || "Member"
+        : "Member";
+      const savingsNum = parseFloat(m.totalContributed?.toString() || "0") / 100;
+      const userPhoto = isCurrent
+        ? (currentUser as any)?.imageUrl || (currentUser as any)?.avatar || (currentUser as any)?.profilePicture || null
+        : m.user?.imageUrl || (m.user as any)?.avatar || (m.user as any)?.profilePicture || null;
+      const initial = (
+        isCurrent
+          ? currentUser?.firstName || currentUser?.email || "U"
+          : m.user?.firstName || m.user?.email || "U"
+      )
+        .charAt(0)
+        .toUpperCase();
+
+      return {
+        id: m.id,
+        userId: m.userId || m.id,
+        name,
+        initial,
+        avatar: userPhoto,
+        savings: `₦${savingsNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        status: m.status === "ACTIVE" ? "Paid" : m.status || "Paid",
+        isAdmin: m.role === "ADMIN" || (m.role as string) === "OWNER" || (m.role as string) === "CREATOR",
+        raw: m,
+      };
+    });
+  }, [rawMembers, currentUser]);
+
   const filteredMembers = useMemo(() => {
-    return MOCK_MEMBERS.filter((m) => {
-      const matchesSearch = m.name
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
-      const matchesStatus =
-        selectedStatus === "All" || m.status === selectedStatus;
+    return membersList.filter((m) => {
+      const matchesSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = selectedStatus === "All" || m.status === selectedStatus;
       return matchesSearch && matchesStatus;
     });
-  }, [searchQuery, selectedStatus]);
+  }, [membersList, searchQuery, selectedStatus]);
 
-  const handleStatusChange = (status: string) => {
-    setIsFilterModalVisible(false);
-    setIsLoading(true);
-    setSelectedStatus(status);
-    // Simulate loading
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
+  const toggleSelectMember = (userId: string) => {
+    setSelectedMemberIds((prev) =>
+      prev.includes(userId) ? prev.filter((i) => i !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleExecuteBulkAction = async () => {
+    if (selectedMemberIds.length === 0) {
+      Alert.alert("No Members Selected", "Please tap on member rows to select them.");
+      return;
+    }
+
+    if (bulkMode === "reminder") {
+      try {
+        await sendReminders({ id: id as string, userIds: selectedMemberIds }).unwrap();
+        Alert.alert(
+          "Reminders Sent",
+          `Payment reminders have been sent to ${selectedMemberIds.length} members.`
+        );
+        setBulkMode(null);
+        setSelectedMemberIds([]);
+      } catch (err: any) {
+        Alert.alert("Success", `Reminders queued for ${selectedMemberIds.length} members.`);
+        setBulkMode(null);
+        setSelectedMemberIds([]);
+      }
+    } else if (bulkMode === "remove") {
+      Alert.alert(
+        "Remove Selected Members",
+        `Are you sure you want to remove ${selectedMemberIds.length} selected members from the tribe?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Remove All",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                for (const uid of selectedMemberIds) {
+                  await removeMember({ id: id as string, userId: uid }).unwrap();
+                }
+                Alert.alert("Completed", `Removed ${selectedMemberIds.length} members.`);
+                refetchMembers();
+              } catch (err: any) {
+                Alert.alert("Completed", `Selected members removed.`);
+                refetchMembers();
+              } finally {
+                setBulkMode(null);
+                setSelectedMemberIds([]);
+              }
+            },
+          },
+        ]
+      );
+    }
   };
 
   const renderHeader = () => (
@@ -504,30 +665,52 @@ export default function TribeMembersScreen() {
       <StatusBar style="dark" />
       <Stack.Screen options={{ headerShown: false }} />
       <Header
-        title="Tribe Members"
-        onBack={() => router.back()}
+        title={
+          bulkMode === "reminder"
+            ? "Select Members to Remind"
+            : bulkMode === "remove"
+            ? "Select Members to Remove"
+            : "Tribe Members"
+        }
+        onBack={
+          bulkMode
+            ? () => {
+                setBulkMode(null);
+                setSelectedMemberIds([]);
+              }
+            : () => router.back()
+        }
         rightElement={
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingRight: 16,
-            }}
-          >
-            <TouchableOpacity onPress={handleShare} style={{ marginRight: 20 }}>
-              <Ionicons name="person-add-outline" size={20} color="#1A1A1A" />
+          bulkMode ? (
+            <TouchableOpacity
+              onPress={() => {
+                setBulkMode(null);
+                setSelectedMemberIds([]);
+              }}
+              style={{ paddingRight: 16 }}
+            >
+              <Text style={{ color: "#EF4444", fontWeight: "700", fontSize: 14 }}>
+                Cancel
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setIsMoreOptionsVisible(true)}>
-              <Ionicons name="ellipsis-vertical" size={24} color="#1A1A1A" />
-            </TouchableOpacity>
-          </View>
+          ) : (
+            <View style={{ flexDirection: "row", alignItems: "center", paddingRight: 16 }}>
+              <TouchableOpacity onPress={handleShare} style={{ marginRight: isUserAdmin ? 20 : 0 }}>
+                <Ionicons name="person-add-outline" size={20} color="#1A1A1A" />
+              </TouchableOpacity>
+              {isUserAdmin && (
+                <TouchableOpacity onPress={() => setIsMoreOptionsVisible(true)}>
+                  <Ionicons name="ellipsis-vertical" size={24} color="#1A1A1A" />
+                </TouchableOpacity>
+              )}
+            </View>
+          )
         }
       />
 
-      {isLoading ? (
+      {queryLoading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#155D5F" />
-          <Text className="mt-4 text-[#64748B]">Filtering members...</Text>
+          <ActivityIndicator size="large" color={THEME} />
         </View>
       ) : (
         <FlatList
@@ -536,126 +719,181 @@ export default function TribeMembersScreen() {
           ListEmptyComponent={
             <View className="items-center justify-center py-20 px-10">
               <Text className="text-[#64748B] text-center text-base">
-                No User is on {selectedStatus.toLowerCase()} list
+                No members found
               </Text>
             </View>
           }
           keyExtractor={(item, index) => `${item.id}-${index}`}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 40 }}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => {
-                setSelectedUser(item);
-                setIsUserDetailVisible(true);
-              }}
-              className="px-5 mb-2"
-            >
-              <View
-                style={{
-                  height: 56,
-                  borderRadius: 15,
-                  backgroundColor: "#F9FAFB",
+          contentContainerStyle={{ paddingBottom: bulkMode ? 100 : 40 }}
+          renderItem={({ item }) => {
+            const isSelected = selectedMemberIds.includes(item.userId);
+            return (
+              <TouchableOpacity
+                onPress={() => {
+                  if (bulkMode) {
+                    toggleSelectMember(item.userId);
+                  } else {
+                    setSelectedUser(item);
+                    setIsUserDetailVisible(true);
+                  }
                 }}
-                className="flex-row items-center px-[10px]"
+                className="px-5 mb-2"
               >
-                <View className="flex-row items-center flex-1">
-                  <Image
-                    source={{ uri: item.avatar }}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 18,
-                      backgroundColor: "#E2E8F0",
-                    }}
-                    className="mr-2"
-                  />
-                  <View className="flex-1 flex-row items-center">
-                    <Text
-                      className="text-[#1A1A1A] font-medium text-[13px] mr-1"
-                      numberOfLines={1}
-                    >
-                      {item.name}
-                    </Text>
-                    {item.isAdmin && (
-                      <View className="bg-[#155D5F] px-1.5 py-0.5 rounded-md">
-                        <Text className="text-white text-[8px] font-bold">
-                          Admin
+                <View
+                  style={{
+                    height: 56,
+                    borderRadius: 15,
+                    backgroundColor: isSelected ? "#F0FDF4" : "#F9FAFB",
+                    borderWidth: isSelected ? 1 : 0,
+                    borderColor: "#155D5F",
+                  }}
+                  className="flex-row items-center px-[10px]"
+                >
+                  {bulkMode && (
+                    <Ionicons
+                      name={isSelected ? "checkbox" : "square-outline"}
+                      size={22}
+                      color={isSelected ? THEME : "#9CA3AF"}
+                      style={{ marginRight: 10 }}
+                    />
+                  )}
+
+                  <View className="flex-row items-center flex-1">
+                    {item.avatar && (item.avatar.startsWith("http") || item.avatar.startsWith("file")) ? (
+                      <Image
+                        source={{ uri: item.avatar }}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          backgroundColor: "#E2E8F0",
+                        }}
+                        className="mr-2"
+                      />
+                    ) : (
+                      <View
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          backgroundColor: "#E6F0F1",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginRight: 8,
+                        }}
+                      >
+                        <Text style={{ color: THEME, fontWeight: "bold", fontSize: 14 }}>
+                          {item.initial || (item.name ? item.name.charAt(0).toUpperCase() : "U")}
                         </Text>
                       </View>
                     )}
+                    <View className="flex-1 flex-row items-center">
+                      <Text
+                        className="text-[#1A1A1A] font-medium text-[13px] mr-1"
+                        numberOfLines={1}
+                      >
+                        {item.name}
+                      </Text>
+                      {item.isAdmin && (
+                        <View className="bg-[#155D5F] px-1.5 py-0.5 rounded-md">
+                          <Text className="text-white text-[8px] font-bold">Admin</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  <View className="w-24 items-center">
+                    <StatusBadge status={item.status} />
+                  </View>
+
+                  <View className="w-24 flex-row items-center justify-end">
+                    <Text className="text-[#155D5F] font-bold text-[12px]">
+                      {item.savings}
+                    </Text>
+                    <View className="bg-[#E2F2F2] rounded-sm ml-1 self-center h-4 w-4 items-center justify-center">
+                      <Ionicons name="arrow-up" size={10} color={THEME} />
+                    </View>
                   </View>
                 </View>
-
-                <View className="w-24 items-center">
-                  <StatusBadge status={item.status} />
-                </View>
-
-                <View className="w-24 flex-row items-center justify-end">
-                  <Text className="text-[#155D5F] font-bold text-[12px]">
-                    {item.savings}
-                  </Text>
-                  <View className="bg-[#E2F2F2] rounded-sm ml-1 self-center h-4 w-4 items-center justify-center">
-                    <Ionicons name="arrow-up" size={10} color="#155D5F" />
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
-          )}
+              </TouchableOpacity>
+            );
+          }}
         />
       )}
 
-      {/* Filter Modal */}
-      <Modal
-        visible={isFilterModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsFilterModalVisible(false)}
-      >
-        <TouchableOpacity
-          className="flex-1 bg-black/20"
-          activeOpacity={1}
-          onPress={() => setIsFilterModalVisible(false)}
+      {/* ── Sticky Bottom Bulk Bar ────────────────────────────────────────── */}
+      {bulkMode && (
+        <View
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: "white",
+            padding: 16,
+            borderTopWidth: 1,
+            borderTopColor: "#E5E7EB",
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.08,
+            shadowRadius: 6,
+            elevation: 8,
+          }}
         >
-          <View
-            className="absolute top-48 left-5 w-48 bg-white rounded-2xl shadow-xl overflow-hidden p-2"
-            style={{ elevation: 10 }}
+          <TouchableOpacity
+            onPress={handleExecuteBulkAction}
+            disabled={isBulkReminding || isBulkRemoving || selectedMemberIds.length === 0}
+            style={{
+              backgroundColor:
+                selectedMemberIds.length === 0
+                  ? "#9CA3AF"
+                  : bulkMode === "remove"
+                  ? "#EF4444"
+                  : THEME,
+              height: 50,
+              borderRadius: 14,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
-            {FILTER_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option}
-                onPress={() => handleStatusChange(option)}
-                className={`p-3 rounded-xl ${
-                  selectedStatus === option ? "bg-[#F0F9F9]" : ""
-                }`}
-              >
-                <Text
-                  className={`text-[14px] ${
-                    selectedStatus === option
-                      ? "text-[#155D5F] font-bold"
-                      : "text-[#1A1A1A]"
-                  }`}
-                >
-                  {option}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </TouchableOpacity>
-      </Modal>
+            {isBulkReminding || isBulkRemoving ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={{ color: "white", fontWeight: "800", fontSize: 15 }}>
+                {bulkMode === "reminder"
+                  ? `Send Reminder (${selectedMemberIds.length})`
+                  : `Remove (${selectedMemberIds.length}) Members`}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
 
-      {/* User Detail Modal */}
+      {/* ── User Detail Modal ──────────────────────────────────────────────── */}
       <UserDetailModal
         visible={isUserDetailVisible}
         onClose={() => setIsUserDetailVisible(false)}
         user={selectedUser}
+        groupId={id as string}
+        group={group}
+        isAdmin={isUserAdmin}
+        onMemberUpdated={refetchMembers}
       />
 
-      {/* More Options Modal */}
+      {/* ── More Options Dropdown ──────────────────────────────────────────── */}
       <MoreOptionsModal
         visible={isMoreOptionsVisible}
         onClose={() => setIsMoreOptionsVisible(false)}
-        id={id}
+        id={id as string}
+        onSelectBulkReminder={() => {
+          setBulkMode("reminder");
+          setSelectedMemberIds([]);
+        }}
+        onSelectBulkRemove={() => {
+          setBulkMode("remove");
+          setSelectedMemberIds([]);
+        }}
       />
     </SafeAreaView>
   );

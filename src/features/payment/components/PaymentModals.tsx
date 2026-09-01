@@ -1,8 +1,12 @@
 import React from "react";
 import {
+  ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Text,
+  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
@@ -145,18 +149,39 @@ export const InsertPinModal = ({
   visible,
   onClose,
   onConfirm,
-}: ModalProps & { onConfirm: (pin: string) => void }) => {
+  isLoading = false,
+  title = "Insert your Pin",
+  subtitle = "Please insert pin to complete transaction",
+}: ModalProps & {
+  onConfirm: (pin: string) => void;
+  isLoading?: boolean;
+  title?: string;
+  subtitle?: string;
+}) => {
   const [pin, setPin] = React.useState("");
+  const inputRef = React.useRef<any>(null);
 
-  const handlePress = (digit: string) => {
+  React.useEffect(() => {
+    if (visible) {
+      setPin("");
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [visible]);
+
+  const handleDigitPress = (digit: string) => {
+    if (isLoading) return;
     if (pin.length < 4) {
-      const newPin = pin + digit;
-      setPin(newPin);
-      if (newPin.length === 4) {
-        onConfirm(newPin);
-        setPin("");
+      const next = pin + digit;
+      setPin(next);
+      if (next.length === 4) {
+        onConfirm(next);
       }
     }
+  };
+
+  const handleDelete = () => {
+    if (isLoading) return;
+    setPin((prev) => prev.slice(0, -1));
   };
 
   return (
@@ -166,51 +191,91 @@ export const InsertPinModal = ({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View className="flex-1 bg-black/50 justify-end">
-          <TouchableWithoutFeedback>
-            <View className="bg-white rounded-t-[40px] p-8 items-center">
-              <View className="w-20 h-1.5 bg-[#BABABA] rounded-full mb-8" />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View className="flex-1 bg-black/50 justify-end">
+            <TouchableWithoutFeedback>
+              <View className="bg-white rounded-t-[36px] px-6 pt-6 pb-8 items-center">
+                <View className="w-16 h-1.5 bg-[#E2E8F0] rounded-full mb-4" />
 
-              <View className="w-20 h-20 bg-[#EFF7F8] rounded-3xl items-center justify-center mb-6">
-                <Image
-                  source={require("@/assets/images/change-pin.png")}
-                  style={{ width: 40, height: 40 }}
-                  resizeMode="contain"
-                />
-              </View>
+                <View className="w-16 h-16 bg-[#EFF7F8] rounded-2xl items-center justify-center mb-3">
+                  <Image
+                    source={require("@/assets/images/change-pin.png")}
+                    style={{ width: 36, height: 36 }}
+                    resizeMode="contain"
+                  />
+                </View>
 
-              <Text className="text-[24px] font-extrabold text-[#155D5F] mb-2">
-                Insert your Pin
-              </Text>
-              <Text className="text-[14px] text-[#6B7280] mb-8 text-center">
-                Please insert pin to complete transaction
-              </Text>
-
-              <View className="flex-row gap-x-4 mb-8">
-                {[1, 2, 3, 4].map((i) => (
-                  <View
-                    key={i}
-                    className={`w-14 h-14 rounded-2xl items-center justify-center border ${pin.length >= i ? "bg-[#EFF7F8] border-[#155D5F]" : "bg-[#F9FAFB] border-[#E5E7EB]"}`}
-                  >
-                    {pin.length >= i && (
-                      <View className="w-3 h-3 bg-[#155D5F] rounded-full" />
-                    )}
-                  </View>
-                ))}
-              </View>
-
-              <TouchableOpacity onPress={() => {}}>
-                <Text className="text-[#155D5F] font-bold underline mb-8">
-                  Forgot your pin?
+                <Text className="text-[20px] font-extrabold text-[#155D5F] mb-1">
+                  {title}
                 </Text>
-              </TouchableOpacity>
+                <Text className="text-[13px] text-[#6B7280] mb-5 text-center px-4">
+                  {subtitle}
+                </Text>
 
-              {/* Number pad would go here for a real implementaton, or just trigger success for demo */}
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
+                {/* PIN Boxes */}
+                <TouchableOpacity
+                  activeOpacity={1}
+                  onPress={() => inputRef.current?.focus()}
+                  className="flex-row gap-x-3 mb-5"
+                >
+                  {[1, 2, 3, 4].map((i) => (
+                    <View
+                      key={i}
+                      className={`w-13 h-13 w-[52px] h-[52px] rounded-2xl items-center justify-center border ${
+                        pin.length >= i
+                          ? "bg-[#EFF7F8] border-[#155D5F]"
+                          : "bg-[#F9FAFB] border-[#E5E7EB]"
+                      }`}
+                    >
+                      {pin.length >= i && (
+                        <View className="w-3.5 h-3.5 bg-[#155D5F] rounded-full" />
+                      )}
+                    </View>
+                  ))}
+                </TouchableOpacity>
+
+                {/* Hidden text input for native keyboard support */}
+                <TextInput
+                  ref={inputRef}
+                  style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
+                  value={pin}
+                  keyboardType="numeric"
+                  maxLength={4}
+                  editable={!isLoading}
+                  onChangeText={(val) => {
+                    const clean = val.replace(/\D/g, "").slice(0, 4);
+                    setPin(clean);
+                    if (clean.length === 4) {
+                      onConfirm(clean);
+                    }
+                  }}
+                />
+
+                {isLoading && (
+                  <View className="flex-row items-center justify-center my-2">
+                    <ActivityIndicator size="small" color="#155D5F" />
+                    <Text className="ml-2 text-[#155D5F] font-bold text-sm">
+                      Verifying PIN...
+                    </Text>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  onPress={onClose}
+                  disabled={isLoading}
+                  className="mt-2 py-2"
+                >
+                  <Text className="text-[#64748B] font-semibold text-sm">Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

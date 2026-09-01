@@ -59,7 +59,14 @@ export default function MyAccountScreen() {
   } = useGetKycStatusQuery();
 
   const { data: notificationsData, refetch: refetchNotifications } =
-    useListNotificationsQuery({ limit: 20 });
+    useListNotificationsQuery(
+      { limit: 50 },
+      {
+        pollingInterval: 10000,
+        refetchOnFocus: true,
+        refetchOnMountOrArgChange: true,
+      }
+    );
 
   const [logoutSession] = useLogoutSessionMutation();
 
@@ -73,7 +80,12 @@ export default function MyAccountScreen() {
       notificationsData?.data?.items ||
       (notificationsData as any)?.items ||
       [];
-    return items.filter((item: any) => !item.isRead).length;
+    return items.filter((item: any) => {
+      if (item.isRead === true || item.read === true) return false;
+      if (item.readAt) return false;
+      if (item.status && item.status.toUpperCase() === "READ") return false;
+      return true;
+    }).length;
   }, [notificationsData]);
 
   // Unified pull-to-refresh
