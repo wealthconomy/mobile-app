@@ -142,36 +142,35 @@ export default function TransactionDetailScreen() {
         <ViewShot ref={viewShotRef} options={{ format: "png", quality: 0.9 }}>
           {/* Receipt Header Card */}
           <View className="bg-white rounded-[30px] p-6 border border-[#E5E7EB] mb-6">
-            <View className="flex-row justify-between items-start mb-4">
-              <View>
+            <View className="flex-row justify-between items-start">
+              <View style={{ flex: 1, marginRight: 12 }}>
                 <Text className="text-[13px] font-bold mb-1" style={{ color: getStatusColor() }}>
                   {getTitle()}
                 </Text>
-                <Text className="text-[32px] font-bold text-[#323232]">
+                <Text className="text-[28px] font-bold text-[#323232]">
                   {isCredit ? "+" : "-"}₦{amountFormatted.split('.')[0]}<Text className="text-[#9CA3AF]">.{amountFormatted.split('.')[1]}</Text>
                 </Text>
                 <Text className="text-[#9CA3AF] text-[11px] mt-1">
                   {formattedDate} • {formattedTime}
                 </Text>
               </View>
-              <View className="items-end">
+              <View style={{ alignItems: "flex-end", flexShrink: 0 }}>
                 <Image
                   source={require("../../assets/images/wealth.png")}
-                  className="mb-8"
-                  style={{ width: 110, height: 49 }}
+                  style={{ width: 84, height: 36, marginBottom: 12 }}
                   resizeMode="contain"
                 />
-                <TouchableOpacity className="flex-row items-center border border-[#F59E0B] px-3 py-1.5 rounded-full">
+                <View className="flex-row items-center border border-[#F59E0B] px-3 py-1.5 rounded-full">
                   <Ionicons
                     name="reader"
                     size={14}
                     color="#F59E0B"
-                    className="mr-1.5"
+                    style={{ marginRight: 4 }}
                   />
                   <Text className="text-[#F59E0B] text-[11px] font-bold">
                     Receipt
                   </Text>
-                </TouchableOpacity>
+                </View>
               </View>
             </View>
           </View>

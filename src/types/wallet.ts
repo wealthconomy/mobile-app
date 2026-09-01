@@ -33,6 +33,7 @@ export interface WalletTransaction {
   reason: "REFERRAL_CREDIT" | "WITHDRAWAL" | "OTHER" | "WALLET_TOPUP";
   action: string;
   reference: string;
+  status?: string;
   createdAt: string;
   description: any;
   orderId: any;

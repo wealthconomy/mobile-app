@@ -122,7 +122,7 @@ export default function HomeScreen() {
                   Recent Activities
                 </Text>
                 <TouchableOpacity
-                  onPress={() => router.push("/transactions/activities")}
+                  onPress={() => router.push("/transactions")}
                 >
                   <Text className="text-[#155D5F] text-[13px] font-bold">
                     View all

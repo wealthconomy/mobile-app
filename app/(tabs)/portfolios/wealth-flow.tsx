@@ -89,8 +89,8 @@ export default function WealthFlowScreen() {
   const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthflow" });
   const allGoals = data?.items || [];
 
-  const ongoingPlans = allGoals.filter((g) => g.status === "ACTIVE" && parseFloat(g.balance) < parseFloat(g.targetAmount));
-  const completedPlans = allGoals.filter((g) => g.status === "COMPLETED" || (parseFloat(g.balance) >= parseFloat(g.targetAmount)));
+  const ongoingPlans = allGoals.filter((g) => g.status === "ACTIVE" && parseFloat(g.balance || "0") > 0);
+  const completedPlans = allGoals.filter((g) => g.status === "COMPLETED" || g.status === "TERMINATED" || (g.status === "ACTIVE" && parseFloat(g.balance || "0") === 0));
 
   const formatAmount = (val?: string) => {
     if (!val) return "0.00";

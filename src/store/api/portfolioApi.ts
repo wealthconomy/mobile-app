@@ -1,9 +1,11 @@
 import {
   CreatePortfolioRequest,
   Portfolio,
+  PortfolioTransaction,
   PortfolioType,
   TerminateRequest,
   TopUpRequest,
+  TransferPortfolioFundsRequest,
   WithdrawToWalletRequest,
 } from "@/src/types/portfolio";
 import { KeysetPagination } from "@/src/types/wallet";
@@ -120,8 +122,35 @@ export const portfolioApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["Portfolio"],
     }),
+
+    // Get portfolio transactions
+    getPortfolioTransactions: builder.query<
+      KeysetPagination<PortfolioTransaction>,
+      { id: string; limit?: number; after?: string; before?: string; q?: string }
+    >({
+      query: ({ id, ...params }) => ({
+        url: `/portfolios/${id}/txns`,
+        params,
+      }),
+      providesTags: ["Portfolio"],
+      transformResponse: (response: { data: KeysetPagination<PortfolioTransaction> }) =>
+        response.data,
+    }),
+
+    // Transfer funds from portfolio to wallet/portfolio/bank
+    transferPortfolioFunds: builder.mutation<
+      { id: string },
+      { id: string; body: TransferPortfolioFundsRequest }
+    >({
+      query: ({ id, body }) => ({
+        url: `/portfolios/${id}/transfer`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Portfolio", "Wallet"],
+    }),
   }),
-  overrideExisting: false,
+  overrideExisting: true,
 });
 
 export const {
@@ -130,4 +159,7 @@ export const {
   useTopUpPortfolioMutation,
   useWithdrawToWalletMutation,
   useTerminatePortfolioMutation,
+  useGetPortfolioTransactionsQuery,
+  useTransferPortfolioFundsMutation,
 } = portfolioApi;
+

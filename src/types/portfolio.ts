@@ -36,6 +36,7 @@ export interface TopUpRequest {
   amount: number;
   source: "WALLET" | "CARD";
   paymentMethodId?: string;
+  redirectUrl?: string;
 }
 
 export interface WithdrawToWalletRequest {
@@ -46,3 +47,25 @@ export interface WithdrawToWalletRequest {
 export interface TerminateRequest {
   pin: string;
 }
+
+export interface PortfolioTransaction {
+  id: string;
+  portfolioId: string;
+  type: string;
+  amount: string;
+  description: string;
+  reference: string;
+  createdAt: string;
+}
+
+export interface TransferPortfolioFundsRequest {
+  amount: number;
+  destinationType: "WALLET" | "PORTFOLIO" | "BANK";
+  destinationId?: string;
+  bankDetails?: {
+    accountNumber: string;
+    bankCode: string;
+  };
+  pin: string;
+}
+
