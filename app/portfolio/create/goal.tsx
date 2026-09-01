@@ -9,16 +9,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   Switch,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
 type Step = "form" | "preview" | "pin" | "success";
 
@@ -40,28 +47,30 @@ export default function CreateGoalScreen() {
   const [createPortfolio] = useCreatePortfolioMutation();
   const [verifyPin] = useVerifyPinMutation();
 
-  const parseDate = (dateStr: string) => {
-    const parts = dateStr.split("/");
-    if (parts.length === 3) {
-      const day = parseInt(parts[0].trim(), 10);
-      const month = parseInt(parts[1].trim(), 10) - 1;
-      const year = parseInt(parts[2].trim(), 10);
-      const date = new Date(year, month, day, 23, 59, 59);
-      if (!isNaN(date.getTime())) {
-        return date.toISOString();
-      }
-    }
-    return new Date().toISOString();
-  };
-
   // Form State
   const [goalName, setGoalName] = useState("");
   const [category, setCategory] = useState(initialCategory || "");
-  const [source, setSource] = useState("");
+  const [source, setSource] = useState("Wealth Save");
   const [amount, setAmount] = useState("");
-  const [frequency, setFrequency] = useState("");
+  const [autoSaveAmount, setAutoSaveAmount] = useState("");
+  const [frequency, setFrequency] = useState("Monthly");
   const [isManual, setIsManual] = useState(false);
-  const [endDate, setEndDate] = useState("");
+  
+  // Date State
+  const minDate = new Date();
+  minDate.setDate(minDate.getDate() + 1); // at least tomorrow
+  const [endDate, setEndDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 1);
+    return d;
+  });
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [calViewDate, setCalViewDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 1);
+    return d;
+  });
+
   const [wealthPreference, setWealthPreference] = useState<"Interest Based" | "Impact Wealth">("Interest Based");
   const [pin, setPin] = useState("");
   const pinInputRef = useRef<TextInput>(null);
@@ -72,14 +81,98 @@ export default function CreateGoalScreen() {
   const SOURCES = ["Wealth Save", "Wealth Flex", "Bank Account"];
   const FREQUENCIES = ["Daily", "Weekly", "Monthly"];
 
-  const formatAmount = (val: string) => {
+  const formatAmount = (val: string | number) => {
     if (!val) return "0.00";
-    const cleaned = val.replace(/[^\d.]/g, "");
+    const cleaned = typeof val === "number" ? val.toString() : val.replace(/[^\d.]/g, "");
     const num = parseFloat(cleaned) || 0;
     return num.toLocaleString("en-NG", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+  };
+
+  const calculateEstimatedInterest = () => {
+    if (wealthPreference === "Impact Wealth") return "0.00";
+    const target = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
+    const now = new Date().getTime();
+    const end = endDate.getTime();
+    const days = Math.max(1, Math.ceil((end - now) / (1000 * 3600 * 24)));
+    // Estimated ~12% per annum on average progressive balance
+    const interest = ((target * 0.12 * days) / 365) * 0.5;
+    return interest.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const getDaysInMonth = (month: number, year: number) =>
+    new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (month: number, year: number) =>
+    (new Date(year, month, 1).getDay() + 6) % 7;
+
+  const renderCalendarGrid = () => {
+    const month = calViewDate.getMonth();
+    const year = calViewDate.getFullYear();
+    const daysInMonth = getDaysInMonth(month, year);
+    const firstDay = getFirstDayOfMonth(month, year);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dayNames = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+    const days: React.ReactElement[] = [];
+
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<View key={`empty-${i}`} style={{ width: "14.28%" as any, aspectRatio: 1 }} />);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const cellDate = new Date(year, month, day);
+      cellDate.setHours(0, 0, 0, 0);
+      const isPast = cellDate <= today;
+      const isSelected =
+        endDate.getDate() === day &&
+        endDate.getMonth() === month &&
+        endDate.getFullYear() === year;
+
+      days.push(
+        <TouchableOpacity
+          key={day}
+          disabled={isPast}
+          onPress={() => setEndDate(new Date(year, month, day))}
+          style={{
+            width: "14.28%" as any,
+            aspectRatio: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 4,
+            backgroundColor: isSelected ? "#155D5F" : "transparent",
+            borderRadius: 999,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: isSelected ? "700" : "500",
+              color: isSelected ? "#fff" : isPast ? "#D1D5DB" : "#323232",
+            }}
+          >
+            {day}
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+
+    return (
+      <View style={{ marginBottom: 24 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 16 }}>
+          {dayNames.map((d) => (
+            <Text
+              key={d}
+              style={{ width: "14.28%" as any, textAlign: "center", fontSize: 13, fontWeight: "600", color: "#6B7280" }}
+            >
+              {d}
+            </Text>
+          ))}
+        </View>
+        <View style={{ flexDirection: "row", flexWrap: "wrap" }}>{days}</View>
+      </View>
+    );
   };
 
   const handleContinue = () => {
@@ -96,23 +189,28 @@ export default function CreateGoalScreen() {
       // 1. Verify transaction PIN
       await verifyPin({ pin }).unwrap();
 
-      // 2. Perform create portfolio request
+      // 2. Convert amounts from Naira to Kobo (integers)
       const targetAmountVal = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
-      const targetAmountKobo = targetAmountVal * 100;
+      const targetAmountKobo = Math.round(targetAmountVal * 100);
+      
+      const autoSaveAmountVal = parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) || 0;
+      const autoSaveAmountKobo = isManual ? 0 : Math.round(autoSaveAmountVal * 100);
+      
       const autoSaveEnabled = !isManual;
 
       const body: any = {
         name: goalName.trim(),
-        amount: 100, // Minimum initial deposit in kobo required by backend
-        targetAmount: targetAmountKobo > 0 ? targetAmountKobo : 100000,
-        maturityDate: parseDate(endDate),
+        amount: 0, // Initial deposit in kobo
+        targetAmount: targetAmountKobo,
+        maturityDate: endDate.toISOString(),
         autoSaveEnabled,
         autoSaveFrequency: (frequency.toUpperCase() as any) || "MONTHLY",
-        autoSaveAmount: 100, // Minimum 100 kobo
+        autoSaveAmount: autoSaveAmountKobo,
         autoSaveSource: (source === "Bank Account" ? "CARD" : "WALLET") as "CARD" | "WALLET",
         metadata: {
           category: category.trim(),
           wealthPreference,
+          source,
         },
       };
 
@@ -146,10 +244,12 @@ export default function CreateGoalScreen() {
     goalName,
     category,
     amount,
+    autoSaveAmount,
     endDate,
     isManual,
     frequency,
     source,
+    wealthPreference,
     pin,
     verifyPin,
     createPortfolio,
@@ -167,29 +267,28 @@ export default function CreateGoalScreen() {
         <View
           style={{
             width: 366,
-            height: 226,
             borderRadius: 15,
             backgroundColor: "#FFE6F2B2",
           }}
           className="p-5 mb-8 relative mt-4 self-center"
         >
           <TouchableOpacity
-            className="absolute right-4 top-4"
+            className="absolute right-4 top-4 z-10"
             onPress={() => setShowRules(false)}
           >
             <Ionicons name="close" size={20} color="#F3007A" />
           </TouchableOpacity>
           <Text
             style={{ color: "#F3007A" }}
-            className="font-extrabold text-[12px] mb-6"
+            className="font-extrabold text-[12px] mb-4"
           >
             Important "Need to Know" Rules
           </Text>
-          <View className="space-y-5 gap-5">
+          <View className="space-y-4 gap-4">
             {wealthPreference === "Interest Based" && (
               <Text
                 style={{ color: "#F3007A" }}
-                className="text-[10px] leading-[15px]"
+                className="text-[11px] leading-[16px]"
               >
                 👉{" "}
                 <Text
@@ -204,7 +303,7 @@ export default function CreateGoalScreen() {
             )}
             <Text
               style={{ color: "#F3007A" }}
-              className="text-[10px] leading-[15px]"
+              className="text-[11px] leading-[16px]"
             >
               👉{" "}
               <Text
@@ -214,13 +313,11 @@ export default function CreateGoalScreen() {
                 The 3% Breaking Fee:
               </Text>{" "}
               If you need to withdraw your money before the maturity date you
-              set, PiggyVest charges a 3% penalty fee on the entire balance.
-              This is to discourage you from touching your "goal" money
-              prematurely.
+              set, a 3% penalty fee applies to ensure financial discipline.
             </Text>
             <Text
               style={{ color: "#F3007A" }}
-              className="text-[10px] leading-[15px]"
+              className="text-[11px] leading-[16px]"
             >
               👉{" "}
               <Text
@@ -229,15 +326,15 @@ export default function CreateGoalScreen() {
               >
                 Goal Completion:
               </Text>{" "}
-              You must reach at least 70% of your target amount by the end date
-              to be considered "successful" and avoid certain restrictions on
-              future targets.
+              Reach at least 70% of your target amount by the end date
+              to be considered successful.
             </Text>
           </View>
         </View>
       )}
 
-      <View className="space-y-6 gap-6 mb-10">
+      <View className="space-y-5 gap-5 mb-10">
+        {/* Wealth Preference */}
         <View>
           <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
             Wealth Preference
@@ -258,33 +355,36 @@ export default function CreateGoalScreen() {
           </View>
         </View>
 
-        <View className="mb-6">
+        {/* Goal Name */}
+        <View>
           <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
-            Wealth Goal
+            Wealth Goal Name
           </Text>
           <TextInput
             placeholder="e.g., 'Tuition fee,' 'New Laptop,' or 'Wedding'"
             placeholderTextColor="#9CA3AF"
-            className="bg-[#F3F4F6] p-4 rounded-xl text-[#1A1A1A]"
+            className="bg-[#F3F4F6] p-4 rounded-xl text-[#1A1A1A] text-sm"
             value={goalName}
             onChangeText={setGoalName}
           />
         </View>
 
-        <View className="mb-6">
+        {/* Category */}
+        <View>
           <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
             Category
           </Text>
           <TextInput
             placeholder="Rent, Travel, Education, Business, etc."
             placeholderTextColor="#9CA3AF"
-            className="bg-[#F3F4F6] p-4 rounded-xl text-[#1A1A1A]"
+            className="bg-[#F3F4F6] p-4 rounded-xl text-[#1A1A1A] text-sm"
             value={category}
             onChangeText={setCategory}
           />
         </View>
 
-        <View className="mb-6">
+        {/* Wealth Source */}
+        <View>
           <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
             Wealth Source
           </Text>
@@ -331,123 +431,217 @@ export default function CreateGoalScreen() {
           )}
         </View>
 
+        {/* Target Amount */}
         <View>
-          <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2 pt-3">
-            Goal Amount(₦)
+          <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
+            Target Goal Amount (₦)
           </Text>
           <TextInput
-            placeholder="₦3,500,000.00"
+            placeholder="₦0.00"
             placeholderTextColor="#9CA3AF"
-            className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] mb-5"
+            className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] font-bold text-base"
             keyboardType="numeric"
             value={amount}
-            onChangeText={setAmount}
+            onChangeText={(text) => {
+              const cleaned = text.replace(/[^\d.]/g, "");
+              setAmount(cleaned);
+            }}
           />
         </View>
 
-        <View>
-          <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
-            Automation Frequency
-          </Text>
-          <TouchableOpacity
-            onPress={() => setShowFreqDropdown(!showFreqDropdown)}
-            className="bg-[#F8F8F8] p-4 rounded-xl flex-row justify-between items-center mb-1"
-          >
-            <Text
-              className={
-                frequency
-                  ? "text-[#1A1A1A] font-medium"
-                  : "text-[#9CA3AF] font-medium"
-              }
-            >
-              {frequency || "Daily, Weekly, or Monthly"}
-            </Text>
-            <Ionicons
-              name={showFreqDropdown ? "chevron-up" : "chevron-down"}
-              size={20}
-              color="#1A1A1A"
-            />
-          </TouchableOpacity>
-          {showFreqDropdown && (
-            <View
-              style={{
-                borderWidth: 1,
-                borderColor: "#E5E5E5",
-                borderRadius: 12,
-                backgroundColor: "#fff",
-                marginTop: 4,
-                overflow: "hidden",
-                elevation: 4,
-                shadowColor: "#000",
-                shadowOpacity: 0.08,
-                shadowRadius: 6,
-              }}
-            >
-              {FREQUENCIES.map((f) => (
-                <TouchableOpacity
-                  key={f}
-                  onPress={() => {
-                    setFrequency(f);
-                    setShowFreqDropdown(false);
-                  }}
-                  style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 14,
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#F5F5F5",
-                  }}
-                >
-                  <Text style={{ color: "#323232", fontSize: 15 }}>{f}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-
-        <View className="flex-row justify-between items-center pt-3">
+        {/* Manual Switch */}
+        <View className="flex-row justify-between items-center py-2">
           <View className="flex-1 mr-4">
-            <Text className="text-[#1A1A1A] font-bold text-[12px] pt-3">
-              Manual
+            <Text className="text-[#1A1A1A] font-bold text-[12px]">
+              Manual Savings
             </Text>
             <Text className="text-[#9CA3AF] text-[10px]">
-              "Top Up" whenever you have spare cash (no automation)
+              {isManual
+                ? "You will manually top up whenever you wish."
+                : "Automatic recurring debit enabled."}
             </Text>
           </View>
           <Switch
             value={isManual}
             onValueChange={setIsManual}
-            trackColor={{ false: "#C9C9C9", true: "#155D5F" }}
+            trackColor={{ false: "#155D5F", true: "#C9C9C9" }}
             ios_backgroundColor="#C9C9C9"
-            thumbColor={
-              Platform.OS === "ios"
-                ? "#FFFFFF"
-                : isManual
-                  ? "#FFFFFF"
-                  : "#999999"
-            }
+            thumbColor={Platform.OS === "ios" ? "#FFFFFF" : "#FFFFFF"}
           />
         </View>
 
-        <View className="mb-10">
-          <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2 pt-3">
-            End Date
+        {/* AutoSave Settings (only when NOT manual) */}
+        {!isManual && (
+          <>
+            <View>
+              <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
+                Auto-Debit Frequency
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowFreqDropdown(!showFreqDropdown)}
+                className="bg-[#F8F8F8] p-4 rounded-xl flex-row justify-between items-center"
+              >
+                <Text className="text-[#1A1A1A] font-medium">
+                  {frequency}
+                </Text>
+                <Ionicons
+                  name={showFreqDropdown ? "chevron-up" : "chevron-down"}
+                  size={20}
+                  color="#1A1A1A"
+                />
+              </TouchableOpacity>
+              {showFreqDropdown && (
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: "#E5E5E5",
+                    borderRadius: 12,
+                    backgroundColor: "#fff",
+                    marginTop: 4,
+                    overflow: "hidden",
+                    elevation: 4,
+                    shadowColor: "#000",
+                    shadowOpacity: 0.08,
+                    shadowRadius: 6,
+                  }}
+                >
+                  {FREQUENCIES.map((f) => (
+                    <TouchableOpacity
+                      key={f}
+                      onPress={() => {
+                        setFrequency(f);
+                        setShowFreqDropdown(false);
+                      }}
+                      style={{
+                        paddingHorizontal: 16,
+                        paddingVertical: 14,
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#F5F5F5",
+                      }}
+                    >
+                      <Text style={{ color: "#323232", fontSize: 15 }}>{f}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <View>
+              <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
+                Auto-Save Amount (₦)
+              </Text>
+              <TextInput
+                placeholder="₦0.00"
+                placeholderTextColor="#9CA3AF"
+                className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] font-bold text-base"
+                keyboardType="numeric"
+                value={autoSaveAmount}
+                onChangeText={(text) => {
+                  const cleaned = text.replace(/[^\d.]/g, "");
+                  setAutoSaveAmount(cleaned);
+                }}
+              />
+              <Text className="text-[#9CA3AF] text-[10px] mt-1">
+                Amount automatically deducted {frequency.toLowerCase()}
+              </Text>
+            </View>
+          </>
+        )}
+
+        {/* End Date Picker */}
+        <View>
+          <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
+            Target End Date
           </Text>
-          <TextInput
-            placeholder="DD / MM / YYYY"
-            placeholderTextColor="#9CA3AF"
-            className="bg-[#F3F4F6] p-4 rounded-xl text-[#1A1A1A]"
-            value={endDate}
-            onChangeText={setEndDate}
-          />
-          <Text className="text-[#9CA3AF] text-[9px] mt-2 italic">
+          <TouchableOpacity
+            onPress={() => {
+              setCalViewDate(new Date(endDate));
+              setShowDatePicker(true);
+            }}
+            activeOpacity={0.7}
+            className="bg-[#F3F4F6] p-4 rounded-xl flex-row justify-between items-center"
+          >
+            <Text className="text-[#1A1A1A] font-medium text-sm">
+              {endDate.toLocaleDateString("en-US", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </Text>
+            <Ionicons name="calendar-outline" size={20} color="#155D5F" />
+          </TouchableOpacity>
+          <Text className="text-[#9CA3AF] text-[10px] mt-1.5 italic">
             Note: To earn the full interest, you must meet your target amount
             and reach this date
           </Text>
         </View>
       </View>
 
+      {/* Custom Calendar Modal */}
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowDatePicker(false)}>
+          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
+            <TouchableWithoutFeedback>
+              <View style={{ backgroundColor: "white", borderTopLeftRadius: 36, borderTopRightRadius: 36, paddingHorizontal: 24, paddingBottom: 48, paddingTop: 12 }}>
+                {/* Handle bar */}
+                <View style={{ width: 80, height: 6, backgroundColor: "#BABABA", borderRadius: 999, alignSelf: "center", marginBottom: 24 }} />
+                <Text style={{ fontSize: 22, fontWeight: "800", color: "#323232", marginBottom: 20 }}>
+                  Pick End Date
+                </Text>
+
+                {/* Month Navigation */}
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "700", color: "#323232" }}>
+                    {MONTHS[calViewDate.getMonth()]} {calViewDate.getFullYear()}
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 16 }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const d = new Date(calViewDate);
+                        d.setMonth(d.getMonth() - 1);
+                        setCalViewDate(d);
+                      }}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons name="chevron-back" size={20} color="#323232" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const d = new Date(calViewDate);
+                        d.setMonth(d.getMonth() + 1);
+                        setCalViewDate(d);
+                      }}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons name="chevron-forward" size={20} color="#323232" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {renderCalendarGrid()}
+
+                <TouchableOpacity
+                  style={{ backgroundColor: "#155D5F", borderRadius: 16, height: 56, alignItems: "center", justifyContent: "center" }}
+                  onPress={() => setShowDatePicker(false)}
+                >
+                  <Text style={{ color: "white", fontSize: 16, fontWeight: "700" }}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       {(() => {
-        const isFormValid = goalName && category && source && amount && endDate;
+        const isTargetValid = parseFloat(amount.replace(/[^\d.]/g, "")) > 0;
+        const isAutoSaveValid = isManual || parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) > 0;
+        const isFormValid = goalName.trim().length > 0 && category.trim().length > 0 && source && isTargetValid && isAutoSaveValid;
+        
         return (
           <ThemedButton
             title="Continue"
@@ -461,127 +655,142 @@ export default function CreateGoalScreen() {
     </View>
   );
 
-  const renderPreview = () => (
-    <View className="px-5">
-      <Text className="text-[#6B7280] text-[13px] mb-8 mt-4">
-        Please, recheck and confirm before making the transaction.
-      </Text>
+  const renderPreview = () => {
+    const formattedEndDate = endDate.toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
 
-      <View
-        className="bg-[#F6F6F6] p-8 rounded-t-[24px] relative self-center"
-        style={{
-          width: 365,
-          height: 310,
-          borderColor: "#fefcfc40",
-          borderWidth: 0.8,
-          borderBottomWidth: 0,
-        }}
-      >
-        <View className="flex-row justify-between mb-8">
-          <View>
-            <Text className="text-[#6B7280] text-[11px] mb-2 font-medium ">
-              Goal Amount
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              ₦{formatAmount(amount)}
-            </Text>
-          </View>
-          <View className="items-end">
-            <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-              Category
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              {category}
-            </Text>
-          </View>
-        </View>
-
-        <View className="flex-row justify-between mb-8">
-          <View>
-            <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-              Funding Source
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              {source || "Wealth Save"}
-            </Text>
-          </View>
-          <View className="items-end">
-            <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-              End Date
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              {endDate || "24th Jan 2023"}
-            </Text>
-          </View>
-        </View>
-
-        <View className="flex-row justify-between mb-8">
-          {wealthPreference === "Interest Based" ? (
-            <View>
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-                Wealth Growth
-              </Text>
-              <Text className="text-[#1A1A1A] font-bold text-[16px]">
-                ₦2,463.00
-              </Text>
-            </View>
-          ) : (
-            <View>
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-                Preference
-              </Text>
-              <Text className="text-[#1A1A1A] font-bold text-[16px]">
-                Impact Wealth
-              </Text>
-            </View>
-          )}
-          <View className="items-end">
-            <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-              Method
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              {isManual ? "Manual" : "Automation"}
-            </Text>
-          </View>
-        </View>
-
-        <View className="flex-row justify-between mb-8">
-          <View>
-            <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-              Automation Frequency
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              {isManual ? "None" : frequency || "Monthly"}
-            </Text>
-          </View>
-        </View>
+    return (
+      <View className="px-5">
+        <Text className="text-[#6B7280] text-[13px] mb-8 mt-4">
+          Please, recheck and confirm before creating your goal.
+        </Text>
 
         <View
-          className="flex-row absolute -bottom-[10px] left-0 right-0 overflow-hidden"
-          style={{ width: 365.1 }}
+          className="bg-[#F6F6F6] p-8 rounded-t-[24px] relative self-center"
+          style={{
+            width: 365,
+            minHeight: 310,
+            borderColor: "#fefcfc40",
+            borderWidth: 0.8,
+            borderBottomWidth: 0,
+          }}
         >
-          {Array.from({ length: 40 }).map((_, i) => (
-            <View
-              key={i}
-              style={{
-                width: 14,
-                height: 14,
-                backgroundColor: "white",
-                transform: [{ rotate: "45deg" }],
-                marginTop: 4,
-              }}
-            />
-          ))}
-        </View>
-      </View>
+          {/* Row 1 */}
+          <View className="flex-row justify-between mb-8">
+            <View>
+              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                Goal Amount
+              </Text>
+              <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                ₦{formatAmount(amount)}
+              </Text>
+            </View>
+            <View className="items-end">
+              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                Category
+              </Text>
+              <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                {category || "General"}
+              </Text>
+            </View>
+          </View>
 
-      <ThemedButton
-        title="Continue"
-        onPress={handleContinue}
-        className="mt-14"
-      />
-    </View>
-  );
+          {/* Row 2 */}
+          <View className="flex-row justify-between mb-8">
+            <View>
+              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                Funding Source
+              </Text>
+              <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                {source || "Wealth Save"}
+              </Text>
+            </View>
+            <View className="items-end">
+              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                End Date
+              </Text>
+              <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                {formattedEndDate}
+              </Text>
+            </View>
+          </View>
+
+          {/* Row 3 */}
+          <View className="flex-row justify-between mb-8">
+            {wealthPreference === "Interest Based" ? (
+              <View>
+                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                  Est. Wealth Growth
+                </Text>
+                <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                  ₦{calculateEstimatedInterest()}
+                </Text>
+              </View>
+            ) : (
+              <View>
+                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                  Preference
+                </Text>
+                <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                  Impact Wealth
+                </Text>
+              </View>
+            )}
+            <View className="items-end">
+              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                Method
+              </Text>
+              <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                {isManual ? "Manual" : "Automation"}
+              </Text>
+            </View>
+          </View>
+
+          {/* Row 4 */}
+          {!isManual && (
+            <View className="flex-row justify-between mb-8">
+              <View>
+                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                  Auto-Debit Schedule
+                </Text>
+                <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                  ₦{formatAmount(autoSaveAmount)} / {frequency}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Jagged Edge */}
+          <View
+            className="flex-row absolute -bottom-[10px] left-0 right-0 overflow-hidden"
+            style={{ width: 365.1 }}
+          >
+            {Array.from({ length: 40 }).map((_, i) => (
+              <View
+                key={i}
+                style={{
+                  width: 14,
+                  height: 14,
+                  backgroundColor: "white",
+                  transform: [{ rotate: "45deg" }],
+                  marginTop: 4,
+                }}
+              />
+            ))}
+          </View>
+        </View>
+
+        <ThemedButton
+          title="Continue"
+          onPress={handleContinue}
+          className="mt-14"
+        />
+      </View>
+    );
+  };
 
   const renderPin = () => (
     <View className="items-center px-5 mt-10">

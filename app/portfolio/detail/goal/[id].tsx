@@ -125,10 +125,11 @@ export default function GoalDetailScreen() {
     }
 
     try {
+      const amountKobo = Math.round(numAmount * 100);
       await topUpPortfolio({
         id: goal.id,
         body: {
-          amount: numAmount,
+          amount: amountKobo,
           source: topUpSource,
         },
       }).unwrap();
@@ -319,7 +320,7 @@ export default function GoalDetailScreen() {
               </View>
             </View>
 
-            {/* Row 2: Wealth Growth & Progressive Amount */}
+            {/* Row 2: Wealth Preference & Progressive Amount */}
             <View
               style={{
                 flexDirection: "row",
@@ -328,12 +329,12 @@ export default function GoalDetailScreen() {
               }}
             >
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Wealth Growth</Text>
-                <Text style={styles.value}>₦0.00</Text>
+                <Text style={styles.label}>Preference</Text>
+                <Text style={styles.value}>{goal.metadata?.wealthPreference || "Interest Based"}</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
-                <Text style={styles.label}>Progressive Amount</Text>
-                <Text style={styles.value}>₦0.00</Text>
+                <Text style={styles.label}>Current Savings</Text>
+                <Text style={styles.value}>₦{formatAmount(goal.balance)}</Text>
               </View>
             </View>
 
@@ -347,7 +348,7 @@ export default function GoalDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Funding Source</Text>
-                <Text style={styles.value}>Wealth Flex</Text>
+                <Text style={styles.value}>{goal.metadata?.source || "Wealth Save"}</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>End Date</Text>
