@@ -59,7 +59,18 @@ import { useListGroupsQuery } from "@/src/store/api/groupApi";
 import { WealthGroupModel } from "@/src/types/group";
 
 export default function WealthGroupScreen() {
-  const { data: groupsData, isLoading: loading, refetch } = useListGroupsQuery();
+  const {
+    data: groupsData,
+    isLoading: loading,
+    refetch,
+  } = useListGroupsQuery(
+    { populate: ["members", "creator"] },
+    {
+      pollingInterval: 10000,
+      refetchOnFocus: true,
+      refetchOnMountOrArgChange: true,
+    }
+  );
   const portfolioPreference = useSelector(
     (state: RootState) => state.portfolioPreference.group
   );
@@ -73,18 +84,39 @@ export default function WealthGroupScreen() {
   const allGroups: WealthGroupModel[] = groupsData?.items || [];
 
   // Map API groups to DiscoveryGroup interface
-  const mappedGroups: DiscoveryGroup[] = allGroups.map((g) => ({
-    id: g.id,
-    title: g.name,
-    category: g.category || "General",
-    dailyAmount: `₦${(parseFloat(g.targetAmount?.toString() || "0") / 100).toLocaleString()} ${g.frequency || "Monthly"}`,
-    endDate: g.endDate ? new Date(g.endDate).toLocaleDateString() : "Flexible",
-    growth: "₦0/day",
-    members: g.membersCount || 1,
-    image: g.coverImage
-      ? { uri: g.coverImage }
-      : require("../../../assets/images/group_trending_1.png"),
-  }));
+  const mappedGroups: DiscoveryGroup[] = allGroups.map((g) => {
+    const memberCount =
+      (g as any).membersCount ??
+      (g as any).memberCount ??
+      (g as any)._count?.members ??
+      (g as any).members?.length ??
+      1;
+
+    const frequencyLabel = g.frequency
+      ? g.frequency.charAt(0).toUpperCase() + g.frequency.slice(1).toLowerCase()
+      : "Monthly";
+
+    const formattedEnd = g.endDate
+      ? new Date(g.endDate).toLocaleDateString("en-US", {
+          month: "numeric",
+          day: "numeric",
+          year: "2-digit",
+        })
+      : "Flexible";
+
+    return {
+      id: g.id,
+      title: g.name,
+      category: g.category || "General",
+      dailyAmount: `₦${(parseFloat(g.targetAmount?.toString() || "0") / 100).toLocaleString()} ${frequencyLabel}`,
+      endDate: formattedEnd,
+      growth: "₦0/day",
+      members: memberCount,
+      image: g.coverImage
+        ? { uri: g.coverImage }
+        : require("../../../assets/images/group_trending_1.png"),
+    };
+  });
 
   const filteredGroups = mappedGroups.filter(
     (g) =>
@@ -97,12 +129,83 @@ export default function WealthGroupScreen() {
 
   const currentUser = useSelector((state: RootState) => state.auth.user);
 
+  const isUserMemberOfGroup = (g: WealthGroupModel) => {
+    if (!currentUser?.id) return false;
+    const uid = currentUser.id;
+
+    // 1. Creator checks
+    if (g.creatorId === uid || (g as any).creator?.id === uid) return true;
+
+    // 2. Explicit admin flag
+    if (g.isAdmin) return true;
+
+    // 3. Status checks on group user membership (MUST BE ACTIVE/APPROVED, NOT PENDING)
+    const userStatus =
+      (g as any).userStatus ||
+      (g as any).membershipStatus ||
+      (g as any).memberStatus;
+    if (
+      userStatus === "ACTIVE" ||
+      userStatus === "PAID" ||
+      userStatus === "UNPAID" ||
+      userStatus === "APPROVED"
+    ) {
+      return true;
+    }
+
+    // 4. Check populated members array
+    const membersList =
+      (g as any).members ||
+      (g as any).groupMembers ||
+      (g as any).membersList;
+    if (Array.isArray(membersList) && membersList.length > 0) {
+      const found = membersList.some((m: any) => {
+        if (!m) return false;
+        if (typeof m === "string") return m === uid;
+        const memberUid =
+          m.userId ||
+          m.id ||
+          m.user?.id ||
+          (typeof m.userId === "object" ? m.userId?.id : null);
+        const memberStatus = m.status;
+        const memberRole = m.role;
+        return (
+          memberUid === uid &&
+          (memberRole === "OWNER" ||
+            memberRole === "ADMIN" ||
+            memberStatus === "ACTIVE" ||
+            memberStatus === "PAID" ||
+            memberStatus === "UNPAID" ||
+            memberStatus === "APPROVED")
+        );
+      });
+      if (found) return true;
+    }
+
+    // 5. Check if user is in userMembership object with ACTIVE status
+    if (
+      (g as any).userMembership &&
+      ((g as any).userMembership.status === "ACTIVE" ||
+        (g as any).userMembership.status === "APPROVED")
+    ) {
+      return true;
+    }
+
+    // 6. Explicit boolean only if not pending
+    if (g.isMember && userStatus !== "PENDING") return true;
+
+    return false;
+  };
+
   const ongoingGroups = allGroups.filter(
-    (g) => g.isMember || g.isAdmin || (currentUser?.id && g.creatorId === currentUser.id)
+    (g) =>
+      isUserMemberOfGroup(g) &&
+      g.status !== "COMPLETED" &&
+      g.status !== "TERMINATED"
   );
   const completedGroups = allGroups.filter(
     (g) =>
-      (g.isMember || g.isAdmin || (currentUser?.id && g.creatorId === currentUser.id)) &&
+      isUserMemberOfGroup(g) &&
       (g.status === "COMPLETED" || g.status === "TERMINATED")
   );
 
@@ -211,7 +314,7 @@ export default function WealthGroupScreen() {
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
                   <Text className="text-[#4B5563] text-[13px] font-extrabold">
-                    Your wealth grew by N230.00 today
+                    Your wealth grew by ₦{(ongoingGroups.reduce((acc, g) => acc + (parseFloat(g.dailyWealthGrowth?.toString() || "0")), 0) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} today
                   </Text>
                   <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
                 </View>
@@ -429,7 +532,16 @@ export default function WealthGroupScreen() {
                   const targetNum = (parseFloat(g.targetAmount?.toString() || "10000000")) / 100;
                   const rawSavings = g.totalSavings ?? g.currentBalance ?? 0;
                   const currentNum = (typeof rawSavings === "string" ? parseFloat(rawSavings) : Number(rawSavings)) / 100;
-                  const progress = Math.min(Math.max((currentNum / targetNum) * 100, 2), 100);
+                  const progressRatio = targetNum > 0 ? (currentNum / targetNum) * 100 : 0;
+                  const formattedPct = progressRatio >= 100 ? "100%" : `${progressRatio.toFixed(1)}%`;
+                  const barWidth = Math.min(Math.max(progressRatio, 2), 100);
+
+                  const memberCount =
+                    (g as any).membersCount ??
+                    (g as any).memberCount ??
+                    (g as any)._count?.members ??
+                    (g as any).members?.length ??
+                    1;
 
                   return (
                     <TouchableOpacity
@@ -468,22 +580,25 @@ export default function WealthGroupScreen() {
                         <Text className="text-[16px] font-bold text-[#1A1A1A] mb-1">
                           {g.name}
                         </Text>
-                        <View className="flex-row items-center justify-between mb-2">
+                        <View className="flex-row items-center justify-between mb-1.5">
                           <Text className="text-[13px] font-bold text-[#4B5563]">
                             Progress:{" "}
                             <Text className="text-[#155D5F] font-black">
                               ₦{currentNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </Text>
+                            <Text className="text-[11px] text-[#6B7280] font-medium">
+                              {" "}({formattedPct})
+                            </Text>
                           </Text>
                           <Text className="text-[12px] font-bold text-[#4B5563]">
-                            {g.membersCount || 1} members
+                            {memberCount} {memberCount === 1 ? "member" : "members"}
                           </Text>
                         </View>
                         {/* Progress Bar */}
-                        <View className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <View className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                           <View
                             className="h-full bg-[#155D5F] rounded-full"
-                            style={{ width: `${progress}%` }}
+                            style={{ width: `${barWidth}%` }}
                           />
                         </View>
                       </View>
@@ -688,10 +803,13 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
         </Text>
 
         <View className="flex-row justify-between items-center mb-1">
-          <Text className="text-[10px] text-[#1A1A1A] font-black font-bold">
+          <Text
+            numberOfLines={1}
+            className="text-[10px] text-[#1A1A1A] font-black font-bold flex-1 mr-1"
+          >
             {item.dailyAmount}
           </Text>
-          <Text className="text-[11px] text-[#4B5563] font-bold">
+          <Text className="text-[10px] text-[#4B5563] font-bold">
             Ends: {item.endDate}
           </Text>
         </View>
@@ -706,7 +824,7 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
             </Text>
           </View>
           <Text className="text-[10px] text-[#155D5F] font-black">
-            {item.members} Members
+            {item.members} {item.members === 1 ? "Member" : "Members"}
           </Text>
         </View>
 

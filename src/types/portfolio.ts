@@ -16,6 +16,8 @@ export interface Portfolio {
   type: string;
   createdAt: string; // ISODate
   status: string;
+  dailyGrowth?: string | number; // in kobo
+  totalYieldEarned?: string | number; // in kobo
   metadata?: any;
 }
 

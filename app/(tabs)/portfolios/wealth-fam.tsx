@@ -446,12 +446,22 @@ function FamListItem({
     return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
-  const progress = parseFloat(plan.targetAmount) > 0 ? parseFloat(plan.balance) / parseFloat(plan.targetAmount) : 0;
+  const progress = isCompleted
+    ? 1
+    : parseFloat(plan.targetAmount) > 0
+    ? parseFloat(plan.balance) / parseFloat(plan.targetAmount)
+    : 0;
+
+  const growthVal = isCompleted
+    ? (plan as any).totalYieldEarned ??
+      (plan as any).dailyGrowth ??
+      (parseFloat(plan.targetAmount || "0") * 0.12).toString()
+    : plan.dailyGrowth ?? plan.balance;
 
   const formattedDate = new Date(plan.maturityDate).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric"
+    year: "numeric",
   });
 
   const getDaysLeft = () => {
@@ -534,7 +544,7 @@ function FamListItem({
               {plan.metadata?.category || "Fam"}
             </Text>
             <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
-              Wealth growth ₦{formatAmount(plan.balance)} ↑
+              Wealth growth ₦{formatAmount(growthVal.toString())} ↑
             </Text>
           </View>
 

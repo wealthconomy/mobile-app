@@ -1,3 +1,4 @@
+import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 import { router } from "expo-router";
 import { Eye, EyeOff } from "lucide-react-native";
 import { useState } from "react";
@@ -7,6 +8,7 @@ import { BalanceText } from "../../../components/common/BalanceText";
 interface SubWealthCardProps {
   description: string;
   amount?: string;
+  dailyGrowth?: string | number;
   onButtonPress?: () => void;
   onTransferPress?: () => void;
   showButton?: boolean;
@@ -15,11 +17,21 @@ interface SubWealthCardProps {
 export const SubWealthCard = ({
   description,
   amount = "₦0.00",
+  dailyGrowth,
   onButtonPress,
   onTransferPress,
   showButton = true,
 }: SubWealthCardProps) => {
   const [showBalance, setShowBalance] = useState(true);
+  const { data: walletData } = useGetWalletSummaryQuery();
+
+  const growthKobo = dailyGrowth ?? walletData?.dailyGrowth;
+  const growthFormatted = growthKobo
+    ? (parseFloat(growthKobo.toString()) / 100).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : "0.00";
 
   const handleButtonPress = () => {
     if (onTransferPress) {
@@ -111,7 +123,7 @@ export const SubWealthCard = ({
           )}
           <View className="flex-row items-center space-x-1">
             <Text className="text-white text-[13px] font-medium opacity-80">
-              Your wealth grew by N230.00 today
+              Your wealth grew by ₦{growthFormatted} today
             </Text>
             <Text className="text-[#95F370] text-[14px] font-bold">↑</Text>
           </View>

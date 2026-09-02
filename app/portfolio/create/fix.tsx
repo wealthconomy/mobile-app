@@ -630,7 +630,7 @@ export default function CreateFixScreen() {
               Method
             </Text>
             <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
-              {isManual ? "Manuel" : "Automation"}
+              {isManual ? "Manual" : "Automation"}
             </Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
@@ -645,7 +645,16 @@ export default function CreateFixScreen() {
               End Date
             </Text>
             <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
-              31th Dec 2023
+              {(() => {
+                const durDays = parseInt(duration, 10) || 30;
+                const d = new Date();
+                d.setDate(d.getDate() + durDays);
+                return d.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
+              })()}
             </Text>
           </View>
         </View>
@@ -796,7 +805,11 @@ export default function CreateFixScreen() {
       const body = {
         name: title.trim() || "WealthFix",
         amount: amtKobo,
+        targetAmount: amtKobo,
         maturityDate: maturity.toISOString(),
+        autoSaveEnabled: false,
+        autoSaveSource: fundingSource === "Debit card" ? "CARD" : "WALLET",
+        pin,
         metadata: {
           durationDays: durDays,
           fundingSource,
@@ -835,25 +848,13 @@ export default function CreateFixScreen() {
   // ─── PIN STEP ─────────────────────────────────────────────────────────────────
   const renderPinStep = () => (
     <View
-      style={{ alignItems: "center", paddingHorizontal: 24, marginTop: 40 }}
+      style={{ alignItems: "center", paddingHorizontal: 24, marginTop: 24 }}
     >
-      <View
-        style={{
-          width: 80,
-          height: 80,
-          borderRadius: 40,
-          backgroundColor: "#E6F0F1",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: 24,
-        }}
-      >
-        <Image
-          source={require("../../../assets/images/change-pin.png")}
-          style={{ width: 44, height: 44 }}
-          resizeMode="contain"
-        />
-      </View>
+      <Image
+        source={require("../../../assets/images/change-pin.png")}
+        style={{ width: 90, height: 90, marginBottom: 20 }}
+        resizeMode="contain"
+      />
 
       <Text
         style={{

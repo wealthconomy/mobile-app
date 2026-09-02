@@ -473,7 +473,17 @@ function AutoListItem({
     return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
-  const progress = parseFloat(plan.targetAmount) > 0 ? parseFloat(plan.balance) / parseFloat(plan.targetAmount) : 0;
+  const progress = isCompleted
+    ? 1
+    : parseFloat(plan.targetAmount) > 0
+    ? parseFloat(plan.balance) / parseFloat(plan.targetAmount)
+    : 0;
+
+  const growthVal = isCompleted
+    ? (plan as any).totalYieldEarned ??
+      (plan as any).dailyGrowth ??
+      (parseFloat(plan.targetAmount || "0") * 0.12).toString()
+    : plan.dailyGrowth ?? plan.balance;
   
   const formattedDate = new Date(plan.maturityDate).toLocaleDateString("en-US", {
     month: "short",
@@ -530,7 +540,7 @@ function AutoListItem({
           <View>
             <Text className="text-[10px] text-[#6B7280]">{plan.metadata?.category || "Flow"}</Text>
             <Text className="text-[10px] text-[#4CAF50] font-bold">
-              Wealth growth ₦{formatAmount(plan.balance)}
+              Wealth growth ₦{formatAmount(growthVal.toString())} ↑
             </Text>
           </View>
           <View className="flex-1 max-w-[120px] ml-4">

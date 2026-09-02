@@ -1,10 +1,14 @@
 import Header from "@/src/components/common/Header";
 import { RootState } from "@/src/store";
 import {
+  useAddGroupAdminMutation,
   useAddToGroupBlacklistMutation,
+  useApproveJoinRequestMutation,
   useGetGroupDetailsQuery,
   useGetGroupMembersQuery,
   useGetMemberStatsQuery,
+  useRejectJoinRequestMutation,
+  useRemoveGroupAdminMutation,
   useRemoveGroupMemberMutation,
   useSendGroupRemindersMutation,
 } from "@/src/store/api/groupApi";
@@ -33,6 +37,7 @@ const THEME = "#155D5F";
 const FILTER_OPTIONS = [
   "All",
   "Paid",
+  "Unpaid",
   "Pending",
   "Overdue",
   "Inactive",
@@ -46,16 +51,28 @@ const StatusBadge = ({ status }: { status: string }) => {
 
   switch (status) {
     case "Paid":
-    case "ACTIVE":
+    case "PAID":
       bgColor = "#E6F7ED";
       textColor = "#4CAF50";
       break;
+    case "Unpaid":
+    case "UNPAID":
+      bgColor = "#FEF3C7";
+      textColor = "#D97706";
+      break;
     case "Pending":
+    case "PENDING":
       bgColor = "#FEF9C3";
       textColor = "#EAB308";
       break;
     case "Overdue":
+    case "OVERDUE":
       bgColor = "#FEE2E2";
+      textColor = "#EF4444";
+      break;
+    case "Blacklist":
+    case "BLACKLIST":
+      bgColor = "#FFE4E4";
       textColor = "#EF4444";
       break;
   }
@@ -64,7 +81,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     <View
       style={{
         backgroundColor: bgColor,
-        width: 68,
+        minWidth: 68,
         height: 25,
         borderRadius: 5,
         paddingHorizontal: 7,
@@ -72,7 +89,7 @@ const StatusBadge = ({ status }: { status: string }) => {
       className="items-center justify-center"
     >
       <Text style={{ color: textColor }} className="text-[11px] font-bold">
-        {status === "ACTIVE" ? "Paid" : status}
+        {status}
       </Text>
     </View>
   );
@@ -131,6 +148,10 @@ const UserDetailModal = ({
   isAdmin?: boolean;
   onMemberUpdated: () => void;
 }) => {
+  const [addAdmin, { isLoading: isAddingAdmin }] = useAddGroupAdminMutation();
+  const [removeAdmin, { isLoading: isRemovingAdmin }] = useRemoveGroupAdminMutation();
+  const [approveRequest, { isLoading: isApproving }] = useApproveJoinRequestMutation();
+  const [rejectRequest, { isLoading: isRejecting }] = useRejectJoinRequestMutation();
   const [removeMember, { isLoading: isRemoving }] = useRemoveGroupMemberMutation();
   const [addToBlacklist, { isLoading: isBlacklisting }] = useAddToGroupBlacklistMutation();
   const [sendReminders, { isLoading: isSendingReminder }] = useSendGroupRemindersMutation();
@@ -141,6 +162,16 @@ const UserDetailModal = ({
   );
 
   if (!user) return null;
+
+  const isPending =
+    user?.status === "PENDING" ||
+    user?.status === "Pending" ||
+    memberStats?.status === "PENDING" ||
+    memberStats?.status === "Pending" ||
+    user?.raw?.status === "PENDING";
+
+  const isMemberAdmin = user?.role === "ADMIN" || user?.raw?.role === "ADMIN";
+  const isMemberOwner = user?.role === "OWNER" || user?.role === "CREATOR" || user?.raw?.role === "OWNER";
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "-/-/-";
@@ -155,6 +186,94 @@ const UserDetailModal = ({
   const growthPerWeekNaira = memberStats?.growthPerWeek
     ? `₦${(parseFloat(memberStats.growthPerWeek.toString()) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : "₦0.00";
+
+  const handleMakeAdmin = () => {
+    Alert.alert(
+      "Make Admin",
+      `Promote ${user.name} to Group Admin? They will have management permissions in this tribe.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Make Admin",
+          onPress: async () => {
+            try {
+              await addAdmin({ id: groupId, userId: user.userId || user.id }).unwrap();
+              Alert.alert("Admin Assigned", `${user.name} is now a Group Admin.`);
+              onClose();
+              onMemberUpdated();
+            } catch (err: any) {
+              const msg = err?.data?.message || err?.message || "Failed to assign admin role.";
+              Alert.alert("Notice", msg);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRemoveAdmin = () => {
+    Alert.alert(
+      "Remove Admin Role",
+      `Are you sure you want to remove admin privileges from ${user.name}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove Admin",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await removeAdmin({ id: groupId, userId: user.userId || user.id }).unwrap();
+              Alert.alert("Role Updated", `${user.name} is now a regular member.`);
+              onClose();
+              onMemberUpdated();
+            } catch (err: any) {
+              const msg = err?.data?.message || err?.message || "Failed to remove admin role.";
+              Alert.alert("Notice", msg);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleApprove = async () => {
+    try {
+      await approveRequest({ id: groupId, userId: user.userId || user.id }).unwrap();
+      Alert.alert("Approved", `${user.name} has been added to the tribe.`);
+      onClose();
+      onMemberUpdated();
+    } catch (err: any) {
+      const msg = err?.data?.message || err?.message || "Failed to approve request.";
+      Alert.alert("Notice", msg);
+      onClose();
+    }
+  };
+
+  const handleReject = () => {
+    Alert.alert(
+      "Reject Request",
+      `Are you sure you want to reject the join request from ${user.name}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reject",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await rejectRequest({ id: groupId, userId: user.userId || user.id }).unwrap();
+              Alert.alert("Rejected", `Join request for ${user.name} was rejected.`);
+              onClose();
+              onMemberUpdated();
+            } catch (err: any) {
+              const msg = err?.data?.message || err?.message || "Failed to reject request.";
+              Alert.alert("Notice", msg);
+              onClose();
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleSendReminder = async () => {
     try {
@@ -283,46 +402,103 @@ const UserDetailModal = ({
 
             {/* Action Buttons */}
             <View className="flex-row justify-between mt-8 px-1">
-              {isAdmin && (
-                <TouchableOpacity
-                  onPress={handleSendReminder}
-                  disabled={isSendingReminder}
-                  style={{ width: 158, height: 50, backgroundColor: "#D7F5DE" }}
-                  className="flex-row items-center justify-center rounded-[15px] space-x-2"
-                >
-                  <Ionicons name="notifications-outline" size={20} color="#4CAF50" />
-                  <Text className="text-[#4CAF50] font-bold text-[14px]">
-                    {isSendingReminder ? "Sending..." : "Send Reminder"}
-                  </Text>
-                </TouchableOpacity>
-              )}
+              {isAdmin && isPending ? (
+                <>
+                  <TouchableOpacity
+                    onPress={handleApprove}
+                    disabled={isApproving}
+                    style={{ width: 158, height: 50, backgroundColor: "#D7F5DE" }}
+                    className="flex-row items-center justify-center rounded-[15px] space-x-2"
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={20} color="#4CAF50" />
+                    <Text className="text-[#4CAF50] font-bold text-[14px]">
+                      {isApproving ? "Approving..." : "Approve"}
+                    </Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => {
-                  onClose();
-                  router.push("/support/chat" as any);
-                }}
-                style={{
-                  width: isAdmin ? 90 : "100%",
-                  height: 50,
-                  backgroundColor: "#F6F6F6",
-                }}
-                className="flex-row items-center justify-center rounded-[15px] space-x-1"
-              >
-                <Ionicons name="at-outline" size={20} color="#64748B" />
-                <Text className="text-[#64748B] font-bold text-[14px]">Tag</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      onClose();
+                      router.push("/support/chat" as any);
+                    }}
+                    style={{ width: 90, height: 50, backgroundColor: "#F6F6F6" }}
+                    className="flex-row items-center justify-center rounded-[15px] space-x-1"
+                  >
+                    <Ionicons name="at-outline" size={20} color="#64748B" />
+                    <Text className="text-[#64748B] font-bold text-[14px]">Tag</Text>
+                  </TouchableOpacity>
 
-              {isAdmin && (
-                <TouchableOpacity
-                  onPress={handleBlacklist}
-                  disabled={isBlacklisting}
-                  style={{ width: 96, height: 50, backgroundColor: "#F6F6F6" }}
-                  className="flex-row items-center justify-center rounded-[15px] space-x-1"
-                >
-                  <Ionicons name="ban-outline" size={20} color="#EF4444" />
-                  <Text className="text-[#EF4444] font-bold text-[14px]">Block</Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleReject}
+                    disabled={isRejecting}
+                    style={{ width: 96, height: 50, backgroundColor: "#FEE2E2" }}
+                    className="flex-row items-center justify-center rounded-[15px] space-x-1"
+                  >
+                    <Ionicons name="close-circle-outline" size={20} color="#EF4444" />
+                    <Text className="text-[#EF4444] font-bold text-[14px]">Reject</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  {isAdmin && (
+                    <>
+                      <TouchableOpacity
+                        onPress={handleSendReminder}
+                        disabled={isSendingReminder}
+                        style={{ width: 140, height: 50, backgroundColor: "#D7F5DE" }}
+                        className="flex-row items-center justify-center rounded-[15px] space-x-1.5"
+                      >
+                        <Ionicons name="notifications-outline" size={18} color="#4CAF50" />
+                        <Text className="text-[#4CAF50] font-bold text-[13px]">
+                          {isSendingReminder ? "Sending..." : "Reminder"}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {!isMemberOwner && (
+                        <TouchableOpacity
+                          onPress={isMemberAdmin ? handleRemoveAdmin : handleMakeAdmin}
+                          disabled={isAddingAdmin || isRemovingAdmin}
+                          style={{
+                            width: 115,
+                            height: 50,
+                            backgroundColor: isMemberAdmin ? "#FEF3C7" : "#F0F9F9",
+                            borderWidth: 1,
+                            borderColor: isMemberAdmin ? "#F59E0B" : THEME,
+                          }}
+                          className="flex-row items-center justify-center rounded-[15px] space-x-1"
+                        >
+                          {isAddingAdmin || isRemovingAdmin ? (
+                            <ActivityIndicator size="small" color={isMemberAdmin ? "#D97706" : THEME} />
+                          ) : (
+                            <>
+                              <Ionicons
+                                name={isMemberAdmin ? "shield-outline" : "shield-checkmark-outline"}
+                                size={16}
+                                color={isMemberAdmin ? "#D97706" : THEME}
+                              />
+                              <Text
+                                style={{ color: isMemberAdmin ? "#D97706" : THEME }}
+                                className="font-bold text-[12px]"
+                              >
+                                {isMemberAdmin ? "Demote" : "Make Admin"}
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      )}
+
+                      <TouchableOpacity
+                        onPress={handleBlacklist}
+                        disabled={isBlacklisting}
+                        style={{ width: 80, height: 50, backgroundColor: "#FEE2E2" }}
+                        className="flex-row items-center justify-center rounded-[15px] space-x-1"
+                      >
+                        <Ionicons name="ban-outline" size={18} color="#EF4444" />
+                        <Text className="text-[#EF4444] font-bold text-[13px]">Block</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </>
               )}
             </View>
 
@@ -349,36 +525,137 @@ const UserDetailModal = ({
             {/* Bottom Summary Action Buttons */}
             {isAdmin && (
               <View className="mt-6">
-                <TouchableOpacity
-                  onPress={handleRemove}
-                  disabled={isRemoving}
-                  style={{ height: 50, backgroundColor: "#F44336" }}
-                  className="w-full rounded-[15px] items-center justify-center mb-3"
-                >
-                  {isRemoving ? (
-                    <ActivityIndicator color="white" />
-                  ) : (
-                    <Text className="text-white font-bold text-base">Remove Member</Text>
-                  )}
-                </TouchableOpacity>
+                {isPending ? (
+                  <>
+                    <TouchableOpacity
+                      onPress={handleApprove}
+                      disabled={isApproving}
+                      style={{ height: 50, backgroundColor: THEME }}
+                      className="w-full rounded-[15px] items-center justify-center mb-3"
+                    >
+                      {isApproving ? (
+                        <ActivityIndicator color="white" />
+                      ) : (
+                        <Text className="text-white font-bold text-base">Approve Join Request</Text>
+                      )}
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={handleBlacklist}
-                  disabled={isBlacklisting}
-                  style={{ height: 50, backgroundColor: "#FFE4E4" }}
-                  className="w-full rounded-[15px] items-center justify-center"
-                >
-                  {isBlacklisting ? (
-                    <ActivityIndicator color="#EF4444" />
-                  ) : (
-                    <Text className="text-[#EF4444] font-bold text-base">Blacklist Member</Text>
-                  )}
-                </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleReject}
+                      disabled={isRejecting}
+                      style={{ height: 50, backgroundColor: "#FFE4E4" }}
+                      className="w-full rounded-[15px] items-center justify-center"
+                    >
+                      {isRejecting ? (
+                        <ActivityIndicator color="#EF4444" />
+                      ) : (
+                        <Text className="text-[#EF4444] font-bold text-base">Reject Request</Text>
+                      )}
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    {!isMemberOwner && (
+                      <TouchableOpacity
+                        onPress={handleRemove}
+                        disabled={isRemoving}
+                        style={{ height: 50, backgroundColor: "#F44336" }}
+                        className="w-full rounded-[15px] items-center justify-center mb-3"
+                      >
+                        {isRemoving ? (
+                          <ActivityIndicator color="white" />
+                        ) : (
+                          <Text className="text-white font-bold text-base">Remove Member</Text>
+                        )}
+                      </TouchableOpacity>
+                    )}
+
+                    <TouchableOpacity
+                      onPress={handleBlacklist}
+                      disabled={isBlacklisting}
+                      style={{ height: 50, backgroundColor: "#FFE4E4" }}
+                      className="w-full rounded-[15px] items-center justify-center"
+                    >
+                      {isBlacklisting ? (
+                        <ActivityIndicator color="#EF4444" />
+                      ) : (
+                        <Text className="text-[#EF4444] font-bold text-base">Blacklist Member</Text>
+                      )}
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             )}
           </ScrollView>
         </View>
       </View>
+    </Modal>
+  );
+};
+
+const FilterModal = ({
+  visible,
+  onClose,
+  selectedStatus,
+  onSelectStatus,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  selectedStatus: string;
+  onSelectStatus: (status: string) => void;
+}) => {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity className="flex-1 bg-black/15" activeOpacity={1} onPress={onClose}>
+        <View
+          style={{
+            position: "absolute",
+            top: 155,
+            left: 20,
+            width: 200,
+            backgroundColor: "white",
+            borderRadius: 16,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 10,
+            elevation: 10,
+            borderWidth: 1,
+            borderColor: "#F1F5F9",
+            paddingVertical: 6,
+            paddingHorizontal: 4,
+          }}
+        >
+          {FILTER_OPTIONS.map((opt) => {
+            const isSelected = selectedStatus === opt;
+            return (
+              <TouchableOpacity
+                key={opt}
+                onPress={() => {
+                  onSelectStatus(opt);
+                  onClose();
+                }}
+                className={`flex-row items-center justify-between px-3 py-2.5 rounded-xl ${
+                  isSelected ? "bg-[#EFF8F8]" : "active:bg-gray-50"
+                }`}
+              >
+                <Text
+                  style={{
+                    color: isSelected ? THEME : "#1E293B",
+                    fontWeight: isSelected ? "700" : "500",
+                    fontSize: 13,
+                  }}
+                >
+                  {opt}
+                </Text>
+                {isSelected && (
+                  <Ionicons name="checkmark" size={16} color={THEME} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </TouchableOpacity>
     </Modal>
   );
 };
@@ -476,7 +753,7 @@ export default function TribeMembersScreen() {
     isLoading: queryLoading,
     refetch: refetchMembers,
   } = useGetGroupMembersQuery(
-    { id: id as string, filter: filterParam as any, populate: ["user"] },
+    { id: id as string, populate: ["user"] },
     { skip: !id }
   );
 
@@ -534,6 +811,21 @@ export default function TribeMembersScreen() {
         .charAt(0)
         .toUpperCase();
 
+      let memberStatus = "Unpaid";
+      if (m.status === "PENDING" || m.status === "Pending") {
+        memberStatus = "Pending";
+      } else if (m.status === "BLACKLIST" || m.status === "Blacklist") {
+        memberStatus = "Blacklist";
+      } else if (m.status === "OVERDUE" || m.status === "Overdue") {
+        memberStatus = "Overdue";
+      } else if (m.status === "INACTIVE" || m.status === "Inactive") {
+        memberStatus = "Inactive";
+      } else if (savingsNum > 0) {
+        memberStatus = "Paid";
+      } else {
+        memberStatus = "Unpaid";
+      }
+
       return {
         id: m.id,
         userId: m.userId || m.id,
@@ -541,7 +833,7 @@ export default function TribeMembersScreen() {
         initial,
         avatar: userPhoto,
         savings: `₦${savingsNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        status: m.status === "ACTIVE" ? "Paid" : m.status || "Paid",
+        status: memberStatus,
         isAdmin: m.role === "ADMIN" || (m.role as string) === "OWNER" || (m.role as string) === "CREATOR",
         raw: m,
       };
@@ -551,7 +843,17 @@ export default function TribeMembersScreen() {
   const filteredMembers = useMemo(() => {
     return membersList.filter((m) => {
       const matchesSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = selectedStatus === "All" || m.status === selectedStatus;
+      let matchesStatus = true;
+      if (selectedStatus === "All") {
+        matchesStatus = true;
+      } else if (selectedStatus === "Past Member") {
+        matchesStatus =
+          m.status?.toLowerCase() === "past" ||
+          m.status?.toLowerCase() === "exited" ||
+          m.status?.toLowerCase() === "past member";
+      } else {
+        matchesStatus = m.status?.toLowerCase() === selectedStatus.toLowerCase();
+      }
       return matchesSearch && matchesStatus;
     });
   }, [membersList, searchQuery, selectedStatus]);
@@ -894,6 +1196,14 @@ export default function TribeMembersScreen() {
           setBulkMode("remove");
           setSelectedMemberIds([]);
         }}
+      />
+
+      {/* ── Filter Dropdown Modal ────────────────────────────────────────── */}
+      <FilterModal
+        visible={isFilterModalVisible}
+        onClose={() => setIsFilterModalVisible(false)}
+        selectedStatus={selectedStatus}
+        onSelectStatus={setSelectedStatus}
       />
     </SafeAreaView>
   );

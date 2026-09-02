@@ -125,7 +125,7 @@ export const WealthCard = () => {
           {showInterest && (
             <View className="flex-row items-center space-x-1 mt-1">
               <Text className="text-white text-[12px] font-medium">
-                Your wealth grew by N230.00 today
+                Your wealth grew by ₦{walletData?.dailyGrowth ? (parseFloat(walletData.dailyGrowth.toString()) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"} today
               </Text>
               <Text className="text-[#95F370] text-[14px] font-bold">↑</Text>
             </View>

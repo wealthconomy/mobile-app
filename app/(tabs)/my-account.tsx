@@ -186,7 +186,10 @@ export default function MyAccountScreen() {
             activeUser?.totalSavings
           }
           dailyGrowth={
-            (summaryData as any)?.data?.totalInterest ?? activeUser?.totalInterest
+            walletData?.dailyGrowth ??
+            (summaryData as any)?.data?.dailyGrowth ??
+            (summaryData as any)?.data?.totalInterest ??
+            activeUser?.totalInterest
           }
           showGrowth={showGrowth}
           loading={(summaryLoading || walletLoading) && !walletData && !(summaryData as any)?.data}

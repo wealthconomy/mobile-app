@@ -495,7 +495,7 @@ export default function FamDetailScreen() {
                   textStyle={{ color: "#E53935", fontWeight: "700" }}
                 />
               </>
-            ) : (
+            ) : parseFloat(plan.balance || "0") > 0 ? (
               <ThemedButton
                 title="Withdraw All to Wallet"
                 onPress={() => setShowWithdrawModal(true)}
@@ -505,6 +505,44 @@ export default function FamDetailScreen() {
                   height: 56,
                 }}
               />
+            ) : (
+              <View
+                style={{
+                  backgroundColor: "#F0FDF4",
+                  borderWidth: 1,
+                  borderColor: "#BBF7D0",
+                  borderRadius: 16,
+                  padding: 16,
+                  alignItems: "center",
+                }}
+              >
+                <Ionicons
+                  name="checkmark-circle"
+                  size={26}
+                  color="#15803D"
+                  style={{ marginBottom: 4 }}
+                />
+                <Text
+                  style={{
+                    color: "#166534",
+                    fontWeight: "800",
+                    fontSize: 15,
+                    marginBottom: 2,
+                  }}
+                >
+                  Funds Transferred to Wallet
+                </Text>
+                <Text
+                  style={{
+                    color: "#15803D",
+                    fontSize: 12,
+                    textAlign: "center",
+                    lineHeight: 18,
+                  }}
+                >
+                  All matured funds from this goal have been successfully withdrawn into your Main Wallet.
+                </Text>
+              </View>
             )}
           </View>
 
@@ -619,59 +657,47 @@ export default function FamDetailScreen() {
 
       {/* ─── WITHDRAW MODAL ────────────────────────────────────────────── */}
       <Modal visible={showWithdrawModal} transparent animationType="slide">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.modalOverlay}
-        >
+        <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ width: "100%", alignItems: "center" }}
-            >
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 16 }}>
-                <Text style={styles.modalTitle}>Withdraw to Wallet</Text>
-                <TouchableOpacity onPress={() => setShowWithdrawModal(false)}>
-                  <Ionicons name="close" size={24} color="#6B7280" />
-                </TouchableOpacity>
-              </View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 12 }}>
+              <Text style={styles.modalTitle}>Withdraw to Main Wallet</Text>
+              <TouchableOpacity onPress={() => setShowWithdrawModal(false)}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
 
-              <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 16, textAlign: "center" }}>
-                Transfer funds from this family pot to your main wallet balance.
-              </Text>
+            <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: "#E6F7ED", alignItems: "center", justifyContent: "center", marginVertical: 12 }}>
+              <Ionicons name="wallet-outline" size={32} color={TEAL} />
+            </View>
 
-              <Text style={styles.inputLabel}>Withdrawal Amount (₦)</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="e.g. 20,000"
-                keyboardType="numeric"
-                value={withdrawAmount}
-                onChangeText={(v) => {
-                  const n = v.replace(/\D/g, "");
-                  setWithdrawAmount(n.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
-                }}
-              />
+            <Text style={{ color: "#1F2937", fontSize: 16, fontWeight: "800", marginBottom: 6, textAlign: "center" }}>
+              Ready to withdraw your savings?
+            </Text>
 
-              <Text style={[styles.inputLabel, { marginTop: 14 }]}>Transaction PIN</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Enter 4-digit PIN"
-                keyboardType="numeric"
-                secureTextEntry
-                maxLength={4}
-                value={actionPin}
-                onChangeText={setActionPin}
-              />
+            <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 20, textAlign: "center", lineHeight: 18, paddingHorizontal: 10 }}>
+              Your plan has reached maturity! Your full savings balance of <Text style={{ color: TEAL, fontWeight: "bold" }}>₦{formatAmount(plan.balance)}</Text> will be transferred directly to your Main Wallet.
+            </Text>
 
-              <ThemedButton
-                title={isProcessing ? "Processing..." : "Confirm Withdrawal"}
-                onPress={handleWithdrawSubmit}
-                disabled={isProcessing}
-                style={{ backgroundColor: TEAL, width: "100%", height: 52, borderRadius: 14, marginTop: 24 }}
-              />
-            </ScrollView>
+            <ThemedButton
+              title="Confirm & Enter PIN"
+              onPress={() => {
+                const balNum = parseFloat(plan.balance || "0") / 100;
+                setShowWithdrawModal(false);
+                router.push({
+                  pathname: "/payment/insert-pin",
+                  params: {
+                    amount: balNum.toString(),
+                    action: "FAM_WITHDRAW",
+                    targetId: plan.id,
+                    targetName: plan.name,
+                    returnUrl: `/portfolio/detail/fam/${plan.id}`,
+                  },
+                });
+              }}
+              style={{ backgroundColor: TEAL, width: "100%", height: 52, borderRadius: 14 }}
+            />
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* ─── TERMINATE MODAL ───────────────────────────────────────────── */}
@@ -698,7 +724,7 @@ export default function FamDetailScreen() {
                     fontSize: 13,
                     color: "#6B7280",
                     textAlign: "center",
-                    marginBottom: 18,
+                    marginBottom: 24,
                     lineHeight: 20,
                   }}
                 >
@@ -707,21 +733,9 @@ export default function FamDetailScreen() {
                   family pot. All accumulated funds will be returned to your main wallet balance.
                 </Text>
 
-                <Text style={[styles.inputLabel, { alignSelf: "flex-start" }]}>Enter PIN to Confirm</Text>
-                <TextInput
-                  style={[styles.textInput, { width: "100%", marginBottom: 20 }]}
-                  placeholder="4-digit PIN"
-                  keyboardType="numeric"
-                  secureTextEntry
-                  maxLength={4}
-                  value={actionPin}
-                  onChangeText={setActionPin}
-                />
-
                 <View style={{ flexDirection: "row", gap: 12, width: "100%" }}>
                   <TouchableOpacity
                     onPress={() => setShowTerminateModal(false)}
-                    disabled={isProcessing}
                     style={{
                       flex: 1,
                       height: 50,
@@ -736,8 +750,20 @@ export default function FamDetailScreen() {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    onPress={handleTerminateSubmit}
-                    disabled={isProcessing}
+                    onPress={() => {
+                      const balNum = parseFloat(plan.balance || "0") / 100;
+                      setShowTerminateModal(false);
+                      router.push({
+                        pathname: "/payment/insert-pin",
+                        params: {
+                          amount: balNum.toString(),
+                          action: "FAM_TERMINATE",
+                          targetId: plan.id,
+                          targetName: plan.name,
+                          returnUrl: `/portfolio/detail/fam/${plan.id}`,
+                        },
+                      });
+                    }}
                     style={{
                       flex: 1,
                       height: 50,
@@ -747,11 +773,9 @@ export default function FamDetailScreen() {
                       justifyContent: "center",
                     }}
                   >
-                    {isProcessing ? (
-                      <ActivityIndicator size="small" color="#E53935" />
-                    ) : (
-                      <Text style={{ fontSize: 14, color: "#E53935", fontWeight: "700" }}>Terminate</Text>
-                    )}
+                    <Text style={{ fontSize: 14, color: "#E53935", fontWeight: "700" }}>
+                      Continue
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
