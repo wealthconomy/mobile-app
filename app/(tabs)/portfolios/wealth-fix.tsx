@@ -72,8 +72,17 @@ export default function WealthFixScreen() {
   const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthfix" });
   const allGoals = data?.items || [];
 
-  const lockedGoals = allGoals.filter((g) => g.status === "ACTIVE" && parseFloat(g.balance) < parseFloat(g.targetAmount));
-  const unlockedGoals = allGoals.filter((g) => g.status === "COMPLETED" || (parseFloat(g.balance) >= parseFloat(g.targetAmount)));
+  const lockedGoals = allGoals.filter(
+    (g) =>
+      g.status === "ACTIVE" &&
+      (!g.maturityDate || new Date(g.maturityDate).getTime() > Date.now())
+  );
+  const unlockedGoals = allGoals.filter(
+    (g) =>
+      g.status === "COMPLETED" ||
+      g.status === "TERMINATED" ||
+      (g.maturityDate && new Date(g.maturityDate).getTime() <= Date.now())
+  );
 
   const THEME_COLOR = "#D48E00"; // Primary Gold
   const THEME_BG = "#FFCF6566"; // Gold with opacity
@@ -85,12 +94,19 @@ export default function WealthFixScreen() {
   };
 
   const totalBalance = allGoals.reduce((sum, g) => sum + parseFloat(g.balance || "0"), 0);
+  const dailyGrowthFormatted = (
+    allGoals.reduce((sum, g) => sum + (parseFloat(g.dailyGrowth?.toString() || "0") || 0), 0) / 100
+  ).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
         <StatusBar style="dark" />
-        <Header title="WealthFix" onBack={() => router.back()} />
+        <Header
+          title="WealthFix"
+          onBack={() => router.back()}
+          rightElement={<PortfolioPreferenceMenu portfolioType="fix" />}
+        />
         <PortfolioDetailSkeleton />
       </SafeAreaView>
     );
@@ -182,7 +198,7 @@ export default function WealthFixScreen() {
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
                   <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-80">
-                    Your wealth grew to N0.00 today
+                    Your wealth grew by ₦{dailyGrowthFormatted} today
                   </Text>
                   <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
                 </View>
@@ -459,7 +475,17 @@ function FixListItem({ goal, themeColor, isUnlocked }: { goal: Portfolio, themeC
     return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
-  const progress = parseFloat(goal.targetAmount) > 0 ? parseFloat(goal.balance) / parseFloat(goal.targetAmount) : 0;
+  const progress = isUnlocked
+    ? 1
+    : parseFloat(goal.targetAmount) > 0
+    ? parseFloat(goal.balance) / parseFloat(goal.targetAmount)
+    : 0;
+
+  const growthVal = isUnlocked
+    ? (goal as any).totalYieldEarned ??
+      (goal as any).dailyGrowth ??
+      (parseFloat(goal.targetAmount || "0") * 0.15).toString()
+    : goal.dailyGrowth ?? goal.balance;
 
   const formattedDate = new Date(goal.maturityDate).toLocaleDateString("en-US", {
     month: "short",
@@ -553,7 +579,7 @@ function FixListItem({ goal, themeColor, isUnlocked }: { goal: Portfolio, themeC
               {goal.metadata?.category || "Fix"}
             </Text>
             <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
-              Wealth growth ₦{formatAmount(goal.balance)} ↑
+              Wealth growth ₦{formatAmount(growthVal.toString())} ↑
             </Text>
           </View>
 

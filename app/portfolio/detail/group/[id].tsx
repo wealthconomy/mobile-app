@@ -160,10 +160,28 @@ export default function GroupDetailScreen() {
       (m) => m.userId === currentUser?.id && (m.role === "OWNER" || m.role === "CREATOR")
     );
 
+  const isPendingJoin =
+    joinRequested ||
+    membersData?.items?.some(
+      (m) =>
+        m.userId === currentUser?.id &&
+        (m.status === "PENDING" || (m.status as string) === "Pending")
+    ) ||
+    (group as any)?.userStatus === "PENDING" ||
+    (group as any)?.memberStatus === "PENDING";
+
   const isMember =
-    isCreator ||
-    group?.isMember ||
-    membersData?.items?.some((m) => m.userId === currentUser?.id && m.status === "ACTIVE");
+    !isPendingJoin &&
+    (isCreator ||
+      (group?.isMember &&
+        (group as any)?.memberStatus !== "PENDING" &&
+        (group as any)?.userStatus !== "PENDING") ||
+      membersData?.items?.some(
+        (m) =>
+          m.userId === currentUser?.id &&
+          (m.status === "ACTIVE" || m.status === "PAID" || m.status === "UNPAID") &&
+          m.status !== "PENDING"
+      ));
 
   const isAdmin =
     isCreator ||
@@ -439,7 +457,7 @@ export default function GroupDetailScreen() {
 
               <View className="flex-row items-center space-x-1">
                 <Text className="text-[#4B5563] text-[13px] font-extrabold">
-                  Group wealth grew by ₦230.00 today
+                  Group wealth grew by ₦{group?.dailyWealthGrowth ? (parseFloat(group.dailyWealthGrowth.toString()) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"} today
                 </Text>
                 <Text className="text-[#4CAF50] text-[15px] font-bold"> ↑</Text>
               </View>
@@ -582,21 +600,27 @@ export default function GroupDetailScreen() {
               </Text>
             </TouchableOpacity>
           ) : (
-            /* Join Group Button for Non-Members */
+            /* Join Group Button for Non-Members / Pending Users */
             <TouchableOpacity
-              onPress={() => (joinRequested ? null : setIsJoinModalVisible(true))}
-              disabled={joinRequested || isProcessing}
+              onPress={() => (isPendingJoin ? null : setIsJoinModalVisible(true))}
+              disabled={isPendingJoin || isProcessing}
               activeOpacity={0.85}
               style={{
-                backgroundColor: joinRequested ? "#9CA3AF" : THEME,
+                backgroundColor: isPendingJoin ? "#E2E8F0" : THEME,
                 height: 54,
                 borderRadius: 14,
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <Text style={{ color: "white", fontWeight: "800", fontSize: 16 }}>
-                {joinRequested ? "Request Sent" : "Join Group"}
+              <Text
+                style={{
+                  color: isPendingJoin ? "#64748B" : "white",
+                  fontWeight: "800",
+                  fontSize: 16,
+                }}
+              >
+                {isPendingJoin ? "Request Pending Approval" : "Join Group"}
               </Text>
             </TouchableOpacity>
           )}

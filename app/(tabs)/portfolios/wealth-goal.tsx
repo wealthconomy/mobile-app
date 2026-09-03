@@ -44,6 +44,9 @@ export default function WealthGoalScreen() {
   };
 
   const totalBalance = allGoals.reduce((sum, g) => sum + parseFloat(g.balance || "0"), 0);
+  const dailyGrowthFormatted = (
+    allGoals.reduce((sum, g) => sum + (parseFloat(g.dailyGrowth?.toString() || "0") || 0), 0) / 100
+  ).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   if (loading) {
     return (
@@ -89,25 +92,17 @@ export default function WealthGoalScreen() {
               source={require("../../../assets/images/arrow.png")}
               className="absolute"
               style={{
-                width: 200,
-                height: 200,
-                top: -17,
-                left: 215,
-                transform: [{ rotate: "368.33deg" }],
+                width: 250,
+                height: 250,
+                right: -30,
+                top: 25,
+                transform: [{ rotate: "140deg" }],
                 opacity: 0.3,
               }}
               resizeMode="contain"
             />
 
-            <View
-              style={{
-                position: "absolute",
-                top: 28,
-                left: 20,
-                width: 326,
-                zIndex: 10,
-              }}
-            >
+            <View style={{ padding: 24 }}>
               <View className="flex-row items-center justify-between mb-1">
                 <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-90">
                   Total Savings
@@ -115,6 +110,7 @@ export default function WealthGoalScreen() {
                 <TouchableOpacity
                   onPress={() => setShowBalance(!showBalance)}
                   className="p-1"
+                  activeOpacity={0.7}
                 >
                   {showBalance ? (
                     <Eye size={18} color="#1A1A1A" />
@@ -148,7 +144,7 @@ export default function WealthGoalScreen() {
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
                   <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-80">
-                    Your wealth grew by N0.00 today
+                    Your wealth grew by ₦{dailyGrowthFormatted} today
                   </Text>
                   <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
                 </View>
@@ -403,7 +399,17 @@ function GoalListItem({ goal }: { goal: Portfolio }) {
     return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
-  const progress = parseFloat(goal.targetAmount) > 0 ? parseFloat(goal.balance) / parseFloat(goal.targetAmount) : 0;
+  const progress = isCompleted
+    ? 1
+    : parseFloat(goal.targetAmount) > 0
+    ? parseFloat(goal.balance) / parseFloat(goal.targetAmount)
+    : 0;
+
+  const growthVal = isCompleted
+    ? (goal as any).totalYieldEarned ??
+      (goal as any).dailyGrowth ??
+      (parseFloat(goal.targetAmount || "0") * 0.12).toString()
+    : goal.dailyGrowth ?? goal.balance;
   
   const formattedDate = new Date(goal.maturityDate).toLocaleDateString("en-US", {
     month: "short",
@@ -486,7 +492,7 @@ function GoalListItem({ goal }: { goal: Portfolio }) {
               {goal.metadata?.category || "Goal"}
             </Text>
             <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
-              Wealth growth ₦{formatAmount(goal.balance)} ↑
+              Wealth growth ₦{formatAmount(growthVal.toString())} ↑
             </Text>
           </View>
 

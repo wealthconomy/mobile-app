@@ -15,6 +15,9 @@ export interface WalletSummary {
   userId: string;
   currentBalance: string; // String amounts in kobo
   reservedBalance: string;
+  dailyGrowth?: string | number; // Amount wealth grew today in kobo
+  totalYieldEarned?: string | number; // Total lifetime growth in kobo
+  growthTrend?: "UP" | "DOWN" | "NEUTRAL";
   status: string; // ACTIVE
   accountNumber: any;
   accountName: any;

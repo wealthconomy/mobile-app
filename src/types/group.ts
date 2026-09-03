@@ -20,6 +20,7 @@ export interface WealthGroupModel {
   allowEmergencyWithdrawal?: boolean;
   currentBalance?: string | number;
   totalSavings?: string | number;
+  dailyWealthGrowth?: string | number;
   membersCount?: number;
   activeMembersCount?: number;
   creatorId?: string;
@@ -70,8 +71,20 @@ export interface GroupMember {
   id: string;
   userId: string;
   groupId: string;
-  role: "CREATOR" | "ADMIN" | "MEMBER" | "OWNER";
-  status: "ACTIVE" | "PENDING" | "BLACKLISTED" | "EXITED" | "BANNED";
+  role: "CREATOR" | "ADMIN" | "MEMBER" | "OWNER" | string;
+  status:
+    | "ACTIVE"
+    | "PENDING"
+    | "BLACKLISTED"
+    | "BLACKLIST"
+    | "EXITED"
+    | "BANNED"
+    | "PAID"
+    | "UNPAID"
+    | "OVERDUE"
+    | "INACTIVE"
+    | "PAST"
+    | string;
   joinedAt: string;
   totalContributed?: string | number;
   user?: {

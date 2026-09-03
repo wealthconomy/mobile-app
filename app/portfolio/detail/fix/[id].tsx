@@ -1,27 +1,39 @@
 import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
+import { useGetPortfoliosQuery, useGetPortfolioTransactionsQuery } from "@/src/store/api/portfolioApi";
+import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
 
 export default function FixDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [showTerminateModal, setShowTerminateModal] = useState(false);
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState("");
 
   const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthfix" });
   const allFixes = data?.items || [];
   const fix = allFixes.find((f) => f.id === id);
+
+  const { data: txnsData, isLoading: txnsLoading } = useGetPortfolioTransactionsQuery(
+    { id: id as string },
+    { skip: !id }
+  );
 
   const THEME_COLOR = "#D48E00";
   const TEAL = "#0B575B";
@@ -57,10 +69,19 @@ export default function FixDetailScreen() {
     );
   }
 
-  const isUnlocked = fix.status === "COMPLETED" || parseFloat(fix.balance) >= parseFloat(fix.targetAmount);
+  const isUnlocked =
+    fix.status === "COMPLETED" ||
+    fix.status === "TERMINATED" ||
+    new Date(fix.maturityDate).getTime() <= Date.now();
 
-  const progress = parseFloat(fix.targetAmount) > 0 ? parseFloat(fix.balance) / parseFloat(fix.targetAmount) : 0;
-  
+  const isWithdrawn = parseFloat(fix.balance || "0") <= 0;
+
+  const progress = isUnlocked
+    ? 1
+    : parseFloat(fix.targetAmount) > 0
+    ? parseFloat(fix.balance) / parseFloat(fix.targetAmount)
+    : 0;
+
   const getDaysLeft = () => {
     const end = new Date(fix.maturityDate).getTime();
     const now = new Date().getTime();
@@ -68,11 +89,11 @@ export default function FixDetailScreen() {
     if (diff <= 0) return 0;
     return Math.ceil(diff / (1000 * 3600 * 24));
   };
-  
+
   const formattedDate = new Date(fix.maturityDate).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric"
+    year: "numeric",
   });
 
   const formatAmount = (val?: string) => {
@@ -81,9 +102,60 @@ export default function FixDetailScreen() {
     return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
-  const handleTerminate = () => {
+  const growthVal = isUnlocked
+    ? (fix as any).totalYieldEarned ??
+      (fix as any).dailyGrowth ??
+      (parseFloat(fix.targetAmount || "0") * 0.15).toString()
+    : fix.dailyGrowth ?? fix.balance;
+
+  const handleProceedTopUp = () => {
+    const cleanAmt = topUpAmount.replace(/[^0-9.]/g, "");
+    const num = parseFloat(cleanAmt);
+    if (!num || num < 100) {
+      Alert.alert("Invalid Amount", "Please enter a top-up amount of at least ₦100.");
+      return;
+    }
+    setShowTopUpModal(false);
+    setTopUpAmount("");
+    router.push({
+      pathname: "/payment/insert-pin",
+      params: {
+        amount: num.toString(),
+        action: "FIX_TOPUP",
+        targetId: fix.id,
+        targetName: fix.name,
+        returnUrl: `/portfolio/detail/fix/${fix.id}`,
+      },
+    });
+  };
+
+  const handleProceedWithdraw = () => {
+    const num = parseFloat(fix.balance || "0") / 100;
+    router.push({
+      pathname: "/payment/insert-pin",
+      params: {
+        amount: num.toString(),
+        action: "FIX_WITHDRAW",
+        targetId: fix.id,
+        targetName: fix.name,
+        returnUrl: `/portfolio/detail/fix/${fix.id}`,
+      },
+    });
+  };
+
+  const handleProceedTerminate = () => {
     setShowTerminateModal(false);
-    router.replace("/(tabs)/portfolios/wealth-fix");
+    const num = parseFloat(fix.balance || "0") / 100;
+    router.push({
+      pathname: "/payment/insert-pin",
+      params: {
+        amount: num.toString(),
+        action: "FIX_TERMINATE",
+        targetId: fix.id,
+        targetName: fix.name,
+        returnUrl: `/portfolio/detail/fix/${fix.id}`,
+      },
+    });
   };
 
   const renderLockedHeader = () => (
@@ -218,15 +290,11 @@ export default function FixDetailScreen() {
         <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
           Fixed Wealth
         </Text>{" "}
-        has been{" "}
-        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-          unlocked successfully
-        </Text>
-        , your{" "}
+        has matured successfully, with a target of{" "}
         <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
           "₦{formatAmount(fix.targetAmount)}"
         </Text>{" "}
-        is sent into your Wealth Save account by {formattedDate}.
+        by {formattedDate}.
       </Text>
     </View>
   );
@@ -265,7 +333,9 @@ export default function FixDetailScreen() {
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Lock Duration</Text>
-                <Text style={styles.value}>{fix.metadata?.lockDuration || "365 days"}</Text>
+                <Text style={styles.value}>
+                  {fix.metadata?.lockDuration || `${getDaysLeft() + 30} days`}
+                </Text>
               </View>
             </View>
 
@@ -279,11 +349,11 @@ export default function FixDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Wealth Growth</Text>
-                <Text style={styles.value}>₦0.00</Text>
+                <Text style={styles.value}>₦{formatAmount(growthVal.toString())}</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Progressive Amount</Text>
-                <Text style={styles.value}>₦0.00</Text>
+                <Text style={styles.value}>₦{formatAmount(fix.balance)}</Text>
               </View>
             </View>
 
@@ -307,7 +377,7 @@ export default function FixDetailScreen() {
               </View>
             </View>
 
-            {/* Row 4: Wealth grows Into & Wealth from */}
+            {/* Row 4: Interest Rate & Funding Source */}
             <View
               style={{
                 flexDirection: "row",
@@ -316,12 +386,16 @@ export default function FixDetailScreen() {
               }}
             >
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Wealth grows Into</Text>
-                <Text style={styles.value}>WinUp</Text>
+                <Text style={styles.label}>Interest Rate</Text>
+                <Text style={styles.value}>
+                  {fix.interestRate ? `${fix.interestRate}% P.A` : "15% P.A"}
+                </Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
-                <Text style={styles.label}>Wealth from:</Text>
-                <Text style={styles.value}>Wealth Flex</Text>
+                <Text style={styles.label}>Funding Source:</Text>
+                <Text style={styles.value}>
+                  {fix.metadata?.fundingSource || "Main Wallet"}
+                </Text>
               </View>
             </View>
 
@@ -361,42 +435,256 @@ export default function FixDetailScreen() {
             }}
           />
 
+          {/* Action Buttons */}
           <View style={{ paddingHorizontal: 20 }}>
-            {!isUnlocked && (
+            {!isUnlocked ? (
               <>
                 <ThemedButton
                   title="TopUp Wealth"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/wallet/top-up",
-                      params: { portfolioName: "WealthFix" },
-                    })
-                  }
+                  onPress={() => setShowTopUpModal(true)}
                   style={{
                     backgroundColor: TEAL,
                     borderRadius: 14,
                     height: 56,
-                    marginBottom: 12,
+                    marginBottom: 16,
                   }}
                 />
-                <View style={{ height: 100 }} />
                 <ThemedButton
-                  title="Terminate Progress"
+                  title="Terminate Fixed Fund"
                   onPress={() => setShowTerminateModal(true)}
                   style={{
                     backgroundColor: "white",
                     borderRadius: 14,
                     height: 56,
                     borderWidth: 1,
-                    borderColor: "#e4e4e4",
+                    borderColor: "#FFCDD2",
                   }}
                   textStyle={{ color: "#E53935", fontWeight: "700" }}
                 />
               </>
+            ) : !isWithdrawn ? (
+              <ThemedButton
+                title="Withdraw All to Wallet"
+                onPress={handleProceedWithdraw}
+                style={{
+                  backgroundColor: TEAL,
+                  borderRadius: 14,
+                  height: 56,
+                }}
+              />
+            ) : (
+              <View
+                style={{
+                  backgroundColor: "#F0FDF4",
+                  borderWidth: 1,
+                  borderColor: "#BBF7D0",
+                  borderRadius: 16,
+                  padding: 16,
+                  alignItems: "center",
+                }}
+              >
+                <Ionicons
+                  name="checkmark-circle"
+                  size={26}
+                  color="#15803D"
+                  style={{ marginBottom: 4 }}
+                />
+                <Text
+                  style={{
+                    color: "#166534",
+                    fontWeight: "800",
+                    fontSize: 15,
+                    marginBottom: 2,
+                  }}
+                >
+                  Funds Transferred to Wallet
+                </Text>
+                <Text
+                  style={{
+                    color: "#15803D",
+                    fontSize: 12,
+                    textAlign: "center",
+                    lineHeight: 18,
+                  }}
+                >
+                  All matured funds from this fixed plan have been successfully withdrawn into your Main Wallet.
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Recent Activity Section */}
+          <View style={{ marginTop: 32, paddingHorizontal: 20 }}>
+            <Text
+              style={{
+                fontSize: 17,
+                fontWeight: "800",
+                color: "#1A1A1A",
+                marginBottom: 14,
+              }}
+            >
+              Recent Activity
+            </Text>
+
+            {txnsLoading ? (
+              <ActivityIndicator
+                size="small"
+                color={TEAL}
+                style={{ marginVertical: 20 }}
+              />
+            ) : txnsData?.items && txnsData.items.length > 0 ? (
+              txnsData.items.map((txn) => (
+                <View
+                  key={txn.id}
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    paddingVertical: 14,
+                    borderBottomWidth: 1,
+                    borderBottomColor: "#F3F4F6",
+                  }}
+                >
+                  <View>
+                    <Text
+                      style={{
+                        fontWeight: "700",
+                        fontSize: 14,
+                        color: "#1A1A1A",
+                      }}
+                    >
+                      {txn.description || txn.type || "Transaction"}
+                    </Text>
+                    <Text
+                      style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}
+                    >
+                      {new Date(txn.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      fontWeight: "800",
+                      fontSize: 14,
+                      color:
+                        txn.type === "DEPOSIT" || txn.type === "INTEREST"
+                          ? "#10B981"
+                          : "#EF4444",
+                    }}
+                  >
+                    {txn.type === "DEPOSIT" || txn.type === "INTEREST"
+                      ? "+"
+                      : "-"}
+                    ₦{formatAmount(txn.amount?.toString())}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <View
+                style={{
+                  backgroundColor: "#F9FAFB",
+                  padding: 20,
+                  borderRadius: 14,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#9CA3AF", fontSize: 13 }}>
+                  No recent transactions found
+                </Text>
+              </View>
             )}
           </View>
         </View>
       </ScrollView>
+
+      {/* TopUp Amount Input Modal */}
+      <Modal visible={showTopUpModal} transparent animationType="fade">
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "white",
+              borderRadius: 24,
+              padding: 24,
+              width: "100%",
+              maxWidth: 340,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 16,
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: "800", color: "#1A1A1A" }}>
+                Top Up WealthFix
+              </Text>
+              <TouchableOpacity onPress={() => setShowTopUpModal(false)}>
+                <Ionicons name="close" size={22} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 16 }}>
+              Enter amount to top up into {fix.name}:
+            </Text>
+
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: "#E5E7EB",
+                borderRadius: 12,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 20,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: "700",
+                  color: "#1A1A1A",
+                  marginRight: 6,
+                }}
+              >
+                ₦
+              </Text>
+              <TextInput
+                placeholder="5,000"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="numeric"
+                value={topUpAmount}
+                onChangeText={setTopUpAmount}
+                style={{
+                  flex: 1,
+                  fontSize: 18,
+                  fontWeight: "700",
+                  color: "#1A1A1A",
+                }}
+              />
+            </View>
+
+            <ThemedButton
+              title="Continue to PIN"
+              onPress={handleProceedTopUp}
+              style={{ backgroundColor: TEAL, borderRadius: 14, height: 50 }}
+            />
+          </View>
+        </View>
+      </Modal>
 
       {/* Terminate Modal */}
       {showTerminateModal && (
@@ -454,9 +742,8 @@ export default function FixDetailScreen() {
               </Text>{" "}
               portfolio. This fund was created to secure a future legacy.
               {"\n\n"}
-              Please note: Closing this will stop all automated Fixed Wealth
-              contributions. We recommend moving these funds to Wealth Flex
-              instead of withdrawing to keep the "Fixed Wealth" habit alive.
+              Please note: Closing this will return all accumulated funds to your
+              Main Wallet with early breaking terms.
             </Text>
             <View
               style={{
@@ -469,7 +756,7 @@ export default function FixDetailScreen() {
               <TouchableOpacity
                 onPress={() => setShowTerminateModal(false)}
                 style={{
-                  width: 163,
+                  flex: 1,
                   height: 50,
                   borderRadius: 15,
                   borderWidth: 0.8,
@@ -477,31 +764,29 @@ export default function FixDetailScreen() {
                   backgroundColor: "#FFFFFF",
                   alignItems: "center",
                   justifyContent: "center",
-                  paddingHorizontal: 20,
                 }}
               >
                 <Text
                   style={{ fontSize: 14, color: "#747474", fontWeight: "500" }}
                 >
-                  Keep building Legacy
+                  Keep Legacy
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={handleTerminate}
+                onPress={handleProceedTerminate}
                 style={{
-                  width: 163,
+                  flex: 1,
                   height: 50,
                   borderRadius: 15,
                   backgroundColor: "#FFD7D4",
                   alignItems: "center",
                   justifyContent: "center",
-                  paddingHorizontal: 20,
                 }}
               >
                 <Text
-                  style={{ fontSize: 14, color: "#F44336", fontWeight: "500" }}
+                  style={{ fontSize: 14, color: "#E53935", fontWeight: "700" }}
                 >
-                  Close goal
+                  Terminate
                 </Text>
               </TouchableOpacity>
             </View>
@@ -514,14 +799,14 @@ export default function FixDetailScreen() {
 
 const styles = StyleSheet.create({
   label: {
-    color: "#6B7280",
     fontSize: 11,
-    marginBottom: 6,
+    color: "#64748B",
+    marginBottom: 4,
     fontWeight: "500",
   },
   value: {
-    color: "#1A1A1A",
+    fontSize: 14,
+    color: "#1E293B",
     fontWeight: "700",
-    fontSize: 16,
   },
 });

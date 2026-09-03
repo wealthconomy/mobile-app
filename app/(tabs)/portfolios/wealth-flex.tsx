@@ -81,6 +81,13 @@ export default function WealthFlexScreen() {
 
   const balanceValue = flexPortfolio?.balance ?? walletData?.currentBalance;
   const amount = `₦${formatAmount(balanceValue)}`;
+  const dailyGrowthFormatted = (
+    flexPortfolio?.dailyGrowth
+      ? parseFloat(flexPortfolio.dailyGrowth.toString()) / 100
+      : walletData?.dailyGrowth
+      ? parseFloat(walletData.dailyGrowth.toString()) / 100
+      : 0
+  ).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   
   const portfolioPreference = useSelector(
     (state: RootState) => state.portfolioPreference.flex
@@ -188,7 +195,7 @@ export default function WealthFlexScreen() {
               {showInterest && (
               <View className="flex-row items-center space-x-1 mt-1">
                 <Text className="text-[#64748B] text-[13px] font-medium opacity-80">
-                  Your wealth grew by N230.00 today
+                  Your wealth grew by ₦{dailyGrowthFormatted} today
                 </Text>
                 <Text className="text-[#4CAF50] text-[14px] font-bold ml-1">
                   ↑

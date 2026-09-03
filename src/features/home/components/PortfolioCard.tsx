@@ -65,7 +65,15 @@ export const PortfolioCard = ({
           iconName: "lock-closed-outline",
           route: "/portfolios/wealth-fix",
           image: require("../../../../assets/images/fix.png"),
-          imageStyle: { position: "absolute", width: 90, height: 90, top: 15, left: 95, opacity: 0.25, transform: [{ rotate: "-5deg" }] },
+          imageStyle: {
+            position: "absolute",
+            width: 110,
+            height: 110,
+            top: 20,
+            right: -20,
+            opacity: 0.25,
+            transform: [{ rotate: "-9deg" }],
+          },
           interest: interestRate || "15% Interest",
         };
       case "fam":
@@ -77,7 +85,15 @@ export const PortfolioCard = ({
           iconName: "people-outline",
           route: "/portfolios/wealth-fam",
           image: require("../../../../assets/images/fam.png"),
-          imageStyle: { position: "absolute", width: 85, height: 95, top: 25, left: 85, opacity: 0.25, transform: [{ rotate: "-1deg" }] },
+          imageStyle: {
+            position: "absolute",
+            width: 100,
+            height: 100,
+            top: 35,
+            right: -10,
+            opacity: 0.25,
+            transform: [{ rotate: "-25deg" }],
+          },
           interest: interestRate || "10% Interest",
         };
       case "flow":
@@ -89,7 +105,7 @@ export const PortfolioCard = ({
           iconName: "refresh-outline",
           route: "/portfolios/wealth-flow",
           image: require("../../../../assets/images/auto.png.png"),
-          imageStyle: { position: "absolute", width: 90, height: 90, top: 25, left: 95, opacity: 0.25, transform: [{ rotate: "-1deg" }] },
+          imageStyle: { position: "absolute", width: 90, height: 90, top: 25, right: 5, opacity: 0.25, transform: [{ rotate: "-1deg" }] },
           interest: interestRate || "10% Interest",
         };
       case "group":
@@ -101,7 +117,15 @@ export const PortfolioCard = ({
           iconName: "people-circle-outline",
           route: "/portfolios/wealth-group",
           image: require("../../../../assets/images/group.png"),
-          imageStyle: { position: "absolute", width: 90, height: 90, top: 15, left: 90, opacity: 0.25, transform: [{ rotate: "-1deg" }] },
+          imageStyle: {
+            position: "absolute",
+            width: 120,
+            height: 110,
+            top: 40,
+            right: -15,
+            opacity: 0.25,
+            transform: [{ rotate: "-15deg" }],
+          },
           interest: interestRate || "8% Interest",
         };
       default:
@@ -138,7 +162,7 @@ export const PortfolioCard = ({
     <TouchableOpacity
       onPress={() => router.push(styles.route as any)}
       activeOpacity={0.85}
-      className="relative overflow-visible p-4 border-[0.7px]"
+      className="relative overflow-hidden p-4 border-[0.7px]"
       style={{
         width: 179,
         height: 119,
@@ -161,7 +185,7 @@ export const PortfolioCard = ({
         </View>
       )}
 
-      {/* Interest Badge OR Dynamic Badge */}
+      {/* Dynamic Badge (Top Up / Days Left / Matured) */}
       <View
         style={{
           position: "absolute",
@@ -173,21 +197,6 @@ export const PortfolioCard = ({
           gap: 4,
         }}
       >
-        {/* Interest tag — hidden if Impact Wealth */}
-        {!hideInterest && (
-          <View
-            style={{
-              backgroundColor: "white",
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: 20,
-            }}
-          >
-            <Text style={{ color: "#155D5F", fontWeight: "600", fontSize: 9 }}>
-              {styles.interest}
-            </Text>
-          </View>
-        )}
 
         {/* Dynamic badge (Top Up / Days Left / Matured) */}
         {badgeType && badgeValue && (
