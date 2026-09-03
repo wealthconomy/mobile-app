@@ -39,26 +39,12 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
   api,
   extraOptions
 ) => {
-  const requestUrl = typeof args === "string" ? args : args.url;
-  const requestMethod = typeof args === "string" ? "GET" : args.method || "GET";
-  console.log(`🚀 [API Request] ${requestMethod} ${requestUrl}`, {
-    params: typeof args === "string" ? undefined : args.params,
-    body: typeof args === "string" ? undefined : args.body,
-  });
-
   let result = await rawBaseQuery(args, api, extraOptions);
-
-  console.log(`📥 [API Response] ${requestMethod} ${requestUrl}\n`, JSON.stringify({
-    status: result.meta?.response?.status,
-    data: result.data,
-    error: result.error,
-  }, null, 2));
 
   if (result.error && result.error.status === 401) {
     const refreshToken = (api.getState() as RootState).auth.refreshToken;
 
     if (refreshToken) {
-      console.log("🔄 Attempting token refresh...");
       // Attempt to get a new pair of tokens
       const refreshResult = await rawBaseQuery(
         {
@@ -69,12 +55,6 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
         api,
         extraOptions
       );
-
-      console.log("🔄 Token refresh response:", {
-        status: refreshResult.meta?.response?.status,
-        data: refreshResult.data,
-        error: refreshResult.error,
-      });
 
       if (refreshResult.data) {
         const res = refreshResult.data as ApiResponse<{
@@ -91,20 +71,12 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
           })
         );
         // Retry the original request with the newly issued token
-        console.log(`🚀 [API Retry] ${requestMethod} ${requestUrl}`);
         result = await rawBaseQuery(args, api, extraOptions);
-        console.log(`📥 [API Retry Response] ${requestMethod} ${requestUrl}`, {
-          status: result.meta?.response?.status,
-          data: result.data,
-          error: result.error,
-        });
       } else {
         // Refresh failed - revoke session client-side
-        console.log("❌ Token refresh failed, logging out...");
         api.dispatch(logout());
       }
     } else {
-      console.log("❌ No refresh token found, logging out...");
       api.dispatch(logout());
     }
   }

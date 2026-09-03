@@ -53,23 +53,6 @@ export const fileApi = baseApi.injectEndpoints({
         }
       },
       invalidatesTags: ["File"],
-      async onQueryStarted(arg, { queryFulfilled }) {
-        const summary = arg?.uri ? `File URI: ${arg.uri} (${arg.name || "auto"})` : `FormData (${arg?._parts?.length || "parts"})`;
-        console.log("\n================ [FILE UPLOAD DEBUG - API REQUEST] ================");
-        console.log("URL: POST /file/upload");
-        console.log("Payload:", summary);
-        console.log("===================================================================\n");
-        try {
-          const { data } = await queryFulfilled;
-          console.log("\n✅ [FILE UPLOAD DEBUG - API RESPONSE] POST /file/upload");
-          console.log("Response:", JSON.stringify(data, null, 2));
-          console.log("===================================================================\n");
-        } catch (error) {
-          console.log("\n❌ [FILE UPLOAD DEBUG - API ERROR] POST /file/upload");
-          console.log("Error Response:", JSON.stringify(error, null, 2));
-          console.log("===================================================================\n");
-        }
-      },
     }),
     uploadManyFiles: builder.mutation<ApiResponse<FileUploadResponse[]>, FormData | any>({
       queryFn: async (formData, { getState }) => {

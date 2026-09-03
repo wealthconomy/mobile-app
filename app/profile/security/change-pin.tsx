@@ -1,5 +1,10 @@
 import Header from "@/src/components/common/Header";
-import { useSetupPinMutation, useUpdatePinMutation } from "@/src/store/api/userApi";
+import { getApiErrorMessage } from "@/src/hooks/useAuthHooks";
+import {
+  useSetupPinMutation,
+  useUpdatePinMutation,
+  useVerifyPinMutation,
+} from "@/src/store/api/userApi";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -19,15 +24,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ChangePinScreen() {
   const router = useRouter();
-  
+
   // mode: "setup" (if user has no pin yet) or "change" (if user wants to change existing pin)
   const [isSetupMode, setIsSetupMode] = useState(true);
   const [step, setStep] = useState(1); // 1: Old PIN (or New PIN for setup), 2: New PIN (or Confirm PIN for setup), 3: Confirm PIN (for change)
-  
+
   const [oldPin, setOldPin] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
-  
+
+  const [errorMessage, setErrorMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -35,12 +41,17 @@ export default function ChangePinScreen() {
 
   const [setupPinApi] = useSetupPinMutation();
   const [updatePinApi] = useUpdatePinMutation();
+  const [verifyPinApi] = useVerifyPinMutation();
 
   useEffect(() => {
-    setTimeout(() => pinInputRef.current?.focus(), 350);
+    setErrorMessage("");
+    const timer = setTimeout(() => pinInputRef.current?.focus(), 350);
+    return () => clearTimeout(timer);
   }, [step, isSetupMode]);
 
   const handleSubmit = async () => {
+    setErrorMessage("");
+
     if (isSetupMode) {
       if (step === 1) {
         if (newPin.length !== 4) return;
@@ -49,6 +60,7 @@ export default function ChangePinScreen() {
       }
       if (step === 2) {
         if (confirmPin !== newPin) {
+          setErrorMessage("PINs do not match. Please try again.");
           Alert.alert("PIN Mismatch", "The confirmed PIN does not match. Please try again.");
           setConfirmPin("");
           return;
@@ -59,8 +71,9 @@ export default function ChangePinScreen() {
           await setupPinApi({ pin: newPin }).unwrap();
           setShowSuccess(true);
         } catch (err: any) {
+          const msg = getApiErrorMessage(err, "Failed to set transaction PIN.");
           // If already set, switch to change mode
-          if (err?.data?.message?.toLowerCase()?.includes("already") || err?.status === 400) {
+          if (msg.toLowerCase().includes("already") || err?.status === 400) {
             setIsSetupMode(false);
             setStep(1);
             setOldPin("");
@@ -68,7 +81,8 @@ export default function ChangePinScreen() {
             setConfirmPin("");
             Alert.alert("Notice", "A transaction PIN is already set. Please enter your existing PIN to change it.");
           } else {
-            Alert.alert("Error", err?.data?.message || err?.message || "Failed to set transaction PIN.");
+            setErrorMessage(msg);
+            Alert.alert("Error", msg);
           }
         } finally {
           setLoading(false);
@@ -78,16 +92,34 @@ export default function ChangePinScreen() {
       // Change PIN flow
       if (step === 1) {
         if (oldPin.length !== 4) return;
-        setStep(2);
+        setLoading(true);
+        try {
+          // Verify current PIN with server before proceeding
+          await verifyPinApi({ pin: oldPin }).unwrap();
+          setStep(2);
+        } catch (err: any) {
+          const msg = getApiErrorMessage(err, "Incorrect transaction PIN. Please try again.");
+          setErrorMessage(msg);
+          Alert.alert("Verification Failed", msg);
+          setOldPin("");
+        } finally {
+          setLoading(false);
+        }
         return;
       }
       if (step === 2) {
         if (newPin.length !== 4) return;
+        if (newPin === oldPin) {
+          setErrorMessage("New PIN must be different from current PIN.");
+          Alert.alert("Invalid PIN", "Your new PIN must be different from your current PIN.");
+          return;
+        }
         setStep(3);
         return;
       }
       if (step === 3) {
         if (confirmPin !== newPin) {
+          setErrorMessage("PINs do not match. Please try again.");
           Alert.alert("PIN Mismatch", "The confirmed PIN does not match. Please try again.");
           setConfirmPin("");
           return;
@@ -95,16 +127,21 @@ export default function ChangePinScreen() {
 
         setLoading(true);
         try {
-          await updatePinApi({ oldPin, newPin }).unwrap();
+          // Try updatePin first, fallback to setupPin
+          try {
+            await updatePinApi({ oldPin, newPin }).unwrap();
+          } catch (updateErr: any) {
+            if (updateErr?.status === 404 || updateErr?.status === 405) {
+              await setupPinApi({ pin: newPin }).unwrap();
+            } else {
+              throw updateErr;
+            }
+          }
           setShowSuccess(true);
         } catch (err: any) {
-          Alert.alert("Error", err?.data?.message || err?.message || "Failed to update transaction PIN.");
-          if (err?.data?.message?.toLowerCase()?.includes("invalid") || err?.data?.message?.toLowerCase()?.includes("incorrect")) {
-            setStep(1);
-            setOldPin("");
-            setNewPin("");
-            setConfirmPin("");
-          }
+          const msg = getApiErrorMessage(err, "Failed to update transaction PIN.");
+          setErrorMessage(msg);
+          Alert.alert("Error", msg);
         } finally {
           setLoading(false);
         }
@@ -185,13 +222,21 @@ export default function ChangePinScreen() {
             {getStepSubtitle()}
           </Text>
 
-          <View className="mb-10 w-full items-center">
+          <View className="mb-6 w-full items-center">
             <PinInput
               value={getActiveValue()}
-              onChange={setActiveValue}
+              onChange={(val: string) => {
+                setErrorMessage("");
+                setActiveValue(val);
+              }}
               length={4}
               inputRef={pinInputRef}
             />
+            {errorMessage ? (
+              <Text className="text-[#DC2626] text-[12px] font-semibold mt-3 text-center">
+                {errorMessage}
+              </Text>
+            ) : null}
           </View>
 
           {/* Mode Switcher */}
@@ -199,6 +244,7 @@ export default function ChangePinScreen() {
             <TouchableOpacity
               onPress={() => {
                 setIsSetupMode(!isSetupMode);
+                setErrorMessage("");
                 setOldPin("");
                 setNewPin("");
                 setConfirmPin("");

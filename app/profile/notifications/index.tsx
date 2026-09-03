@@ -43,21 +43,6 @@ export default function NotificationsScreen() {
     (notificationsResponse as any)?.items ||
     [];
 
-  console.log("🔔 [NotificationsScreen] Component State:", {
-    isLoading: isQueryLoading,
-    isFetching,
-    hasResponse: !!notificationsResponse,
-    statusCode: notificationsResponse?.statusCode,
-    message: notificationsResponse?.message,
-    itemsCount: rawItems.length,
-    rawItems: rawItems.map((item) => ({
-      id: item.id,
-      title: item.title,
-      isRead: item.isRead,
-      createdAt: item.createdAt,
-    })),
-  });
-
   const unreadCount = useMemo(
     () => rawItems.filter((item) => !item.isRead).length,
     [rawItems]

@@ -1,17 +1,26 @@
 import Header from "@/src/components/common/Header";
 import { Trophy } from "@/src/components/icons/Trophy";
 import { ThemedButton } from "@/src/components/ThemedButton";
+import {
+  KeyboardDoneAccessory,
+  KEYBOARD_ACCESSORY_ID,
+} from "@/src/components/common/KeyboardDoneAccessory";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
   Alert,
   TextInput,
@@ -22,6 +31,7 @@ import {
   useTerminatePortfolioMutation,
   useTopUpPortfolioMutation,
 } from "@/src/store/api/portfolioApi";
+import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 
 export default function GoalDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -34,6 +44,9 @@ export default function GoalDetailScreen() {
   const [terminatePortfolio, { isLoading: isTerminating }] = useTerminatePortfolioMutation();
   const [topUpPortfolio, { isLoading: isToppingUp }] = useTopUpPortfolioMutation();
   const { data, isLoading: loading, refetch: refetchPortfolios } = useGetPortfoliosQuery({ type: "wealthgoal" });
+  const { data: walletSummary } = useGetWalletSummaryQuery();
+  const walletBalance = (parseFloat(walletSummary?.currentBalance || "0")) / 100; // in Naira
+
   const allGoals = data?.items || [];
   const goal = allGoals.find((g) => g.id === id);
 
@@ -450,266 +463,313 @@ export default function GoalDetailScreen() {
       </ScrollView>
 
       {/* TopUp Modal */}
-      {showTopUpModal && (
-        <View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: 20,
-            zIndex: 100,
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "white",
-              borderRadius: 20,
-              padding: 24,
-              width: "100%",
-              alignItems: "center",
-            }}
+      <Modal visible={showTopUpModal} transparent animationType="slide">
+        <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.modalOverlay}
           >
-            <Image
-              source={require("../../../../assets/images/topup.png")}
-              style={{ width: 80, height: 80, marginBottom: 12 }}
-              resizeMode="contain"
-            />
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "900",
-                color: "#1A1A1A",
-                textAlign: "center",
-                marginBottom: 12,
-              }}
-            >
-              Top Up {goal.name}
-            </Text>
-            
-            <View style={{ width: "100%", marginBottom: 16 }}>
-              <Text style={{ fontSize: 12, color: "#64748B", fontWeight: "700", marginBottom: 6 }}>Amount (₦)</Text>
-              <TextInput
-                placeholder="e.g. 5000"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="numeric"
-                value={topUpAmount}
-                onChangeText={setTopUpAmount}
-                style={{
-                  backgroundColor: "#F3F4F6",
-                  height: 50,
-                  borderRadius: 12,
-                  paddingHorizontal: 16,
-                  fontSize: 16,
-                  color: "#1A1A1A",
-                }}
-              />
-            </View>
-
-            <View style={{ width: "100%", marginBottom: 20 }}>
-              <Text style={{ fontSize: 12, color: "#64748B", fontWeight: "700", marginBottom: 8 }}>Funding Source</Text>
-              <View style={{ flexDirection: "row", gap: 12 }}>
-                <TouchableOpacity
-                  onPress={() => setTopUpSource("WALLET")}
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.modalCard}>
+                <Image
+                  source={require("../../../../assets/images/topup.png")}
+                  style={{ width: 80, height: 80, marginBottom: 12 }}
+                  resizeMode="contain"
+                />
+                <Text
                   style={{
-                    flex: 1,
-                    height: 44,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: topUpSource === "WALLET" ? TEAL : "#E5E7EB",
-                    backgroundColor: topUpSource === "WALLET" ? "#EEF6F6" : "white",
-                    alignItems: "center",
-                    justifyContent: "center",
+                    fontSize: 18,
+                    fontWeight: "900",
+                    color: "#1A1A1A",
+                    textAlign: "center",
+                    marginBottom: 12,
                   }}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: topUpSource === "WALLET" ? TEAL : "#4B5563" }}>Main Wallet</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                width: "100%",
-                gap: 12,
-              }}
-            >
-              <TouchableOpacity
-                onPress={() => {
-                  setShowTopUpModal(false);
-                  setTopUpAmount("");
-                }}
-                disabled={isToppingUp}
-                style={{
-                  flex: 1,
-                  height: 48,
-                  borderRadius: 15,
-                  borderWidth: 0.8,
-                  borderColor: "#CDCDCD",
-                  backgroundColor: "#FFFFFF",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text style={{ fontSize: 14, color: "#747474", fontWeight: "500" }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleTopUpSubmit}
-                disabled={isToppingUp || !topUpAmount}
-                style={{
-                  flex: 1,
-                  height: 48,
-                  borderRadius: 15,
-                  backgroundColor: TEAL,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text style={{ fontSize: 14, color: "white", fontWeight: "500" }}>
-                  {isToppingUp ? "Topping up..." : "Confirm"}
+                  Top Up {goal.name}
                 </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
+                
+                <View style={{ width: "100%", marginBottom: 16 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <Text style={{ fontSize: 12, color: "#64748B", fontWeight: "700" }}>Amount (₦)</Text>
+                    <Text style={{ fontSize: 11, color: "#64748B", fontWeight: "500" }}>
+                      Bal: <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>₦{walletBalance.toLocaleString("en-NG", { minimumFractionDigits: 2 })}</Text>
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      backgroundColor: "#F3F4F6",
+                      borderRadius: 12,
+                      paddingHorizontal: 16,
+                      height: 52,
+                    }}
+                  >
+                    <TextInput
+                      placeholder="e.g. 5,000"
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="numeric"
+                      returnKeyType="done"
+                      inputAccessoryViewID={KEYBOARD_ACCESSORY_ID}
+                      onSubmitEditing={() => Keyboard.dismiss()}
+                      blurOnSubmit={true}
+                      autoFocus
+                      value={topUpAmount ? `₦${topUpAmount}` : ""}
+                      onChangeText={(v) => {
+                        const cleaned = v.replace(/\D/g, "");
+                        setTopUpAmount(cleaned ? Number(cleaned).toLocaleString("en-NG") : "");
+                      }}
+                      style={{
+                        flex: 1,
+                        fontSize: 16,
+                        fontWeight: "600",
+                        color: "#1A1A1A",
+                      }}
+                    />
+                    {topUpAmount.length > 0 && (
+                      <TouchableOpacity
+                        onPress={() => Keyboard.dismiss()}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        style={{
+                          backgroundColor: "#E2E8F0",
+                          borderRadius: 999,
+                          padding: 4,
+                          marginLeft: 8,
+                        }}
+                      >
+                        <Ionicons name="checkmark" size={14} color="#0B575B" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {(() => {
+                    const enteredVal = parseFloat(topUpAmount.replace(/[^\d.]/g, "")) || 0;
+                    if (enteredVal > walletBalance && walletBalance > 0) {
+                      return (
+                        <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                          Insufficient wallet balance.
+                        </Text>
+                      );
+                    }
+                    return null;
+                  })()}
+                </View>
+
+                <View style={{ width: "100%", marginBottom: 20 }}>
+                  <Text style={{ fontSize: 12, color: "#64748B", fontWeight: "700", marginBottom: 8 }}>Funding Source</Text>
+                  <View style={{ flexDirection: "row", gap: 12, width: "100%" }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setTopUpSource("WALLET");
+                      }}
+                      style={{
+                        flex: 1,
+                        height: 44,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: topUpSource === "WALLET" ? TEAL : "#E5E7EB",
+                        backgroundColor: topUpSource === "WALLET" ? "#EEF6F6" : "white",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: topUpSource === "WALLET" ? TEAL : "#4B5563" }}>Main Wallet</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    width: "100%",
+                    gap: 12,
+                  }}
+                >
+                  <TouchableOpacity
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setShowTopUpModal(false);
+                      setTopUpAmount("");
+                    }}
+                    disabled={isToppingUp}
+                    style={{
+                      flex: 1,
+                      height: 48,
+                      borderRadius: 15,
+                      borderWidth: 0.8,
+                      borderColor: "#CDCDCD",
+                      backgroundColor: "#FFFFFF",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text style={{ fontSize: 14, color: "#747474", fontWeight: "500" }}>Cancel</Text>
+                  </TouchableOpacity>
+                  {(() => {
+                    const enteredVal = parseFloat(topUpAmount.replace(/[^\d.]/g, "")) || 0;
+                    const isTopUpDisabled = isToppingUp || enteredVal <= 0 || (walletBalance > 0 && enteredVal > walletBalance);
+                    return (
+                      <TouchableOpacity
+                        onPress={() => {
+                          Keyboard.dismiss();
+                          handleTopUpSubmit();
+                        }}
+                        disabled={isTopUpDisabled}
+                        style={{
+                          flex: 1,
+                          height: 48,
+                          borderRadius: 15,
+                          backgroundColor: TEAL,
+                          opacity: isTopUpDisabled ? 0.5 : 1,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Text style={{ fontSize: 14, color: "white", fontWeight: "500" }}>
+                          {isToppingUp ? "Topping up..." : "Confirm"}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })()}
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
+        <KeyboardDoneAccessory />
+      </Modal>
 
       {/* Terminate Modal */}
-      {showTerminateModal && (
-        <View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: 20,
-            zIndex: 100,
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "white",
-              borderRadius: 20,
-              padding: 24,
-              width: "100%",
-              alignItems: "center",
-            }}
+      <Modal visible={showTerminateModal} transparent animationType="slide">
+        <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.modalOverlay}
           >
-            <Image
-              source={require("../../../../assets/images/terminate.png")}
-              style={{ width: 100, height: 100, marginBottom: 12 }}
-              resizeMode="contain"
-            />
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "900",
-                color: "#1A1A1A",
-                textAlign: "center",
-                marginBottom: 12,
-              }}
-            >
-              Terminate Wealth Fund?
-            </Text>
-            <Text
-              style={{
-                fontSize: 13,
-                color: "#6B7280",
-                textAlign: "center",
-                marginBottom: 16,
-                lineHeight: 18,
-              }}
-            >
-              You are about to close the{" "}
-              <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-                {goal.name}
-              </Text>{" "}
-              portfolio. This fund was created to secure a future legacy.
-              {"\n\n"}
-              Please note: Closing this will stop all automated goal
-              contributions. We recommend moving these funds to Wealth Flex
-              instead of withdrawing to keep the "Goal Wealth" habit alive.
-            </Text>
-
-            <TextInput
-              placeholder="Enter 4-digit PIN"
-              placeholderTextColor="#9CA3AF"
-              keyboardType="numeric"
-              secureTextEntry
-              maxLength={4}
-              value={terminatePin}
-              onChangeText={setTerminatePin}
-              style={{
-                backgroundColor: "#F3F4F6",
-                height: 48,
-                width: "100%",
-                borderRadius: 12,
-                textAlign: "center",
-                fontSize: 16,
-                fontWeight: "bold",
-                marginBottom: 20,
-              }}
-            />
-
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                width: "100%",
-                gap: 12,
-              }}
-            >
-              <TouchableOpacity
-                onPress={() => setShowTerminateModal(false)}
-                disabled={isTerminating}
-                style={{
-                  flex: 1,
-                  height: 48,
-                  borderRadius: 15,
-                  borderWidth: 0.8,
-                  borderColor: "#CDCDCD",
-                  backgroundColor: "#FFFFFF",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.modalCard}>
+                <Image
+                  source={require("../../../../assets/images/terminate.png")}
+                  style={{ width: 80, height: 80, marginBottom: 12 }}
+                  resizeMode="contain"
+                />
                 <Text
-                  style={{ fontSize: 14, color: "#747474", fontWeight: "500" }}
+                  style={{
+                    fontSize: 18,
+                    fontWeight: "900",
+                    color: "#1A1A1A",
+                    textAlign: "center",
+                    marginBottom: 8,
+                  }}
                 >
-                  Keep building
+                  Terminate Wealth Fund?
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleTerminate}
-                disabled={isTerminating || terminatePin.length !== 4}
-                style={{
-                  flex: 1,
-                  height: 48,
-                  borderRadius: 15,
-                  backgroundColor: "#FFD7D4",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
                 <Text
-                  style={{ fontSize: 14, color: "#F44336", fontWeight: "500" }}
+                  style={{
+                    fontSize: 13,
+                    color: "#6B7280",
+                    textAlign: "center",
+                    marginBottom: 16,
+                    lineHeight: 18,
+                  }}
                 >
-                  {isTerminating ? "Closing..." : "Close goal"}
+                  You are about to close the{" "}
+                  <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
+                    {goal?.name}
+                  </Text>{" "}
+                  portfolio. This fund was created to secure a future legacy.
+                  {"\n\n"}
+                  <Text style={{ color: "#EF4444", fontWeight: "600" }}>⚠️ Warning:</Text> Closing this will stop all automated goal
+                  contributions. Any accrued early interest may be forfeited according to policy.
                 </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
+
+                <TextInput
+                  placeholder="Enter 4-digit PIN"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="numeric"
+                  secureTextEntry
+                  maxLength={4}
+                  inputAccessoryViewID={KEYBOARD_ACCESSORY_ID}
+                  returnKeyType="done"
+                  onSubmitEditing={() => Keyboard.dismiss()}
+                  value={terminatePin}
+                  onChangeText={setTerminatePin}
+                  style={{
+                    backgroundColor: "#F3F4F6",
+                    height: 48,
+                    width: "100%",
+                    borderRadius: 12,
+                    textAlign: "center",
+                    fontSize: 18,
+                    fontWeight: "bold",
+                    marginBottom: 20,
+                    letterSpacing: 8,
+                  }}
+                />
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    width: "100%",
+                    gap: 12,
+                  }}
+                >
+                  <TouchableOpacity
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setShowTerminateModal(false);
+                      setTerminatePin("");
+                    }}
+                    disabled={isTerminating}
+                    style={{
+                      flex: 1,
+                      height: 48,
+                      borderRadius: 15,
+                      borderWidth: 0.8,
+                      borderColor: "#CDCDCD",
+                      backgroundColor: "#FFFFFF",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text
+                      style={{ fontSize: 14, color: "#747474", fontWeight: "500" }}
+                    >
+                      Keep building
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleTerminate}
+                    disabled={isTerminating || terminatePin.length !== 4}
+                    style={{
+                      flex: 1,
+                      height: 48,
+                      borderRadius: 15,
+                      backgroundColor: terminatePin.length === 4 ? "#FEE2E2" : "#F3F4F6",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        color: terminatePin.length === 4 ? "#EF4444" : "#9CA3AF",
+                        fontWeight: "700",
+                      }}
+                    >
+                      {isTerminating ? "Closing..." : "Close goal"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
+        <KeyboardDoneAccessory />
+      </Modal>
+      <KeyboardDoneAccessory />
     </SafeAreaView>
   );
 }
@@ -757,5 +817,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
     color: "#1E293B",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    alignItems: "center",
+    maxWidth: 400,
   },
 });

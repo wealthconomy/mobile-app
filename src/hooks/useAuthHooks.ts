@@ -31,12 +31,38 @@ import {
 export function getApiErrorMessage(error: any, fallback = "An unexpected error occurred"): string {
   if (!error) return fallback;
   if (typeof error === "string") return error;
-  if (error.data && typeof error.data.message === "string") {
-    return error.data.message;
+
+  // Handle NestJS / Express error response shapes
+  if (error.data) {
+    if (typeof error.data.message === "string") {
+      return error.data.message;
+    }
+    if (Array.isArray(error.data.message) && error.data.message.length > 0) {
+      return error.data.message.join(", ");
+    }
+    if (typeof error.data.error === "string") {
+      return error.data.error;
+    }
+    if (typeof error.data === "string") {
+      return error.data;
+    }
   }
+
+  if (error.error && typeof error.error === "string") {
+    if (error.status === "FETCH_ERROR") {
+      return "Network error. Please check your internet connection.";
+    }
+    return error.error;
+  }
+
   if (error.message && typeof error.message === "string") {
     return error.message;
   }
+
+  if (error.status === 401) {
+    return "Your session has expired. Please log in again.";
+  }
+
   return fallback;
 }
 

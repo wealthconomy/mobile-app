@@ -65,6 +65,7 @@ export default function CreateGoalScreen() {
     return d;
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [calMode, setCalMode] = useState<"days" | "months" | "years">("days");
   const [calViewDate, setCalViewDate] = useState<Date>(() => {
     const d = new Date();
     d.setFullYear(d.getFullYear() + 1);
@@ -78,7 +79,7 @@ export default function CreateGoalScreen() {
   const [showSourceDropdown, setShowSourceDropdown] = useState(false);
   const [showFreqDropdown, setShowFreqDropdown] = useState(false);
 
-  const SOURCES = ["Wealth Save", "Wealth Flex", "Bank Account"];
+  const SOURCES = ["Wealth Save", "Wealth Flex"];
   const FREQUENCIES = ["Daily", "Weekly", "Monthly"];
 
   const formatAmount = (val: string | number) => {
@@ -89,6 +90,27 @@ export default function CreateGoalScreen() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+  };
+
+  const calculateRecommendedSaving = () => {
+    const target = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
+    if (target <= 0) return null;
+    const now = new Date().getTime();
+    const end = endDate.getTime();
+    const days = Math.max(1, Math.ceil((end - now) / (1000 * 3600 * 24)));
+
+    if (frequency === "Daily") {
+      const perDay = Math.ceil(target / days);
+      return `₦${perDay.toLocaleString("en-NG")} / day (${days} days)`;
+    } else if (frequency === "Weekly") {
+      const weeks = Math.max(1, Math.ceil(days / 7));
+      const perWeek = Math.ceil(target / weeks);
+      return `₦${perWeek.toLocaleString("en-NG")} / week (~${weeks} weeks)`;
+    } else {
+      const months = Math.max(1, Math.ceil(days / 30));
+      const perMonth = Math.ceil(target / months);
+      return `₦${perMonth.toLocaleString("en-NG")} / month (~${months} months)`;
+    }
   };
 
   const calculateEstimatedInterest = () => {
@@ -175,6 +197,89 @@ export default function CreateGoalScreen() {
     );
   };
 
+  const renderMonthSelector = () => {
+    return (
+      <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 24, justifyContent: "space-between" }}>
+        {MONTHS.map((m, idx) => {
+          const isSelected = calViewDate.getMonth() === idx;
+          return (
+            <TouchableOpacity
+              key={m}
+              onPress={() => {
+                const d = new Date(calViewDate);
+                d.setMonth(idx);
+                setCalViewDate(d);
+                setCalMode("days");
+              }}
+              style={{
+                width: "30%",
+                paddingVertical: 14,
+                marginBottom: 10,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: isSelected ? "#155D5F" : "#F8F8F8",
+                borderRadius: 12,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: isSelected ? "700" : "600",
+                  color: isSelected ? "#fff" : "#1A1A1A",
+                }}
+              >
+                {m.slice(0, 3)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  };
+
+  const renderYearSelector = () => {
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 12 }, (_, i) => currentYear + i);
+
+    return (
+      <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 24, justifyContent: "space-between" }}>
+        {years.map((yr) => {
+          const isSelected = calViewDate.getFullYear() === yr;
+          return (
+            <TouchableOpacity
+              key={yr}
+              onPress={() => {
+                const d = new Date(calViewDate);
+                d.setFullYear(yr);
+                setCalViewDate(d);
+                setCalMode("months");
+              }}
+              style={{
+                width: "30%",
+                paddingVertical: 14,
+                marginBottom: 10,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: isSelected ? "#155D5F" : "#F8F8F8",
+                borderRadius: 12,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: isSelected ? "700" : "600",
+                  color: isSelected ? "#fff" : "#1A1A1A",
+                }}
+              >
+                {yr}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  };
+
   const handleContinue = () => {
     if (step === "form") {
       setStep("preview");
@@ -198,15 +303,17 @@ export default function CreateGoalScreen() {
       
       const autoSaveEnabled = !isManual;
 
+      const initialAmountKobo = !isManual && autoSaveAmountKobo >= 100 ? autoSaveAmountKobo : 100;
+
       const body: any = {
         name: goalName.trim(),
-        amount: 0, // Initial deposit in kobo
+        amount: initialAmountKobo, // Backend requires amount >= 100 (min 100 Kobo = ₦1)
         targetAmount: targetAmountKobo,
         maturityDate: endDate.toISOString(),
         autoSaveEnabled,
         autoSaveFrequency: (frequency.toUpperCase() as any) || "MONTHLY",
         autoSaveAmount: autoSaveAmountKobo,
-        autoSaveSource: (source === "Bank Account" ? "CARD" : "WALLET") as "CARD" | "WALLET",
+        autoSaveSource: "WALLET",
         metadata: {
           category: category.trim(),
           wealthPreference,
@@ -441,12 +548,19 @@ export default function CreateGoalScreen() {
             placeholderTextColor="#9CA3AF"
             className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] font-bold text-base"
             keyboardType="numeric"
-            value={amount}
+            value={amount ? `₦${amount}` : ""}
             onChangeText={(text) => {
-              const cleaned = text.replace(/[^\d.]/g, "");
-              setAmount(cleaned);
+              const cleaned = text.replace(/\D/g, "");
+              const formatted = cleaned ? Number(cleaned).toLocaleString("en-NG") : "";
+              setAmount(formatted);
             }}
           />
+          {parseFloat(amount.replace(/[^\d.]/g, "")) > 0 &&
+            parseFloat(amount.replace(/[^\d.]/g, "")) < 1000 && (
+              <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                Minimum target goal is ₦1,000.00
+              </Text>
+            )}
         </View>
 
         {/* Manual Switch */}
@@ -527,23 +641,60 @@ export default function CreateGoalScreen() {
             </View>
 
             <View>
-              <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
-                Auto-Save Amount (₦)
-              </Text>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <Text className="text-[#1A1A1A] font-bold text-[12px]">
+                  Auto-Save Amount (₦)
+                </Text>
+                {calculateRecommendedSaving() && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      const rec = calculateRecommendedSaving();
+                      if (rec) {
+                        const numOnly = rec.split(" ")[0].replace(/[^\d.]/g, "");
+                        setAutoSaveAmount(Number(numOnly).toLocaleString("en-NG"));
+                      }
+                    }}
+                    style={{
+                      backgroundColor: "#EEF6F6",
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Text style={{ color: "#0B575B", fontSize: 10, fontWeight: "700" }}>
+                      💡 Recommended: {calculateRecommendedSaving()?.split(" (")[0]}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               <TextInput
                 placeholder="₦0.00"
                 placeholderTextColor="#9CA3AF"
                 className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] font-bold text-base"
                 keyboardType="numeric"
-                value={autoSaveAmount}
+                value={autoSaveAmount ? `₦${autoSaveAmount}` : ""}
                 onChangeText={(text) => {
-                  const cleaned = text.replace(/[^\d.]/g, "");
-                  setAutoSaveAmount(cleaned);
+                  const cleaned = text.replace(/\D/g, "");
+                  const formatted = cleaned ? Number(cleaned).toLocaleString("en-NG") : "";
+                  setAutoSaveAmount(formatted);
                 }}
               />
-              <Text className="text-[#9CA3AF] text-[10px] mt-1">
-                Amount automatically deducted {frequency.toLowerCase()}
-              </Text>
+              {(() => {
+                const targetVal = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
+                const autoVal = parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) || 0;
+                if (autoVal > targetVal && targetVal > 0) {
+                  return (
+                    <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                      Auto-save cannot exceed target goal amount.
+                    </Text>
+                  );
+                }
+                return (
+                  <Text className="text-[#9CA3AF] text-[10px] mt-1">
+                    Amount automatically deducted {frequency.toLowerCase()}
+                  </Text>
+                );
+              })()}
             </View>
           </>
         )}
@@ -594,36 +745,79 @@ export default function CreateGoalScreen() {
                   Pick End Date
                 </Text>
 
-                {/* Month Navigation */}
+                {/* Month & Year Navigation Header */}
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                  <Text style={{ fontSize: 18, fontWeight: "700", color: "#323232" }}>
-                    {MONTHS[calViewDate.getMonth()]} {calViewDate.getFullYear()}
-                  </Text>
-                  <View style={{ flexDirection: "row", gap: 16 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <TouchableOpacity
-                      onPress={() => {
-                        const d = new Date(calViewDate);
-                        d.setMonth(d.getMonth() - 1);
-                        setCalViewDate(d);
+                      onPress={() => setCalMode(calMode === "months" ? "days" : "months")}
+                      style={{
+                        backgroundColor: calMode === "months" ? "#EEF6F6" : "#F3F4F6",
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: calMode === "months" ? "#155D5F" : "transparent",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
                       }}
-                      style={{ padding: 4 }}
                     >
-                      <Ionicons name="chevron-back" size={20} color="#323232" />
+                      <Text style={{ fontSize: 16, fontWeight: "700", color: "#1A1A1A" }}>
+                        {MONTHS[calViewDate.getMonth()]}
+                      </Text>
+                      <Ionicons name={calMode === "months" ? "chevron-up" : "chevron-down"} size={14} color="#6B7280" />
                     </TouchableOpacity>
+
                     <TouchableOpacity
-                      onPress={() => {
-                        const d = new Date(calViewDate);
-                        d.setMonth(d.getMonth() + 1);
-                        setCalViewDate(d);
+                      onPress={() => setCalMode(calMode === "years" ? "days" : "years")}
+                      style={{
+                        backgroundColor: calMode === "years" ? "#EEF6F6" : "#F3F4F6",
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: calMode === "years" ? "#155D5F" : "transparent",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
                       }}
-                      style={{ padding: 4 }}
                     >
-                      <Ionicons name="chevron-forward" size={20} color="#323232" />
+                      <Text style={{ fontSize: 16, fontWeight: "700", color: "#1A1A1A" }}>
+                        {calViewDate.getFullYear()}
+                      </Text>
+                      <Ionicons name={calMode === "years" ? "chevron-up" : "chevron-down"} size={14} color="#6B7280" />
                     </TouchableOpacity>
                   </View>
+
+                  {calMode === "days" && (
+                    <View style={{ flexDirection: "row", gap: 12 }}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const d = new Date(calViewDate);
+                          d.setMonth(d.getMonth() - 1);
+                          setCalViewDate(d);
+                        }}
+                        style={{ padding: 6, backgroundColor: "#F3F4F6", borderRadius: 8 }}
+                      >
+                        <Ionicons name="chevron-back" size={18} color="#323232" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const d = new Date(calViewDate);
+                          d.setMonth(d.getMonth() + 1);
+                          setCalViewDate(d);
+                        }}
+                        style={{ padding: 6, backgroundColor: "#F3F4F6", borderRadius: 8 }}
+                      >
+                        <Ionicons name="chevron-forward" size={18} color="#323232" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
 
-                {renderCalendarGrid()}
+                {calMode === "days" && renderCalendarGrid()}
+                {calMode === "months" && renderMonthSelector()}
+                {calMode === "years" && renderYearSelector()}
 
                 <TouchableOpacity
                   style={{ backgroundColor: "#155D5F", borderRadius: 16, height: 56, alignItems: "center", justifyContent: "center" }}
@@ -638,8 +832,10 @@ export default function CreateGoalScreen() {
       </Modal>
 
       {(() => {
-        const isTargetValid = parseFloat(amount.replace(/[^\d.]/g, "")) > 0;
-        const isAutoSaveValid = isManual || parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) > 0;
+        const targetVal = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
+        const autoSaveVal = parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) || 0;
+        const isTargetValid = targetVal >= 1000;
+        const isAutoSaveValid = isManual || (autoSaveVal > 0 && autoSaveVal <= targetVal);
         const isFormValid = goalName.trim().length > 0 && category.trim().length > 0 && source && isTargetValid && isAutoSaveValid;
         
         return (

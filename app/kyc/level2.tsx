@@ -74,12 +74,6 @@ export default function KYCLevel2Screen() {
 
   // Pre-populate user profile data and existing KYC documents data if available
   useEffect(() => {
-    if (kycDocsResponse !== undefined) {
-      console.log("\n================ [KYC 2 DEBUG - GET KYC DOCUMENTS RESPONSE] ================");
-      console.log(JSON.stringify(kycDocsResponse, null, 2));
-      console.log("============================================================================\n");
-    }
-
     const isLevel2Complete =
       (user?.kycLevel !== undefined && user.kycLevel >= 2) ||
       kycDocsResponse?.data?.faceVerified === true;
@@ -212,14 +206,8 @@ export default function KYCLevel2Screen() {
         nextOfKinRelationship: formData.nextOfKinRelationship || user?.nextOfKinRelationship || "",
         nextOfKinPhone: formData.nextOfKinPhone || user?.nextOfKinPhone || "",
       };
-      console.log("\n================ [KYC 2 DEBUG - SUBMIT INFO PAYLOAD] ================");
-      console.log(JSON.stringify(payload, null, 2));
-      console.log("=====================================================================\n");
 
-      const response = await submitLevel2Info(payload).unwrap();
-      console.log("\n================ [KYC 2 DEBUG - SUBMIT INFO RESPONSE] ================");
-      console.log(JSON.stringify(response, null, 2));
-      console.log("======================================================================\n");
+      await submitLevel2Info(payload).unwrap();
 
       setScannedData((prev) => ({
         ...prev,
@@ -227,9 +215,8 @@ export default function KYCLevel2Screen() {
         dateOfBirth: formData.dateOfBirth,
       }));
       setStep(2);
-    } catch (err) {
-      console.log("\n❌ [KYC 2 DEBUG - SUBMIT INFO ERROR]:", err);
-      console.log("=====================================================================\n");
+    } catch {
+      // handled by mutation error state
     }
   };
 
@@ -248,20 +235,12 @@ export default function KYCLevel2Screen() {
         idNumber: data.idNumber,
         idImageUrl: imageUrl,
       };
-      console.log("\n================ [KYC 2 DEBUG - SCAN ID PAYLOAD] ================");
-      console.log(JSON.stringify(payload, null, 2));
-      console.log("=================================================================\n");
 
-      const response = await scanId(payload).unwrap();
-      console.log("\n================ [KYC 2 DEBUG - SCAN ID RESPONSE] ================");
-      console.log(JSON.stringify(response, null, 2));
-      console.log("==================================================================\n");
+      await scanId(payload).unwrap();
 
       setScannedData(data);
       setStep(4);
     } catch (err: any) {
-      console.log("\n❌ [KYC 2 DEBUG - SCAN ID ERROR]:", err);
-      console.log("=================================================================\n");
       setLocalError(err?.data?.message || err?.message || "Failed to upload ID image. Please try again.");
     }
   };
@@ -285,22 +264,12 @@ export default function KYCLevel2Screen() {
         biometricSessionId: sessionId,
         imageBase64: capturedSelfieBase64 || "mock_base64_string",
       };
-      console.log("\n================ [KYC 2 DEBUG - FACE VERIFY PAYLOAD] ================");
-      console.log(JSON.stringify({
-        ...payload,
-        imageBase64: payload.imageBase64 ? `${payload.imageBase64.substring(0, 40)}... [Length: ${payload.imageBase64.length}]` : null,
-      }, null, 2));
-      console.log("=====================================================================\n");
 
-      const response = await faceVerify(payload).unwrap();
-      console.log("\n================ [KYC 2 DEBUG - FACE VERIFY RESPONSE] ================");
-      console.log(JSON.stringify(response, null, 2));
-      console.log("======================================================================\n");
+      await faceVerify(payload).unwrap();
 
       setStep(7);
-    } catch (err) {
-      console.log("\n❌ [KYC 2 DEBUG - FACE VERIFY ERROR]:", err);
-      console.log("=====================================================================\n");
+    } catch {
+      // handled by mutation error state
     }
   };
 

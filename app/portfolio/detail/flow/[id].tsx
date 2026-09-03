@@ -1,5 +1,9 @@
 import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
+import {
+  KeyboardDoneAccessory,
+  KEYBOARD_ACCESSORY_ID,
+} from "@/src/components/common/KeyboardDoneAccessory";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import {
   useGetPortfoliosQuery,
@@ -17,6 +21,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -25,6 +30,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -577,62 +583,106 @@ export default function FlowDetailScreen() {
 
       {/* ─── STEP 1: CLEAN TOP-UP AMOUNT MODAL ───────────────────────── */}
       <Modal visible={showTopUpModal} transparent animationType="slide">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.modalOverlay}
-        >
-          <View style={styles.modalCard}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 12 }}>
-              <Text style={styles.modalTitle}>Top Up WealthFlow</Text>
-              <TouchableOpacity onPress={() => setShowTopUpModal(false)}>
-                <Ionicons name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
+        <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.modalOverlay}
+          >
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.modalCard}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 12 }}>
+                  <Text style={styles.modalTitle}>Top Up WealthFlow</Text>
+                  <TouchableOpacity onPress={() => {
+                    Keyboard.dismiss();
+                    setShowTopUpModal(false);
+                  }}>
+                    <Ionicons name="close" size={24} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
 
-            <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 20, textAlign: "center" }}>
-              Add extra funds directly from your main wallet to speed up your savings goal.
-            </Text>
+                <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 20, textAlign: "center" }}>
+                  Add extra funds directly from your main wallet to speed up your savings goal.
+                </Text>
 
-            <Text style={styles.inputLabel}>Amount (₦)</Text>
-            <TextInput
-              style={[styles.textInput, { fontSize: 22, fontWeight: "700", textAlign: "center", height: 56, marginBottom: 20 }]}
-              placeholder="₦0.00"
-              placeholderTextColor="#9CA3AF"
-              keyboardType="numeric"
-              autoFocus
-              value={topUpAmount ? `₦${topUpAmount}` : ""}
-              onChangeText={(v) => {
-                const n = v.replace(/\D/g, "");
-                setTopUpAmount(n ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "");
-              }}
-            />
+                <Text style={styles.inputLabel}>Amount (₦)</Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: "#F3F4F6",
+                    borderRadius: 12,
+                    paddingHorizontal: 16,
+                    height: 56,
+                    marginBottom: 20,
+                    width: "100%",
+                  }}
+                >
+                  <TextInput
+                    style={{ flex: 1, fontSize: 22, fontWeight: "700", textAlign: "center", color: TEXT_DARK }}
+                    placeholder="₦0.00"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    returnKeyType="done"
+                    inputAccessoryViewID={KEYBOARD_ACCESSORY_ID}
+                    onSubmitEditing={() => Keyboard.dismiss()}
+                    blurOnSubmit={true}
+                    autoFocus
+                    value={topUpAmount ? `₦${topUpAmount}` : ""}
+                    onChangeText={(v) => {
+                      const n = v.replace(/\D/g, "");
+                      setTopUpAmount(n ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "");
+                    }}
+                  />
+                  {topUpAmount.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => Keyboard.dismiss()}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      style={{
+                        backgroundColor: "#E2E8F0",
+                        borderRadius: 999,
+                        padding: 4,
+                        marginLeft: 8,
+                      }}
+                    >
+                      <Ionicons name="checkmark" size={14} color="#0B575B" />
+                    </TouchableOpacity>
+                  )}
+                </View>
 
-            <ThemedButton
-              title="Continue"
-              onPress={() => {
-                const num = parseFloat(topUpAmount.replace(/,/g, ""));
-                if (!num || num <= 0) {
-                  Alert.alert("Invalid Amount", "Please enter a valid amount to top up.");
-                  return;
-                }
-                const amtStr = num.toString();
-                setShowTopUpModal(false);
-                setTopUpAmount("");
-                router.push({
-                  pathname: "/payment/insert-pin",
-                  params: {
-                    amount: amtStr,
-                    action: "FLOW_TOPUP",
-                    targetId: plan.id,
-                    targetName: plan.name,
-                    returnUrl: `/portfolio/detail/flow/${plan.id}`,
-                  },
-                });
-              }}
-              style={{ backgroundColor: TEAL, width: "100%", height: 52, borderRadius: 14 }}
-            />
-          </View>
-        </KeyboardAvoidingView>
+                <ThemedButton
+                  title="Continue"
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    const num = parseFloat(topUpAmount.replace(/,/g, ""));
+                    if (!num || num <= 0) {
+                      Alert.alert("Invalid Amount", "Please enter a valid amount to top up.");
+                      return;
+                    }
+                    const amtStr = num.toString();
+                    setShowTopUpModal(false);
+                    setTopUpAmount("");
+                    router.push({
+                      pathname: "/payment/insert-pin",
+                      params: {
+                        amount: amtStr,
+                        action: "FLOW_TOPUP",
+                        targetId: (plan?.id || id) as string,
+                        source: "WALLET",
+                      },
+                    } as any);
+                  }}
+                  style={{
+                    backgroundColor: TEAL,
+                    borderRadius: 14,
+                    height: 52,
+                    width: "100%",
+                  }}
+                />
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
+        <KeyboardDoneAccessory />
       </Modal>
 
       {/* ─── WITHDRAW MODAL ────────────────────────────────────────────── */}
@@ -777,6 +827,7 @@ export default function FlowDetailScreen() {
           </KeyboardAvoidingView>
         </Modal>
       )}
+      <KeyboardDoneAccessory />
     </SafeAreaView>
   );
 }

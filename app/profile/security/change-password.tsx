@@ -1,8 +1,13 @@
 import Header from "@/src/components/common/Header";
+import { AuthErrorBanner } from "@/src/components/auth";
+import { getApiErrorMessage } from "@/src/hooks/useAuthHooks";
+import { useChangePasswordMutation } from "@/src/store/api/authApi";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -45,16 +50,28 @@ export default function ChangePasswordScreen() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  const [oldPasswordError, setOldPasswordError] = useState("");
   const [newPasswordError, setNewPasswordError] = useState("");
   const [confirmPasswordError, setConfirmPasswordError] = useState("");
+  const [apiError, setApiError] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
+
+  const [changePasswordApi, { isLoading }] = useChangePasswordMutation();
 
   const allRulesPassed = STRENGTH_RULES.every((r) => r.test(newPassword));
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    setApiError("");
+    setOldPasswordError("");
     setNewPasswordError("");
     setConfirmPasswordError("");
+
     let valid = true;
+
+    if (!oldPassword) {
+      setOldPasswordError("Current password is required");
+      valid = false;
+    }
 
     if (!newPassword) {
       setNewPasswordError("Please enter a new password");
@@ -64,13 +81,34 @@ export default function ChangePasswordScreen() {
       valid = false;
     }
 
-    if (newPassword !== confirmPassword) {
+    if (!confirmPassword) {
+      setConfirmPasswordError("Please confirm your new password");
+      valid = false;
+    } else if (newPassword !== confirmPassword) {
       setConfirmPasswordError("Passwords do not match");
       valid = false;
     }
 
-    if (valid && oldPassword) {
+    if (!valid) return;
+
+    try {
+      await changePasswordApi({
+        oldPassword,
+        newPassword,
+      }).unwrap();
+
+      // Clear input fields upon successful change
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
       setShowSuccess(true);
+    } catch (err: any) {
+      const message = getApiErrorMessage(
+        err,
+        "Failed to change password. Please check your credentials and try again."
+      );
+      setApiError(message);
+      Alert.alert("Password Change Failed", message);
     }
   };
 
@@ -101,14 +139,21 @@ export default function ChangePasswordScreen() {
             </Text>
           </View>
 
+          <AuthErrorBanner error={apiError} />
+
           <View className="gap-y-5 mb-10">
             <PasswordField
               label="Enter your old password"
               placeholder="Old password"
               secure={!showOld}
               value={oldPassword}
-              onChangeText={setOldPassword}
+              onChangeText={(v: string) => {
+                setOldPassword(v);
+                setOldPasswordError("");
+                setApiError("");
+              }}
               onToggle={() => setShowOld(!showOld)}
+              error={oldPasswordError}
             />
             <PasswordField
               label="Enter new password"
@@ -118,6 +163,7 @@ export default function ChangePasswordScreen() {
               onChangeText={(v: string) => {
                 setNewPassword(v);
                 setNewPasswordError("");
+                setApiError("");
               }}
               onToggle={() => setShowNew(!showNew)}
               error={newPasswordError}
@@ -163,6 +209,7 @@ export default function ChangePasswordScreen() {
               onChangeText={(v: string) => {
                 setConfirmPassword(v);
                 setConfirmPasswordError("");
+                setApiError("");
               }}
               onToggle={() => setShowConfirm(!showConfirm)}
               error={confirmPasswordError}
@@ -171,9 +218,17 @@ export default function ChangePasswordScreen() {
 
           <TouchableOpacity
             onPress={handleConfirm}
+            disabled={isLoading}
             className="bg-[#155D5F] h-14 rounded-2xl items-center justify-center"
+            style={{
+              opacity: isLoading ? 0.6 : 1,
+            }}
           >
-            <Text className="text-white text-base font-bold">Confirm</Text>
+            {isLoading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text className="text-white text-base font-bold">Confirm</Text>
+            )}
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
