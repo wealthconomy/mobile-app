@@ -1,5 +1,6 @@
 import Header from "@/src/components/common/Header";
 import ThemedButton from "@/src/components/ThemedButton";
+import { AppToast, ToastState } from "@/src/components/common/AppToast";
 import {
   useGetGroupDetailsQuery,
   useUpdateGroupSettingsMutation,
@@ -11,7 +12,6 @@ import { Check } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   Switch,
   Text,
@@ -37,6 +37,7 @@ export default function RiskSettingsScreen() {
   const [allowEarlyExit, setAllowEarlyExit] = useState(false);
   const [allowEmergencyWithdrawal, setAllowEmergencyWithdrawal] = useState(false);
   const [isPenaltyOpen, setIsPenaltyOpen] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   useEffect(() => {
     if (group) {
@@ -67,11 +68,11 @@ export default function RiskSettingsScreen() {
         },
       }).unwrap();
 
-      Alert.alert("Settings Saved", "Risk & discipline rules updated successfully.");
+      setToast({ type: "success", title: "Settings Saved", message: "Risk & discipline rules updated successfully." });
       router.back();
     } catch (err: any) {
       const msg = err?.data?.message || err?.message || "Failed to update risk settings.";
-      Alert.alert("Update Failed", msg);
+      setToast({ type: "error", title: "Update Failed", message: msg });
     }
   };
 
@@ -194,6 +195,7 @@ export default function RiskSettingsScreen() {
           </View>
         </ScrollView>
       </View>
+      <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </SafeAreaView>
   );
 }

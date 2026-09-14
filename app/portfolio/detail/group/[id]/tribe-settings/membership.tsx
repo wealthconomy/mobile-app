@@ -1,5 +1,6 @@
 import Header from "@/src/components/common/Header";
 import ThemedButton from "@/src/components/ThemedButton";
+import { AppToast, ToastState } from "@/src/components/common/AppToast";
 import {
   useApproveJoinRequestMutation,
   useGetGroupDetailsQuery,
@@ -14,7 +15,6 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   ScrollView,
   Text,
@@ -45,6 +45,7 @@ export default function MembershipRolesScreen() {
   const [rejectRequest] = useRejectJoinRequestMutation();
 
   const [limit, setLimit] = useState("");
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   useEffect(() => {
     if (group) {
@@ -61,29 +62,29 @@ export default function MembershipRolesScreen() {
   const handleApprove = async (userId: string, name: string) => {
     try {
       await approveRequest({ id: id as string, userId }).unwrap();
-      Alert.alert("Approved", `${name} has been added to the tribe.`);
+      setToast({ type: "success", title: "Approved! ✅", message: `${name} has been added to the tribe.` });
       refetchRequests();
     } catch (err: any) {
       const msg = err?.data?.message || err?.message || "Failed to approve request.";
-      Alert.alert("Notice", msg);
+      setToast({ type: "error", title: "Notice", message: msg });
     }
   };
 
   const handleReject = async (userId: string, name: string) => {
     try {
       await rejectRequest({ id: id as string, userId }).unwrap();
-      Alert.alert("Rejected", `Join request for ${name} was rejected.`);
+      setToast({ type: "info", title: "Request Rejected", message: `Join request for ${name} was declined.` });
       refetchRequests();
     } catch (err: any) {
       const msg = err?.data?.message || err?.message || "Failed to reject request.";
-      Alert.alert("Notice", msg);
+      setToast({ type: "error", title: "Notice", message: msg });
     }
   };
 
   const handleSave = async () => {
     const numericLimit = parseInt(limit.replace(/\D/g, ""));
     if (!numericLimit || numericLimit <= 0 || numericLimit > 200) {
-      Alert.alert("Invalid Limit", "Member limit must be between 1 and 200.");
+      setToast({ type: "warning", title: "Invalid Limit", message: "Member limit must be between 1 and 200." });
       return;
     }
 
@@ -93,11 +94,11 @@ export default function MembershipRolesScreen() {
         body: { membersLimit: numericLimit },
       }).unwrap();
 
-      Alert.alert("Settings Saved", "Membership settings updated.");
+      setToast({ type: "success", title: "Settings Saved", message: "Membership settings updated." });
       router.back();
     } catch (err: any) {
       const msg = err?.data?.message || err?.message || "Failed to update membership settings.";
-      Alert.alert("Update Failed", msg);
+      setToast({ type: "error", title: "Update Failed", message: msg });
     }
   };
 
@@ -265,6 +266,7 @@ export default function MembershipRolesScreen() {
           </View>
         </ScrollView>
       </View>
+      <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </SafeAreaView>
   );
 }

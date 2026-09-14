@@ -1,13 +1,16 @@
-import { useGetBlogsQuery, useToggleBookmarkMutation } from "@/src/store/api/blogApi";
+import { useGetBlogsQuery } from "@/src/store/api/blogApi";
+import { useBookmarks } from "@/src/hooks/useBookmarks";
 import { BlogListItem } from "@/src/features/wise-up/components/BlogListItem";
 import { BlogSkeleton } from "@/src/features/wise-up/components/BlogSkeleton";
 import { CategoryChips } from "@/src/features/wise-up/components/CategoryChips";
 import { Category } from "@/src/types/blog";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -20,20 +23,29 @@ const TABS = ["For you", "Popular", "Trending", "Categories"];
 
 export default function WiseUpScreen() {
   const router = useRouter();
+  const { isBookmarked, toggleBookmark } = useBookmarks();
 
   const [activeTab, setActiveTab] = useState("For you");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null,
   );
+  const [refreshing, setRefreshing] = useState(false);
 
-  const { data: response, isLoading } = useGetBlogsQuery({ publishToApp: true });
-  
+  const { data: response, isLoading, refetch } = useGetBlogsQuery({ publishToApp: true });
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch().unwrap();
+    } catch {
+      // ignore
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const allBlogs = response?.data?.items || [];
-
-  const [toggleBookmark] = useToggleBookmarkMutation();
 
   let filteredBlogs = [...allBlogs];
 
@@ -51,13 +63,10 @@ export default function WiseUpScreen() {
     blog.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const handleBookmark = (id: string) => {
-    toggleBookmark(id);
-  };
-
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
       <StatusBar style="dark" />
+      <AppRefreshIndicator refreshing={refreshing} topOffset={15} />
       <View className="px-5 pt-2 pb-4">
         <View className="flex-row justify-between items-center mb-6">
           <TouchableOpacity
@@ -136,18 +145,34 @@ export default function WiseUpScreen() {
         className="flex-1 px-5"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["#155D5F"]}
+            progressBackgroundColor="#FFFFFF"
+          />
+        }
       >
         {isLoading ? (
           <BlogSkeleton />
         ) : filteredBlogs.length > 0 ? (
-          filteredBlogs.map((blog) => (
-            <BlogListItem
-              key={blog.id}
-              blog={blog}
-              onPress={() => router.push(`/blog/${blog.id}` as any)}
-              onBookmark={() => handleBookmark(blog.id)}
-            />
-          ))
+          filteredBlogs.map((blog) => {
+            const isItemBookmarked = isBookmarked(blog.id) || !!blog.isBookmarked;
+            const blogWithBookmark = {
+              ...blog,
+              isBookmarked: isItemBookmarked,
+            };
+            return (
+              <BlogListItem
+                key={blog.id}
+                blog={blogWithBookmark}
+                onPress={() => router.push(`/blog/${blog.id}` as any)}
+                onBookmark={() => toggleBookmark(blogWithBookmark)}
+              />
+            );
+          })
         ) : (
           <View className="items-center justify-center py-20">
             <Ionicons name="document-text-outline" size={48} color="#D1D5DB" />

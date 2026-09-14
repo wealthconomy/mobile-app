@@ -1,6 +1,9 @@
-import { RootState } from "@/src/store";
+﻿import { RootState } from "@/src/store";
 import { useListGroupsQuery } from "@/src/store/api/groupApi";
-import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
+import {
+  useGetPortfoliosQuery,
+  useGetPortfolioConfigQuery,
+} from "@/src/store/api/portfolioApi";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef } from "react";
@@ -14,7 +17,9 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  StyleSheet,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { useSelector } from "react-redux";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -46,6 +51,9 @@ export const TransferToPortfolioSheet = ({
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const currentUser = useSelector((state: RootState) => state.auth.user);
+  const preferences = useSelector(
+    (state: RootState) => state.portfolioPreference
+  );
   const uid = currentUser?.id;
 
   // Real live portfolio queries per backend endpoint
@@ -55,6 +63,41 @@ export const TransferToPortfolioSheet = ({
   const { data: famData } = useGetPortfoliosQuery({ type: "wealthfam" });
   const { data: flowData } = useGetPortfoliosQuery({ type: "wealthflow" });
   const { data: groupsData } = useListGroupsQuery();
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+
+  const getRateLabel = (type: string) => {
+    if ((preferences as any)?.[type] === "Impact Wealth") return undefined;
+    const keyMap: Record<string, string> = {
+      flex: "wealthflex",
+      fix: "wealthfix",
+      goal: "wealthgoal",
+      fam: "wealthfam",
+      flow: "wealthflow",
+      group: "wealthgroup",
+    };
+    const rateKey = keyMap[type] || `wealth${type}`;
+    return rates?.[rateKey]?.label;
+  };
+
+  const getBadgeColor = (type: string) => {
+    switch (type) {
+      case "flex":
+        return "#F44336";
+      case "goal":
+        return "#F3007A";
+      case "fix":
+        return "#D97706";
+      case "fam":
+        return "#6366F1";
+      case "flow":
+        return "#0EA5E9";
+      case "group":
+        return "#4B5563";
+      default:
+        return "#155D5F";
+    }
+  };
 
   const flexItems = (flexData?.items || []).filter(
     (p) => p.status === "ACTIVE",
@@ -69,6 +112,21 @@ export const TransferToPortfolioSheet = ({
   );
   const groupItems = (groupsData?.items || []).filter((g) => {
     if (!uid) return false;
+    const s = (g.status || (g as any).state || "").toString().trim().toUpperCase();
+    if (
+      s === "TERMINATED" ||
+      s === "DISSOLVED" ||
+      s === "CANCELLED" ||
+      s === "CLOSED" ||
+      s === "INACTIVE" ||
+      s === "ENDED" ||
+      s === "DISBANDED" ||
+      s === "COMPLETED" ||
+      Boolean((g as any).isTerminated) ||
+      Boolean((g as any).is_terminated)
+    ) {
+      return false;
+    }
     if (g.creatorId === uid || (g as any).creator?.id === uid) return true;
     if (g.isAdmin) return true;
     const uStatus = (g as any).userStatus || (g as any).memberStatus;
@@ -298,15 +356,12 @@ export const TransferToPortfolioSheet = ({
       animationType="none"
       statusBarTranslucent
     >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <Animated.View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            opacity: fadeAnim,
-          }}
-        />
-      </TouchableWithoutFeedback>
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
+        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={StyleSheet.absoluteFill} />
+        </TouchableWithoutFeedback>
+      </Animated.View>
 
       <Animated.View
         style={{
@@ -475,22 +530,51 @@ export const TransferToPortfolioSheet = ({
 
                     <View
                       style={{
-                        backgroundColor: "#EF4444",
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        borderRadius: 20,
-                        marginTop: -35, // <-- Add this to push it up (try -4, -6, or -8)
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                        marginTop: -35,
                       }}
                     >
-                      <Text
+                      {getRateLabel(portfolio.type) && (
+                        <View
+                          style={{
+                            backgroundColor: getBadgeColor(portfolio.type),
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 20,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: "#FFFFFF",
+                              fontWeight: "700",
+                              fontSize: 9,
+                            }}
+                          >
+                            {getRateLabel(portfolio.type)}
+                          </Text>
+                        </View>
+                      )}
+
+                      <View
                         style={{
-                          color: "#FFFFFF",
-                          fontWeight: "700",
-                          fontSize: 9,
+                          backgroundColor: "#EF4444",
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 20,
                         }}
                       >
-                        {portfolio.type === "group" ? "Deposit" : "Top Up"}
-                      </Text>
+                        <Text
+                          style={{
+                            color: "#FFFFFF",
+                            fontWeight: "700",
+                            fontSize: 9,
+                          }}
+                        >
+                          {portfolio.type === "group" ? "Deposit" : "Top Up"}
+                        </Text>
+                      </View>
                     </View>
                   </View>
 

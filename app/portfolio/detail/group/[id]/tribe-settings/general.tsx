@@ -1,9 +1,11 @@
 import Header from "@/src/components/common/Header";
 import ThemedButton from "@/src/components/ThemedButton";
+import { AppToast, ToastState } from "@/src/components/common/AppToast";
 import {
   useGetGroupDetailsQuery,
   useUpdateGroupSettingsMutation,
 } from "@/src/store/api/groupApi";
+import { useImageUpload } from "@/src/hooks/useImageUpload";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router, Stack, useLocalSearchParams } from "expo-router";
@@ -12,7 +14,6 @@ import { Check } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   ScrollView,
   Text,
@@ -33,6 +34,7 @@ export default function GeneralSettingsScreen() {
     skip: !id,
   });
   const [updateSettings, { isLoading: isSaving }] = useUpdateGroupSettingsMutation();
+  const { uploadImage } = useImageUpload();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -40,6 +42,7 @@ export default function GeneralSettingsScreen() {
   const [visibility, setVisibility] = useState(VISIBILITY_OPTIONS[0]);
   const [coverImage, setCoverImage] = useState("");
   const [isVisibilityOpen, setIsVisibilityOpen] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   useEffect(() => {
     if (group) {
@@ -68,11 +71,29 @@ export default function GeneralSettingsScreen() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert("Required", "Group name cannot be empty.");
+      setToast({ type: "warning", title: "Required", message: "Group name cannot be empty." });
       return;
     }
 
     try {
+      let uploadedCoverUrl: string | undefined = undefined;
+      if (coverImage) {
+        if (coverImage.startsWith("http://") || coverImage.startsWith("https://")) {
+          uploadedCoverUrl = coverImage;
+        } else if (coverImage.startsWith("file://") || coverImage.startsWith("content://")) {
+          try {
+            uploadedCoverUrl = await uploadImage(coverImage, { allowFallback: false });
+          } catch (e) {
+            console.warn("Image upload failed in settings:", e);
+            uploadedCoverUrl = undefined;
+          }
+        }
+      }
+
+      if (uploadedCoverUrl && (uploadedCoverUrl.startsWith("file://") || uploadedCoverUrl.startsWith("content://"))) {
+        uploadedCoverUrl = undefined;
+      }
+
       const accessType = visibility.includes("Private") ? "PRIVATE" : "PUBLIC";
       await updateSettings({
         id: id as string,
@@ -81,15 +102,15 @@ export default function GeneralSettingsScreen() {
           description: description.trim(),
           category: category.trim(),
           accessType,
-          coverImage: coverImage || undefined,
+          coverImage: uploadedCoverUrl,
         },
       }).unwrap();
 
-      Alert.alert("Settings Saved", "Group details updated successfully.");
+      setToast({ type: "success", title: "Settings Saved", message: "Group details updated successfully." });
       router.back();
     } catch (err: any) {
       const msg = err?.data?.message || err?.message || "Failed to update group settings.";
-      Alert.alert("Update Failed", msg);
+      setToast({ type: "error", title: "Update Failed", message: msg });
     }
   };
 
@@ -231,6 +252,7 @@ export default function GeneralSettingsScreen() {
           />
         </View>
       </View>
+      <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </SafeAreaView>
   );
 }

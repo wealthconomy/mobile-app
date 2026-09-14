@@ -1,4 +1,4 @@
-import Header from "@/src/components/common/Header";
+﻿import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import {
   KeyboardDoneAccessory,
@@ -11,12 +11,22 @@ import {
   useTerminatePortfolioMutation,
   useTopUpPortfolioMutation,
   useWithdrawToWalletMutation,
+  useGetPortfolioConfigQuery,
 } from "@/src/store/api/portfolioApi";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
+import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
+import {
+  getCleanTransactionTitle,
+  getPortfolioZeroBalanceBannerInfo,
+  formatEarlyTerminationPenaltyRate,
+} from "@/src/utils/formatters";
 import { Ionicons } from "@expo/vector-icons";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState } from "@/src/store";
+import { saveSingleCompletedPortfolio } from "@/src/store/slices/completedPortfolioSlice";
 import {
   ActivityIndicator,
   Alert,
@@ -34,19 +44,26 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import ManageFundsSheet from "@/src/components/portfolio/ManageFundsSheet";
+import ConfirmActionModal from "@/src/components/common/ConfirmActionModal";
+import { BlurView } from "expo-blur";
 
 const TEAL = "#0B575B";
 const TEAL_LIGHT = "#E0F2F1";
 const TEXT_DARK = "#1A1A1A";
+const SCREEN_OPTIONS = { headerShown: false } as const;
 
-export default function FamDetailScreen() {
+export default function FamilyGoalDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   // Modals state
   const [showTerminateModal, setShowTerminateModal] = useState(false);
   const [showTopUpModal, setShowTopUpModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showManageFundsModal, setShowManageFundsModal] = useState(false);
   const [showTopUpPinModal, setShowTopUpPinModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [showOverflowMenu, setShowOverflowMenu] = useState(false);
 
   // Form states for modals
   const [topUpAmount, setTopUpAmount] = useState("");
@@ -54,20 +71,86 @@ export default function FamDetailScreen() {
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [actionPin, setActionPin] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  const dispatch = useDispatch();
 
   // Queries & Mutations
-  const { data, isLoading: loading, refetch } = useGetPortfoliosQuery({ type: "wealthfam" });
-  const { data: txnsData, isLoading: txnsLoading } = useGetPortfolioTransactionsQuery(
+  const { data, isLoading: loading, refetch: refetchFam } = useGetPortfoliosQuery({ type: "wealthfam" });
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const famRate = rates?.wealthfam;
+  const penaltyRate = formatEarlyTerminationPenaltyRate(
+    famRate?.earlyLiquidationPenaltyRate ?? famRate?.earlyWithdrawalPenaltyPercentage,
+    "2.5%"
+  );
+  const penaltyRatio = (() => {
+    const n = parseFloat(penaltyRate.replace("%", ""));
+    return !isNaN(n) && n > 0 ? n / 100 : 0.025;
+  })();
+  const { data: walletSummary, refetch: refetchWallet } = useGetWalletSummaryQuery();
+  const walletBalance = (parseFloat(walletSummary?.currentBalance || "0")) / 100;
+  const { data: txnsData, isLoading: txnsLoading, refetch: refetchTxns } = useGetPortfolioTransactionsQuery(
     { id: id as string },
-    { skip: !id }
+    { skip: !id, refetchOnMountOrArgChange: true }
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchFam();
+      refetchTxns();
+      refetchWallet();
+    }, [refetchFam, refetchTxns, refetchWallet])
   );
 
   const [topUpPortfolio] = useTopUpPortfolioMutation();
   const [withdrawToWallet] = useWithdrawToWalletMutation();
   const [terminatePortfolio] = useTerminatePortfolioMutation();
+  const [verifyPin] = useVerifyPinMutation();
 
+  const handleBack = useCallback(() => router.back(), []);
+  const savedCompletedPlan = useSelector((state: RootState) =>
+    id ? state.completedPortfolio.completedMap[id as string] : undefined
+  );
   const allPlans = data?.items || [];
-  const plan = allPlans.find((p) => p.id === id);
+  const fetchedPlan = allPlans.find((p) => p.id === id);
+  const lastPlanRef = useRef(fetchedPlan);
+  if (fetchedPlan) {
+    lastPlanRef.current = fetchedPlan;
+  }
+  const plan = fetchedPlan || savedCompletedPlan || lastPlanRef.current;
+
+  useEffect(() => {
+    if (!fetchedPlan) return;
+    const isMatured =
+      fetchedPlan.maturityDate &&
+      new Date(fetchedPlan.maturityDate).getTime() <= Date.now();
+    const isCompletedOrTerminated =
+      fetchedPlan.status === "COMPLETED" ||
+      fetchedPlan.status === "TERMINATED" ||
+      fetchedPlan.status === "WITHDRAWN" ||
+      isMatured;
+
+    if (isCompletedOrTerminated) {
+      const targetStatus =
+        fetchedPlan.status === "TERMINATED" ? "TERMINATED" : "COMPLETED";
+      if (
+        !savedCompletedPlan ||
+        savedCompletedPlan.status !== targetStatus ||
+        savedCompletedPlan.balance !== fetchedPlan.balance
+      ) {
+        dispatch(saveSingleCompletedPortfolio(fetchedPlan));
+      }
+    }
+  }, [
+    fetchedPlan?.id,
+    fetchedPlan?.status,
+    fetchedPlan?.balance,
+    fetchedPlan?.maturityDate,
+    savedCompletedPlan?.status,
+    savedCompletedPlan?.balance,
+    dispatch,
+  ]);
 
   if (loading) {
     return (
@@ -76,8 +159,8 @@ export default function FamDetailScreen() {
         edges={["top"]}
       >
         <StatusBar style="dark" />
-        <Stack.Screen options={{ headerShown: false }} />
-        <Header title="Review" onBack={() => router.back()} />
+        <Stack.Screen options={SCREEN_OPTIONS} />
+        <Header title="Review" onBack={handleBack} />
         <PortfolioDetailSkeleton />
       </SafeAreaView>
     );
@@ -94,8 +177,8 @@ export default function FamDetailScreen() {
         }}
         edges={["top"]}
       >
-        <Stack.Screen options={{ headerShown: false }} />
-        <Header title="Review" onBack={() => router.back()} />
+        <Stack.Screen options={SCREEN_OPTIONS} />
+        <Header title="Review" onBack={handleBack} />
         <Text style={{ color: "#6B7280", marginTop: 20 }}>Plan not found</Text>
         <TouchableOpacity
           onPress={() => router.replace("/(tabs)/portfolios/wealth-fam")}
@@ -108,6 +191,8 @@ export default function FamDetailScreen() {
   }
 
   const isCompleted = plan.status === "COMPLETED" || plan.status === "TERMINATED" || new Date(plan.maturityDate).getTime() <= Date.now();
+  const hasRemainingBalance = parseFloat(plan.balance || "0") > 0;
+  const zeroBalanceBanner = getPortfolioZeroBalanceBannerInfo(txnsData?.items);
 
   const progress = parseFloat(plan.targetAmount) > 0 ? parseFloat(plan.balance) / parseFloat(plan.targetAmount) : 0;
   const progressPct = Math.round(Math.min(progress * 100, 100));
@@ -128,11 +213,9 @@ export default function FamDetailScreen() {
 
   const formatAmount = (val?: string) => {
     if (!val) return "0.00";
-    const amountNum = parseFloat(val) / 100;
+    const amountNum = Math.abs(parseFloat(val)) / 100;
     return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
-
-  const [verifyPin] = useVerifyPinMutation();
 
   const handleWithdrawSubmit = async () => {
     const num = parseFloat(withdrawAmount.replace(/,/g, ""));
@@ -161,7 +244,7 @@ export default function FamDetailScreen() {
       setShowWithdrawModal(false);
       setWithdrawAmount("");
       setActionPin("");
-      refetch();
+      refetchFam();
     } catch (err: any) {
       console.error("❌ [WealthFam Withdraw Error]:", err);
       const message = err?.data?.message || err?.message || "Failed to withdraw funds. Please check your PIN and balance.";
@@ -344,8 +427,28 @@ export default function FamDetailScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "white" }} edges={["top"]}>
       <StatusBar style="dark" />
-      <Stack.Screen options={{ headerShown: false }} />
-      <Header title="Review" onBack={() => router.back()} />
+      <Stack.Screen options={SCREEN_OPTIONS} />
+      <Header
+        title="Review"
+        onBack={handleBack}
+        rightElement={
+          hasRemainingBalance ? (
+            <TouchableOpacity
+              onPress={() => setShowOverflowMenu(true)}
+              style={{
+                width: 36,
+                height: 36,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="ellipsis-vertical" size={22} color="#1A1A1A" />
+            </TouchableOpacity>
+          ) : null
+        }
+      />
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={{ paddingTop: 8, paddingBottom: 40 }}>
@@ -406,8 +509,8 @@ export default function FamDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Status</Text>
-                <Text style={[styles.value, { color: plan.status === "ACTIVE" ? TEAL : "#6B7280" }]}>
-                  {plan.status || "ACTIVE"}
+                <Text style={[styles.value, { color: isCompleted || plan.status === "COMPLETED" ? "#10B981" : TEAL }]}>
+                  {isCompleted ? "COMPLETED" : (plan.status || "ACTIVE")}
                 </Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
@@ -430,7 +533,7 @@ export default function FamDetailScreen() {
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Funding Source</Text>
-                <Text style={styles.value}>{plan.metadata?.fundingSource || "Wallet"}</Text>
+                <Text style={styles.value}>Main Wallet</Text>
               </View>
             </View>
 
@@ -473,35 +576,16 @@ export default function FamDetailScreen() {
           {/* Action Buttons */}
           <View style={{ paddingHorizontal: 20 }}>
             {!isCompleted ? (
-              <>
-                <ThemedButton
-                  title="TopUp Family Pot"
-                  onPress={() => setShowTopUpModal(true)}
-                  style={{
-                    backgroundColor: TEAL,
-                    borderRadius: 14,
-                    height: 56,
-                    marginBottom: 16,
-                  }}
-                />
-
-                <ThemedButton
-                  title="Terminate Family Goal"
-                  onPress={() => {
-                    setActionPin("");
-                    setShowTerminateModal(true);
-                  }}
-                  style={{
-                    backgroundColor: "white",
-                    borderRadius: 14,
-                    height: 56,
-                    borderWidth: 1,
-                    borderColor: "#FFCDD2",
-                  }}
-                  textStyle={{ color: "#E53935", fontWeight: "700" }}
-                />
-              </>
-            ) : parseFloat(plan.balance || "0") > 0 ? (
+              <ThemedButton
+                title="TopUp Family Pot"
+                onPress={() => setShowTopUpModal(true)}
+                style={{
+                  backgroundColor: TEAL,
+                  borderRadius: 14,
+                  height: 56,
+                }}
+              />
+            ) : hasRemainingBalance ? (
               <ThemedButton
                 title="Withdraw All to Wallet"
                 onPress={() => setShowWithdrawModal(true)}
@@ -536,7 +620,7 @@ export default function FamDetailScreen() {
                     marginBottom: 2,
                   }}
                 >
-                  Funds Transferred to Wallet
+                  {zeroBalanceBanner.title}
                 </Text>
                 <Text
                   style={{
@@ -546,7 +630,7 @@ export default function FamDetailScreen() {
                     lineHeight: 18,
                   }}
                 >
-                  All matured funds from this goal have been successfully withdrawn into your Main Wallet.
+                  {zeroBalanceBanner.subtitle}
                 </Text>
               </View>
             )}
@@ -575,7 +659,7 @@ export default function FamDetailScreen() {
                 >
                   <View style={{ flex: 1, marginRight: 12 }}>
                     <Text style={{ fontWeight: "700", color: TEXT_DARK, fontSize: 14 }}>
-                      {txn.description || txn.type}
+                      {getCleanTransactionTitle(txn, plan?.name)}
                     </Text>
                     <Text style={{ color: "#9CA3AF", fontSize: 11, marginTop: 2 }}>
                       {new Date(txn.createdAt).toLocaleDateString()} • {txn.reference}
@@ -608,10 +692,11 @@ export default function FamDetailScreen() {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.modalOverlay}
           >
+            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
             <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.modalCard}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 12 }}>
-                  <Text style={styles.modalTitle}>Top Up Family Pot</Text>
+                  <Text style={styles.modalTitle}>Top Up Family Pot: {plan.name}</Text>
                   <TouchableOpacity onPress={() => {
                     Keyboard.dismiss();
                     setShowTopUpModal(false);
@@ -620,80 +705,123 @@ export default function FamDetailScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 20, textAlign: "center" }}>
+                <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 16, textAlign: "center" }}>
                   Add extra funds directly from your main wallet to accelerate this family goal.
                 </Text>
 
-                <Text style={styles.inputLabel}>Amount (₦)</Text>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    backgroundColor: "#F3F4F6",
-                    borderRadius: 12,
-                    paddingHorizontal: 16,
-                    height: 56,
-                    marginBottom: 20,
-                    width: "100%",
-                  }}
-                >
-                  <TextInput
-                    style={{ flex: 1, fontSize: 22, fontWeight: "700", textAlign: "center", color: TEXT_DARK }}
-                    placeholder="₦0.00"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="numeric"
-                    returnKeyType="done"
-                    inputAccessoryViewID={KEYBOARD_ACCESSORY_ID}
-                    onSubmitEditing={() => Keyboard.dismiss()}
-                    blurOnSubmit={true}
-                    autoFocus
-                    value={topUpAmount ? `₦${topUpAmount}` : ""}
-                    onChangeText={(v) => {
-                      const n = v.replace(/\D/g, "");
-                      setTopUpAmount(n ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "");
-                    }}
-                  />
-                  {topUpAmount.length > 0 && (
-                    <TouchableOpacity
-                      onPress={() => Keyboard.dismiss()}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      style={{
-                        backgroundColor: "#E2E8F0",
-                        borderRadius: 999,
-                        padding: 4,
-                        marginLeft: 8,
-                      }}
-                    >
-                      <Ionicons name="checkmark" size={14} color="#0B575B" />
-                    </TouchableOpacity>
-                  )}
-                </View>
+                {(() => {
+                  const numTopUp = parseFloat(topUpAmount.replace(/,/g, "")) || 0;
+                  const isExceeding = numTopUp > walletBalance;
+                  const isValid = numTopUp > 0 && !isExceeding;
+                  const formattedBal = walletBalance.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
 
-                <ThemedButton
-                  title="Continue"
-                  onPress={() => {
-                    Keyboard.dismiss();
-                    const num = parseFloat(topUpAmount.replace(/,/g, ""));
-                    if (!num || num <= 0) {
-                      Alert.alert("Invalid Amount", "Please enter a valid amount to top up.");
-                      return;
-                    }
-                    const amtStr = num.toString();
-                    setShowTopUpModal(false);
-                    setTopUpAmount("");
-                    router.push({
-                      pathname: "/payment/insert-pin",
-                      params: {
-                        amount: amtStr,
-                        action: "FAM_TOPUP",
-                        targetId: plan.id,
-                        targetName: plan.name,
-                        returnUrl: `/portfolio/detail/fam/${plan.id}`,
-                      },
-                    });
-                  }}
-                  style={{ backgroundColor: TEAL, width: "100%", height: 52, borderRadius: 14 }}
-                />
+                  return (
+                    <>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 6 }}>
+                        <Text style={styles.inputLabel}>Amount (₦)</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#6B7280" }}>
+                          Wallet Balance: <Text style={{ fontWeight: "700", color: "#059669" }}>₦{formattedBal}</Text>
+                        </Text>
+                      </View>
+
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          backgroundColor: "#F3F4F6",
+                          borderRadius: 12,
+                          paddingHorizontal: 16,
+                          height: 56,
+                          marginBottom: isExceeding ? 6 : 20,
+                          width: "100%",
+                          borderWidth: isExceeding ? 1.5 : 0,
+                          borderColor: isExceeding ? "#EF4444" : "transparent",
+                        }}
+                      >
+                        <TextInput
+                          style={{ flex: 1, fontSize: 22, fontWeight: "700", textAlign: "center", color: isExceeding ? "#EF4444" : TEXT_DARK }}
+                          placeholder="₦0.00"
+                          placeholderTextColor="#9CA3AF"
+                          keyboardType="numeric"
+                          returnKeyType="done"
+                          inputAccessoryViewID={KEYBOARD_ACCESSORY_ID}
+                          onSubmitEditing={() => Keyboard.dismiss()}
+                          blurOnSubmit={true}
+                          autoFocus
+                          value={topUpAmount ? `₦${topUpAmount}` : ""}
+                          onChangeText={(v) => {
+                            const n = v.replace(/\D/g, "");
+                            setTopUpAmount(n ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "");
+                          }}
+                        />
+                        {topUpAmount.length > 0 && (
+                          <TouchableOpacity
+                            onPress={() => Keyboard.dismiss()}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            style={{
+                              backgroundColor: isExceeding ? "#FEE2E2" : "#E2E8F0",
+                              borderRadius: 999,
+                              padding: 4,
+                              marginLeft: 8,
+                            }}
+                          >
+                            <Ionicons name={isExceeding ? "alert-circle" : "checkmark"} size={14} color={isExceeding ? "#EF4444" : "#0B575B"} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      {isExceeding && (
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 16 }}>
+                          <Text style={{ color: "#EF4444", fontSize: 12, fontWeight: "600" }}>
+                            Insufficient wallet balance
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              setShowTopUpModal(false);
+                              setTopUpAmount("");
+                              router.push("/wallet/deposit");
+                            }}
+                            style={{
+                              backgroundColor: "#ECFDF5",
+                              paddingHorizontal: 10,
+                              paddingVertical: 5,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: "#A7F3D0",
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            <Ionicons name="wallet-outline" size={14} color="#059669" />
+                            <Text style={{ color: "#059669", fontSize: 12, fontWeight: "700" }}>
+                              Fund Wallet
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+
+                      <ThemedButton
+                        title="Continue"
+                        disabled={!isValid || isNavigating}
+                        loading={isNavigating}
+                        onPress={() => {
+                          if (!isValid || isNavigating) return;
+                          Keyboard.dismiss();
+                          setShowTopUpModal(false);
+                          setShowConfirmModal(true);
+                        }}
+                        style={{
+                          backgroundColor: isValid && !isNavigating ? TEAL : "#9CA3AF",
+                          width: "100%",
+                          height: 52,
+                          borderRadius: 14,
+                          opacity: isValid && !isNavigating ? 1 : 0.6,
+                        }}
+                      />
+                    </>
+                  );
+                })()}
               </View>
             </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
@@ -701,9 +829,40 @@ export default function FamDetailScreen() {
         <KeyboardDoneAccessory />
       </Modal>
 
+      {/* Confirmation Modal */}
+      <ConfirmActionModal
+        visible={showConfirmModal}
+        title="Confirm Top Up"
+        summaryRows={[
+          { label: "Amount", value: `₦${topUpAmount}` },
+          { label: "Plan Name", value: plan.name },
+          { label: "Funding Source", value: "Main Wallet" },
+        ]}
+        onCancel={() => {
+          setShowConfirmModal(false);
+          setShowTopUpModal(true);
+        }}
+        onConfirm={() => {
+          const numTopUp = parseFloat(topUpAmount.replace(/,/g, "")) || 0;
+          setShowConfirmModal(false);
+          router.push({
+            pathname: "/payment/insert-pin",
+            params: {
+              amount: numTopUp.toString(),
+              action: "FAM_TOPUP",
+              targetId: plan.id,
+              targetName: plan.name,
+              returnUrl: `/portfolio/detail/fam/${plan.id}`,
+            },
+          });
+          setTopUpAmount("");
+        }}
+      />
+
       {/* ─── WITHDRAW MODAL ────────────────────────────────────────────── */}
       <Modal visible={showWithdrawModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
           <View style={styles.modalCard}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 12 }}>
               <Text style={styles.modalTitle}>Withdraw to Main Wallet</Text>
@@ -753,6 +912,7 @@ export default function FamDetailScreen() {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.modalOverlay}
           >
+            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
             <View style={styles.modalCard}>
               <ScrollView
                 showsVerticalScrollIndicator={false}
@@ -770,7 +930,7 @@ export default function FamDetailScreen() {
                     fontSize: 13,
                     color: "#6B7280",
                     textAlign: "center",
-                    marginBottom: 24,
+                    marginBottom: 14,
                     lineHeight: 20,
                   }}
                 >
@@ -778,6 +938,93 @@ export default function FamDetailScreen() {
                   <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>{plan.name}</Text>{" "}
                   family pot. All accumulated funds will be returned to your main wallet balance.
                 </Text>
+
+                {/* Early Termination Penalty Breakdown Card */}
+                {(() => {
+                  const balNaira = parseFloat(plan.balance || "0") / 100;
+                  const penaltyAmt = balNaira * penaltyRatio;
+                  const estimatedPayout = Math.max(0, balNaira - penaltyAmt);
+
+                  return balNaira > 0 ? (
+                    <View
+                      style={{
+                        width: "100%",
+                        backgroundColor: "#FEF2F2",
+                        borderColor: "#FECACA",
+                        borderWidth: 1,
+                        borderRadius: 16,
+                        padding: 14,
+                        marginBottom: 16,
+                      }}
+                    >
+                      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                        <Ionicons name="alert-circle" size={18} color="#DC2626" style={{ marginRight: 6 }} />
+                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#991B1B" }}>
+                          Early Termination Deduction
+                        </Text>
+                      </View>
+
+                      <Text style={{ fontSize: 12, color: "#7F1D1D", marginBottom: 12, lineHeight: 16 }}>
+                        Terminating early will incur a <Text style={{ fontWeight: "700" }}>{penaltyRate}</Text> penalty, deducted from your current balance.
+                      </Text>
+
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                        <Text style={{ fontSize: 12, color: "#6B7280" }}>Current Balance</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}>
+                          ₦{balNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Text>
+                      </View>
+
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                        <Text style={{ fontSize: 12, color: "#DC2626", fontWeight: "700" }}>
+                          Penalty Fee ({penaltyRate})
+                        </Text>
+                        <Text style={{ fontSize: 12, fontWeight: "800", color: "#DC2626" }}>
+                          -₦{penaltyAmt.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Text>
+                      </View>
+
+                      <View style={{ height: 1, backgroundColor: "#FECACA", marginBottom: 8 }} />
+
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#155D5F" }}>
+                          Estimated Payout to Wallet
+                        </Text>
+                        <Text style={{ fontSize: 14, fontWeight: "900", color: "#155D5F" }}>
+                          ₦{estimatedPayout.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <View
+                      style={{
+                        width: "100%",
+                        backgroundColor: "#FEF2F2",
+                        borderColor: "#FECACA",
+                        borderWidth: 1,
+                        borderRadius: 14,
+                        padding: 12,
+                        marginBottom: 16,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
+                      <Ionicons name="alert-circle" size={22} color="#DC2626" />
+                      <Text
+                        style={{
+                          flex: 1,
+                          fontSize: 13,
+                          color: "#991B1B",
+                          fontWeight: "700",
+                          lineHeight: 18,
+                        }}
+                      >
+                        Terminating early will incur a {penaltyRate} penalty, deducted from your current balance.
+                      </Text>
+                    </View>
+                  );
+                })()}
 
                 <View style={{ flexDirection: "row", gap: 12, width: "100%" }}>
                   <TouchableOpacity
@@ -799,7 +1046,7 @@ export default function FamDetailScreen() {
                     onPress={() => {
                       const balNum = parseFloat(plan.balance || "0") / 100;
                       setShowTerminateModal(false);
-                      router.push({
+                      router.replace({
                         pathname: "/payment/insert-pin",
                         params: {
                           amount: balNum.toString(),
@@ -829,7 +1076,65 @@ export default function FamDetailScreen() {
           </KeyboardAvoidingView>
         </Modal>
       )}
-      <KeyboardDoneAccessory />
+      {/* Overflow Action Sheet */}
+      <Modal visible={showOverflowMenu} transparent animationType="slide" onRequestClose={() => setShowOverflowMenu(false)}>
+        <View style={{ flex: 1, justifyContent: "flex-end" }}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          <TouchableWithoutFeedback onPress={() => setShowOverflowMenu(false)}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+          <View style={{ backgroundColor: "white", borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12, paddingBottom: Platform.OS === "ios" ? 36 : 24 }}>
+            <View style={{ width: 44, height: 5, backgroundColor: "#D1D5DB", borderRadius: 999, alignSelf: "center", marginBottom: 16 }} />
+            <Text style={{ fontSize: 16, fontWeight: "800", color: "#1A1A1A", marginBottom: 16 }}>
+              Portfolio Options
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => {
+                setShowOverflowMenu(false);
+                setShowManageFundsModal(true);
+              }}
+              style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}
+            >
+              <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: "#EEF6F6", alignItems: "center", justifyContent: "center", marginRight: 14 }}>
+                <Ionicons name="wallet-outline" size={20} color={TEAL} />
+              </View>
+              <Text style={{ flex: 1, fontSize: 15, fontWeight: "700", color: "#1A1A1A" }}>Transfer Funds</Text>
+              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+            </TouchableOpacity>
+
+            {!isCompleted && (
+              <>
+                <View style={{ height: 1, backgroundColor: "#F3F4F6", marginVertical: 4 }} />
+
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowOverflowMenu(false);
+                    setShowTerminateModal(true);
+                  }}
+                  style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}
+                >
+                  <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: "#FEE2E2", alignItems: "center", justifyContent: "center", marginRight: 14 }}>
+                    <Ionicons name="alert-circle-outline" size={20} color="#E53935" />
+                  </View>
+                  <Text style={{ flex: 1, fontSize: 15, fontWeight: "700", color: "#E53935" }}>Terminate Plan</Text>
+                  <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Manage Funds Sheet */}
+      <ManageFundsSheet
+        portfolioId={plan.id}
+        portfolioName={plan.name}
+        portfolioBalance={plan.balance}
+        portfolioType="wealthfam"
+        visible={showManageFundsModal}
+        onClose={() => setShowManageFundsModal(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -848,7 +1153,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
@@ -865,6 +1169,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: TEXT_DARK,
+    flex: 1,
+    marginRight: 8,
   },
   inputLabel: {
     fontSize: 13,

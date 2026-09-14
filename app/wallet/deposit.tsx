@@ -1,9 +1,9 @@
-import Header from "@/src/components/common/Header";
+﻿import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -14,12 +14,14 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardAvoidingView, Platform } from "react-native";
 import Svg, { Path } from "react-native-svg";
-import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
-import { useSelector } from "react-redux";
+import { useGetWalletSummaryQuery, walletApi } from "@/src/store/api/walletApi";
+import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/src/store";
 import {
   useCreateWalletTopupIntentMutation,
@@ -43,9 +45,16 @@ export default function DepositScreen() {
   const [wealthPlan] = useState(plan || "WealthFlex");
 
   const [selectedMandateId, setSelectedMandateId] = useState<string | null>(null);
+  const [depositMethod, setDepositMethod] = useState<"card" | "bank_transfer">("card");
+  const [vaLoading, setVaLoading] = useState(false);
+  const [vaError, setVaError] = useState<string | null>(null);
+  const timeoutRef = useRef<any>(null);
 
+  const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
-  const { data: wallet, refetch: refetchWallet } = useGetWalletSummaryQuery();
+  const { data: wallet, refetch: refetchWallet } = useGetWalletSummaryQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
 
   useEffect(() => {
     if (wallet) {
@@ -65,23 +74,61 @@ export default function DepositScreen() {
   const [verifying, setVerifying] = useState(false);
 
   // Auto-generate virtual account if modal is opened and accountNumber is missing
-  useEffect(() => {
-    const generateVA = async () => {
-      if (showBankModal && !wallet?.accountNumber && user) {
-        try {
-          await createVirtualAccount({
-            userId: user.id,
-            email: user.email || "",
-            name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || "User",
-          }).unwrap();
-          refetchWallet();
-        } catch (error) {
-          console.error("Failed to generate virtual account:", error);
-        }
+  const generateVirtualAccount = useCallback(async () => {
+    if (!user || wallet?.accountNumber) return;
+
+    setVaLoading(true);
+    setVaError(null);
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // 15-second timeout
+    timeoutRef.current = setTimeout(() => {
+      if (!wallet?.accountNumber) {
+        setVaLoading(false);
+        setVaError("Unable to generate account details. Please try again.");
       }
+    }, 15000);
+
+    try {
+      await createVirtualAccount({
+        userId: user.id,
+        email: user.email || "",
+        name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || "User",
+      }).unwrap();
+
+      const updated = await refetchWallet();
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      setVaLoading(false);
+
+      if (!updated.data?.accountNumber && !wallet?.accountNumber) {
+        setVaError("Unable to generate account details. Please try again.");
+      } else {
+        setVaError(null);
+      }
+    } catch (error: any) {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      setVaLoading(false);
+      const errMsg =
+        error?.data?.message ||
+        error?.message ||
+        "Unable to generate account details. Please try again.";
+      setVaError(errMsg);
+      console.error("Failed to generate virtual account:", error);
+      Alert.alert("Account Generation Failed", errMsg);
+    }
+  }, [user, wallet?.accountNumber, createVirtualAccount, refetchWallet]);
+
+  useEffect(() => {
+    if (showBankModal && !wallet?.accountNumber && !vaError && !vaLoading) {
+      generateVirtualAccount();
+    }
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-    generateVA();
-  }, [showBankModal, wallet?.accountNumber, user, createVirtualAccount, refetchWallet]);
+  }, [showBankModal, wallet?.accountNumber, vaError, vaLoading, generateVirtualAccount]);
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
@@ -104,18 +151,20 @@ export default function DepositScreen() {
   };
 
   const handleCardSelect = (card: any) => {
+    setDepositMethod("card");
     setSelectedMandateId(card.id);
     setStep("use-card");
   };
 
   const handleConfirmDeposit = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
+    const numAmount = parseFloat(amount.replace(/,/g, "")) || 0;
+    if (!numAmount || numAmount <= 0) {
       Alert.alert("Error", "Please enter a valid amount.");
       return;
     }
     
     setLoading(true);
-    const amountKobo = String(Math.round(parseFloat(amount) * 100));
+    const amountKobo = String(Math.round(numAmount * 100));
     const idempotencyKey = `dep_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
 
     try {
@@ -130,6 +179,8 @@ export default function DepositScreen() {
           idempotencyKey,
         }).unwrap();
         
+        dispatch(walletApi.util.invalidateTags(["Wallet"]));
+        await refetchWallet();
         setShowSuccess(true);
       } else {
         // Create dynamic web top-up checkout
@@ -171,6 +222,7 @@ export default function DepositScreen() {
 
             const safeRefetch = () => {
               try {
+                dispatch(walletApi.util.invalidateTags(["Wallet"]));
                 refetchWallet();
               } catch (e) {
                 console.warn("Refetch wallet query ignored:", e);
@@ -178,9 +230,11 @@ export default function DepositScreen() {
             };
 
             if (verified) {
+              dispatch(walletApi.util.invalidateTags(["Wallet"]));
               safeRefetch();
               setShowSuccess(true);
             } else {
+              dispatch(walletApi.util.invalidateTags(["Wallet"]));
               safeRefetch();
               Alert.alert(
                 "Payment Processing",
@@ -189,6 +243,7 @@ export default function DepositScreen() {
             }
           } else {
             // Fallback if no paymentRef returned
+            dispatch(walletApi.util.invalidateTags(["Wallet"]));
             try {
               refetchWallet();
             } catch (e) {}
@@ -250,6 +305,7 @@ export default function DepositScreen() {
       <View className="mt-8 border-t border-b border-gray-100">
         <TouchableOpacity
           onPress={() => {
+            setDepositMethod("card");
             setSelectedMandateId(null);
             setStep("use-card");
           }}
@@ -271,7 +327,11 @@ export default function DepositScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => setShowBankModal(true)}
+          onPress={() => {
+            setDepositMethod("bank_transfer");
+            setVaError(null);
+            setShowBankModal(true);
+          }}
           className="flex-row items-center py-6 px-1"
           activeOpacity={0.7}
         >
@@ -347,6 +407,7 @@ export default function DepositScreen() {
 
       <TouchableOpacity
         onPress={() => {
+          setDepositMethod("card");
           setSelectedMandateId(null);
           setStep("use-card");
         }}
@@ -357,8 +418,14 @@ export default function DepositScreen() {
         <Text className="text-white font-bold ml-2">Add card / Link bank</Text>
       </TouchableOpacity>
 
-      <Modal visible={showBankModal} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 justify-end">
+      <Modal visible={showBankModal} transparent animationType="fade" onRequestClose={() => setShowBankModal(false)}>
+        <View className="flex-1 justify-end">
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowBankModal(false)}
+          />
           <View className="bg-white rounded-t-[40px] px-8 py-10 pb-12 w-full">
             <View className="w-12 h-1.5 bg-[#E5E7EB] rounded-full self-center mb-8" />
             <Text className="text-[#1A1A1A] font-extrabold text-[24px] mb-2 leading-tight">
@@ -370,31 +437,53 @@ export default function DepositScreen() {
 
             <View className="h-[1px] bg-gray-100 mb-8" />
 
-            <InfoRow
-              label="Bank Acct Number"
-              value={wallet?.accountNumber || "Generating..."}
-              icon={
-                <MaterialCommunityIcons
-                  name="pound"
-                  size={20}
-                  color="#155D5F"
+            {vaError ? (
+              <View className="py-6 px-4 bg-red-50 rounded-2xl border border-red-200 items-center mb-6">
+                <Ionicons name="alert-circle" size={36} color="#DC2626" />
+                <Text className="text-[#1A1A1A] font-bold text-[15px] mt-2 text-center">
+                  Unable to Generate Account
+                </Text>
+                <Text className="text-[#6B7280] text-[12px] text-center mt-1 leading-5">
+                  {vaError}
+                </Text>
+                <TouchableOpacity
+                  onPress={generateVirtualAccount}
+                  className="mt-4 bg-[#155D5F] px-6 py-2.5 rounded-xl flex-row items-center"
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="refresh" size={16} color="white" />
+                  <Text className="text-white font-bold text-xs ml-1.5">Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <InfoRow
+                  label="Bank Acct Number"
+                  value={wallet?.accountNumber || (vaLoading ? "Generating..." : "Not Available")}
+                  icon={
+                    <MaterialCommunityIcons
+                      name="pound"
+                      size={20}
+                      color="#155D5F"
+                    />
+                  }
+                  showCopy={!!wallet?.accountNumber}
                 />
-              }
-              showCopy={!!wallet?.accountNumber}
-            />
-            <InfoRow
-              label="Bank"
-              value={wallet?.bankName || "Generating..."}
-              icon={
-                <MaterialCommunityIcons name="bank" size={20} color="#155D5F" />
-              }
-            />
-            <InfoRow
-              label="Account Name"
-              value={wallet?.accountName || "Generating..."}
-              icon={<Ionicons name="person" size={20} color="#155D5F" />}
-              showCopy={!!wallet?.accountName}
-            />
+                <InfoRow
+                  label="Bank"
+                  value={wallet?.bankName || (vaLoading ? "Generating..." : "Not Available")}
+                  icon={
+                    <MaterialCommunityIcons name="bank" size={20} color="#155D5F" />
+                  }
+                />
+                <InfoRow
+                  label="Account Name"
+                  value={wallet?.accountName || (vaLoading ? "Generating..." : "Not Available")}
+                  icon={<Ionicons name="person" size={20} color="#155D5F" />}
+                  showCopy={!!wallet?.accountName}
+                />
+              </>
+            )}
 
             <ThemedButton
               title="Confirm"
@@ -418,24 +507,40 @@ export default function DepositScreen() {
           <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
             Amount(₦)
           </Text>
-          <TextInput
-            placeholder="₦0.00"
-            placeholderTextColor="#9CA3AF"
-            className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] text-lg font-bold"
-            keyboardType="numeric"
-            value={amount}
-            onChangeText={(text) => {
-              const cleaned = text.replace(/[^\d.]/g, "");
-              setAmount(cleaned);
-            }}
-          />
+          <View style={{ position: "relative", justifyContent: "center" }}>
+            <TextInput
+              placeholder="₦0.00"
+              placeholderTextColor="#9CA3AF"
+              className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] text-xl font-bold pr-12"
+              keyboardType="numeric"
+              value={amount ? `₦${amount}` : ""}
+              onChangeText={(text) => {
+                const cleaned = text.replace(/\D/g, "");
+                if (!cleaned) {
+                  setAmount("");
+                  return;
+                }
+                setAmount(cleaned.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+              }}
+            />
+            {amount ? (
+              <TouchableOpacity
+                onPress={() => setAmount("")}
+                style={{ position: "absolute", right: 14, padding: 4 }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
       </View>
 
       <ThemedButton
         title="Continue"
         onPress={() => {
-          if (!amount || parseFloat(amount) <= 0) {
+          const numAmount = parseFloat(amount.replace(/,/g, "")) || 0;
+          if (!numAmount || numAmount <= 0) {
             Alert.alert("Error", "Please enter a valid amount.");
             return;
           }
@@ -446,103 +551,125 @@ export default function DepositScreen() {
     </View>
   );
 
-  const renderPreview = () => (
-    <View className="px-5">
-      <Text className="text-[#374151] text-[14px] font-extrabold mb-8 mt-4">
-        Please, recheck and confirm before making the transaction.
-      </Text>
+  const renderPreview = () => {
+    const isCardFlow = depositMethod === "card" || !!selectedMandateId;
+    const selectedCard = savedCards.find((c: any) => c.id === selectedMandateId);
 
-      <View
-        className="bg-[#F6F6F6] p-6 rounded-t-[24px] relative self-center"
-        style={{
-          width: 365,
-          height: 250,
-          borderWidth: 0.8,
-          borderColor: "#00000040",
-          borderBottomWidth: 0,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 10,
-          elevation: 2,
-        }}
-      >
-        <View className="flex-row justify-between mb-8 mt-2 items-start">
-          <View>
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
-              Amount To Deposit
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              ₦{formatAmount(amount)}
-            </Text>
-          </View>
-          <View className="items-end">
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
-              Account No.
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              {wallet?.accountNumber || "N/A"}
-            </Text>
-          </View>
-        </View>
+    return (
+      <View className="px-5">
+        <Text className="text-[#374151] text-[14px] font-extrabold mb-8 mt-4">
+          Please, recheck and confirm before making the transaction.
+        </Text>
 
-        <View className="flex-row justify-between mb-8">
-          <View>
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
-              Account Name
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              {wallet?.accountName || "N/A"}
-            </Text>
-          </View>
-          <View className="items-end">
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
-              Bank Name
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">{wallet?.bankName || "N/A"}</Text>
-          </View>
-        </View>
-
-        <View className="flex-row justify-between">
-          <View>
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
-              Transfer Method{" "}
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              {selectedMandateId ? "Saved Card" : "Card Checkout"}
-            </Text>
-          </View>
-        </View>
-
-        {/* Jagged Edge Components */}
         <View
-          className="flex-row absolute -bottom-[10px] left-0 right-0 overflow-hidden"
-          style={{ width: 365.1 }}
+          className="bg-[#F6F6F6] p-6 rounded-t-[24px] relative self-center"
+          style={{
+            width: 365,
+            minHeight: isCardFlow ? (selectedMandateId && selectedCard ? 180 : 150) : 250,
+            borderWidth: 0.8,
+            borderColor: "#00000040",
+            borderBottomWidth: 0,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 10,
+            elevation: 2,
+          }}
         >
-          {Array.from({ length: 40 }).map((_, i) => (
-            <View
-              key={i}
-              style={{
-                width: 14,
-                height: 14,
-                backgroundColor: "white",
-                transform: [{ rotate: "45deg" }],
-                marginTop: 4,
-              }}
-            />
-          ))}
-        </View>
-      </View>
+          <View className="flex-row justify-between mb-8 mt-2 items-start">
+            <View>
+              <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
+                Amount To Deposit
+              </Text>
+              <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                ₦{formatAmount(amount)}
+              </Text>
+            </View>
+            <View className="items-end">
+              <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
+                Transfer Method
+              </Text>
+              <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                {selectedMandateId ? "Saved Card" : isCardFlow ? "Card Checkout" : "Bank Transfer"}
+              </Text>
+            </View>
+          </View>
 
-      <ThemedButton
-        title={verifying ? "Verifying payment..." : "Confirm"}
-        onPress={handleConfirmDeposit}
-        loading={loading || verifying}
-        disabled={loading || verifying}
-        className="mt-14"
-      />
-    </View>
-  );
+          {selectedMandateId && selectedCard && (
+            <View className="flex-row justify-between items-center mb-6">
+              <View>
+                <Text className="text-[#4B5563] text-[12px] font-semibold">
+                  Card Details
+                </Text>
+                <Text className="text-[#1A1A1A] font-bold text-[14px]">
+                  {selectedCard.brand ? `${selectedCard.brand} ` : ""}•••• {selectedCard.lastFour || "xxxx"}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {!isCardFlow && (
+            <>
+              <View className="flex-row justify-between mb-8">
+                <View>
+                  <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
+                    Account Name
+                  </Text>
+                  <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                    {wallet?.accountName || "N/A"}
+                  </Text>
+                </View>
+                <View className="items-end">
+                  <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
+                    Bank Name
+                  </Text>
+                  <Text className="text-[#1A1A1A] font-bold text-[16px]">{wallet?.bankName || "N/A"}</Text>
+                </View>
+              </View>
+
+              <View className="flex-row justify-between mb-6">
+                <View>
+                  <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
+                    Account No.
+                  </Text>
+                  <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                    {wallet?.accountNumber || "N/A"}
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
+
+          {/* Jagged Edge Components */}
+          <View
+            className="flex-row absolute -bottom-[10px] left-0 right-0 overflow-hidden"
+            style={{ width: 365.1 }}
+          >
+            {Array.from({ length: 40 }).map((_, i) => (
+              <View
+                key={i}
+                style={{
+                  width: 14,
+                  height: 14,
+                  backgroundColor: "white",
+                  transform: [{ rotate: "45deg" }],
+                  marginTop: 4,
+                }}
+              />
+            ))}
+          </View>
+        </View>
+
+        <ThemedButton
+          title={verifying ? "Verifying payment..." : "Confirm"}
+          onPress={handleConfirmDeposit}
+          loading={loading || verifying}
+          disabled={loading || verifying}
+          className="mt-14"
+        />
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -566,7 +693,8 @@ export default function DepositScreen() {
       </KeyboardAvoidingView>
 
       <Modal visible={showSuccess} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 justify-center items-center px-10">
+        <View className="flex-1 justify-center items-center px-10">
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
           <View className="bg-white rounded-[32px] p-8 items-center w-full">
             <Image
               source={require("@/assets/images/funds.png")}
@@ -583,6 +711,7 @@ export default function DepositScreen() {
             <ThemedButton
               title="Done"
               onPress={() => {
+                dispatch(walletApi.util.invalidateTags(["Wallet"]));
                 setShowSuccess(false);
                 router.replace("/education/win-up");
               }}

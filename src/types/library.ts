@@ -7,6 +7,7 @@ export interface LibraryComment {
   text?: string;
   timePosted?: string;
   timeAgo?: string;
+  createdAt?: string;
 }
 
 export interface LibraryMaterial {
@@ -19,6 +20,7 @@ export interface LibraryMaterial {
   authorAvatar?: string;
   timePosted?: string;
   timeAgo?: string;
+  createdAt?: string;
   readingDuration?: string; // For videos this will be the video duration e.g. "12 min watch"
   // Document-specific fields (optional for video type)
   documentUrl?: string;
@@ -28,6 +30,8 @@ export interface LibraryMaterial {
   // Video-specific fields (optional for document type)
   youtubeUrl?: string;
   likesCount: number;
+  isLiked?: boolean;
+  isBookmarked?: boolean;
   downloadsCount?: number;
   commentsCount: number;
   comments?: LibraryComment[];

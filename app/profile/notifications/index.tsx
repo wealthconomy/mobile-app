@@ -1,4 +1,5 @@
 import Header from "@/src/components/common/Header";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { DateFilterPicker } from "@/src/features/profile/components/DateFilterPicker";
 import { EmptyNotificationsView } from "@/src/features/profile/components/EmptyNotificationsView";
 import { NotificationCardSkeleton } from "@/src/features/profile/components/NotificationCardSkeleton";
@@ -26,13 +27,24 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showPicker, setShowPicker] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const {
     data: notificationsResponse,
     isLoading: isQueryLoading,
-    isFetching,
     refetch,
   } = useListNotificationsQuery({ limit: 50 });
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch().unwrap();
+    } catch {
+      // ignore
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const [markRead] = useMarkNotificationReadMutation();
   const [markAllRead, { isLoading: isMarkingAllRead }] =
@@ -128,6 +140,8 @@ export default function NotificationsScreen() {
         rightElement={rightHeaderActions}
       />
 
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
+
       <View className="px-4 mb-4 flex-row items-center justify-between">
         <TouchableOpacity
           className="flex-row items-center bg-[#F5F5F5] px-3.5 py-2 rounded-full"
@@ -182,10 +196,11 @@ export default function NotificationsScreen() {
         }
         refreshControl={
           <RefreshControl
-            refreshing={isFetching}
-            onRefresh={refetch}
-            tintColor="#155D5F"
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
             colors={["#155D5F"]}
+            progressBackgroundColor="#FFFFFF"
           />
         }
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20, flexGrow: 1 }}

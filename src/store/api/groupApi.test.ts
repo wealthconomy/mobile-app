@@ -43,6 +43,6 @@ describe("groupApi endpoint definitions", () => {
     expect(groupApi.endpoints.contributeToGroup).toBeDefined();
     expect(groupApi.endpoints.withdrawFromGroup).toBeDefined();
     expect(groupApi.endpoints.exitGroup).toBeDefined();
-    expect(groupApi.endpoints.terminateGroup).toBeDefined();
+    expect(groupApi.endpoints.reportGroup).toBeDefined();
   });
 });

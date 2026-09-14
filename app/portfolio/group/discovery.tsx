@@ -1,11 +1,12 @@
 import Header from "@/src/components/common/Header";
 import { useListGroupsQuery } from "@/src/store/api/groupApi";
+import { isGroupCompleted, isGroupDateEnded, isGroupTerminated } from "@/app/(tabs)/portfolios/wealth-group";
 import { WealthGroupModel } from "@/src/types/group";
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Search, Users } from "lucide-react-native";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -21,18 +22,61 @@ const THEME = "#155D5F";
 
 const CATEGORIES = ["All", "Business", "Real Estate", "Tech", "Savings", "Rotational"];
 
+const GroupCoverThumbnail = ({ uri, name }: { uri?: string; name?: string }) => {
+  const [hasError, setHasError] = useState(false);
+  const sanitized = uri?.startsWith("http://") ? uri.replace("http://", "https://") : uri;
+
+  useEffect(() => {
+    if (uri) {
+      console.log(`🖼️ [GroupCoverThumbnail] [${name || "Group"}] Raw URI: "${uri}" | Sanitized: "${sanitized}"`);
+    }
+  }, [uri, sanitized, name]);
+
+  if (!sanitized || hasError) {
+    return <Users size={28} color={THEME} />;
+  }
+
+  return (
+    <Image
+      source={{ uri: sanitized }}
+      onError={(e) => {
+        console.warn(`❌ [GroupCoverThumbnail Error] [${name || "Group"}]:`, e.nativeEvent?.error, `| URI: "${sanitized}"`);
+        setHasError(true);
+      }}
+      style={{ width: "100%", height: "100%" }}
+      resizeMode="cover"
+    />
+  );
+};
+
 export default function GroupDiscoveryScreen() {
   const router = useRouter();
   const { type = "trending" } = useLocalSearchParams<{ type?: string }>();
   const isTrending = type === "trending";
 
-  const { data: groupsData, isLoading, refetch } = useListGroupsQuery();
+  const { data: groupsData, isLoading, refetch } = useListGroupsQuery(undefined, {
+    refetchOnFocus: true,
+    refetchOnMountOrArgChange: true,
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
 
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
+
+
   const allGroups: WealthGroupModel[] = groupsData?.items || [];
 
-  const filteredGroups = allGroups.filter((g) => {
+  // Filter out completed, terminated, AND date-ended groups — same logic as wealth-group.tsx
+  const activeGroups = allGroups.filter(
+    (g) => !isGroupCompleted(g) && !isGroupTerminated(g) && !isGroupDateEnded(g)
+  );
+
+  const filteredGroups = activeGroups.filter((g) => {
     const matchesSearch =
       g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (g.category && g.category.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -164,15 +208,7 @@ export default function GroupDiscoveryScreen() {
                           justifyContent: "center",
                         }}
                       >
-                        {group.coverImage ? (
-                          <Image
-                            source={{ uri: group.coverImage }}
-                            style={{ width: "100%", height: "100%" }}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <Users size={28} color={THEME} />
-                        )}
+                        <GroupCoverThumbnail uri={group.coverImage} name={group.name} />
                       </View>
 
                       <View style={{ flex: 1 }}>

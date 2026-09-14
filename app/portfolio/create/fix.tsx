@@ -1,27 +1,46 @@
-import Header from "@/src/components/common/Header";
+﻿import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { useCreatePortfolioMutation } from "@/src/store/api/portfolioApi";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
+import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
+import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Check } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const TEAL = "#0B575B";
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+const DURATION_PRESETS = [
+  { label: "30 Days", days: 30 },
+  { label: "90 Days", days: 90 },
+  { label: "6 Months", days: 180 },
+  { label: "1 Year", days: 365 },
+  { label: "2 Years", days: 730 },
+];
 
 export default function CreateFixScreen() {
   const params = useLocalSearchParams<{
@@ -35,7 +54,6 @@ export default function CreateFixScreen() {
   const [title, setTitle] = useState("");
   const [initialAmount, setInitialAmount] = useState(params.amount || "");
   const [duration, setDuration] = useState(params.duration || "");
-  const [fundingSource, setFundingSource] = useState("");
   const [lockType] = useState(params.lockType || "WealthFix");
   const [showInterestCard, setShowInterestCard] = useState(true);
   const [isManual, setIsManual] = useState(false);
@@ -43,15 +61,49 @@ export default function CreateFixScreen() {
   const [agreedPenalty, setAgreedPenalty] = useState(false);
   const [acknowledgedTemptation, setAcknowledgedTemptation] = useState(false);
   const [wealthPreference, setWealthPreference] = useState<"Interest Based" | "Impact Wealth">("Interest Based");
+  const [isNavigating, setIsNavigating] = useState(false);
 
   // RTK Query
   const [createPortfolio, { isLoading: isCreating }] = useCreatePortfolioMutation();
   const [verifyPin, { isLoading: isVerifyingPin }] = useVerifyPinMutation();
   const loading = isCreating || isVerifyingPin;
 
-  // Dropdown state
-  const [showSourceDropdown, setShowSourceDropdown] = useState(false);
-  const SOURCES = ["Wealth Save", "Wealth Flex", "Bank Account"];
+  // Wallet Query & Balance
+  const { data: walletData, refetch: refetchWallet } = useGetWalletSummaryQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchWallet();
+    }, [refetchWallet])
+  );
+
+  const walletBalanceNaira = (parseFloat(walletData?.currentBalance || "0") / 100);
+  const enteredAmountNum = parseFloat(initialAmount.replace(/[^\d.]/g, "")) || 0;
+  const isInsufficientBalance = enteredAmountNum > walletBalanceNaira && enteredAmountNum > 0;
+
+  // Date picker state
+  const [endDate, setEndDate] = useState<Date>(() => {
+    const d = new Date();
+    if (params.duration) {
+      d.setDate(d.getDate() + (parseInt(params.duration, 10) || 180));
+    } else {
+      d.setDate(d.getDate() + 180);
+    }
+    return d;
+  });
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [calMode, setCalMode] = useState<"days" | "months" | "years">("days");
+  const [calViewDate, setCalViewDate] = useState<Date>(() => {
+    const d = new Date();
+    if (params.duration) {
+      d.setDate(d.getDate() + (parseInt(params.duration, 10) || 180));
+    } else {
+      d.setDate(d.getDate() + 180);
+    }
+    return d;
+  });
 
   // PIN state
   const [pin, setPin] = useState("");
@@ -67,6 +119,183 @@ export default function CreateFixScreen() {
     const amt = parseFloat(initialAmount.replace(/,/g, "")) || 0;
     const dur = parseInt(duration) || 0;
     return ((amt * 0.1 * dur) / 365).toFixed(2);
+  };
+
+  const selectDurationDays = (days: number) => {
+    setDuration(days.toString());
+    const target = new Date();
+    target.setDate(target.getDate() + days);
+    setEndDate(target);
+    setCalViewDate(target);
+    setShowDatePicker(false);
+  };
+
+  const selectCalendarDate = (date: Date) => {
+    setEndDate(date);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const target = new Date(date);
+    target.setHours(0, 0, 0, 0);
+    const diffDays = Math.max(1, Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    setDuration(diffDays.toString());
+    setShowDatePicker(false);
+  };
+
+  const getDaysInMonth = (month: number, year: number) =>
+    new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (month: number, year: number) =>
+    (new Date(year, month, 1).getDay() + 6) % 7;
+
+  const renderCalendarGrid = () => {
+    const month = calViewDate.getMonth();
+    const year = calViewDate.getFullYear();
+    const daysInMonth = getDaysInMonth(month, year);
+    const firstDay = getFirstDayOfMonth(month, year);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dayNames = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+    const days: React.ReactElement[] = [];
+
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<View key={`empty-${i}`} style={{ width: "14.28%" as any, aspectRatio: 1 }} />);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const cellDate = new Date(year, month, day);
+      cellDate.setHours(0, 0, 0, 0);
+      const isPast = cellDate <= today;
+      const isSelected =
+        duration !== "" &&
+        endDate.getDate() === day &&
+        endDate.getMonth() === month &&
+        endDate.getFullYear() === year;
+
+      days.push(
+        <TouchableOpacity
+          key={day}
+          disabled={isPast}
+          onPress={() => selectCalendarDate(new Date(year, month, day))}
+          style={{
+            width: "14.28%" as any,
+            aspectRatio: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 4,
+            backgroundColor: isSelected ? TEAL : "transparent",
+            borderRadius: 999,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: isSelected ? "700" : "500",
+              color: isSelected ? "#fff" : isPast ? "#D1D5DB" : "#323232",
+            }}
+          >
+            {day}
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+
+    return (
+      <View style={{ marginBottom: 24 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 16 }}>
+          {dayNames.map((d) => (
+            <Text
+              key={d}
+              style={{ width: "14.28%" as any, textAlign: "center", fontSize: 13, fontWeight: "600", color: "#6B7280" }}
+            >
+              {d}
+            </Text>
+          ))}
+        </View>
+        <View style={{ flexDirection: "row", flexWrap: "wrap" }}>{days}</View>
+      </View>
+    );
+  };
+
+  const renderMonthSelector = () => {
+    return (
+      <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 24, justifyContent: "space-between" }}>
+        {MONTHS.map((m, idx) => {
+          const isSelected = calViewDate.getMonth() === idx;
+          return (
+            <TouchableOpacity
+              key={m}
+              onPress={() => {
+                const d = new Date(calViewDate);
+                d.setMonth(idx);
+                setCalViewDate(d);
+                setCalMode("days");
+              }}
+              style={{
+                width: "30%",
+                paddingVertical: 14,
+                marginBottom: 10,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: isSelected ? TEAL : "#F8F8F8",
+                borderRadius: 12,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: isSelected ? "700" : "600",
+                  color: isSelected ? "#fff" : "#1A1A1A",
+                }}
+              >
+                {m.slice(0, 3)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  };
+
+  const renderYearSelector = () => {
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
+
+    return (
+      <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 24, justifyContent: "space-between" }}>
+        {years.map((yr) => {
+          const isSelected = calViewDate.getFullYear() === yr;
+          return (
+            <TouchableOpacity
+              key={yr}
+              onPress={() => {
+                const d = new Date(calViewDate);
+                d.setFullYear(yr);
+                setCalViewDate(d);
+                setCalMode("months");
+              }}
+              style={{
+                width: "30%",
+                paddingVertical: 14,
+                marginBottom: 10,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: isSelected ? TEAL : "#F8F8F8",
+                borderRadius: 12,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: isSelected ? "700" : "600",
+                  color: isSelected ? "#fff" : "#1A1A1A",
+                }}
+              >
+                {yr}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
   };
 
   // ─── FORM STEP ───────────────────────────────────────────────────────────────
@@ -209,16 +438,45 @@ export default function CreateFixScreen() {
 
       {/* Target Amount */}
       <View style={{ marginBottom: 18 }}>
-        <Text
+        <View
           style={{
-            color: "#1A1A1A",
-            fontWeight: "700",
-            fontSize: 13,
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
             marginBottom: 8,
           }}
         >
-          {lockType === "WealthFix" ? "Target Amount" : "Amount To Fix"}
-        </Text>
+          <Text
+            style={{
+              color: "#1A1A1A",
+              fontWeight: "700",
+              fontSize: 13,
+            }}
+          >
+            {lockType === "WealthFix" ? "Target Amount" : "Amount To Fix"}
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={{ color: "#6B7280", fontSize: 11, fontWeight: "500" }}>
+              Wallet:{" "}
+              <Text style={{ color: "#1A1A1A", fontWeight: "700" }}>
+                ₦{walletBalanceNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </Text>
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push("/wallet/deposit" as any)}
+              style={{
+                backgroundColor: "#E6F4F4",
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 6,
+              }}
+            >
+              <Text style={{ color: TEAL, fontSize: 10, fontWeight: "700" }}>
+                + Fund
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
         <View
           style={{
             backgroundColor: "#F3F4F6",
@@ -227,6 +485,8 @@ export default function CreateFixScreen() {
             paddingHorizontal: 16,
             flexDirection: "row",
             alignItems: "center",
+            borderWidth: isInsufficientBalance ? 1 : 0,
+            borderColor: isInsufficientBalance ? "#EF4444" : "transparent",
           }}
         >
           <Text
@@ -259,6 +519,47 @@ export default function CreateFixScreen() {
             }}
           />
         </View>
+        {isInsufficientBalance && (
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginTop: 6,
+              backgroundColor: "#FEF2F2",
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: "#FEE2E2",
+            }}
+          >
+            <Text
+              style={{
+                color: "#DC2626",
+                fontSize: 11,
+                fontWeight: "600",
+                flex: 1,
+                marginRight: 8,
+              }}
+            >
+              ⚠️ Insufficient wallet balance. Fund your wallet to fix this amount.
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push("/wallet/deposit" as any)}
+              style={{
+                backgroundColor: "#DC2626",
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 6,
+              }}
+            >
+              <Text style={{ color: "#FFFFFF", fontSize: 11, fontWeight: "700" }}>
+                Fund Wallet
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* End Date */}
@@ -273,36 +574,18 @@ export default function CreateFixScreen() {
         >
           End Date
         </Text>
-        <View
-          style={{
-            backgroundColor: "#F3F4F6",
-            height: 56,
-            borderRadius: 12,
-            paddingHorizontal: 16,
-            justifyContent: "center",
-          }}
-        >
-          <Text style={{ color: "#9CA3AF", fontSize: 14 }}>
-            {duration ? `${duration} days from now` : "DD / MM / YYYY"}
-          </Text>
-        </View>
-      </View>
-
-      {/* Funding Source */}
-      <View style={{ marginBottom: 18 }}>
-        <Text
-          style={{
-            color: "#1A1A1A",
-            fontWeight: "700",
-            fontSize: 13,
-            marginBottom: 8,
-          }}
-        >
-          Funding Source
-        </Text>
         <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setShowSourceDropdown(!showSourceDropdown)}
+          onPress={() => {
+            if (duration) {
+              const d = new Date();
+              d.setDate(d.getDate() + (parseInt(duration, 10) || 180));
+              setCalViewDate(d);
+            } else {
+              setCalViewDate(new Date());
+            }
+            setShowDatePicker(true);
+          }}
+          activeOpacity={0.7}
           style={{
             backgroundColor: "#F3F4F6",
             height: 56,
@@ -315,52 +598,48 @@ export default function CreateFixScreen() {
         >
           <Text
             style={{
-              color: fundingSource ? "#1A1A1A" : "#9CA3AF",
+              color: duration ? "#1A1A1A" : "#9CA3AF",
               fontSize: 14,
+              fontWeight: duration ? "600" : "400",
             }}
           >
-            {fundingSource || "Select funding source"}
+            {duration
+              ? `${endDate.toLocaleDateString("en-US", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })} (${duration} days)`
+              : "Select end date or duration"}
           </Text>
-          <Ionicons
-            name={showSourceDropdown ? "chevron-up" : "chevron-down"}
-            size={20}
-            color="#6B7280"
-          />
+          <Ionicons name="calendar-outline" size={20} color={TEAL} />
         </TouchableOpacity>
-        {showSourceDropdown && (
-          <View
-            style={{
-              backgroundColor: "white",
-              borderRadius: 12,
-              marginTop: 4,
-              overflow: "hidden",
-              borderWidth: 1,
-              borderColor: "#E5E5E5",
-              elevation: 4,
-              shadowColor: "#000",
-              shadowOpacity: 0.08,
-              shadowRadius: 6,
-            }}
-          >
-            {SOURCES.map((s) => (
-              <TouchableOpacity
-                key={s}
-                onPress={() => {
-                  setFundingSource(s);
-                  setShowSourceDropdown(false);
-                }}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 14,
-                  borderBottomWidth: 1,
-                  borderBottomColor: "#F5F5F5",
-                }}
-              >
-                <Text style={{ color: "#323232", fontSize: 15 }}>{s}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+      </View>
+
+      {/* Funding Source (Read-only) */}
+      <View style={{ marginBottom: 18 }}>
+        <Text
+          style={{
+            color: "#1A1A1A",
+            fontWeight: "700",
+            fontSize: 13,
+            marginBottom: 8,
+          }}
+        >
+          Funding Source
+        </Text>
+        <View
+          style={{
+            backgroundColor: "#F3F4F6",
+            height: 56,
+            borderRadius: 12,
+            paddingHorizontal: 16,
+            justifyContent: "center",
+          }}
+        >
+          <Text style={{ color: "#1A1A1A", fontSize: 14, fontWeight: "600" }}>
+            Main Wallet
+          </Text>
+        </View>
       </View>
 
       {/* Manual Toggle */}
@@ -460,18 +739,29 @@ export default function CreateFixScreen() {
 
       {(() => {
         const isFormValid =
-          title && initialAmount && duration && fundingSource && isConsent;
+          title.trim().length > 0 &&
+          enteredAmountNum > 0 &&
+          !isInsufficientBalance &&
+          Boolean(duration) &&
+          isConsent;
         return (
           <ThemedButton
             title="Preview Fix"
-            onPress={() => setStep("preview")}
-            disabled={!isFormValid}
+            onPress={() => {
+              setIsNavigating(true);
+              setTimeout(() => {
+                setStep("preview");
+                setIsNavigating(false);
+              }, 150);
+            }}
+            loading={isNavigating}
+            disabled={!isFormValid || isNavigating}
             style={{
               backgroundColor: TEAL,
               borderRadius: 14,
               height: 56,
               marginBottom: 40,
-              opacity: !isFormValid ? 0.45 : 1,
+              opacity: !isFormValid || isNavigating ? 0.45 : 1,
             }}
           />
         );
@@ -554,63 +844,6 @@ export default function CreateFixScreen() {
           </View>
         </View>
 
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              marginBottom: 28,
-            }}
-          >
-            {wealthPreference === "Interest Based" ? (
-              <View>
-                <Text
-                  style={{
-                    color: "#6B7280",
-                    fontSize: 11,
-                    marginBottom: 6,
-                    fontWeight: "500",
-                  }}
-                >
-                  Wealth Growth
-                </Text>
-                <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
-                  ₦{formatAmount(calculateInterest())}
-                </Text>
-              </View>
-            ) : (
-              <View>
-                <Text
-                  style={{
-                    color: "#6B7280",
-                    fontSize: 11,
-                    marginBottom: 6,
-                    fontWeight: "500",
-                  }}
-                >
-                  Preference
-                </Text>
-                <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
-                  Impact Wealth
-                </Text>
-              </View>
-            )}
-            <View style={{ alignItems: "flex-end" }}>
-            <Text
-              style={{
-                color: "#6B7280",
-                fontSize: 11,
-                marginBottom: 6,
-                fontWeight: "500",
-              }}
-            >
-              Wealth from:
-            </Text>
-            <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
-              WealthFlex
-            </Text>
-          </View>
-        </View>
-
         <View
           style={{
             flexDirection: "row",
@@ -627,10 +860,10 @@ export default function CreateFixScreen() {
                 fontWeight: "500",
               }}
             >
-              Method
+              {wealthPreference === "Interest Based" ? "Interest Rate" : "Preference"}
             </Text>
             <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
-              {isManual ? "Manual" : "Automation"}
+              {wealthPreference === "Interest Based" ? "12% P.A" : "Impact Wealth"}
             </Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
@@ -645,34 +878,54 @@ export default function CreateFixScreen() {
               End Date
             </Text>
             <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
-              {(() => {
-                const durDays = parseInt(duration, 10) || 30;
-                const d = new Date();
-                d.setDate(d.getDate() + durDays);
-                return d.toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                });
-              })()}
+              {endDate.toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
             </Text>
           </View>
         </View>
 
-        <View style={{ marginBottom: 8 }}>
-          <Text
-            style={{
-              color: "#6B7280",
-              fontSize: 11,
-              marginBottom: 6,
-              fontWeight: "500",
-            }}
-          >
-            Wealth grows Into
-          </Text>
-          <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
-            WinUp
-          </Text>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 8,
+          }}
+        >
+          <View>
+            <Text
+              style={{
+                color: "#6B7280",
+                fontSize: 11,
+                marginBottom: 6,
+                fontWeight: "500",
+              }}
+            >
+              Funding Source
+            </Text>
+            <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
+              Main Wallet
+            </Text>
+          </View>
+          {wealthPreference === "Interest Based" && (
+            <View style={{ alignItems: "flex-end" }}>
+              <Text
+                style={{
+                  color: "#6B7280",
+                  fontSize: 11,
+                  marginBottom: 6,
+                  fontWeight: "500",
+                }}
+              >
+                Estimated Return
+              </Text>
+              <Text style={{ color: TEAL, fontWeight: "700", fontSize: 16 }}>
+                +₦{formatAmount(calculateInterest())}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Jagged Edge */}
@@ -778,14 +1031,21 @@ export default function CreateFixScreen() {
 
       <ThemedButton
         title="Lock Wealth"
-        onPress={() => setStep("pin")}
-        disabled={!agreedPenalty || !acknowledgedTemptation}
+        onPress={() => {
+          setIsNavigating(true);
+          setTimeout(() => {
+            setStep("pin");
+            setIsNavigating(false);
+          }, 150);
+        }}
+        loading={isNavigating}
+        disabled={!agreedPenalty || !acknowledgedTemptation || isNavigating}
         style={{
           backgroundColor: TEAL,
           borderRadius: 14,
           height: 56,
           marginBottom: 40,
-          opacity: !agreedPenalty || !acknowledgedTemptation ? 0.45 : 1,
+          opacity: !agreedPenalty || !acknowledgedTemptation || isNavigating ? 0.45 : 1,
         }}
       />
     </ScrollView>
@@ -799,8 +1059,7 @@ export default function CreateFixScreen() {
       const amtNum = parseFloat(initialAmount.replace(/[^\d.]/g, "")) || 0;
       const amtKobo = Math.max(amtNum * 100, 100);
       const durDays = parseInt(duration, 10) || 30;
-      const maturity = new Date();
-      maturity.setDate(maturity.getDate() + durDays);
+      const maturity = new Date(endDate);
 
       const body = {
         name: title.trim() || "WealthFix",
@@ -808,11 +1067,11 @@ export default function CreateFixScreen() {
         targetAmount: amtKobo,
         maturityDate: maturity.toISOString(),
         autoSaveEnabled: false,
-        autoSaveSource: fundingSource === "Debit card" ? "CARD" : "WALLET",
+        autoSaveSource: "WALLET" as const,
         pin,
         metadata: {
           durationDays: durDays,
-          fundingSource,
+          fundingSource: "WALLET",
           wealthPreference,
         },
       };
@@ -1082,6 +1341,219 @@ export default function CreateFixScreen() {
           </ScrollView>
         )}
       </KeyboardAvoidingView>
+
+      {/* Custom Calendar Modal */}
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <View style={{ flex: 1, justifyContent: "flex-end" }}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          <TouchableWithoutFeedback onPress={() => setShowDatePicker(false)}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+          <View
+                style={{
+                  backgroundColor: "white",
+                  borderTopLeftRadius: 36,
+                  borderTopRightRadius: 36,
+                  paddingHorizontal: 24,
+                  paddingBottom: 48,
+                  paddingTop: 12,
+                  maxHeight: "85%",
+                }}
+              >
+                {/* Handle bar */}
+                <View
+                  style={{
+                    width: 80,
+                    height: 6,
+                    backgroundColor: "#BABABA",
+                    borderRadius: 999,
+                    alignSelf: "center",
+                    marginBottom: 20,
+                  }}
+                />
+
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontWeight: "800",
+                    color: "#1A1A1A",
+                    marginBottom: 16,
+                  }}
+                >
+                  Select Lock Maturity
+                </Text>
+
+                {/* Quick Presets */}
+                <View style={{ marginBottom: 20 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "700",
+                      color: "#6B7280",
+                      marginBottom: 8,
+                    }}
+                  >
+                    Quick Durations
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 8 }}
+                  >
+                    {DURATION_PRESETS.map((p) => {
+                      const isSelected = duration === p.days.toString();
+                      return (
+                        <TouchableOpacity
+                          key={p.days}
+                          onPress={() => selectDurationDays(p.days)}
+                          style={{
+                            backgroundColor: isSelected ? TEAL : "#F3F4F6",
+                            paddingHorizontal: 14,
+                            paddingVertical: 8,
+                            borderRadius: 20,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: isSelected ? "#fff" : "#1A1A1A",
+                              fontWeight: "700",
+                              fontSize: 12,
+                            }}
+                          >
+                            {p.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                {/* Month & Year Navigation Header */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => setCalMode(calMode === "months" ? "days" : "months")}
+                      style={{
+                        backgroundColor: calMode === "months" ? "#EEF6F6" : "#F3F4F6",
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: calMode === "months" ? TEAL : "#1A1A1A",
+                          fontWeight: "700",
+                          fontSize: 14,
+                        }}
+                      >
+                        {MONTHS[calViewDate.getMonth()]}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setCalMode(calMode === "years" ? "days" : "years")}
+                      style={{
+                        backgroundColor: calMode === "years" ? "#EEF6F6" : "#F3F4F6",
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: calMode === "years" ? TEAL : "#1A1A1A",
+                          fontWeight: "700",
+                          fontSize: 14,
+                        }}
+                      >
+                        {calViewDate.getFullYear()}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={{ flexDirection: "row", gap: 4 }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const d = new Date(calViewDate);
+                        if (calMode === "years") {
+                          d.setFullYear(d.getFullYear() - 10);
+                        } else if (calMode === "months") {
+                          d.setFullYear(d.getFullYear() - 1);
+                        } else {
+                          d.setMonth(d.getMonth() - 1);
+                        }
+                        setCalViewDate(d);
+                      }}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                        backgroundColor: "#F3F4F6",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Ionicons name="chevron-back" size={18} color="#1A1A1A" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const d = new Date(calViewDate);
+                        if (calMode === "years") {
+                          d.setFullYear(d.getFullYear() + 10);
+                        } else if (calMode === "months") {
+                          d.setFullYear(d.getFullYear() + 1);
+                        } else {
+                          d.setMonth(d.getMonth() + 1);
+                        }
+                        setCalViewDate(d);
+                      }}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                        backgroundColor: "#F3F4F6",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Ionicons name="chevron-forward" size={18} color="#1A1A1A" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Calendar View Body */}
+                {calMode === "days" && renderCalendarGrid()}
+                {calMode === "months" && renderMonthSelector()}
+                {calMode === "years" && renderYearSelector()}
+
+                <TouchableOpacity
+                  onPress={() => setShowDatePicker(false)}
+                  style={{
+                    backgroundColor: "#F3F4F6",
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text style={{ color: "#4B5563", fontWeight: "700", fontSize: 14 }}>
+                    Close
+                  </Text>
+                </TouchableOpacity>
+              </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

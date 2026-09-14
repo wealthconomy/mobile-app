@@ -1,19 +1,28 @@
 import { BalanceText } from "@/src/components/common/BalanceText";
 import { useRouter } from "expo-router";
-import { Eye, EyeOff } from "lucide-react-native";
-import { useState } from "react";
+import { ArrowUp, Eye, EyeOff } from "lucide-react-native";
+import { useCallback, useState } from "react";
 import { Image, Text, TouchableOpacity, View, ActivityIndicator } from "react-native";
 import Svg, { ClipPath, Defs, G, Path } from "react-native-svg";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../store";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
+import { useFocusEffect } from "@react-navigation/native";
 
-export const WealthCard = () => {
-  const [showBalance, setShowBalance] = useState(true);
+export const WealthCard = ({ style }: { style?: any } = {}) => {
   const router = useRouter();
+  const [showBalance, setShowBalance] = useState(true);
   const { user } = useSelector((state: RootState) => state.auth);
   
-  const { data: walletData, isLoading } = useGetWalletSummaryQuery();
+  const { data: walletData, isLoading, refetch } = useGetWalletSummaryQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   // Users with "Impact Wealth" preference don't see "interest" (wealth growth)
   const showInterest = user?.wealthPreference?.toLowerCase().includes("impact")
@@ -28,25 +37,29 @@ export const WealthCard = () => {
   return (
     <View
       className="relative overflow-hidden"
-      style={{
-        width: 365,
-        height: 170,
-        borderTopLeftRadius: 50,
-        borderTopRightRadius: 20,
-        borderBottomRightRadius: 50,
-        borderBottomLeftRadius: 20,
-        backgroundColor: "#008185",
-        shadowColor: "#323232",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.12,
-        shadowRadius: 13,
-        elevation: 10,
-        alignSelf: "center",
-      }}
+      style={[
+        {
+          width: "100%",
+          maxWidth: 365,
+          height: 170,
+          borderTopLeftRadius: 50,
+          borderTopRightRadius: 20,
+          borderBottomRightRadius: 50,
+          borderBottomLeftRadius: 20,
+          backgroundColor: "#008185",
+          shadowColor: "#323232",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.12,
+          shadowRadius: 13,
+          elevation: 10,
+          alignSelf: "center",
+        },
+        style,
+      ]}
     >
       {/* SVG Background Patterns & Overlays */}
       <View className="absolute inset-0">
-        <Svg width="365" height="170" viewBox="0 0 365 170" fill="none">
+        <Svg width="100%" height="100%" viewBox="0 0 365 170" fill="none" preserveAspectRatio="none">
           <Defs>
             <ClipPath id="clip-card">
               <Path d="M50,0 L345,0 Q365,0 365,20 L365,120 Q365,170 315,170 L20,170 Q0,170 0,150 L0,50 Q0,0 50,0 Z" />
@@ -72,7 +85,7 @@ export const WealthCard = () => {
           width: 210,
           height: 210,
           top: -39,
-          left: 228,
+          right: -30,
           opacity: 0.3,
           transform: [{ rotate: "20.35deg" }],
         }}
@@ -114,7 +127,7 @@ export const WealthCard = () => {
               )
             ) : (
               <Text className="text-white text-[32px] font-extrabold tracking-tight">
-                ••••••••
+                ***
               </Text>
             )}
             <Text className="text-white text-[35px] font-light ml-5 mb-1">
@@ -127,7 +140,7 @@ export const WealthCard = () => {
               <Text className="text-white text-[12px] font-medium">
                 Your wealth grew by ₦{walletData?.dailyGrowth ? (parseFloat(walletData.dailyGrowth.toString()) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"} today
               </Text>
-              <Text className="text-[#95F370] text-[14px] font-bold">↑</Text>
+              <ArrowUp size={14} color="#95F370" />
             </View>
           )}
         </View>

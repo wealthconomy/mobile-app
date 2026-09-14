@@ -1,4 +1,6 @@
-import { useGetBlogByIdQuery, useToggleBookmarkMutation, useToggleLikeMutation, useAddCommentMutation } from "@/src/store/api/blogApi";
+import { useGetBlogByIdQuery, useToggleLikeMutation, useAddCommentMutation } from "@/src/store/api/blogApi";
+import { useBookmarks } from "@/src/hooks/useBookmarks";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { LikeIcon } from "@/src/components/icons/LikeIcon";
 import { BookmarkIcon } from "@/src/components/icons/BookmarkIcon";
@@ -24,6 +26,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function BlogDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { isBookmarked, toggleBookmark } = useBookmarks();
 
   const { data: response, isLoading } = useGetBlogByIdQuery(id as string, {
     skip: !id,
@@ -36,37 +39,76 @@ export default function BlogDetailScreen() {
   const [localLikesCount, setLocalLikesCount] = useState(0);
   const [localIsBookmarked, setLocalIsBookmarked] = useState(false);
   const [localBookmarks, setLocalBookmarks] = useState(0);
+  const [localSharesCount, setLocalSharesCount] = useState(0);
 
   useEffect(() => {
     if (blog) {
+      const blogId = blog.id || (id as string);
       setLocalIsLiked(blog.isLiked || false);
       setLocalLikesCount(blog.likesCount || 0);
-      setLocalIsBookmarked(blog.isBookmarked || false);
+      const isMarked = isBookmarked(blogId) || !!blog.isBookmarked;
+      setLocalIsBookmarked(isMarked);
       setLocalBookmarks(blog.bookmarks || 0);
-    }
-  }, [blog]);
 
-  const [toggleBookmark] = useToggleBookmarkMutation();
+      // Load persisted shares count
+      AsyncStorage.getItem(`@wealthconomy_blog_shares_${blogId}`)
+        .then((stored) => {
+          const storedNum = stored ? parseInt(stored, 10) : 0;
+          setLocalSharesCount(Math.max(blog.sharesCount || 0, storedNum));
+        })
+        .catch(() => {
+          setLocalSharesCount(blog.sharesCount || 0);
+        });
+    }
+  }, [blog, id, isBookmarked]);
+
   const [toggleLike] = useToggleLikeMutation();
   const [addComment, { isLoading: isCommenting }] = useAddCommentMutation();
 
   const handleShare = async () => {
     if (!blog) return;
     try {
-      await Share.share({
-        message: `Check out this blog: ${blog.title}\n\n${blog.description}`,
-      });
+      const blogId = blog.id || (id as string);
+      const shareUrl = `https://wealthconomy.org/blog/${blog.slug || blogId}`;
+      const shareMessage = `Check out this blog: ${blog.title}\n\nRead more at: ${shareUrl}`;
+
+      // Optimistically increment and persist share count
+      const nextCount = localSharesCount + 1;
+      setLocalSharesCount(nextCount);
+      AsyncStorage.setItem(
+        `@wealthconomy_blog_shares_${blogId}`,
+        String(nextCount)
+      ).catch((err) => console.warn("Failed to persist share count:", err));
+
+      await Share.share(
+        Platform.OS === "ios"
+          ? {
+              title: blog.title,
+              message: shareMessage,
+              url: shareUrl,
+            }
+          : {
+              title: blog.title,
+              message: shareMessage,
+            },
+        {
+          dialogTitle: `Share "${blog.title}"`,
+        }
+      );
     } catch (error) {
       console.error("Error sharing:", error);
     }
   };
 
   const handleBookmark = () => {
-    if (!id) return;
+    if (!blog && !id) return;
     const newIsBookmarked = !localIsBookmarked;
     setLocalIsBookmarked(newIsBookmarked);
-    setLocalBookmarks(prev => newIsBookmarked ? prev + 1 : Math.max(0, prev - 1));
-    toggleBookmark(id as string);
+    setLocalBookmarks((prev) => (newIsBookmarked ? prev + 1 : Math.max(0, prev - 1)));
+    
+    if (blog) {
+      toggleBookmark(blog);
+    }
   };
   const handleLike = async () => {
     if (!id) return;
@@ -248,7 +290,7 @@ export default function BlogDetailScreen() {
             >
               <Ionicons name="share-social-outline" size={20} color="#6B7280" />
               <Text className="text-[#6B7280] text-xs ml-2 font-bold">
-                {blog.sharesCount || 0}
+                {localSharesCount}
               </Text>
             </TouchableOpacity>
 

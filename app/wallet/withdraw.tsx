@@ -1,4 +1,4 @@
-import {
+﻿import {
   useAddPayoutAccountMutation,
   useGetSupportedBanksQuery,
   useGetUserPayoutAccountsQuery,
@@ -19,11 +19,13 @@ import {
   Image,
   Modal,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -669,7 +671,8 @@ export default function WithdrawScreen() {
       </ScrollView>
 
       <Modal visible={showSuccess} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 justify-center items-center px-6">
+        <View className="flex-1 justify-center items-center px-6">
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
           <View className="bg-white rounded-[32px] p-8 items-center w-full max-w-[340px]">
             <Image
               source={require("@/assets/images/funds.png")}

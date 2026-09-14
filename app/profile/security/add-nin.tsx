@@ -1,4 +1,4 @@
-import Header from "@/src/components/common/Header";
+﻿import Header from "@/src/components/common/Header";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -8,11 +8,13 @@ import {
   Platform,
   ScrollView,
   StatusBar,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function AddNINScreen() {
@@ -78,7 +80,8 @@ export default function AddNINScreen() {
       </KeyboardAvoidingView>
 
       <Modal visible={showSuccess} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 items-center justify-center px-5">
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 20 }}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
           <View className="bg-white rounded-[32px] w-full p-8 items-center max-w-[340px]">
             <View className="w-20 h-20 bg-[#E7F5F5] rounded-full items-center justify-center mb-6">
               <Image

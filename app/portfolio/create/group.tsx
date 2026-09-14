@@ -1,5 +1,6 @@
 import Header from "@/src/components/common/Header";
 import { useCreateGroupMutation } from "@/src/store/api/groupApi";
+import { useImageUpload } from "@/src/hooks/useImageUpload";
 import { CreateGroupRequest, GroupFrequency } from "@/src/types/group";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -54,7 +55,9 @@ export default function CreateGroupScreen() {
   const [step, setStep] = useState(1);
   const [isInfoVisible, setIsInfoVisible] = useState(true);
   const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
   const [createGroup, { isLoading: isCreating }] = useCreateGroupMutation();
+  const { uploadImage } = useImageUpload();
 
   const [formData, setFormData] = useState<GroupData>({
     name: "",
@@ -111,11 +114,30 @@ export default function CreateGroupScreen() {
           mappedPenalty = formData.penalty;
         }
 
+        let uploadedCoverUrl: string | undefined = undefined;
+        if (formData.coverImage) {
+          if (formData.coverImage.startsWith("http://") || formData.coverImage.startsWith("https://")) {
+            uploadedCoverUrl = formData.coverImage;
+          } else if (formData.coverImage.startsWith("file://") || formData.coverImage.startsWith("content://")) {
+            try {
+              uploadedCoverUrl = await uploadImage(formData.coverImage, { allowFallback: false });
+            } catch (e) {
+              console.warn("Cover image upload failed, skipping cloud coverImage in payload:", e);
+              uploadedCoverUrl = undefined;
+            }
+          }
+        }
+
+        // Strictly verify that coverImage is a remote URL, never a local file:// path
+        if (uploadedCoverUrl && (uploadedCoverUrl.startsWith("file://") || uploadedCoverUrl.startsWith("content://"))) {
+          uploadedCoverUrl = undefined;
+        }
+
         const payload: CreateGroupRequest = {
           name: formData.name.trim(),
           category: formData.category.trim() || "General",
           description: formData.description.trim(),
-          coverImage: formData.coverImage || undefined,
+          coverImage: uploadedCoverUrl,
           targetAmount: amountKobo,
           frequency: (formData.frequency ? formData.frequency.toUpperCase() : "MONTHLY") as GroupFrequency,
           memberInterest: formData.hasInterest,
@@ -141,7 +163,11 @@ export default function CreateGroupScreen() {
         Alert.alert("Creation Failed", msg);
       }
     } else {
-      setStep((s) => s + 1);
+      setIsNavigating(true);
+      setTimeout(() => {
+        setStep((s) => s + 1);
+        setIsNavigating(false);
+      }, 150);
     }
   };
 
@@ -258,13 +284,13 @@ export default function CreateGroupScreen() {
             {/* ── Action Button ────────────────────────────────────────── */}
             <View className="mt-10">
               <TouchableOpacity
-                disabled={!isStepValid || isCreating}
+                disabled={!isStepValid || isCreating || isNavigating}
                 onPress={nextStep}
                 className={`h-14 rounded-2xl items-center justify-center ${
-                  isStepValid && !isCreating ? "bg-[#155D5F]" : "bg-gray-200"
+                  isStepValid && !isCreating && !isNavigating ? "bg-[#155D5F]" : "bg-gray-200"
                 }`}
               >
-                {isCreating ? (
+                {isCreating || isNavigating ? (
                   <ActivityIndicator color="white" />
                 ) : (
                   <Text className="text-white font-bold text-base">
@@ -515,7 +541,7 @@ function Step3Membership({ data, update }: any) {
           onPress={() => setIsOpen(!isOpen)}
           className="h-14 bg-gray-50 rounded-xl px-4 flex-row items-center justify-between border border-gray-100"
         >
-          <Text className={data.accessType ? "text-[#1A1A1A]" : "text-gray-400"}>
+          <Text className={data.accessType ? "text-[#1A1A1A] font-semibold" : "text-gray-400"}>
             {data.accessType || "Public/Open, Private/Invite-Only"}
           </Text>
           <Ionicons
@@ -526,19 +552,41 @@ function Step3Membership({ data, update }: any) {
         </TouchableOpacity>
         {isOpen && (
           <View className="bg-white rounded-xl mt-2 border border-gray-100 overflow-hidden shadow-sm">
-            {options.map((opt) => (
-              <TouchableOpacity
-                key={opt}
-                onPress={() => {
-                  update("accessType", opt);
-                  setIsOpen(false);
-                }}
-                className="px-4 py-4 border-b border-gray-50 flex-row items-center justify-between"
-              >
-                <Text className="text-[#1A1A1A] font-medium">{opt}</Text>
-                {data.accessType === opt && <Check size={16} color={THEME} />}
-              </TouchableOpacity>
-            ))}
+            {options.map((opt) => {
+              const isPublic = opt.toLowerCase().includes("public");
+              return (
+                <TouchableOpacity
+                  key={opt}
+                  onPress={() => {
+                    update("accessType", opt);
+                    setIsOpen(false);
+                  }}
+                  className="px-4 py-4 border-b border-gray-50 flex-row items-center justify-between"
+                >
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text className="text-[#1A1A1A] font-bold text-[14px]">{opt}</Text>
+                    <Text className="text-[#64748B] text-[11px] mt-0.5 leading-[16px]">
+                      {isPublic
+                        ? "Open group: Members can join immediately without waiting for admin approval."
+                        : "Private group: Members send a join request. Admin can accept or reject each request."}
+                    </Text>
+                  </View>
+                  {data.accessType === opt && <Check size={18} color={THEME} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+        {data.accessType && (
+          <View className="bg-[#EEF7F8] p-3 rounded-xl mt-3 border border-[#D5EAE9]">
+            <Text className="text-[#155D5F] text-[12px] font-bold mb-0.5">
+              ℹ️ {data.accessType.toLowerCase().includes("public") ? "Public Group Policy" : "Private Group Policy"}
+            </Text>
+            <Text className="text-[#155D5F] text-[11px] leading-[16px]">
+              {data.accessType.toLowerCase().includes("public")
+                ? "People can join this group directly without you approving them."
+                : "People must request to join this group. You will have full control in settings to accept or reject them."}
+            </Text>
           </View>
         )}
       </View>
@@ -558,7 +606,7 @@ function Step4Risk({ data, update }: any) {
 
   const exitOptions = [
     "No Withdrawal",
-    "Allow with Fixed Penalty (10%)",
+    "Allow with Fixed Penalty (1.5%)",
     "Allow without Penalty",
   ];
 
@@ -678,7 +726,7 @@ function Step5Review({ data, update }: any) {
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => update("agreed", !data.agreed)}
-        className="flex-row items-center space-x-3 p-2"
+        style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8, paddingHorizontal: 4 }}
       >
         <View
           className={`w-6 h-6 rounded-lg items-center justify-center border ${
@@ -686,10 +734,11 @@ function Step5Review({ data, update }: any) {
               ? "bg-[#155D5F] border-[#155D5F]"
               : "border-gray-300 bg-white"
           }`}
+          style={{ marginRight: 4 }}
         >
           {data.agreed && <Check size={14} color="white" />}
         </View>
-        <Text className="text-[#64748B] text-[12px] flex-1 leading-[18px]">
+        <Text className="text-[#64748B] text-[13px] flex-1 leading-[19px]">
           I agree to the WealthGroup Terms of Service and understand the
           financial responsibilities as group administrator.
         </Text>

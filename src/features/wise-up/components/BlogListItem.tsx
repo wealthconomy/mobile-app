@@ -52,7 +52,7 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
   };
 
   return (
-    <View style={{ width: 372 }}>
+    <View style={{ width: "100%" }}>
       <TouchableOpacity
         onPress={onPress}
         className="flex-row items-center"
@@ -60,7 +60,11 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
         activeOpacity={0.7}
       >
         <Image
-          source={{ uri: blog.image }}
+          source={{
+            uri:
+              blog.image ||
+              "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=800",
+          }}
           className="rounded-[6px] bg-gray-100"
           style={{ width: 104, height: 66 }}
           resizeMode="cover"
@@ -105,7 +109,15 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
 
           <View className="flex-row items-center">
             <Image
-              source={{ uri: blog.authorAvatar }}
+              source={{
+                uri:
+                  blog.authorAvatar ||
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                    typeof blog.author === "string"
+                      ? blog.author
+                      : blog.author?.name || "Wealthconomy"
+                  )}&background=155D5F&color=fff`,
+              }}
               className="w-4 h-4 rounded-full bg-gray-200 mr-2"
             />
             <View>

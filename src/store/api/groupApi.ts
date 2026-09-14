@@ -1,7 +1,6 @@
 import {
   ContributeGroupRequest,
   CreateGroupRequest,
-  GroupChatMessage,
   GroupJoinRequest,
   GroupMember,
   GroupMemberFilter,
@@ -134,20 +133,6 @@ export const groupApi = baseApi.injectEndpoints({
       invalidatesTags: ["WealthGroup", "Wallet"],
     }),
 
-    // Get group messages
-    getGroupMessages: builder.query<
-      KeysetPagination<GroupChatMessage>,
-      { id: string; limit?: number; after?: string; before?: string; q?: string; populate?: string[] }
-    >({
-      query: ({ id, ...params }) => ({
-        url: `/groups/${id}/messages`,
-        params,
-      }),
-      providesTags: ["WealthGroup"],
-      transformResponse: (response: { data: KeysetPagination<GroupChatMessage> }) =>
-        response.data || response,
-    }),
-
     // Get group members
     getGroupMembers: builder.query<
       KeysetPagination<GroupMember>,
@@ -173,15 +158,6 @@ export const groupApi = baseApi.injectEndpoints({
         response.data || response,
     }),
 
-    // Clear chat
-    clearGroupChat: builder.mutation<{ message: string }, string>({
-      query: (id) => ({
-        url: `/groups/${id}/chat/clear`,
-        method: "POST",
-      }),
-      invalidatesTags: ["WealthGroup"],
-    }),
-
     // Emergency withdrawal from group
     withdrawFromGroup: builder.mutation<
       { message: string },
@@ -195,22 +171,13 @@ export const groupApi = baseApi.injectEndpoints({
       invalidatesTags: ["WealthGroup", "Wallet"],
     }),
 
-    // Exit group
+    // Exit group (voluntary exit - refunds savings to Main Wallet minus penalty)
     exitGroup: builder.mutation<{ message: string }, string>({
       query: (id) => ({
         url: `/groups/${id}/exit`,
         method: "POST",
       }),
-      invalidatesTags: ["WealthGroup"],
-    }),
-
-    // Terminate group
-    terminateGroup: builder.mutation<{ message: string }, string>({
-      query: (id) => ({
-        url: `/groups/${id}/terminate`,
-        method: "POST",
-      }),
-      invalidatesTags: ["WealthGroup"],
+      invalidatesTags: ["WealthGroup", "Wallet", "Payment"],
     }),
 
     // Toggle mute
@@ -250,13 +217,22 @@ export const groupApi = baseApi.injectEndpoints({
       invalidatesTags: ["WealthGroup"],
     }),
 
-    // Remove member (kick)
+    // Remove member (kick - refunds 100% savings directly to Main Wallet)
     removeGroupMember: builder.mutation<{ message: string }, { id: string; userId: string }>({
       query: ({ id, userId }) => ({
         url: `/groups/${id}/members/${userId}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["WealthGroup"],
+      invalidatesTags: ["WealthGroup", "Wallet", "Payment"],
+    }),
+
+    // Terminate group (Creator only - refunds 100% of all active members' savings to their Main Wallets)
+    terminateGroup: builder.mutation<{ message: string }, string>({
+      query: (id) => ({
+        url: `/groups/${id}/terminate`,
+        method: "POST",
+      }),
+      invalidatesTags: ["WealthGroup", "Wallet", "Payment"],
     }),
 
     // Add to blacklist
@@ -300,18 +276,16 @@ export const {
   useApproveJoinRequestMutation,
   useRejectJoinRequestMutation,
   useContributeToGroupMutation,
-  useGetGroupMessagesQuery,
   useGetGroupMembersQuery,
   useGetMemberStatsQuery,
-  useClearGroupChatMutation,
   useWithdrawFromGroupMutation,
   useExitGroupMutation,
-  useTerminateGroupMutation,
   useToggleGroupMuteMutation,
   useReportGroupMutation,
   useAddGroupAdminMutation,
   useRemoveGroupAdminMutation,
   useRemoveGroupMemberMutation,
+  useTerminateGroupMutation,
   useAddToGroupBlacklistMutation,
   useRemoveFromGroupBlacklistMutation,
   useSendGroupRemindersMutation,

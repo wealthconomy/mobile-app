@@ -1,5 +1,6 @@
 import Header from "@/src/components/common/Header";
 import ThemedButton from "@/src/components/ThemedButton";
+import { AppToast, ToastState } from "@/src/components/common/AppToast";
 import {
   useGetGroupDetailsQuery,
   useUpdateGroupSettingsMutation,
@@ -11,7 +12,6 @@ import { Check } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   Text,
   TextInput,
@@ -32,6 +32,7 @@ export default function FinanceSettingsScreen() {
   const [amount, setAmount] = useState("");
   const [frequency, setFrequency] = useState("MONTHLY");
   const [isOpen, setIsOpen] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   useEffect(() => {
     if (group) {
@@ -44,7 +45,7 @@ export default function FinanceSettingsScreen() {
   const handleSave = async () => {
     const numeric = parseFloat(amount.replace(/,/g, ""));
     if (!numeric || numeric <= 0) {
-      Alert.alert("Invalid Amount", "Please enter a valid target amount.");
+      setToast({ type: "warning", title: "Invalid Amount", message: "Please enter a valid target amount." });
       return;
     }
 
@@ -58,11 +59,11 @@ export default function FinanceSettingsScreen() {
         },
       }).unwrap();
 
-      Alert.alert("Settings Saved", "Finance settings updated successfully.");
+      setToast({ type: "success", title: "Settings Saved", message: "Finance settings updated successfully." });
       router.back();
     } catch (err: any) {
       const msg = err?.data?.message || err?.message || "Failed to update finance settings.";
-      Alert.alert("Update Failed", msg);
+      setToast({ type: "error", title: "Update Failed", message: msg });
     }
   };
 
@@ -162,6 +163,7 @@ export default function FinanceSettingsScreen() {
           />
         </View>
       </View>
+      <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </SafeAreaView>
   );
 }

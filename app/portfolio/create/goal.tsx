@@ -1,10 +1,12 @@
-import Header from "@/src/components/common/Header";
+﻿import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCreatePortfolioMutation } from "@/src/store/api/portfolioApi";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
+import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
+import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
@@ -19,7 +21,9 @@ import {
   TouchableWithoutFeedback,
   View,
   Alert,
+  StyleSheet,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const MONTHS = [
@@ -47,12 +51,26 @@ export default function CreateGoalScreen() {
   const [createPortfolio] = useCreatePortfolioMutation();
   const [verifyPin] = useVerifyPinMutation();
 
+  // Wallet State
+  const { data: walletData, refetch: refetchWallet } = useGetWalletSummaryQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchWallet();
+    }, [refetchWallet])
+  );
+
+  const walletBalanceNaira = parseFloat(walletData?.currentBalance || "0") / 100;
+  const [createdGoalId, setCreatedGoalId] = useState<string | null>(null);
+
   // Form State
   const [goalName, setGoalName] = useState("");
   const [category, setCategory] = useState(initialCategory || "");
-  const [source, setSource] = useState("Wealth Save");
   const [amount, setAmount] = useState("");
   const [autoSaveAmount, setAutoSaveAmount] = useState("");
+  const [manualDepositAmount, setManualDepositAmount] = useState("");
   const [frequency, setFrequency] = useState("Monthly");
   const [isManual, setIsManual] = useState(false);
   
@@ -74,12 +92,11 @@ export default function CreateGoalScreen() {
 
   const [wealthPreference, setWealthPreference] = useState<"Interest Based" | "Impact Wealth">("Interest Based");
   const [pin, setPin] = useState("");
+  const [isNavigating, setIsNavigating] = useState(false);
   const pinInputRef = useRef<TextInput>(null);
 
-  const [showSourceDropdown, setShowSourceDropdown] = useState(false);
   const [showFreqDropdown, setShowFreqDropdown] = useState(false);
 
-  const SOURCES = ["Wealth Save", "Wealth Flex"];
   const FREQUENCIES = ["Daily", "Weekly", "Monthly"];
 
   const formatAmount = (val: string | number) => {
@@ -281,11 +298,15 @@ export default function CreateGoalScreen() {
   };
 
   const handleContinue = () => {
-    if (step === "form") {
-      setStep("preview");
-    } else if (step === "preview") {
-      setStep("pin");
-    }
+    setIsNavigating(true);
+    setTimeout(() => {
+      if (step === "form") {
+        setStep("preview");
+      } else if (step === "preview") {
+        setStep("pin");
+      }
+      setIsNavigating(false);
+    }, 150);
   };
 
   const handleCreate = useCallback(async () => {
@@ -299,34 +320,47 @@ export default function CreateGoalScreen() {
       const targetAmountKobo = Math.round(targetAmountVal * 100);
       
       const autoSaveAmountVal = parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) || 0;
-      const autoSaveAmountKobo = isManual ? 0 : Math.round(autoSaveAmountVal * 100);
+      const autoSaveAmountKobo = Math.round(autoSaveAmountVal * 100);
       
-      const autoSaveEnabled = !isManual;
+      const manualDepositVal = parseFloat(manualDepositAmount.replace(/[^\d.]/g, "")) || 0;
+      const manualDepositKobo = Math.round(manualDepositVal * 100);
 
-      const initialAmountKobo = !isManual && autoSaveAmountKobo >= 100 ? autoSaveAmountKobo : 100;
+      const initialAmountKobo = isManual ? manualDepositKobo : autoSaveAmountKobo;
 
       const body: any = {
         name: goalName.trim(),
-        amount: initialAmountKobo, // Backend requires amount >= 100 (min 100 Kobo = ₦1)
+        amount: initialAmountKobo,
         targetAmount: targetAmountKobo,
         maturityDate: endDate.toISOString(),
-        autoSaveEnabled,
-        autoSaveFrequency: (frequency.toUpperCase() as any) || "MONTHLY",
-        autoSaveAmount: autoSaveAmountKobo,
+        autoSaveEnabled: !isManual,
+        autoSaveFrequency: (frequency ? frequency.toUpperCase() : "MONTHLY") as "DAILY" | "WEEKLY" | "MONTHLY",
+        autoSaveAmount: isManual ? initialAmountKobo : autoSaveAmountKobo,
         autoSaveSource: "WALLET",
+        nextAutoSaveDate: new Date(Date.now() + 86400000).toISOString(),
         metadata: {
           category: category.trim(),
           wealthPreference,
-          source,
+          fundingSource: "WALLET",
         },
       };
 
-      await createPortfolio({ type: "wealthgoal", body }).unwrap();
+      console.log("🎯 [WealthGoal Create Request] Payload:\n", JSON.stringify(body, null, 2));
+
+      const res: any = await createPortfolio({ type: "wealthgoal", body }).unwrap();
+      console.log("✅ [WealthGoal Create Success] Response:\n", JSON.stringify(res, null, 2));
+
+      if (res?.id) {
+        setCreatedGoalId(res.id);
+      }
       setStep("success");
     } catch (err: any) {
-      console.error("Failed to create portfolio:", err);
+      console.error("❌ [WealthGoal Create Error] Full Error:\n", JSON.stringify(err, null, 2));
       const rawMsg = err?.data?.message;
-      const errorMsg = Array.isArray(rawMsg) ? rawMsg.join(", ") : rawMsg || err?.message || "Invalid transaction PIN or request failed.";
+      const errorMsg = Array.isArray(rawMsg)
+        ? rawMsg.join(", ")
+        : typeof rawMsg === "string"
+        ? rawMsg
+        : err?.data?.error || err?.message || "Failed to create WealthGoal. Please check your balance and try again.";
       
       if (typeof errorMsg === "string" && errorMsg.toLowerCase().includes("not set")) {
         Alert.alert(
@@ -338,10 +372,7 @@ export default function CreateGoalScreen() {
           ]
         );
       } else {
-        Alert.alert(
-          "Verification Failed",
-          errorMsg
-        );
+        Alert.alert("Creation Failed", errorMsg);
       }
       setPin(""); // Clear invalid PIN
     } finally {
@@ -352,10 +383,10 @@ export default function CreateGoalScreen() {
     category,
     amount,
     autoSaveAmount,
+    manualDepositAmount,
     endDate,
     isManual,
     frequency,
-    source,
     wealthPreference,
     pin,
     verifyPin,
@@ -493,49 +524,13 @@ export default function CreateGoalScreen() {
         {/* Wealth Source */}
         <View>
           <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
-            Wealth Source
+            Funding Source
           </Text>
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => setShowSourceDropdown(!showSourceDropdown)}
-            className="bg-[#F3F4F6] p-4 rounded-xl flex-row justify-between items-center"
-          >
-            <Text
-              className={
-                source
-                  ? "text-[#1A1A1A] font-medium"
-                  : "text-[#9CA3AF] font-medium"
-              }
-            >
-              {source || "Select funding source"}
+          <View className="bg-[#F3F4F6] p-4 rounded-xl flex-row justify-between items-center">
+            <Text className="text-[#1A1A1A] font-medium text-sm">
+              Main Wallet
             </Text>
-            <Ionicons
-              name={showSourceDropdown ? "chevron-up" : "chevron-down"}
-              size={20}
-              color="#1A1A1A"
-            />
-          </TouchableOpacity>
-          {showSourceDropdown && (
-            <View className="bg-white rounded-xl mt-2 overflow-hidden elevation-5 shadow-lg border border-[#F3F4F6]">
-              {SOURCES.map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  onPress={() => {
-                    setSource(s);
-                    setShowSourceDropdown(false);
-                  }}
-                  style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 14,
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#F5F5F5",
-                  }}
-                >
-                  <Text style={{ color: "#323232", fontSize: 15 }}>{s}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+          </View>
         </View>
 
         {/* Target Amount */}
@@ -578,11 +573,89 @@ export default function CreateGoalScreen() {
           <Switch
             value={isManual}
             onValueChange={setIsManual}
-            trackColor={{ false: "#155D5F", true: "#C9C9C9" }}
-            ios_backgroundColor="#C9C9C9"
-            thumbColor={Platform.OS === "ios" ? "#FFFFFF" : "#FFFFFF"}
+            trackColor={{ false: "#D1D5DB", true: "#155D5F" }}
+            ios_backgroundColor="#D1D5DB"
+            thumbColor="#FFFFFF"
           />
         </View>
+
+        {/* Starting Deposit (when manual savings is ON) */}
+        {isManual && (
+          <View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <Text className="text-[#1A1A1A] font-bold text-[12px]">
+                Starting Deposit (₦)
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={{ color: "#6B7280", fontSize: 11, fontWeight: "500" }}>
+                  Wallet:{" "}
+                  <Text style={{ color: "#1A1A1A", fontWeight: "700" }}>
+                    ₦{walletBalanceNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </Text>
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push("/wallet/deposit" as any)}
+                  style={{
+                    backgroundColor: "#EEF6F6",
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 6,
+                  }}
+                >
+                  <Text style={{ color: "#155D5F", fontSize: 10, fontWeight: "700" }}>
+                    + Fund
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <TextInput
+              placeholder="₦1,000.00"
+              placeholderTextColor="#9CA3AF"
+              className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] font-bold text-base"
+              keyboardType="numeric"
+              value={manualDepositAmount ? `₦${manualDepositAmount}` : ""}
+              onChangeText={(text) => {
+                const cleaned = text.replace(/\D/g, "");
+                const formatted = cleaned ? Number(cleaned).toLocaleString("en-NG") : "";
+                setManualDepositAmount(formatted);
+              }}
+              style={{
+                borderWidth: (parseFloat(manualDepositAmount.replace(/[^\d.]/g, "")) || 0) > walletBalanceNaira ? 1 : 0,
+                borderColor: (parseFloat(manualDepositAmount.replace(/[^\d.]/g, "")) || 0) > walletBalanceNaira ? "#EF4444" : "transparent",
+              }}
+            />
+            {(() => {
+              const depositVal = parseFloat(manualDepositAmount.replace(/[^\d.]/g, "")) || 0;
+              const targetVal = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
+              if (depositVal > walletBalanceNaira) {
+                return (
+                  <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                    ⚠️ Insufficient wallet balance. Fund your wallet or enter a lower starting amount.
+                  </Text>
+                );
+              }
+              if (depositVal > targetVal && targetVal > 0) {
+                return (
+                  <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                    Starting deposit cannot exceed target goal amount.
+                  </Text>
+                );
+              }
+              if (depositVal > 0 && depositVal < 100) {
+                return (
+                  <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                    Minimum starting deposit is ₦100.00
+                  </Text>
+                );
+              }
+              return (
+                <Text className="text-[#9CA3AF] text-[10px] mt-1">
+                  Initial amount debited from your wallet today to kickstart your savings goal.
+                </Text>
+              );
+            })()}
+          </View>
+        )}
 
         {/* AutoSave Settings (only when NOT manual) */}
         {!isManual && (
@@ -645,15 +718,15 @@ export default function CreateGoalScreen() {
                 <Text className="text-[#1A1A1A] font-bold text-[12px]">
                   Auto-Save Amount (₦)
                 </Text>
-                {calculateRecommendedSaving() && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={{ color: "#6B7280", fontSize: 11, fontWeight: "500" }}>
+                    Wallet:{" "}
+                    <Text style={{ color: "#1A1A1A", fontWeight: "700" }}>
+                      ₦{walletBalanceNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Text>
+                  </Text>
                   <TouchableOpacity
-                    onPress={() => {
-                      const rec = calculateRecommendedSaving();
-                      if (rec) {
-                        const numOnly = rec.split(" ")[0].replace(/[^\d.]/g, "");
-                        setAutoSaveAmount(Number(numOnly).toLocaleString("en-NG"));
-                      }
-                    }}
+                    onPress={() => router.push("/wallet/deposit" as any)}
                     style={{
                       backgroundColor: "#EEF6F6",
                       paddingHorizontal: 8,
@@ -661,11 +734,11 @@ export default function CreateGoalScreen() {
                       borderRadius: 6,
                     }}
                   >
-                    <Text style={{ color: "#0B575B", fontSize: 10, fontWeight: "700" }}>
-                      💡 Recommended: {calculateRecommendedSaving()?.split(" (")[0]}
+                    <Text style={{ color: "#155D5F", fontSize: 10, fontWeight: "700" }}>
+                      + Fund
                     </Text>
                   </TouchableOpacity>
-                )}
+                </View>
               </View>
               <TextInput
                 placeholder="₦0.00"
@@ -678,10 +751,21 @@ export default function CreateGoalScreen() {
                   const formatted = cleaned ? Number(cleaned).toLocaleString("en-NG") : "";
                   setAutoSaveAmount(formatted);
                 }}
+                style={{
+                  borderWidth: (parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) || 0) > walletBalanceNaira ? 1 : 0,
+                  borderColor: (parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) || 0) > walletBalanceNaira ? "#EF4444" : "transparent",
+                }}
               />
               {(() => {
                 const targetVal = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
                 const autoVal = parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) || 0;
+                if (autoVal > walletBalanceNaira) {
+                  return (
+                    <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                      ⚠️ Insufficient wallet balance for initial auto-save deduction.
+                    </Text>
+                  );
+                }
                 if (autoVal > targetVal && targetVal > 0) {
                   return (
                     <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
@@ -689,9 +773,27 @@ export default function CreateGoalScreen() {
                     </Text>
                   );
                 }
+                if (calculateRecommendedSaving()) {
+                  return (
+                    <TouchableOpacity
+                      onPress={() => {
+                        const rec = calculateRecommendedSaving();
+                        if (rec) {
+                          const numOnly = rec.split(" ")[0].replace(/[^\d.]/g, "");
+                          setAutoSaveAmount(Number(numOnly).toLocaleString("en-NG"));
+                        }
+                      }}
+                      style={{ marginTop: 6 }}
+                    >
+                      <Text style={{ color: "#0B575B", fontSize: 11, fontWeight: "600" }}>
+                        💡 Recommended: {calculateRecommendedSaving()?.split(" (")[0]}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                }
                 return (
                   <Text className="text-[#9CA3AF] text-[10px] mt-1">
-                    Amount automatically deducted {frequency.toLowerCase()}
+                    First amount debited today, then automatically deducted {frequency.toLowerCase()}.
                   </Text>
                 );
               })()}
@@ -735,10 +837,12 @@ export default function CreateGoalScreen() {
         animationType="slide"
         onRequestClose={() => setShowDatePicker(false)}
       >
-        <TouchableWithoutFeedback onPress={() => setShowDatePicker(false)}>
-          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
-            <TouchableWithoutFeedback>
-              <View style={{ backgroundColor: "white", borderTopLeftRadius: 36, borderTopRightRadius: 36, paddingHorizontal: 24, paddingBottom: 48, paddingTop: 12 }}>
+        <View style={{ flex: 1, justifyContent: "flex-end" }}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          <TouchableWithoutFeedback onPress={() => setShowDatePicker(false)}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+          <View style={{ backgroundColor: "white", borderTopLeftRadius: 36, borderTopRightRadius: 36, paddingHorizontal: 24, paddingBottom: 48, paddingTop: 12 }}>
                 {/* Handle bar */}
                 <View style={{ width: 80, height: 6, backgroundColor: "#BABABA", borderRadius: 999, alignSelf: "center", marginBottom: 24 }} />
                 <Text style={{ fontSize: 22, fontWeight: "800", color: "#323232", marginBottom: 20 }}>
@@ -826,24 +930,29 @@ export default function CreateGoalScreen() {
                   <Text style={{ color: "white", fontSize: 16, fontWeight: "700" }}>Confirm</Text>
                 </TouchableOpacity>
               </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+        </View>
       </Modal>
 
       {(() => {
         const targetVal = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
         const autoSaveVal = parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) || 0;
+        const manualDepositVal = parseFloat(manualDepositAmount.replace(/[^\d.]/g, "")) || 0;
         const isTargetValid = targetVal >= 1000;
-        const isAutoSaveValid = isManual || (autoSaveVal > 0 && autoSaveVal <= targetVal);
-        const isFormValid = goalName.trim().length > 0 && category.trim().length > 0 && source && isTargetValid && isAutoSaveValid;
+        const isAutoSaveValid = !isManual && autoSaveVal >= 100 && autoSaveVal <= targetVal && autoSaveVal <= walletBalanceNaira;
+        const isManualDepositValid = isManual && manualDepositVal >= 100 && manualDepositVal <= targetVal && manualDepositVal <= walletBalanceNaira;
+        const isFormValid =
+          goalName.trim().length > 0 &&
+          category.trim().length > 0 &&
+          isTargetValid &&
+          (isManual ? isManualDepositValid : isAutoSaveValid);
         
         return (
           <ThemedButton
             title="Continue"
             onPress={handleContinue}
-            disabled={!isFormValid}
-            style={{ opacity: !isFormValid ? 0.5 : 1 }}
+            loading={isNavigating}
+            disabled={!isFormValid || isNavigating}
+            style={{ opacity: !isFormValid || isNavigating ? 0.5 : 1 }}
             className="mb-10"
           />
         );
@@ -901,7 +1010,7 @@ export default function CreateGoalScreen() {
                 Funding Source
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
-                {source || "Wealth Save"}
+                Main Wallet
               </Text>
             </View>
             <View className="items-end">
@@ -916,25 +1025,14 @@ export default function CreateGoalScreen() {
 
           {/* Row 3 */}
           <View className="flex-row justify-between mb-8">
-            {wealthPreference === "Interest Based" ? (
-              <View>
-                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-                  Est. Wealth Growth
-                </Text>
-                <Text className="text-[#1A1A1A] font-bold text-[16px]">
-                  ₦{calculateEstimatedInterest()}
-                </Text>
-              </View>
-            ) : (
-              <View>
-                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
-                  Preference
-                </Text>
-                <Text className="text-[#1A1A1A] font-bold text-[16px]">
-                  Impact Wealth
-                </Text>
-              </View>
-            )}
+            <View>
+              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                {wealthPreference === "Interest Based" ? "Interest Rate" : "Preference"}
+              </Text>
+              <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                {wealthPreference === "Interest Based" ? "12% P.A" : "Impact Wealth"}
+              </Text>
+            </View>
             <View className="items-end">
               <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
                 Method
@@ -945,10 +1043,18 @@ export default function CreateGoalScreen() {
             </View>
           </View>
 
-          {/* Row 4 */}
-          {!isManual && (
-            <View className="flex-row justify-between mb-8">
-              <View>
+          {/* Row 4: Debit Today */}
+          <View className="flex-row justify-between mb-2">
+            <View>
+              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                Debit Today
+              </Text>
+              <Text style={{ color: "#155D5F", fontWeight: "700", fontSize: 16 }}>
+                ₦{formatAmount(isManual ? manualDepositAmount : autoSaveAmount)}
+              </Text>
+            </View>
+            {!isManual ? (
+              <View className="items-end">
                 <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
                   Auto-Debit Schedule
                 </Text>
@@ -956,8 +1062,17 @@ export default function CreateGoalScreen() {
                   ₦{formatAmount(autoSaveAmount)} / {frequency}
                 </Text>
               </View>
-            </View>
-          )}
+            ) : (
+              <View className="items-end">
+                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                  Deposit Type
+                </Text>
+                <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                  Initial Deposit
+                </Text>
+              </View>
+            )}
+          </View>
 
           {/* Jagged Edge */}
           <View
@@ -982,6 +1097,8 @@ export default function CreateGoalScreen() {
         <ThemedButton
           title="Continue"
           onPress={handleContinue}
+          loading={isNavigating}
+          disabled={isNavigating}
           className="mt-14"
         />
       </View>
@@ -1070,20 +1187,44 @@ export default function CreateGoalScreen() {
         You have set a Wealth Goal🥳🎯
       </Text>
 
-      <Text className="text-[#6B7280] text-center text-[14px] leading-[22px] mb-12 px-2">
-        Congratulations, WealthBuilder! You have successfully funded your Wealth
-        Goal account. Your money is now looking forward to help you achieve your
-        goal.🥳{"\n"}
+      <Text className="text-[#6B7280] text-center text-[14px] leading-[22px] mb-8 px-2">
+        Congratulations, WealthBuilder! Your WealthGoal has been created and funded successfully. Your savings journey towards your target has begun!🥳{"\n\n"}
         <Text className="font-bold text-[#1A1A1A]">
-          Current Balance: ₦{formatAmount(amount)}
+          Target Goal: ₦{formatAmount(amount)}{"\n"}
+          Starting Balance: ₦{formatAmount(isManual ? manualDepositAmount : autoSaveAmount)}
         </Text>
       </Text>
 
-      <ThemedButton
-        title="Close"
-        onPress={() => router.replace("/(tabs)/portfolios/wealth-goal" as any)}
-        className="w-full"
-      />
+      <View style={{ width: "100%", gap: 12 }}>
+        <ThemedButton
+          title="View Goal Details"
+          onPress={() => {
+            if (createdGoalId) {
+              router.replace({
+                pathname: "/portfolio/detail/goal/[id]",
+                params: { id: createdGoalId },
+              });
+            } else {
+              router.replace("/(tabs)/portfolios/wealth-goal" as any);
+            }
+          }}
+          style={{ backgroundColor: "#155D5F" }}
+        />
+        <TouchableOpacity
+          onPress={() => router.replace("/(tabs)/portfolios/wealth-goal" as any)}
+          style={{
+            paddingVertical: 14,
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: "#E5E7EB",
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ color: "#4B5563", fontWeight: "700", fontSize: 15 }}>
+            Back to Goals
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 

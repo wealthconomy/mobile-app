@@ -5,14 +5,18 @@ import { PortfolioDetailSkeleton } from "@/src/features/home/components/Dashboar
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Eye, EyeOff } from "lucide-react-native";
-import { useState } from "react";
+import { ArrowUp, Eye, EyeOff } from "lucide-react-native";
+import { useEffect, useMemo, useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/src/store";
-import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
+import {
+  useGetPortfoliosQuery,
+  useGetPortfolioConfigQuery,
+} from "@/src/store/api/portfolioApi";
 import { Portfolio } from "@/src/types/portfolio";
+import { saveCompletedPortfolios, hydrateCompletedPortfolios } from "@/src/store/slices/completedPortfolioSlice";
 
 const THEME = "#560FF1";
 const THEME_BG = "#F3EEFF";
@@ -70,11 +74,64 @@ export default function WealthFamScreen() {
   );
   const showInterest = portfolioPreference !== "Impact Wealth";
 
+  const dispatch = useDispatch();
+  const completedMap = useSelector(
+    (state: RootState) => state.completedPortfolio.completedMap
+  );
+
   const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthfam" });
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const famRateLabel = rates?.wealthfam?.label || "10% P.A.";
   const allGoals = data?.items || [];
 
-  const ongoingPlans = allGoals.filter((g) => g.status === "ACTIVE" && parseFloat(g.balance || "0") > 0);
-  const completedPlans = allGoals.filter((g) => g.status === "COMPLETED" || g.status === "TERMINATED" || (g.status === "ACTIVE" && parseFloat(g.balance || "0") === 0));
+  const isPlanCompleted = (g: Portfolio) =>
+    g.status === "COMPLETED" ||
+    g.status === "TERMINATED" ||
+    g.status === "WITHDRAWN" ||
+    g.status === "CLOSED" ||
+    (g.maturityDate && new Date(g.maturityDate).getTime() <= Date.now());
+
+  useEffect(() => {
+    (dispatch as any)(hydrateCompletedPortfolios());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (allGoals.length > 0) {
+      const completed = allGoals.filter(isPlanCompleted);
+      if (completed.length > 0) {
+        dispatch(saveCompletedPortfolios(completed));
+      }
+    }
+  }, [allGoals, dispatch]);
+
+  const ongoingPlans = allGoals.filter((g: Portfolio) => !isPlanCompleted(g));
+  const completedPlans = useMemo(() => {
+    const fromApi = allGoals.filter((g: Portfolio) => isPlanCompleted(g));
+    const fromCache = Object.values(completedMap).filter((g) => {
+      const type = g.type?.toLowerCase();
+      if (type === "wealthfam") return true;
+      if (g.metadata?.familyMemberName || g.metadata?.familyCategory) return true;
+      if (
+        !type &&
+        !g.metadata?.autoSaveFrequency &&
+        !g.metadata?.lockType &&
+        (g.name?.includes("Kids") ||
+          g.name?.includes("Spouse") ||
+          g.name?.includes("Parent") ||
+          g.name?.includes("Sibling") ||
+          g.name?.includes("Fam") ||
+          g.name?.includes("Family"))
+      ) {
+        return true;
+      }
+      return false;
+    });
+    const combined = new Map<string, Portfolio>();
+    fromCache.forEach((item) => combined.set(item.id, item));
+    fromApi.forEach((item) => combined.set(item.id, item));
+    return Array.from(combined.values());
+  }, [allGoals, completedMap]);
 
   const formatAmount = (val?: string) => {
     if (!val) return "0.00";
@@ -109,7 +166,8 @@ export default function WealthFamScreen() {
           <View
             className="relative overflow-hidden mb-8"
             style={{
-              width: 365,
+              width: "100%",
+              maxWidth: 365,
               height: 170,
               borderTopLeftRadius: 50,
               borderTopRightRadius: 20,
@@ -124,33 +182,56 @@ export default function WealthFamScreen() {
               alignSelf: "center",
             }}
           >
-            <Image
-              source={require("../../../assets/images/fam.png")}
-              className="absolute"
+            {/* Decorative Background Graphic */}
+            <View
+              pointerEvents="none"
               style={{
+                position: "absolute",
                 width: 200,
                 height: 200,
                 top: -17,
                 left: 215,
                 transform: [{ rotate: "368.33deg" }],
                 opacity: 0.3,
+                zIndex: 1,
               }}
-              resizeMode="contain"
-            />
+            >
+              <Image
+                source={require("../../../assets/images/fam.png")}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="contain"
+              />
+            </View>
 
             <View
               style={{
                 position: "absolute",
                 top: 28,
                 left: 20,
-                width: 326,
+                right: 20,
                 zIndex: 10,
               }}
             >
               <View className="flex-row items-center justify-between mb-1">
-                <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-90">
-                  Total Savings
-                </Text>
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-90">
+                    Total Savings
+                  </Text>
+                  {showInterest && (
+                    <View
+                      style={{
+                        backgroundColor: "#6366F1",
+                        paddingHorizontal: 8,
+                        paddingVertical: 2.5,
+                        borderRadius: 20,
+                      }}
+                    >
+                      <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                        {famRateLabel}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <TouchableOpacity
                   onPress={() => setShowBalance(!showBalance)}
                   className="p-1"
@@ -172,7 +253,7 @@ export default function WealthFamScreen() {
                   />
                 ) : (
                   <Text className="text-[#1A1A1A] text-[31px] font-extrabold tracking-tight">
-                    ••••••••
+                    ***
                   </Text>
                 )}
               </View>
@@ -182,7 +263,7 @@ export default function WealthFamScreen() {
                   <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-80">
                     Your wealth grew to ₦0.00 today
                   </Text>
-                  <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
+                  <ArrowUp size={14} color="#4CAF50" />
                 </View>
               )}
             </View>
@@ -312,7 +393,7 @@ export default function WealthFamScreen() {
             style={{
               height: 2,
               backgroundColor: "#EEEEEE",
-              width: 365,
+              width: "100%",
               alignSelf: "center",
               marginBottom: 30,
             }}
@@ -321,7 +402,7 @@ export default function WealthFamScreen() {
           {/* ── Tabs (same structure as WealthGoal) ───────────────── */}
           <View
             style={{
-              width: 365,
+              width: "100%",
               height: 40,
               alignSelf: "center",
               flexDirection: "row",
@@ -452,11 +533,12 @@ function FamListItem({
     ? parseFloat(plan.balance) / parseFloat(plan.targetAmount)
     : 0;
 
-  const growthVal = isCompleted
-    ? (plan as any).totalYieldEarned ??
-      (plan as any).dailyGrowth ??
-      (parseFloat(plan.targetAmount || "0") * 0.12).toString()
-    : plan.dailyGrowth ?? plan.balance;
+  const growthVal =
+    (plan as any).interestAccrued ??
+    (plan as any).accruedInterest ??
+    plan.dailyGrowth ??
+    (plan as any).totalYieldEarned ??
+    "0";
 
   const formattedDate = new Date(plan.maturityDate).toLocaleDateString("en-US", {
     month: "short",
@@ -543,9 +625,12 @@ function FamListItem({
             <Text style={{ fontSize: 10, color: "#9CA3AF" }}>
               {plan.metadata?.category || "Fam"}
             </Text>
-            <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
-              Wealth growth ₦{formatAmount(growthVal.toString())} ↑
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
+                Wealth growth ₦{formatAmount(growthVal.toString())}{" "}
+              </Text>
+              <ArrowUp size={12} color="#4CAF50" />
+            </View>
           </View>
 
           <View

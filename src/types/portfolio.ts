@@ -16,8 +16,21 @@ export interface Portfolio {
   type: string;
   createdAt: string; // ISODate
   status: string;
-  dailyGrowth?: string | number; // in kobo
-  totalYieldEarned?: string | number; // in kobo
+  // Calculated fields from backend
+  dailyGrowth?: string | number;
+  accruedInterest?: string | number;
+  projectedInterest?: string | number;
+  progressPercentage?: number;
+  daysRemaining?: number;
+  nextDebitDate?: string;
+  // AutoSave fields
+  autoSaveEnabled?: boolean;
+  autoSaveAmount?: string | number;
+  autoSaveFrequency?: string;
+  autoSaveSource?: string;
+  nextAutoSaveDate?: string;
+  // Legacy
+  totalYieldEarned?: string | number;
   metadata?: any;
 }
 
@@ -71,3 +84,33 @@ export interface TransferPortfolioFundsRequest {
   pin: string;
 }
 
+export interface UpdateAutoSaveRequest {
+  autoSaveEnabled?: boolean;
+  autoSaveAmount?: number;
+  autoSaveFrequency?: "DAILY" | "WEEKLY" | "MONTHLY";
+  autoSaveSource?: "WALLET" | "CARD";
+}
+
+export interface PortfolioSummaryItem {
+  portfolioType: string;
+  totalBalance: string;
+  dailyGrowth: string;
+  annualPercentageYield: number;
+  growthTrend: "UP" | "DOWN" | string;
+}
+
+export interface PortfolioRateConfig {
+  annualInterestRate: number;
+  label: string;
+  minimumAmount?: number;
+  maximumAmount?: number;
+  minimumTenureDays?: number;
+  maximumTenureDays?: number;
+  earlyWithdrawalPenaltyPercentage?: number;
+  [key: string]: any;
+}
+
+export interface PortfolioConfigData {
+  rates?: Record<string, PortfolioRateConfig>;
+  [key: string]: any;
+}

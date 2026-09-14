@@ -11,6 +11,13 @@ export const libraryApi = baseApi.injectEndpoints({
       providesTags: ["Library"],
     }),
 
+    getLibraryItem: builder.query<ApiResponse<LibraryMaterial>, string>({
+      query: (id) => ({
+        url: `/client/library/${id}`,
+      }),
+      providesTags: ["Library"],
+    }),
+
     recordDownload: builder.mutation<ApiResponse<void>, string>({
       query: (id) => ({
         url: `/client/library/${id}/download`,
@@ -27,11 +34,30 @@ export const libraryApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["Library"],
     }),
+
+    addLibraryLike: builder.mutation<ApiResponse<void>, string>({
+      query: (id) => ({
+        url: `/client/library/${id}/likes`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Library"],
+    }),
+
+    removeLibraryLike: builder.mutation<ApiResponse<void>, string>({
+      query: (id) => ({
+        url: `/client/library/${id}/likes`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Library"],
+    }),
   }),
 });
 
 export const {
   useGetLibraryMaterialsQuery,
+  useGetLibraryItemQuery,
   useRecordDownloadMutation,
   useAddLibraryCommentMutation,
+  useAddLibraryLikeMutation,
+  useRemoveLibraryLikeMutation,
 } = libraryApi;

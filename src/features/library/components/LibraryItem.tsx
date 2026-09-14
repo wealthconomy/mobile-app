@@ -3,6 +3,12 @@ import React from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 import { LibraryMaterial } from "../../../types/library";
 
+function formatDate(raw?: string): string {
+  if (!raw) return "";
+  const date = new Date(raw);
+  if (isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
 
 interface LibraryItemProps {
@@ -33,6 +39,7 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
           onPress={onPress}
           className="bg-white rounded-lg border border-gray-100 p-2"
           activeOpacity={0.7}
+          style={{ overflow: "hidden" }}
         >
           {/* Image with optional play overlay for videos */}
           <View className="relative w-full h-32 rounded-md bg-gray-100 mb-2">
@@ -58,42 +65,48 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
           <Text className="text-gray-500 text-[10px] mb-2" numberOfLines={2}>
             {material.description}
           </Text>
-          <View className="flex-row items-center justify-between mt-2">
-            <View>
-              <Text className="text-gray-400 text-xs font-medium">
-                {material.timeAgo || material.timePosted}{material.readingDuration ? ` • ${material.readingDuration}` : ""}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+          <View style={{ flex: 1, marginRight: 6 }}>
+              <Text className="text-gray-400 text-xs font-medium" numberOfLines={1}>
+                {formatDate(material.createdAt || material.timePosted || material.timeAgo)}
+                {material.readingDuration ? ` • ${material.readingDuration}` : ""}
               </Text>
-              <View className="flex-row items-center mt-1">
-                <View className="flex-row items-center">
-                  <Ionicons name="heart-outline" size={12} color="#9CA3AF" />
-                  <Text className="text-gray-400 text-xs ml-1">{material.likesCount}</Text>
+              {material.contentType !== "video" && (
+                <View className="flex-row items-center mt-1">
+                  <View className="flex-row items-center">
+                    <Ionicons name="heart" size={12} color="#EF4444" />
+                    <Text className="text-gray-400 text-xs ml-1">{material.likesCount}</Text>
+                  </View>
+                  <View className="flex-row items-center ml-3">
+                    <Ionicons name="chatbubble-outline" size={12} color="#9CA3AF" />
+                    <Text className="text-gray-400 text-xs ml-1">{material.commentsCount}</Text>
+                  </View>
                 </View>
-                <View className="flex-row items-center ml-3">
-                  <Ionicons name="chatbubble-outline" size={12} color="#9CA3AF" />
-                  <Text className="text-gray-400 text-xs ml-1">{material.commentsCount}</Text>
-                </View>
-              </View>
+              )}
             </View>
-            {/* Action button: play for videos, read/download for docs */}
-            {material.contentType === "video" ? (
-              <TouchableOpacity onPress={onWatchOnYouTube} className="bg-red-50 p-1.5 rounded-full">
-                <Ionicons name="play-circle-outline" size={16} color="#EF4444" />
-              </TouchableOpacity>
-            ) : (
-              <View className="flex-row items-center">
-                <TouchableOpacity onPress={onReadInApp} className="bg-gray-50 p-1.5 rounded-full mr-1">
-                  <Ionicons name="book-outline" size={16} color="#155D5F" />
+            {/* Action button — flexShrink: 0 keeps it from being pushed outside */}
+            <View style={{ flexShrink: 0 }}>
+              {material.contentType === "video" ? (
+                <TouchableOpacity onPress={onWatchOnYouTube} style={{ backgroundColor: "#FEF2F2", padding: 6, borderRadius: 999 }}>
+                  <Ionicons name="play-circle-outline" size={16} color="#EF4444" />
                 </TouchableOpacity>
-                {material.isDownloadable && (
-                  <TouchableOpacity onPress={onDownload} className="bg-gray-50 p-1.5 rounded-full">
-                    <Ionicons name="download-outline" size={16} color="#155D5F" />
+              ) : (
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <TouchableOpacity onPress={onReadInApp} style={{ backgroundColor: "#F9FAFB", padding: 6, borderRadius: 999, marginRight: 4 }}>
+                    <Ionicons name="book-outline" size={16} color="#155D5F" />
                   </TouchableOpacity>
-                )}
-              </View>
-            )}
+                  {material.isDownloadable && (
+                    <TouchableOpacity onPress={onDownload} style={{ backgroundColor: "#F9FAFB", padding: 6, borderRadius: 999 }}>
+                      <Ionicons name="download-outline" size={16} color="#155D5F" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
           </View>
         </TouchableOpacity>
       </View>
+
     );
   }
 
@@ -168,19 +181,22 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center">
               <View>
-                <Text className="text-gray-400 text-xs font-medium">
-                  {material.timeAgo || material.timePosted}{material.readingDuration ? ` • ${material.readingDuration}` : ""}
+                <Text className="text-gray-400 text-xs font-medium" numberOfLines={1}>
+                  {formatDate((material as any).createdAt || material.timePosted || material.timeAgo)}
+                  {material.readingDuration ? ` • ${material.readingDuration}` : ""}
                 </Text>
-                <View className="flex-row items-center mt-1">
-                  <View className="flex-row items-center mr-3">
-                    <Ionicons name="heart-outline" size={12} color="#9CA3AF" />
-                    <Text className="text-gray-400 text-xs ml-1">{material.likesCount}</Text>
+                {material.contentType !== "video" && (
+                  <View className="flex-row items-center mt-1">
+                    <View className="flex-row items-center mr-3">
+                      <Ionicons name="heart" size={12} color="#EF4444" />
+                      <Text className="text-gray-400 text-xs ml-1">{material.likesCount}</Text>
+                    </View>
+                    <View className="flex-row items-center">
+                      <Ionicons name="chatbubble-outline" size={12} color="#9CA3AF" />
+                      <Text className="text-gray-400 text-xs ml-1">{material.commentsCount}</Text>
+                    </View>
                   </View>
-                  <View className="flex-row items-center">
-                    <Ionicons name="chatbubble-outline" size={12} color="#9CA3AF" />
-                    <Text className="text-gray-400 text-xs ml-1">{material.commentsCount}</Text>
-                  </View>
-                </View>
+                )}
               </View>
             </View>
           </View>

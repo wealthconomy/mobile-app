@@ -1,4 +1,6 @@
 import Header from "@/src/components/common/Header";
+import { AppToast, ToastState } from "@/src/components/common/AppToast";
+import { AppConfirmModal, ConfirmState } from "@/src/components/common/AppConfirmModal";
 import {
   useAddToGroupBlacklistMutation,
   useGetGroupMembersQuery,
@@ -10,7 +12,6 @@ import { StatusBar } from "expo-status-bar";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   Text,
@@ -31,6 +32,8 @@ export default function BlacklistScreen() {
 
   const [removeFromBlacklist] = useRemoveFromGroupBlacklistMutation();
   const [searchQuery, setSearchQuery] = useState("");
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
 
   const members = membersData?.items || [];
   const mappedMembers = useMemo(() => {
@@ -59,26 +62,22 @@ export default function BlacklistScreen() {
   }, [mappedMembers, searchQuery]);
 
   const handleUnblacklist = (userId: string, name: string) => {
-    Alert.alert(
-      "Remove from Blacklist",
-      `Are you sure you want to unblock ${name}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Unblock",
-          onPress: async () => {
-            try {
-              await removeFromBlacklist({ id: id as string, userId }).unwrap();
-              Alert.alert("Success", `${name} has been removed from blacklist.`);
-              refetch();
-            } catch (err: any) {
-              Alert.alert("Notice", "Member unblocked successfully.");
-              refetch();
-            }
-          },
-        },
-      ]
-    );
+    setConfirm({
+      title: "Remove from Blacklist",
+      message: `Are you sure you want to unblock ${name}?`,
+      confirmLabel: "Unblock",
+      isDestructive: false,
+      onConfirm: async () => {
+        try {
+          await removeFromBlacklist({ id: id as string, userId }).unwrap();
+          setToast({ type: "success", title: "Success", message: `${name} has been removed from blacklist.` });
+          refetch();
+        } catch (err: any) {
+          setToast({ type: "info", title: "Notice", message: "Member unblocked successfully." });
+          refetch();
+        }
+      },
+    });
   };
 
   return (
@@ -200,6 +199,8 @@ export default function BlacklistScreen() {
           />
         )}
       </View>
+      <AppToast toast={toast} onDismiss={() => setToast(null)} />
+      <AppConfirmModal confirm={confirm} onDismiss={() => setConfirm(null)} />
     </SafeAreaView>
   );
 }

@@ -5,14 +5,18 @@ import { PortfolioDetailSkeleton } from "@/src/features/home/components/Dashboar
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Eye, EyeOff } from "lucide-react-native";
-import { useState } from "react";
+import { ArrowUp, Eye, EyeOff } from "lucide-react-native";
+import { useState, useEffect, useMemo } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/src/store";
-import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
+import {
+  useGetPortfoliosQuery,
+  useGetPortfolioConfigQuery,
+} from "@/src/store/api/portfolioApi";
 import { Portfolio } from "@/src/types/portfolio";
+import { saveCompletedPortfolios, hydrateCompletedPortfolios } from "@/src/store/slices/completedPortfolioSlice";
 
 const THEME = "#005F61"; // Dark teal for text/buttons
 const THEME_BG = "#D5EDFF"; // Theme light blue
@@ -86,11 +90,51 @@ export default function WealthFlowScreen() {
   );
   const showInterest = portfolioPreference !== "Impact Wealth";
 
+  const dispatch = useDispatch();
+  const completedMap = useSelector(
+    (state: RootState) => state.completedPortfolio.completedMap
+  );
+
   const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthflow" });
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const flowRateLabel = rates?.wealthflow?.label || "10% P.A.";
   const allGoals = data?.items || [];
 
-  const ongoingPlans = allGoals.filter((g) => g.status === "ACTIVE" && parseFloat(g.balance || "0") > 0);
-  const completedPlans = allGoals.filter((g) => g.status === "COMPLETED" || g.status === "TERMINATED" || (g.status === "ACTIVE" && parseFloat(g.balance || "0") === 0));
+  const isPlanCompleted = (g: Portfolio) =>
+    g.status === "COMPLETED" ||
+    g.status === "TERMINATED" ||
+    g.status === "WITHDRAWN" ||
+    g.status === "CLOSED" ||
+    (g.maturityDate && new Date(g.maturityDate).getTime() <= Date.now());
+
+  useEffect(() => {
+    (dispatch as any)(hydrateCompletedPortfolios());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (allGoals.length > 0) {
+      const completed = allGoals.filter(isPlanCompleted);
+      if (completed.length > 0) {
+        dispatch(saveCompletedPortfolios(completed));
+      }
+    }
+  }, [allGoals, dispatch]);
+
+  const ongoingPlans = allGoals.filter((g) => !isPlanCompleted(g));
+  const completedPlans = useMemo(() => {
+    const fromApi = allGoals.filter(isPlanCompleted);
+    const fromCache = Object.values(completedMap).filter((g) => {
+      const type = g.type?.toLowerCase();
+      if (type === "wealthflow") return true;
+      if (g.metadata?.autoSaveFrequency || g.metadata?.category?.includes("Flow") || g.metadata?.category?.includes("Auto")) return true;
+      return false;
+    });
+    const combined = new Map<string, Portfolio>();
+    fromCache.forEach((item) => combined.set(item.id, item));
+    fromApi.forEach((item) => combined.set(item.id, item));
+    return Array.from(combined.values());
+  }, [allGoals, completedMap]);
 
   const formatAmount = (val?: string) => {
     if (!val) return "0.00";
@@ -129,7 +173,8 @@ export default function WealthFlowScreen() {
           <View
             className="relative overflow-hidden mb-8"
             style={{
-              width: 365,
+              width: "100%",
+              maxWidth: 365,
               height: 170,
               borderTopLeftRadius: 50,
               borderTopRightRadius: 20,
@@ -144,29 +189,52 @@ export default function WealthFlowScreen() {
               alignSelf: "center",
             }}
           >
-            <Image
-              source={require("../../../assets/images/auto.png.png")}
-              className="absolute"
+            {/* Decorative Background Graphic */}
+            <View
+              pointerEvents="none"
               style={{
+                position: "absolute",
                 width: 180,
                 height: 180,
                 right: -40,
                 top: -10,
                 opacity: 0.3,
+                zIndex: 1,
               }}
-              resizeMode="contain"
-            />
+            >
+              <Image
+                source={require("../../../assets/images/auto.png.png")}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="contain"
+              />
+            </View>
 
             <View
-              style={{ position: "absolute", top: 25, left: 20, zIndex: 10 }}
+              style={{ position: "absolute", top: 25, left: 20, right: 20, zIndex: 10 }}
             >
               <View
                 className="flex-row items-center justify-between mb-1"
                 style={{ width: 280 }}
               >
-                <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-80">
-                  Total Savings
-                </Text>
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-80">
+                    Total Savings
+                  </Text>
+                  {showInterest && (
+                    <View
+                      style={{
+                        backgroundColor: "#0EA5E9",
+                        paddingHorizontal: 8,
+                        paddingVertical: 2.5,
+                        borderRadius: 20,
+                      }}
+                    >
+                      <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                        {flowRateLabel}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <TouchableOpacity
                   onPress={() => setShowBalance(!showBalance)}
                   className="p-1"
@@ -188,7 +256,7 @@ export default function WealthFlowScreen() {
                   />
                 ) : (
                   <Text className="text-[#1A1A1A] text-[31px] font-extrabold tracking-tight">
-                    ••••••••
+                    ***
                   </Text>
                 )}
               </View>
@@ -198,7 +266,7 @@ export default function WealthFlowScreen() {
                   <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-70">
                     Your wealth grew to ₦0.00 today
                   </Text>
-                  <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
+                  <ArrowUp size={14} color="#4CAF50" />
                 </View>
               )}
             </View>
@@ -479,11 +547,12 @@ function AutoListItem({
     ? parseFloat(plan.balance) / parseFloat(plan.targetAmount)
     : 0;
 
-  const growthVal = isCompleted
-    ? (plan as any).totalYieldEarned ??
-      (plan as any).dailyGrowth ??
-      (parseFloat(plan.targetAmount || "0") * 0.12).toString()
-    : plan.dailyGrowth ?? plan.balance;
+  const growthVal =
+    (plan as any).interestAccrued ??
+    (plan as any).accruedInterest ??
+    plan.dailyGrowth ??
+    (plan as any).totalYieldEarned ??
+    "0";
   
   const formattedDate = new Date(plan.maturityDate).toLocaleDateString("en-US", {
     month: "short",
@@ -539,9 +608,12 @@ function AutoListItem({
         <View className="flex-row justify-between items-center mb-2">
           <View>
             <Text className="text-[10px] text-[#6B7280]">{plan.metadata?.category || "Flow"}</Text>
-            <Text className="text-[10px] text-[#4CAF50] font-bold">
-              Wealth growth ₦{formatAmount(growthVal.toString())} ↑
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
+                Wealth growth ₦{formatAmount(growthVal.toString())}{" "}
+              </Text>
+              <ArrowUp size={12} color="#4CAF50" />
+            </View>
           </View>
           <View className="flex-1 max-w-[120px] ml-4">
             <View

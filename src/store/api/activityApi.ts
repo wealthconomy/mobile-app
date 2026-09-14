@@ -14,7 +14,7 @@ export const activityApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getMyActivities: builder.query<
       ApiResponse<CursorPaginatedResponse<UserActivity[]>>,
-      { limit?: number; type?: string; period?: string; after?: string; _append?: boolean } | void
+      { limit?: number; type?: string; period?: string; after?: string; from?: string; to?: string; _append?: boolean } | void
     >({
       query: (params) => {
         const { _append, ...rest } = params || {};
@@ -29,7 +29,9 @@ export const activityApi = baseApi.injectEndpoints({
       },
       merge: (currentCache, newItems, { arg }) => {
         if (arg?._append) {
-          currentCache.data.items.push(...newItems.data.items);
+          const existingIds = new Set((currentCache.data?.items || []).map((i) => i.id));
+          const freshItems = (newItems.data?.items || []).filter((i) => !existingIds.has(i.id));
+          currentCache.data.items.push(...freshItems);
           currentCache.data.nextCursor = newItems.data.nextCursor;
           currentCache.data.hasNext = newItems.data.hasNext;
         } else {

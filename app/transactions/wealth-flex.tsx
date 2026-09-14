@@ -1,21 +1,24 @@
-import Header from "@/src/components/common/Header";
+﻿import Header from "@/src/components/common/Header";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   FlatList,
   Modal,
+  StyleSheet,
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path, Rect } from "react-native-svg";
 import { useGetWalletTransactionsQuery } from "@/src/store/api/walletApi";
 import { WalletTransaction } from "@/src/types/wallet";
 import { InfiniteScrollList } from "@/src/components/common/ui/InfiniteScrollList";
+import { getCleanTransactionTitle } from "@/src/utils/formatters";
 
 
 const MONTHS = [
@@ -75,7 +78,16 @@ export default function FlexTransactionsScreen() {
   const [viewDate, setViewDate] = useState(new Date());
   
   const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const { data, isLoading, isFetching } = useGetWalletTransactionsQuery({ limit: 20, after: cursor });
+  const { data, isLoading, isFetching, refetch } = useGetWalletTransactionsQuery(
+    { limit: 20, after: cursor },
+    { refetchOnMountOrArgChange: true }
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const transactions = data?.items || [];
   const hasNextPage = data?.hasNext ?? false;
@@ -191,7 +203,9 @@ export default function FlexTransactionsScreen() {
         >
           <InfiniteScrollList
             data={transactions}
-            keyExtractor={(item: WalletTransaction) => item.id}
+            keyExtractor={(item: WalletTransaction, index: number) =>
+              `flex-txn-${item.id}-${index}`
+            }
             renderItem={({ item }) => <FlexTransactionItem item={item as WalletTransaction} />}
             ItemSeparatorComponent={() => <View className="h-[10px]" />}
             showsVerticalScrollIndicator={false}
@@ -204,11 +218,13 @@ export default function FlexTransactionsScreen() {
         </View>
       </View>
 
-      <Modal visible={showPicker} transparent animationType="slide">
-        <TouchableWithoutFeedback onPress={() => setShowPicker(false)}>
-          <View className="flex-1 bg-black/50 justify-end">
-            <TouchableWithoutFeedback>
-              <View className="bg-white rounded-t-[36px] px-6 pb-12 pt-3">
+      <Modal visible={showPicker} transparent animationType="slide" onRequestClose={() => setShowPicker(false)}>
+        <View style={{ flex: 1, justifyContent: "flex-end" }}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          <TouchableWithoutFeedback onPress={() => setShowPicker(false)}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+          <View className="bg-white rounded-t-[36px] px-6 pb-12 pt-3">
                 <View className="w-20 h-1.5 bg-[#bababa] rounded-full self-center mb-6" />
                 <Text className="text-[22px] font-extrabold text-[#323232] mb-5 mt-2">
                   Filter by date
@@ -257,9 +273,7 @@ export default function FlexTransactionsScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -283,7 +297,10 @@ function FlexTransactionItem({ item }: { item: WalletTransaction }) {
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
-    const amountNum = parseFloat(val) / 100;
+    const cleaned = String(val).replace(/[^0-9.-]/g, "");
+    const raw = parseFloat(cleaned);
+    if (isNaN(raw)) return "0.00";
+    const amountNum = Math.abs(raw) / 100;
     return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
@@ -294,13 +311,7 @@ function FlexTransactionItem({ item }: { item: WalletTransaction }) {
   });
 
   const getTitle = () => {
-    if (item.description) return item.description;
-    switch (item.reason) {
-      case "WALLET_TOPUP": return "Wallet Topup";
-      case "WITHDRAWAL": return "Withdrawal";
-      case "REFERRAL_CREDIT": return "Referral Bonus";
-      default: return item.reason;
-    }
+    return getCleanTransactionTitle(item);
   };
 
   return (
@@ -335,7 +346,7 @@ function FlexTransactionItem({ item }: { item: WalletTransaction }) {
       </View>
       <View className="items-end">
         <Text
-          className={`font-bold text-[13px] mb-1.5 ${isCredit ? "text-[#4CAF50]" : "text-[#1A1A1A]"}`}
+          className={`font-bold text-[13px] mb-1.5 ${isCredit ? "text-[#10B981]" : "text-[#DC2626]"}`}
         >
           {isCredit ? "+" : "-"}₦{formatAmount(item.amount)}
         </Text>

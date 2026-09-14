@@ -1,14 +1,16 @@
-import Header from "@/src/components/common/Header";
+﻿import Header from "@/src/components/common/Header";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
   Modal,
   ScrollView,
   StatusBar,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useState } from "react";
@@ -111,7 +113,13 @@ export default function SecurityScreen() {
         visible={showDeleteModal}
         onRequestClose={() => setShowDeleteModal(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black/50 px-5">
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowDeleteModal(false)}
+          />
           <View className="bg-white rounded-[24px] p-6 w-full max-w-[340px] items-center">
             <View className="w-16 h-16 bg-red-50 rounded-full justify-center items-center mb-4">
               <MaterialCommunityIcons

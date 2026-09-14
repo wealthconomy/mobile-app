@@ -1,5 +1,6 @@
 import { Skeleton } from "@/src/components/common/skeletons";
 import { Ionicons } from "@expo/vector-icons";
+import { ArrowUp } from "lucide-react-native";
 import React, { useMemo } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -93,16 +94,21 @@ export const SavingsSummary = React.memo(
                 </Text>
               </>
             ) : (
-              "••••••••"
+              "***"
             )}
           </Text>
         )}
 
         {showGrowth && (
-          <Text className="text-[14px] font-semibold text-[#4B5563] mt-1">
-            Your wealth grew by{" "}
-            <Text className="text-[#10B981]">{formattedGrowth} today ↑</Text>
-          </Text>
+          <View className="flex-row items-center mt-1">
+            <Text className="text-[14px] font-semibold text-[#4B5563]">
+              Your wealth grew by{" "}
+            </Text>
+            <Text className="text-[#10B981] font-semibold text-[14px]">
+              {formattedGrowth} today{" "}
+            </Text>
+            <ArrowUp size={14} color="#10B981" />
+          </View>
         )}
       </Animated.View>
     );

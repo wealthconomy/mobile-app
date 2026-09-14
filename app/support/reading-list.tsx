@@ -1,22 +1,121 @@
-import { useGetBookmarkedBlogsQuery, useToggleBookmarkMutation } from "@/src/store/api/blogApi";
+import { useGetBookmarkedBlogsQuery } from "@/src/store/api/blogApi";
+import { useBookmarks } from "@/src/hooks/useBookmarks";
 import { BlogListItem } from "@/src/features/wise-up/components/BlogListItem";
 import { BlogSkeleton } from "@/src/features/wise-up/components/BlogSkeleton";
+import { Blog } from "@/src/types/blog";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useCallback, useEffect, useMemo } from "react";
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ReadingListScreen() {
   const router = useRouter();
 
-  const { data: response, isLoading } = useGetBookmarkedBlogsQuery();
-  const bookmarkedBlogs = response?.data?.items || [];
+  const {
+    bookmarkedBlogs: localBookmarkedBlogs,
+    removeBookmark,
+    syncServerBookmarks,
+    isHydrated,
+  } = useBookmarks();
 
-  const [toggleBookmark] = useToggleBookmarkMutation();
+  const {
+    data: response,
+    isLoading: isServerLoading,
+    isFetching,
+    refetch,
+  } = useGetBookmarkedBlogsQuery(undefined, {
+    refetchOnFocus: true,
+    refetchOnMountOrArgChange: true,
+  });
 
-  const handleBookmark = (id: string) => {
-    toggleBookmark(id);
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
+  // Sync any valid blogs returned from server into local store
+  useEffect(() => {
+    if (!response) return;
+    const payload = (response as any)?.data !== undefined ? (response as any).data : response;
+    let list: any[] = [];
+    if (Array.isArray(payload)) {
+      list = payload;
+    } else if (Array.isArray(payload?.items)) {
+      list = payload.items;
+    } else if (Array.isArray(payload?.blogs)) {
+      list = payload.blogs;
+    } else if (Array.isArray(payload?.data)) {
+      list = payload.data;
+    }
+
+    const validServerBlogs: Blog[] = [];
+    list.forEach((item: any) => {
+      const blogObj = item?.blog && typeof item.blog === "object" ? item.blog : item;
+      const blogId = blogObj.id || blogObj._id || item.blogId || item.id || item._id;
+      if (blogId && (blogObj.title || blogObj.name)) {
+        validServerBlogs.push({
+          ...blogObj,
+          id: blogId,
+          title: blogObj.title || blogObj.name,
+          image: blogObj.image || blogObj.coverImage || blogObj.imageUrl || "",
+          isBookmarked: true,
+        });
+      }
+    });
+
+    if (validServerBlogs.length > 0) {
+      syncServerBookmarks(validServerBlogs);
+    }
+  }, [response, syncServerBookmarks]);
+
+  // Combined list prioritizing local bookmarks with server bookmarks
+  const displayBlogs: Blog[] = useMemo(() => {
+    const blogMap = new Map<string, Blog>();
+
+    // Add local bookmarks first
+    localBookmarkedBlogs.forEach((blog) => {
+      if (blog && blog.id) {
+        blogMap.set(blog.id, { ...blog, isBookmarked: true });
+      }
+    });
+
+    // Merge server blogs if present
+    if (response) {
+      const payload = (response as any)?.data !== undefined ? (response as any).data : response;
+      let list: any[] = [];
+      if (Array.isArray(payload)) {
+        list = payload;
+      } else if (Array.isArray(payload?.items)) {
+        list = payload.items;
+      } else if (Array.isArray(payload?.blogs)) {
+        list = payload.blogs;
+      } else if (Array.isArray(payload?.data)) {
+        list = payload.data;
+      }
+
+      list.forEach((item: any) => {
+        const blogObj = item?.blog && typeof item.blog === "object" ? item.blog : item;
+        const blogId = blogObj.id || blogObj._id || item.blogId || item.id || item._id;
+        if (blogId && !blogMap.has(blogId) && (blogObj.title || blogObj.name)) {
+          blogMap.set(blogId, {
+            ...blogObj,
+            id: blogId,
+            title: blogObj.title || blogObj.name,
+            image: blogObj.image || blogObj.coverImage || blogObj.imageUrl || "",
+            isBookmarked: true,
+          });
+        }
+      });
+    }
+
+    return Array.from(blogMap.values());
+  }, [localBookmarkedBlogs, response]);
+
+  const handleRemoveBookmark = (id: string) => {
+    removeBookmark(id);
   };
 
   return (
@@ -41,17 +140,20 @@ export default function ReadingListScreen() {
         className="flex-1 px-5 mt-4"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
+        refreshControl={
+          <RefreshControl refreshing={isFetching} onRefresh={refetch} colors={["#155D5F"]} />
+        }
       >
-        {isLoading ? (
+        {!isHydrated && isServerLoading ? (
           <BlogSkeleton />
-        ) : bookmarkedBlogs && bookmarkedBlogs.length > 0 ? (
-          bookmarkedBlogs.map((blog, index) => (
+        ) : displayBlogs && displayBlogs.length > 0 ? (
+          displayBlogs.map((blog, index) => (
             <BlogListItem
-              key={blog.id}
+              key={blog.id || index}
               blog={blog}
               onPress={() => router.push(`/blog/${blog.id}` as any)}
-              onBookmark={() => handleBookmark(blog.id)}
-              showSeparator={index !== bookmarkedBlogs.length - 1}
+              onBookmark={() => handleRemoveBookmark(blog.id)}
+              showSeparator={index !== displayBlogs.length - 1}
             />
           ))
         ) : (

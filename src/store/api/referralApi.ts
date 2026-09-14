@@ -1,15 +1,34 @@
 import { baseApi, ApiResponse } from "./baseApi";
 
+export interface RefereeProfile {
+  id?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  imageUrl?: string;
+}
+
 export interface RefereeItem {
   id: string;
+  referrerId?: string;
+  refereeId?: string;
+  code?: string;
+  status?: string;
+  amountKobo?: string | number;
+  isValid?: boolean;
+  paidAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  totalRewardsEarnedKobo?: string | number;
+  referee?: RefereeProfile;
+  // Optional fallbacks for backward compatibility
   firstName?: string;
   lastName?: string;
   name?: string;
   email?: string;
   phone?: string;
   imageUrl?: string;
-  status?: string;
-  createdAt?: string;
   cumulativeSpend?: string;
   totalRewards?: string;
 }

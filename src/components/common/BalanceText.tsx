@@ -32,7 +32,7 @@ export const BalanceText = ({
           style,
         ]}
       >
-        ••••••
+        ***
       </Text>
     );
   }

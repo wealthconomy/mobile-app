@@ -13,6 +13,7 @@ import {
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
+import { GlobalLockoutModal } from "../src/components/common/GlobalLockoutModal";
 import { ActivityIndicator, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -48,7 +49,9 @@ export default function RootLayout() {
   }, [error]);
 
   useEffect(() => {
-    if (loaded) SplashScreen.hideAsync();
+    if (loaded) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
   }, [loaded]);
 
   if (!loaded) return null;
@@ -121,7 +124,11 @@ function RootLayoutNav() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="transactions/activities"
+              name="transactions/activities/index"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="transactions/activities/[id]"
               options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -204,6 +211,10 @@ function RootLayoutNav() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
+              name="profile/my-referrals"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
               name="transactions/detail"
               options={{ headerShown: false }}
             />
@@ -248,6 +259,9 @@ function RootLayoutNav() {
           </Stack>
         </ThemeProvider>
       </QueryClientProvider>
+      {/* GlobalLockoutModal must sit outside QueryClientProvider but inside Provider/SafeAreaProvider
+          so it renders above all screens while still having Redux access */}
+      <GlobalLockoutModal />
     </SafeAreaProvider>
   );
 }

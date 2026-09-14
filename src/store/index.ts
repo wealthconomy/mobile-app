@@ -5,6 +5,9 @@ import authReducer from "./slices/authSlice";
 import paymentReducer from "./slices/paymentSlice";
 import wealthGroupReducer from "./slices/wealthGroupSlice";
 import portfolioPreferenceReducer from "./slices/portfolioPreferenceSlice";
+import bookmarkReducer from "./slices/bookmarkSlice";
+import appStatusReducer from "./slices/appStatusSlice";
+import completedPortfolioReducer from "./slices/completedPortfolioSlice";
 
 export const store = configureStore({
   reducer: {
@@ -13,6 +16,9 @@ export const store = configureStore({
     payment: paymentReducer,
     wealthGroup: wealthGroupReducer,
     portfolioPreference: portfolioPreferenceReducer,
+    bookmark: bookmarkReducer,
+    appStatus: appStatusReducer,
+    completedPortfolio: completedPortfolioReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -112,7 +112,7 @@ export const AccountMenuSections = React.memo(
               }
               iconBgColor="#E0F2F1"
               iconColor="#155D5F"
-              label="Invitations"
+              label="Invitations & Referrals"
               onPress={() => onNavigate("/profile/invite")}
             />
             <MenuItem
