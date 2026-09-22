@@ -26,12 +26,6 @@ const GroupCoverThumbnail = ({ uri, name }: { uri?: string; name?: string }) => 
   const [hasError, setHasError] = useState(false);
   const sanitized = uri?.startsWith("http://") ? uri.replace("http://", "https://") : uri;
 
-  useEffect(() => {
-    if (uri) {
-      console.log(`🖼️ [GroupCoverThumbnail] [${name || "Group"}] Raw URI: "${uri}" | Sanitized: "${sanitized}"`);
-    }
-  }, [uri, sanitized, name]);
-
   if (!sanitized || hasError) {
     return <Users size={28} color={THEME} />;
   }
@@ -39,8 +33,7 @@ const GroupCoverThumbnail = ({ uri, name }: { uri?: string; name?: string }) => 
   return (
     <Image
       source={{ uri: sanitized }}
-      onError={(e) => {
-        console.warn(`❌ [GroupCoverThumbnail Error] [${name || "Group"}]:`, e.nativeEvent?.error, `| URI: "${sanitized}"`);
+      onError={() => {
         setHasError(true);
       }}
       style={{ width: "100%", height: "100%" }}
@@ -69,7 +62,31 @@ export default function GroupDiscoveryScreen() {
 
 
 
-  const allGroups: WealthGroupModel[] = groupsData?.items || [];
+  const rawGroups: WealthGroupModel[] = Array.isArray(groupsData?.items)
+    ? groupsData.items
+    : Array.isArray((groupsData as any)?.data?.items)
+    ? (groupsData as any).data.items
+    : Array.isArray((groupsData as any)?.data)
+    ? (groupsData as any).data
+    : Array.isArray(groupsData)
+    ? (groupsData as any)
+    : [];
+
+  const uniqueGroupsMap = new Map<string, WealthGroupModel>();
+  rawGroups.forEach((g: any) => {
+    if (!g) return;
+    const id = String(
+      g.id ||
+        g._id ||
+        g.groupId ||
+        g.group_id ||
+        (g.name ? `${g.name}_${g.createdAt || ""}` : "")
+    ).trim();
+    if (id) {
+      uniqueGroupsMap.set(id, { ...g, id: String(g.id || g._id || id) });
+    }
+  });
+  const allGroups = Array.from(uniqueGroupsMap.values());
 
   // Filter out completed, terminated, AND date-ended groups — same logic as wealth-group.tsx
   const activeGroups = allGroups.filter(
@@ -88,6 +105,10 @@ export default function GroupDiscoveryScreen() {
 
     return matchesSearch && matchesCategory;
   });
+
+  const displayGroups = isTrending
+    ? [...filteredGroups].sort((a, b) => Number(b.membersCount || 0) - Number(a.membersCount || 0))
+    : filteredGroups;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "white" }} edges={["top"]}>
@@ -166,8 +187,8 @@ export default function GroupDiscoveryScreen() {
           </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-            {filteredGroups.length > 0 ? (
-              filteredGroups.map((group) => {
+            {displayGroups.length > 0 ? (
+              displayGroups.map((group) => {
                 const targetFormatted = (parseFloat(group.targetAmount?.toString() || "0") / 100).toLocaleString();
                 const currentFormatted = ((typeof group.currentBalance === "string" ? parseFloat(group.currentBalance) : (group.currentBalance || 0)) / 100).toLocaleString();
 
@@ -219,17 +240,49 @@ export default function GroupDiscoveryScreen() {
                           >
                             {group.name}
                           </Text>
-                          <View
-                            style={{
-                              backgroundColor: "#F0FDF4",
-                              paddingHorizontal: 8,
-                              paddingVertical: 3,
-                              borderRadius: 6,
-                            }}
-                          >
-                            <Text style={{ fontSize: 10, fontWeight: "700", color: THEME }}>
-                              {group.category || "Tribe"}
-                            </Text>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                            {Boolean(group.isVetted) && (
+                              <View
+                                style={{
+                                  backgroundColor: "#F0FDF4",
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 2,
+                                  borderRadius: 6,
+                                  borderWidth: 1,
+                                  borderColor: "#BBF7D0",
+                                }}
+                              >
+                                <Text style={{ fontSize: 9, fontWeight: "800", color: "#166534" }}>🛡️ Vetted</Text>
+                              </View>
+                            )}
+                            <View
+                              style={{
+                                backgroundColor: "#E6F7F7",
+                                paddingHorizontal: 6,
+                                paddingVertical: 2,
+                                borderRadius: 6,
+                              }}
+                            >
+                              <Text style={{ fontSize: 9, fontWeight: "800", color: THEME }}>
+                                {(group.groupType || (group as any).type || "FIXED").toString().includes("FLEX")
+                                  ? "Flex"
+                                  : (group.groupType || (group as any).type || "FIXED").toString().includes("ROTATIONAL")
+                                  ? "Rotational"
+                                  : "Fixed"}
+                              </Text>
+                            </View>
+                            <View
+                              style={{
+                                backgroundColor: "#F1F5F9",
+                                paddingHorizontal: 8,
+                                paddingVertical: 3,
+                                borderRadius: 6,
+                              }}
+                            >
+                              <Text style={{ fontSize: 10, fontWeight: "700", color: "#475569" }}>
+                                {group.category || "Tribe"}
+                              </Text>
+                            </View>
                           </View>
                         </View>
 

@@ -1,4 +1,4 @@
-﻿import Header from "@/src/components/common/Header";
+import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import {
   KeyboardDoneAccessory,
@@ -15,10 +15,14 @@ import {
 } from "@/src/store/api/portfolioApi";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
+import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
 import {
   getCleanTransactionTitle,
   getPortfolioZeroBalanceBannerInfo,
   formatEarlyTerminationPenaltyRate,
+  getDynamicPenaltyRate,
+  getDynamicInterestRateLabel,
+  isPortfolioCompleted,
 } from "@/src/utils/formatters";
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -26,7 +30,10 @@ import { StatusBar } from "expo-status-bar";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/src/store";
-import { saveSingleCompletedPortfolio } from "@/src/store/slices/completedPortfolioSlice";
+import {
+  saveSingleCompletedPortfolio,
+  removeCompletedPortfolio,
+} from "@/src/store/slices/completedPortfolioSlice";
 import {
   ActivityIndicator,
   Alert,
@@ -35,6 +42,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -44,6 +52,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import ManageFundsSheet from "@/src/components/portfolio/ManageFundsSheet";
 import { BlurView } from "expo-blur";
 import ConfirmActionModal from "@/src/components/common/ConfirmActionModal";
@@ -81,18 +90,33 @@ export default function FlowDetailScreen() {
   // Queries & Mutations
   const { data, isLoading: loading, refetch: refetchFlow } = useGetPortfoliosQuery({ type: "wealthflow" });
   const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const flowRate = rates?.wealthflow;
-  const penaltyRate = formatEarlyTerminationPenaltyRate(
-    flowRate?.earlyLiquidationPenaltyRate ?? flowRate?.earlyWithdrawalPenaltyPercentage,
+  const { penaltyRate, penaltyRatio } = getDynamicPenaltyRate(
+    "flow",
+    systemConfigData,
+    rates,
     "2.5%"
   );
-  const penaltyRatio = (() => {
-    const n = parseFloat(penaltyRate.replace("%", ""));
-    return !isNaN(n) && n > 0 ? n / 100 : 0.025;
-  })();
+  const flowInterestRateLabel = getDynamicInterestRateLabel(
+    "flow",
+    systemConfigData,
+    rates,
+    10
+  );
   const { data: walletSummary, refetch: refetchWallet } = useGetWalletSummaryQuery();
   const walletBalance = (parseFloat(walletSummary?.currentBalance || "0")) / 100;
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([refetchFlow(), refetchTxns(), refetchWallet()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const { data: txnsData, isLoading: txnsLoading, refetch: refetchTxns } = useGetPortfolioTransactionsQuery(
     { id: id as string },
     { skip: !id, refetchOnMountOrArgChange: true }
@@ -123,7 +147,58 @@ export default function FlowDetailScreen() {
   const plan = fetchedPlan || savedCompletedPlan || lastPlanRef.current;
   const flow = plan;
 
+  const isTransferredOrWithdrawnInTxns = Boolean(
+    txnsData?.items?.some((t) => {
+      const type = (t.type || "").toUpperCase();
+      const ref = (t.reference || "").toUpperCase();
+      const action = ((t as any).action || "").toUpperCase();
+      const reason = ((t as any).reason || "").toUpperCase();
+      const desc = ((t as any).description || "").toUpperCase();
+      return (
+        type === "DEBIT" ||
+        type.includes("DEBIT") ||
+        type.includes("WITHDRAW") ||
+        type.includes("TRANSFER") ||
+        ref.includes("WITHDRAW") ||
+        ref.includes("TRANSFER") ||
+        action.includes("WITHDRAW") ||
+        action.includes("TRANSFER") ||
+        reason.includes("WITHDRAW") ||
+        reason.includes("TRANSFER") ||
+        desc.includes("WITHDRAW") ||
+        desc.includes("TRANSFER")
+      );
+    })
+  );
+
+  const isCompleted =
+    plan?.status === "COMPLETED" ||
+    plan?.status === "TERMINATED" ||
+    plan?.status === "WITHDRAWN" ||
+    (plan?.maturityDate && new Date(plan.maturityDate).getTime() <= Date.now());
+
+  const isFullyWithdrawn =
+    plan?.status === "WITHDRAWN" ||
+    parseFloat(plan?.balance || "0") <= 0 ||
+    (isCompleted && isTransferredOrWithdrawnInTxns);
+
+  const displayBalance = isFullyWithdrawn ? "0" : plan?.balance || "0";
+  const hasRemainingBalance = !isFullyWithdrawn && parseFloat(displayBalance) > 0;
+
   useEffect(() => {
+    if (isFullyWithdrawn) {
+      if (savedCompletedPlan && (savedCompletedPlan.balance !== "0" || savedCompletedPlan.status !== "WITHDRAWN")) {
+        dispatch(
+          saveSingleCompletedPortfolio({
+            ...savedCompletedPlan,
+            type: savedCompletedPlan.type || "wealthflow",
+            balance: "0",
+            status: "WITHDRAWN",
+          })
+        );
+      }
+      return;
+    }
     if (!fetchedPlan) return;
     const isMatured =
       fetchedPlan.maturityDate &&
@@ -142,10 +217,17 @@ export default function FlowDetailScreen() {
         savedCompletedPlan.status !== targetStatus ||
         savedCompletedPlan.balance !== fetchedPlan.balance
       ) {
-        dispatch(saveSingleCompletedPortfolio(fetchedPlan));
+        dispatch(saveSingleCompletedPortfolio({
+          ...fetchedPlan,
+          type: fetchedPlan.type || "wealthflow",
+        }));
       }
+    } else if (savedCompletedPlan) {
+      // If plan is active on backend, ensure it's not stored in completedMap
+      dispatch(removeCompletedPortfolio(fetchedPlan.id));
     }
   }, [
+    isFullyWithdrawn,
     fetchedPlan?.id,
     fetchedPlan?.status,
     fetchedPlan?.balance,
@@ -193,11 +275,9 @@ export default function FlowDetailScreen() {
     );
   }
 
-  const isCompleted = plan.status === "COMPLETED" || plan.status === "TERMINATED" || new Date(plan.maturityDate).getTime() <= Date.now();
-  const hasRemainingBalance = parseFloat(plan.balance || "0") > 0;
   const zeroBalanceBanner = getPortfolioZeroBalanceBannerInfo(txnsData?.items);
 
-  const progress = parseFloat(plan.targetAmount) > 0 ? parseFloat(plan.balance) / parseFloat(plan.targetAmount) : 0;
+  const progress = parseFloat(plan.targetAmount) > 0 ? parseFloat(displayBalance) / parseFloat(plan.targetAmount) : 0;
   const progressPct = Math.round(Math.min(progress * 100, 100));
 
   const getDaysLeft = () => {
@@ -240,7 +320,7 @@ export default function FlowDetailScreen() {
       };
 
       console.log(`🏎️ [WealthFlow Withdraw Request] POST /api/v1/portfolios/${plan.id}/withdraw-to-wallet:`, payload);
-      const res = await withdrawToWallet({ id: plan.id, body: payload }).unwrap();
+      const res = await withdrawToWallet({ id: plan.id, type: "wealthflow", body: payload }).unwrap();
       console.log("✅ [WealthFlow Withdraw Success] Response:", res);
 
       Alert.alert("Withdrawal Successful", `Successfully transferred ₦${num.toLocaleString()} to your main wallet.`);
@@ -308,7 +388,7 @@ export default function FlowDetailScreen() {
             {plan.metadata?.wealthPreference || "WealthFlow"}
           </Text>
           <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 28 }}>
-            ₦{formatAmount(plan.balance)}
+            ₦{formatAmount(displayBalance)}
           </Text>
           <Text style={{ color: "#9CA3AF", fontSize: 11, marginTop: 2 }}>
             of ₦{formatAmount(plan.targetAmount)} target
@@ -420,7 +500,7 @@ export default function FlowDetailScreen() {
         </Text>{" "}
         has matured.{"\n"}
         Total Accumulated Balance:{" "}
-        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>₦{formatAmount(plan.balance)}</Text>
+        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>₦{formatAmount(displayBalance)}</Text>
       </Text>
     </View>
   );
@@ -451,7 +531,18 @@ export default function FlowDetailScreen() {
         }
       />
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["transparent"]}
+          />
+        }
+      >
         <View style={{ paddingTop: 8, paddingBottom: 40 }}>
           {isCompleted ? renderCompletedHeader() : renderOngoingHeader()}
 
@@ -492,11 +583,11 @@ export default function FlowDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Current Balance</Text>
-                <Text style={styles.value}>₦{formatAmount(plan.balance)}</Text>
+                <Text style={styles.value}>₦{formatAmount(displayBalance)}</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Interest Rate</Text>
-                <Text style={styles.value}>{plan.interestRate || 12}% P.A</Text>
+                <Text style={styles.value}>{plan.interestRate ? `${plan.interestRate}% P.A` : flowInterestRateLabel}</Text>
               </View>
             </View>
 

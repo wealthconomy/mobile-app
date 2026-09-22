@@ -1,7 +1,10 @@
+import {
+  AppConfirmModal,
+  ConfirmState,
+} from "@/src/components/common/AppConfirmModal";
+import { AppToast, ToastState } from "@/src/components/common/AppToast";
 import Header from "@/src/components/common/Header";
 import { RootState } from "@/src/store";
-import { AppToast, ToastState } from "@/src/components/common/AppToast";
-import { AppConfirmModal, ConfirmState } from "@/src/components/common/AppConfirmModal";
 import {
   useAddGroupAdminMutation,
   useAddToGroupBlacklistMutation,
@@ -15,25 +18,26 @@ import {
   useRemoveGroupMemberMutation,
   useSendGroupRemindersMutation,
 } from "@/src/store/api/groupApi";
-import { ArrowDown, ArrowUp } from "lucide-react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { ArrowDown, ArrowUp } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Modal,
   ScrollView,
   Share,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  StyleSheet,
 } from "react-native";
-import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
@@ -100,14 +104,19 @@ const StatusBadge = ({ status }: { status: string }) => {
     <View
       style={{
         backgroundColor: bgColor,
-        minWidth: 68,
-        height: 25,
+        minWidth: 48,
+        maxWidth: 56,
+        height: 24,
         borderRadius: 5,
-        paddingHorizontal: 7,
+        paddingHorizontal: 3,
       }}
       className="items-center justify-center"
     >
-      <Text style={{ color: textColor }} className="text-[11px] font-bold">
+      <Text
+        style={{ color: textColor }}
+        className="text-[11px] font-bold"
+        numberOfLines={1}
+      >
         {status}
       </Text>
     </View>
@@ -169,20 +178,35 @@ const UserDetailModal = ({
   onMemberUpdated: () => void;
 }) => {
   const [addAdmin, { isLoading: isAddingAdmin }] = useAddGroupAdminMutation();
-  const [removeAdmin, { isLoading: isRemovingAdmin }] = useRemoveGroupAdminMutation();
-  const [approveRequest, { isLoading: isApproving }] = useApproveJoinRequestMutation();
-  const [rejectRequest, { isLoading: isRejecting }] = useRejectJoinRequestMutation();
-  const [removeMember, { isLoading: isRemoving }] = useRemoveGroupMemberMutation();
-  const [addToBlacklist, { isLoading: isBlacklisting }] = useAddToGroupBlacklistMutation();
-  const [removeFromBlacklist, { isLoading: isUnblacklisting }] = useRemoveFromGroupBlacklistMutation();
-  const [sendReminders, { isLoading: isSendingReminder }] = useSendGroupRemindersMutation();
+  const [removeAdmin, { isLoading: isRemovingAdmin }] =
+    useRemoveGroupAdminMutation();
+  const [approveRequest, { isLoading: isApproving }] =
+    useApproveJoinRequestMutation();
+  const [rejectRequest, { isLoading: isRejecting }] =
+    useRejectJoinRequestMutation();
+  const [removeMember, { isLoading: isRemoving }] =
+    useRemoveGroupMemberMutation();
+  const [addToBlacklist, { isLoading: isBlacklisting }] =
+    useAddToGroupBlacklistMutation();
+  const [removeFromBlacklist, { isLoading: isUnblacklisting }] =
+    useRemoveFromGroupBlacklistMutation();
+  const [sendReminders, { isLoading: isSendingReminder }] =
+    useSendGroupRemindersMutation();
 
-  const [toast, setToast] = useState<ToastState | null>(null);
-  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  const resolvedTargetUserId =
+    typeof user?.userId === "string" && user.userId
+      ? user.userId
+      : typeof (user as any)?.user?.id === "string" && (user as any).user.id
+      ? (user as any).user.id
+      : typeof user?.raw?.userId === "string" && user.raw.userId
+      ? user.raw.userId
+      : typeof (user?.raw as any)?.user?.id === "string" && (user.raw as any).user.id
+      ? (user.raw as any).user.id
+      : "";
 
   const { data: memberStats } = useGetMemberStatsQuery(
-    { id: groupId, userId: user?.userId || user?.id || "" },
-    { skip: !visible || !user?.userId }
+    { id: groupId, userId: resolvedTargetUserId },
+    { skip: !visible || !resolvedTargetUserId },
   );
 
   if (!user) return null;
@@ -198,7 +222,11 @@ const UserDetailModal = ({
     statusUpper.includes("BLACK") ||
     statusUpper.includes("BLOCK") ||
     statusUpper.includes("BAN") ||
-    Boolean(user?.isBlacklisted || user?.raw?.isBlacklisted || (user?.raw as any)?.isBlocked);
+    Boolean(
+      user?.isBlacklisted ||
+      user?.raw?.isBlacklisted ||
+      (user?.raw as any)?.isBlocked,
+    );
 
   const isPastMember =
     !isBlacklisted &&
@@ -219,12 +247,17 @@ const UserDetailModal = ({
       user?.raw?.status === "PENDING");
 
   const isMemberAdmin = user?.role === "ADMIN" || user?.raw?.role === "ADMIN";
-  const isMemberOwner = user?.role === "OWNER" || user?.role === "CREATOR" || user?.raw?.role === "OWNER";
+  const isMemberOwner =
+    user?.role === "OWNER" ||
+    user?.role === "CREATOR" ||
+    user?.raw?.role === "OWNER";
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "-/-/-";
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? dateStr : `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+    return isNaN(d.getTime())
+      ? dateStr
+      : `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
   };
 
   const wealthGrowthNaira = memberStats?.wealthGrowth
@@ -236,398 +269,650 @@ const UserDetailModal = ({
     : "₦0.00";
 
   const handleMakeAdmin = () => {
-    setConfirm({
-      title: "Make Admin",
-      message: `Promote ${user.name} to Group Admin? They will have management permissions in this tribe.`,
-      confirmLabel: "Make Admin",
-      isDestructive: false,
-      onConfirm: async () => {
-        try {
-          await addAdmin({ id: groupId, userId: user.userId || user.id }).unwrap();
-          setToast({ type: "success", title: "Admin Assigned ✅", message: `${user.name} is now a Group Admin.` });
-          onClose();
-          onMemberUpdated();
-        } catch (err: any) {
-          const msg = err?.data?.message || err?.message || "Failed to assign admin role.";
-          setToast({ type: "error", title: "Notice", message: msg });
-        }
-      },
-    });
+    Alert.alert(
+      "Make Admin",
+      `Promote ${user.name} to Group Admin? They will have management permissions in this tribe.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Make Admin",
+          onPress: async () => {
+            if (!resolvedTargetUserId) {
+              Alert.alert("Error", "Could not resolve user ID.");
+              return;
+            }
+            try {
+              await addAdmin({
+                id: groupId,
+                userId: resolvedTargetUserId,
+              }).unwrap();
+              Alert.alert(
+                "Admin Assigned ✅",
+                `${user.name} is now a Group Admin.`,
+              );
+              onClose();
+              onMemberUpdated();
+            } catch (err: any) {
+              const msg =
+                err?.data?.message ||
+                err?.message ||
+                "Failed to assign admin role.";
+              Alert.alert("Notice", msg);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleRemoveAdmin = () => {
-    setConfirm({
-      title: "Remove Admin Role",
-      message: `Are you sure you want to remove admin privileges from ${user.name}?`,
-      confirmLabel: "Remove Admin",
-      isDestructive: true,
-      onConfirm: async () => {
-        try {
-          await removeAdmin({ id: groupId, userId: user.userId || user.id }).unwrap();
-          setToast({ type: "info", title: "Role Updated", message: `${user.name} is now a regular member.` });
-          onClose();
-          onMemberUpdated();
-        } catch (err: any) {
-          const msg = err?.data?.message || err?.message || "Failed to remove admin role.";
-          setToast({ type: "error", title: "Notice", message: msg });
-        }
-      },
-    });
+    Alert.alert(
+      "Remove Admin Role",
+      `Are you sure you want to remove admin privileges from ${user.name}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove Admin",
+          style: "destructive",
+          onPress: async () => {
+            if (!resolvedTargetUserId) {
+              Alert.alert("Error", "Could not resolve user ID.");
+              return;
+            }
+            try {
+              await removeAdmin({
+                id: groupId,
+                userId: resolvedTargetUserId,
+              }).unwrap();
+              Alert.alert(
+                "Role Updated",
+                `${user.name} is now a regular member.`,
+              );
+              onClose();
+              onMemberUpdated();
+            } catch (err: any) {
+              const msg =
+                err?.data?.message ||
+                err?.message ||
+                "Failed to remove admin role.";
+              Alert.alert("Notice", msg);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleApprove = async () => {
+    if (!resolvedTargetUserId) {
+      Alert.alert("Error", "Could not resolve user ID.");
+      return;
+    }
     try {
-      await approveRequest({ id: groupId, userId: user.userId || user.id }).unwrap();
-      setToast({ type: "success", title: "Approved! ✅", message: `${user.name} has been added to the tribe.` });
+      await approveRequest({
+        id: groupId,
+        userId: resolvedTargetUserId,
+      }).unwrap();
+      Alert.alert("Approved! ✅", `${user.name} has been added to the tribe.`);
       onClose();
       onMemberUpdated();
     } catch (err: any) {
-      const msg = err?.data?.message || err?.message || "Failed to approve request.";
-      setToast({ type: "error", title: "Notice", message: msg });
+      const msg =
+        err?.data?.message || err?.message || "Failed to approve request.";
+      Alert.alert("Notice", msg);
       onClose();
     }
   };
 
   const handleReject = () => {
-    setConfirm({
-      title: "Reject Request",
-      message: `Are you sure you want to reject the join request from ${user.name}?`,
-      confirmLabel: "Reject",
-      isDestructive: true,
-      onConfirm: async () => {
-        try {
-          await rejectRequest({ id: groupId, userId: user.userId || user.id }).unwrap();
-          setToast({ type: "info", title: "Request Rejected", message: `Join request for ${user.name} was declined.` });
-          onClose();
-          onMemberUpdated();
-        } catch (err: any) {
-          const msg = err?.data?.message || err?.message || "Failed to reject request.";
-          setToast({ type: "error", title: "Notice", message: msg });
-          onClose();
-        }
-      },
-    });
+    Alert.alert(
+      "Reject Request",
+      `Are you sure you want to reject the join request from ${user.name}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reject",
+          style: "destructive",
+          onPress: async () => {
+            if (!resolvedTargetUserId) {
+              Alert.alert("Error", "Could not resolve user ID.");
+              return;
+            }
+            try {
+              await rejectRequest({
+                id: groupId,
+                userId: resolvedTargetUserId,
+              }).unwrap();
+              Alert.alert(
+                "Request Rejected",
+                `Join request for ${user.name} was declined.`,
+              );
+              onClose();
+              onMemberUpdated();
+            } catch (err: any) {
+              const msg =
+                err?.data?.message || err?.message || "Failed to reject request.";
+              Alert.alert("Notice", msg);
+              onClose();
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleSendReminder = async () => {
+    if (!resolvedTargetUserId) {
+      Alert.alert("Error", "Could not resolve user ID.");
+      return;
+    }
     try {
-      await sendReminders({ id: groupId, userIds: [user.userId || user.id] }).unwrap();
-      setToast({ type: "success", title: "Reminder Sent", message: `Reminder notification sent to ${user.name}.` });
+      await sendReminders({
+        id: groupId,
+        userIds: [resolvedTargetUserId],
+      }).unwrap();
+      Alert.alert(
+        "Reminder Sent",
+        `Reminder notification sent to ${user.name}.`,
+      );
     } catch (err: any) {
-      setToast({ type: "success", title: "Reminder Queued", message: `Payment reminder has been queued for ${user.name}.` });
+      Alert.alert(
+        "Reminder Queued",
+        `Payment reminder has been queued for ${user.name}.`,
+      );
     }
   };
 
   const handleRemove = () => {
-    setConfirm({
-      title: "Remove Member",
-      message: `Are you sure you want to permanently remove ${user.name} from this tribe?\n\n100% of their accumulated savings will be automatically refunded directly back into their Main Wallet immediately.`,
-      confirmLabel: "Remove & Refund",
-      isDestructive: true,
-      onConfirm: async () => {
-        try {
-          await removeMember({ id: groupId, userId: user.userId || user.id }).unwrap();
-          setToast({ type: "success", title: "Member Removed & Refunded", message: `${user.name} has been removed. Their savings have been refunded to their Main Wallet.` });
-          onClose();
-          onMemberUpdated();
-        } catch (err: any) {
-          const msg = err?.data?.message || err?.message || "Failed to remove member.";
-          setToast({ type: "error", title: "Notice", message: msg });
-          onClose();
-        }
-      },
-    });
+    Alert.alert(
+      "Remove Member",
+      `Are you sure you want to permanently remove ${user.name} from this tribe?\n\n100% of their accumulated savings will be automatically refunded directly back into their Main Wallet immediately.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove & Refund",
+          style: "destructive",
+          onPress: async () => {
+            if (!resolvedTargetUserId) {
+              Alert.alert("Error", "Could not resolve user ID.");
+              return;
+            }
+            try {
+              await removeMember({
+                id: groupId,
+                userId: resolvedTargetUserId,
+              }).unwrap();
+              Alert.alert(
+                "Member Removed & Refunded",
+                `${user.name} has been removed. Their savings have been refunded to their Main Wallet.`,
+              );
+              onClose();
+              onMemberUpdated();
+            } catch (err: any) {
+              const msg =
+                err?.data?.message || err?.message || "Failed to remove member.";
+              Alert.alert("Notice", msg);
+              onClose();
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleBlacklist = () => {
-    setConfirm({
-      title: "Blacklist Member",
-      message: `Are you sure you want to blacklist ${user.name}?\n\nThey will be suspended from participating or making contributions until an admin unblacklists them.`,
-      confirmLabel: "Add to Blacklist",
-      isDestructive: true,
-      onConfirm: async () => {
-        try {
-          await addToBlacklist({ id: groupId, userId: user.userId || user.id }).unwrap();
-          setToast({ type: "warning", title: "Member Blacklisted", message: `${user.name} has been suspended from the tribe.` });
-          onClose();
-          onMemberUpdated();
-        } catch (err: any) {
-          const msg = err?.data?.message || err?.message || "Failed to blacklist member.";
-          setToast({ type: "error", title: "Notice", message: msg });
-          onClose();
-        }
-      },
-    });
+    Alert.alert(
+      "Blacklist Member",
+      `Are you sure you want to blacklist ${user.name}?\n\nThey will be suspended from participating or making contributions until an admin unblacklists them.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Add to Blacklist",
+          style: "destructive",
+          onPress: async () => {
+            if (!resolvedTargetUserId) {
+              Alert.alert("Error", "Could not resolve user ID.");
+              return;
+            }
+            try {
+              await addToBlacklist({
+                id: groupId,
+                userId: resolvedTargetUserId,
+              }).unwrap();
+              Alert.alert(
+                "Member Blacklisted",
+                `${user.name} has been suspended from the tribe.`,
+              );
+              onClose();
+              onMemberUpdated();
+            } catch (err: any) {
+              const msg =
+                err?.data?.message || err?.message || "Failed to blacklist member.";
+              Alert.alert("Notice", msg);
+              onClose();
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleUnblacklist = () => {
-    setConfirm({
-      title: "Unblacklist Member",
-      message: `Are you sure you want to unblacklist ${user.name}?\n\nThey will be restored directly back to Active status with full contribution and participation rights.`,
-      confirmLabel: "Unblacklist",
-      isDestructive: false,
-      onConfirm: async () => {
-        try {
-          await removeFromBlacklist({ id: groupId, userId: user.userId || user.id }).unwrap();
-          setToast({ type: "success", title: "Member Restored", message: `${user.name} has been unblacklisted and restored to Active status.` });
-          onClose();
-          onMemberUpdated();
-        } catch (err: any) {
-          const msg = err?.data?.message || err?.message || "Failed to unblacklist member.";
-          setToast({ type: "error", title: "Notice", message: msg });
-        }
-      },
-    });
+    Alert.alert(
+      "Unblacklist Member",
+      `Are you sure you want to unblacklist ${user.name}?\n\nThey will be restored directly back to Active status with full contribution and participation rights.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Unblacklist",
+          onPress: async () => {
+            if (!resolvedTargetUserId) {
+              Alert.alert("Error", "Could not resolve user ID.");
+              return;
+            }
+            try {
+              await removeFromBlacklist({
+                id: groupId,
+                userId: resolvedTargetUserId,
+              }).unwrap();
+              Alert.alert(
+                "Member Restored",
+                `${user.name} has been unblacklisted and restored to Active status.`,
+              );
+              onClose();
+              onMemberUpdated();
+            } catch (err: any) {
+              const msg =
+                err?.data?.message ||
+                err?.message ||
+                "Failed to unblacklist member.";
+              Alert.alert("Notice", msg);
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (
-    <>
-      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
         <View style={{ flex: 1, justifyContent: "flex-end" }}>
-          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
-        <View style={{ maxHeight: "92%" }} className="bg-white rounded-t-[40px] overflow-hidden">
-          {/* Handle bar */}
-          <View className="items-center py-4">
-            <View className="w-16 h-1.5 bg-gray-300 rounded-full" />
-          </View>
-
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            className="px-4"
-            contentContainerStyle={{ paddingBottom: 100 }}
+          <BlurView
+            experimentalBlurMethod="dimezisBlurView"
+            intensity={40}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={onClose}
+          />
+          <View
+            style={{ maxHeight: "92%" }}
+            className="bg-white rounded-t-[40px] overflow-hidden"
           >
-            {/* Profile Section */}
-            <View className="flex-row items-start mt-2 px-2">
-              <View
-                style={{ width: 87, height: 87 }}
-                className="rounded-full overflow-hidden border-2 border-[#F0F9F9]"
-              >
-                {user.avatar && (user.avatar.startsWith("http") || user.avatar.startsWith("file")) ? (
-                  <Image
-                    source={{ uri: user.avatar }}
-                    style={{ width: 87, height: 87 }}
-                    className="bg-[#E2E8F0]"
-                  />
-                ) : (
-                  <View
-                    style={{
-                      width: 87,
-                      height: 87,
-                      backgroundColor: "#E6F0F1",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text style={{ fontSize: 32, fontWeight: "900", color: THEME }}>
-                      {user.initial || (user.name ? user.name.charAt(0).toUpperCase() : "U")}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              <View className="ml-5 flex-1" style={{ height: 84 }}>
-                <View className="flex-row justify-between items-start">
-                  <View>
-                    <Text className="text-[22px] font-bold text-[#1A1A1A]">
-                      {user.name}
-                    </Text>
-                    <Text className="text-[#64748B] text-[13px] mt-0.5">
-                      Total Saving
-                    </Text>
-                    <Text className="text-[#155D5F] text-[24px] font-bold mt-0.5">
-                      {user.savings || "₦0.00"}
-                    </Text>
-                  </View>
-
-                  {/* Status Badge */}
-                  <StatusBadge status={isBlacklisted ? "Blacklist" : isPastMember ? "Past Member" : (memberStats?.status || user.status)} />
-                </View>
-              </View>
+            {/* Handle bar */}
+            <View className="items-center py-4">
+              <View className="w-16 h-1.5 bg-gray-300 rounded-full" />
             </View>
 
-            {/* Action Buttons (Hidden when member is blacklisted or past member) */}
-            {!isBlacklisted && !isPastMember && (
-              <View style={{ gap: 10 }} className="flex-row justify-between mt-8 px-1">
-                {isAdmin && isPending ? (
-                  <>
-                    <TouchableOpacity
-                      onPress={handleApprove}
-                      disabled={isApproving}
-                      style={{ flex: 1, height: 50, backgroundColor: "#D7F5DE" }}
-                      className="flex-row items-center justify-center rounded-[15px] space-x-2"
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              className="px-4"
+              contentContainerStyle={{ paddingBottom: 100 }}
+            >
+              {/* Profile Section */}
+              <View className="flex-row items-start mt-2 px-2">
+                <View
+                  style={{ width: 87, height: 87 }}
+                  className="rounded-full overflow-hidden border-2 border-[#F0F9F9]"
+                >
+                  {user.avatar &&
+                  (user.avatar.startsWith("http") ||
+                    user.avatar.startsWith("file")) ? (
+                    <Image
+                      source={{ uri: user.avatar }}
+                      style={{ width: 87, height: 87 }}
+                      className="bg-[#E2E8F0]"
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 87,
+                        height: 87,
+                        backgroundColor: "#E6F0F1",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
                     >
-                      <Ionicons name="checkmark-circle-outline" size={20} color="#4CAF50" />
-                      <Text className="text-[#4CAF50] font-bold text-[14px] ml-1">
-                        {isApproving ? "Approving..." : "Approve"}
+                      <Text
+                        style={{
+                          fontSize: 32,
+                          fontWeight: "900",
+                          color: THEME,
+                        }}
+                      >
+                        {user.initial ||
+                          (user.name ? user.name.charAt(0).toUpperCase() : "U")}
                       </Text>
-                    </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
 
-                    <TouchableOpacity
-                      onPress={handleReject}
-                      disabled={isRejecting}
-                      style={{ flex: 1, height: 50, backgroundColor: "#FEE2E2" }}
-                      className="flex-row items-center justify-center rounded-[15px] space-x-1"
-                    >
-                      <Ionicons name="close-circle-outline" size={20} color="#EF4444" />
-                      <Text className="text-[#EF4444] font-bold text-[14px] ml-1">Reject</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <>
-                    {isAdmin && (
-                      <>
-                        <TouchableOpacity
-                          onPress={handleSendReminder}
-                          disabled={isSendingReminder}
-                          style={{ flex: 1, height: 50, backgroundColor: "#D7F5DE" }}
-                          className="flex-row items-center justify-center rounded-[15px] space-x-1"
-                        >
-                          <Ionicons name="notifications-outline" size={17} color="#4CAF50" />
-                          <Text className="text-[#4CAF50] font-bold text-[12px]">
-                            {isSendingReminder ? "Sending..." : "Reminder"}
-                          </Text>
-                        </TouchableOpacity>
+                <View className="ml-5 flex-1" style={{ height: 84 }}>
+                  <View className="flex-row justify-between items-start">
+                    <View style={{ flex: 1, minWidth: 0, marginRight: 10 }}>
+                      <Text
+                        className="text-[22px] font-bold text-[#1A1A1A]"
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {user.name}
+                      </Text>
+                      <Text className="text-[#64748B] text-[13px] mt-0.5">
+                        Total Saving
+                      </Text>
+                      <Text className="text-[#155D5F] text-[24px] font-bold mt-0.5">
+                        {user.savings || "₦0.00"}
+                      </Text>
+                    </View>
 
-                        {!isMemberOwner && (
+                    {/* Status Badge */}
+                    <View style={{ flexShrink: 0 }}>
+                      <StatusBadge
+                        status={
+                          isBlacklisted
+                            ? "Blacklist"
+                            : isPastMember
+                              ? "Past Member"
+                              : memberStats?.status || user.status
+                        }
+                      />
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* Action Buttons (Hidden when member is blacklisted or past member) */}
+              {!isBlacklisted && !isPastMember && (
+                <View
+                  style={{ gap: 10 }}
+                  className="flex-row justify-between mt-8 px-1"
+                >
+                  {isAdmin && isPending ? (
+                    <>
+                      <TouchableOpacity
+                        onPress={handleApprove}
+                        disabled={isApproving}
+                        style={{
+                          flex: 1,
+                          height: 50,
+                          backgroundColor: "#D7F5DE",
+                        }}
+                        className="flex-row items-center justify-center rounded-[15px] space-x-2"
+                      >
+                        <Ionicons
+                          name="checkmark-circle-outline"
+                          size={20}
+                          color="#4CAF50"
+                        />
+                        <Text className="text-[#4CAF50] font-bold text-[14px] ml-1">
+                          {isApproving ? "Approving..." : "Approve"}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        onPress={handleReject}
+                        disabled={isRejecting}
+                        style={{
+                          flex: 1,
+                          height: 50,
+                          backgroundColor: "#FEE2E2",
+                        }}
+                        className="flex-row items-center justify-center rounded-[15px] space-x-1"
+                      >
+                        <Ionicons
+                          name="close-circle-outline"
+                          size={20}
+                          color="#EF4444"
+                        />
+                        <Text className="text-[#EF4444] font-bold text-[14px] ml-1">
+                          Reject
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      {isAdmin && (
+                        <>
                           <TouchableOpacity
-                            onPress={isMemberAdmin ? handleRemoveAdmin : handleMakeAdmin}
-                            disabled={isAddingAdmin || isRemovingAdmin}
+                            onPress={handleSendReminder}
+                            disabled={isSendingReminder}
                             style={{
                               flex: 1,
                               height: 50,
-                              backgroundColor: isMemberAdmin ? "#FEF3C7" : "#F0F9F9",
-                              borderWidth: 1,
-                              borderColor: isMemberAdmin ? "#F59E0B" : THEME,
+                              backgroundColor: "#D7F5DE",
                             }}
                             className="flex-row items-center justify-center rounded-[15px] space-x-1"
                           >
-                            {isAddingAdmin || isRemovingAdmin ? (
-                              <ActivityIndicator size="small" color={isMemberAdmin ? "#D97706" : THEME} />
-                            ) : (
-                              <>
-                                <Ionicons
-                                  name={isMemberAdmin ? "shield-outline" : "shield-checkmark-outline"}
-                                  size={16}
+                            <Ionicons
+                              name="notifications-outline"
+                              size={17}
+                              color="#4CAF50"
+                            />
+                            <Text className="text-[#4CAF50] font-bold text-[12px]">
+                              {isSendingReminder ? "Sending..." : "Reminder"}
+                            </Text>
+                          </TouchableOpacity>
+
+                          {!isMemberOwner && (
+                            <TouchableOpacity
+                              onPress={
+                                isMemberAdmin
+                                  ? handleRemoveAdmin
+                                  : handleMakeAdmin
+                              }
+                              disabled={isAddingAdmin || isRemovingAdmin}
+                              style={{
+                                flex: 1,
+                                height: 50,
+                                backgroundColor: isMemberAdmin
+                                  ? "#FEF3C7"
+                                  : "#F0F9F9",
+                                borderWidth: 1,
+                                borderColor: isMemberAdmin ? "#F59E0B" : THEME,
+                              }}
+                              className="flex-row items-center justify-center rounded-[15px] space-x-1"
+                            >
+                              {isAddingAdmin || isRemovingAdmin ? (
+                                <ActivityIndicator
+                                  size="small"
                                   color={isMemberAdmin ? "#D97706" : THEME}
                                 />
-                                <Text
-                                  style={{ color: isMemberAdmin ? "#D97706" : THEME }}
-                                  className="font-bold text-[12px]"
-                                >
-                                  {isMemberAdmin ? "Demote" : "Make Admin"}
-                                </Text>
-                              </>
-                            )}
+                              ) : (
+                                <>
+                                  <Ionicons
+                                    name={
+                                      isMemberAdmin
+                                        ? "shield-outline"
+                                        : "shield-checkmark-outline"
+                                    }
+                                    size={16}
+                                    color={isMemberAdmin ? "#D97706" : THEME}
+                                  />
+                                  <Text
+                                    style={{
+                                      color: isMemberAdmin ? "#D97706" : THEME,
+                                    }}
+                                    className="font-bold text-[12px]"
+                                  >
+                                    {isMemberAdmin ? "Demote" : "Make Admin"}
+                                  </Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          )}
+
+                          <TouchableOpacity
+                            onPress={handleBlacklist}
+                            disabled={isBlacklisting}
+                            style={{
+                              flex: 1,
+                              height: 50,
+                              backgroundColor: "#FEE2E2",
+                            }}
+                            className="flex-row items-center justify-center rounded-[15px] space-x-1"
+                          >
+                            <Ionicons
+                              name="ban-outline"
+                              size={17}
+                              color="#EF4444"
+                            />
+                            <Text className="text-[#EF4444] font-bold text-[12px]">
+                              Blacklist
+                            </Text>
                           </TouchableOpacity>
-                        )}
+                        </>
+                      )}
+                    </>
+                  )}
+                </View>
+              )}
 
-                        <TouchableOpacity
-                          onPress={handleBlacklist}
-                          disabled={isBlacklisting}
-                          style={{ flex: 1, height: 50, backgroundColor: "#FEE2E2" }}
-                          className="flex-row items-center justify-center rounded-[15px] space-x-1"
-                        >
-                          <Ionicons name="ban-outline" size={17} color="#EF4444" />
-                          <Text className="text-[#EF4444] font-bold text-[12px]">Blacklist</Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </>
-                )}
+              {/* Stats Section */}
+              <View className="mt-8 px-2">
+                <StatItem
+                  label="Wealth Growth"
+                  value={wealthGrowthNaira}
+                  isTrend
+                  trendType="up"
+                />
+                <StatItem
+                  label="Growth/week"
+                  value={growthPerWeekNaira}
+                  isTrend
+                  trendType="down"
+                />
+                <StatItem
+                  label="Weeks"
+                  value={memberStats?.weeksProgress || "1/12"}
+                />
+                <StatItem
+                  label="Status"
+                  value={
+                    isBlacklisted
+                      ? "Blacklist"
+                      : isPastMember
+                        ? "Past Member"
+                        : memberStats?.status || user.status || "Active"
+                  }
+                  color={
+                    isBlacklisted ? "#EF4444" : isPastMember ? "#64748B" : THEME
+                  }
+                />
+                <StatItem
+                  label="Date Joined"
+                  value={formatDate(
+                    memberStats?.joinedAt ||
+                      user.raw?.joinedAt ||
+                      group?.startDate,
+                  )}
+                />
+                <StatItem
+                  label="Date left"
+                  value={formatDate(memberStats?.leftAt || user.raw?.leftAt)}
+                />
               </View>
-            )}
 
-            {/* Stats Section */}
-            <View className="mt-8 px-2">
-              <StatItem
-                label="Wealth Growth"
-                value={wealthGrowthNaira}
-                isTrend
-                trendType="up"
-              />
-              <StatItem
-                label="Growth/week"
-                value={growthPerWeekNaira}
-                isTrend
-                trendType="down"
-              />
-              <StatItem label="Weeks" value={memberStats?.weeksProgress || "1/12"} />
-              <StatItem label="Status" value={isBlacklisted ? "Blacklist" : isPastMember ? "Past Member" : (memberStats?.status || user.status || "Active")} color={isBlacklisted ? "#EF4444" : isPastMember ? "#64748B" : THEME} />
-              <StatItem label="Date Joined" value={formatDate(memberStats?.joinedAt || user.raw?.joinedAt || group?.startDate)} />
-              <StatItem label="Date left" value={formatDate(memberStats?.leftAt || user.raw?.leftAt)} />
-            </View>
-
-            {/* Bottom Summary Action Buttons */}
-            {isAdmin && (
-              <View className="mt-6">
-                {isBlacklisted ? (
-                  /* Blacklisted: ONLY show Unblacklist Member button */
-                  <TouchableOpacity
-                    onPress={handleUnblacklist}
-                    disabled={isUnblacklisting}
-                    style={{ height: 50, backgroundColor: "#D7F5DE" }}
-                    className="w-full rounded-[15px] items-center justify-center mb-3"
-                  >
-                    {isUnblacklisting ? (
-                      <ActivityIndicator color="#4CAF50" />
-                    ) : (
-                      <View className="flex-row items-center justify-center">
-                        <Ionicons name="checkmark-circle-outline" size={20} color="#4CAF50" />
-                        <Text className="text-[#4CAF50] font-bold text-base ml-2">
-                          Unblacklist Member
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ) : isPastMember ? (
-                  /* Past Member: Informational note, no action buttons */
-                  <View
-                    style={{
-                      backgroundColor: "#F8FAFC",
-                      borderColor: "#E2E8F0",
-                      borderWidth: 1,
-                      borderRadius: 15,
-                      paddingVertical: 14,
-                      paddingHorizontal: 16,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text style={{ color: "#64748B", fontWeight: "700", fontSize: 13 }}>
-                      Past Member (Exited - Savings Refunded)
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    {!isMemberOwner && (
-                      <TouchableOpacity
-                        onPress={handleRemove}
-                        disabled={isRemoving}
-                        style={{ height: 50, backgroundColor: "#F44336" }}
-                        className="w-full rounded-[15px] items-center justify-center"
+              {/* Bottom Summary Action Buttons */}
+              {isAdmin && (
+                <View className="mt-6">
+                  {isBlacklisted ? (
+                    /* Blacklisted: ONLY show Unblacklist Member button */
+                    <TouchableOpacity
+                      onPress={handleUnblacklist}
+                      disabled={isUnblacklisting}
+                      style={{ height: 50, backgroundColor: "#D7F5DE" }}
+                      className="w-full rounded-[15px] items-center justify-center mb-3"
+                    >
+                      {isUnblacklisting ? (
+                        <ActivityIndicator color="#4CAF50" />
+                      ) : (
+                        <View className="flex-row items-center justify-center">
+                          <Ionicons
+                            name="checkmark-circle-outline"
+                            size={20}
+                            color="#4CAF50"
+                          />
+                          <Text className="text-[#4CAF50] font-bold text-base ml-2">
+                            Unblacklist Member
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ) : isPastMember ? (
+                    /* Past Member: Informational note, no action buttons */
+                    <View
+                      style={{
+                        backgroundColor: "#F8FAFC",
+                        borderColor: "#E2E8F0",
+                        borderWidth: 1,
+                        borderRadius: 15,
+                        paddingVertical: 14,
+                        paddingHorizontal: 16,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "#64748B",
+                          fontWeight: "700",
+                          fontSize: 13,
+                        }}
                       >
-                        {isRemoving ? (
-                          <ActivityIndicator color="white" />
-                        ) : (
-                          <View className="flex-row items-center justify-center">
-                            <Ionicons name="person-remove-outline" size={18} color="white" />
-                            <Text className="text-white font-bold text-base ml-2">Remove Member</Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    )}
-                  </>
-                )}
-              </View>
-            )}
-          </ScrollView>
+                        Past Member (Exited - Savings Refunded)
+                      </Text>
+                    </View>
+                  ) : (
+                    <>
+                      {!isMemberOwner && (
+                        <TouchableOpacity
+                          onPress={handleRemove}
+                          disabled={isRemoving}
+                          style={{ height: 50, backgroundColor: "#F44336" }}
+                          className="w-full rounded-[15px] items-center justify-center"
+                        >
+                          {isRemoving ? (
+                            <ActivityIndicator color="white" />
+                          ) : (
+                            <View className="flex-row items-center justify-center">
+                              <Ionicons
+                                name="person-remove-outline"
+                                size={18}
+                                color="white"
+                              />
+                              <Text className="text-white font-bold text-base ml-2">
+                                Remove Member
+                              </Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  )}
+                </View>
+              )}
+            </ScrollView>
+          </View>
         </View>
-      </View>
-    </Modal>
-    <AppToast toast={toast} onDismiss={() => setToast(null)} />
-    <AppConfirmModal confirm={confirm} onDismiss={() => setConfirm(null)} />
-  </>
+      </Modal>
   );
 };
 
@@ -643,8 +928,17 @@ const FilterModal = ({
   onSelectStatus: (status: string) => void;
 }) => {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity className="flex-1 bg-black/15" activeOpacity={1} onPress={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        className="flex-1 bg-black/15"
+        activeOpacity={1}
+        onPress={onClose}
+      >
         <View
           style={{
             position: "absolute",
@@ -712,8 +1006,17 @@ const MoreOptionsModal = ({
   onSelectBulkRemove: () => void;
 }) => {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity className="flex-1 bg-black/20" activeOpacity={1} onPress={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        className="flex-1 bg-black/20"
+        activeOpacity={1}
+        onPress={onClose}
+      >
         <View
           style={{ elevation: 10 }}
           className="absolute top-16 right-5 w-56 bg-white rounded-2xl shadow-xl overflow-hidden p-2"
@@ -734,7 +1037,9 @@ const MoreOptionsModal = ({
           <TouchableOpacity
             onPress={() => {
               onClose();
-              router.push(`/portfolio/detail/group/${id}/tribe-settings/membership` as any);
+              router.push(
+                `/portfolio/detail/group/${id}/tribe-settings/membership` as any,
+              );
             }}
             className="flex-row items-center p-3 rounded-xl active:bg-gray-100"
           >
@@ -792,13 +1097,15 @@ export default function TribeMembersScreen() {
     refetch: refetchMembers,
   } = useGetGroupMembersQuery(
     { id: id as string, populate: ["user"] },
-    { skip: !id }
+    { skip: !id },
   );
 
   const { data: group } = useGetGroupDetailsQuery(id as string, { skip: !id });
 
-  const [sendReminders, { isLoading: isBulkReminding }] = useSendGroupRemindersMutation();
-  const [removeMember, { isLoading: isBulkRemoving }] = useRemoveGroupMemberMutation();
+  const [sendReminders, { isLoading: isBulkReminding }] =
+    useSendGroupRemindersMutation();
+  const [removeMember, { isLoading: isBulkRemoving }] =
+    useRemoveGroupMemberMutation();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
@@ -829,21 +1136,35 @@ export default function TribeMembersScreen() {
     (currentUser?.id && group?.creatorId === currentUser.id) ||
     group?.isAdmin ||
     rawMembers.some(
-      (m) => m.userId === currentUser?.id && (m.role === "OWNER" || m.role === "ADMIN" || m.role === "CREATOR")
+      (m) =>
+        m.userId === currentUser?.id &&
+        (m.role === "OWNER" || m.role === "ADMIN" || m.role === "CREATOR"),
     );
 
   const membersList = useMemo(() => {
     return rawMembers.map((m) => {
-      const isCurrent = currentUser?.id && m.userId === currentUser.id;
+      const isCurrent =
+        Boolean(currentUser?.id) &&
+        (m.userId === currentUser?.id || (m.user as any)?.id === currentUser?.id);
       const name = isCurrent
-        ? `${currentUser?.firstName || ""} ${currentUser?.lastName || ""} (You)`.trim() || "You"
+        ? `${currentUser?.firstName || ""} ${currentUser?.lastName || ""} (You)`.trim() ||
+          "You"
         : m.user
-        ? `${m.user.firstName || ""} ${m.user.lastName || ""}`.trim() || m.user.email || "Member"
-        : "Member";
-      const savingsNum = parseFloat(m.totalContributed?.toString() || "0") / 100;
+          ? `${m.user.firstName || ""} ${m.user.lastName || ""}`.trim() ||
+            m.user.email ||
+            "Member"
+          : "Member";
+      const savingsNum =
+        parseFloat(m.totalContributed?.toString() || "0") / 100;
       const userPhoto = isCurrent
-        ? (currentUser as any)?.imageUrl || (currentUser as any)?.avatar || (currentUser as any)?.profilePicture || null
-        : m.user?.imageUrl || (m.user as any)?.avatar || (m.user as any)?.profilePicture || null;
+        ? (currentUser as any)?.imageUrl ||
+          (currentUser as any)?.avatar ||
+          (currentUser as any)?.profilePicture ||
+          null
+        : m.user?.imageUrl ||
+          (m.user as any)?.avatar ||
+          (m.user as any)?.profilePicture ||
+          null;
       const initial = (
         isCurrent
           ? currentUser?.firstName || currentUser?.email || "U"
@@ -888,9 +1209,16 @@ export default function TribeMembersScreen() {
         memberStatus = "Unpaid";
       }
 
+      const resolvedUserId =
+        typeof m.userId === "string" && m.userId
+          ? m.userId
+          : typeof m.user?.id === "string" && m.user.id
+          ? m.user.id
+          : "";
+
       return {
         id: m.id,
-        userId: m.userId || m.id,
+        userId: resolvedUserId,
         name,
         initial,
         avatar: userPhoto,
@@ -898,7 +1226,10 @@ export default function TribeMembersScreen() {
         status: memberStatus,
         isBlacklisted: isBlack,
         isPastMember: isPast,
-        isAdmin: m.role === "ADMIN" || (m.role as string) === "OWNER" || (m.role as string) === "CREATOR",
+        isAdmin:
+          m.role === "ADMIN" ||
+          (m.role as string) === "OWNER" ||
+          (m.role as string) === "CREATOR",
         raw: m,
       };
     });
@@ -906,7 +1237,9 @@ export default function TribeMembersScreen() {
 
   const filteredMembers = useMemo(() => {
     return membersList.filter((m) => {
-      const matchesSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = m.name
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
       let matchesStatus = true;
       if (selectedStatus === "All") {
         matchesStatus = true;
@@ -916,7 +1249,8 @@ export default function TribeMembersScreen() {
           m.status?.toLowerCase() === "exited" ||
           m.status?.toLowerCase() === "past member";
       } else {
-        matchesStatus = m.status?.toLowerCase() === selectedStatus.toLowerCase();
+        matchesStatus =
+          m.status?.toLowerCase() === selectedStatus.toLowerCase();
       }
       return matchesSearch && matchesStatus;
     });
@@ -924,24 +1258,41 @@ export default function TribeMembersScreen() {
 
   const toggleSelectMember = (userId: string) => {
     setSelectedMemberIds((prev) =>
-      prev.includes(userId) ? prev.filter((i) => i !== userId) : [...prev, userId]
+      prev.includes(userId)
+        ? prev.filter((i) => i !== userId)
+        : [...prev, userId],
     );
   };
 
   const handleExecuteBulkAction = async () => {
     if (selectedMemberIds.length === 0) {
-      setBulkToast({ type: "warning", title: "No Members Selected", message: "Please tap on member rows to select them." });
+      setBulkToast({
+        type: "warning",
+        title: "No Members Selected",
+        message: "Please tap on member rows to select them.",
+      });
       return;
     }
 
     if (bulkMode === "reminder") {
       try {
-        await sendReminders({ id: id as string, userIds: selectedMemberIds }).unwrap();
-        setBulkToast({ type: "success", title: "Reminders Sent", message: `Payment reminders have been sent to ${selectedMemberIds.length} members.` });
+        await sendReminders({
+          id: id as string,
+          userIds: selectedMemberIds,
+        }).unwrap();
+        setBulkToast({
+          type: "success",
+          title: "Reminders Sent",
+          message: `Payment reminders have been sent to ${selectedMemberIds.length} members.`,
+        });
         setBulkMode(null);
         setSelectedMemberIds([]);
       } catch (err: any) {
-        setBulkToast({ type: "success", title: "Reminders Queued", message: `Reminders queued for ${selectedMemberIds.length} members.` });
+        setBulkToast({
+          type: "success",
+          title: "Reminders Queued",
+          message: `Reminders queued for ${selectedMemberIds.length} members.`,
+        });
         setBulkMode(null);
         setSelectedMemberIds([]);
       }
@@ -956,10 +1307,18 @@ export default function TribeMembersScreen() {
             for (const uid of selectedMemberIds) {
               await removeMember({ id: id as string, userId: uid }).unwrap();
             }
-            setBulkToast({ type: "success", title: "Completed", message: `Removed ${selectedMemberIds.length} member(s).` });
+            setBulkToast({
+              type: "success",
+              title: "Completed",
+              message: `Removed ${selectedMemberIds.length} member(s).`,
+            });
             refetchMembers();
           } catch (err: any) {
-            setBulkToast({ type: "info", title: "Completed", message: "Selected members removed." });
+            setBulkToast({
+              type: "info",
+              title: "Completed",
+              message: "Selected members removed.",
+            });
             refetchMembers();
           } finally {
             setBulkMode(null);
@@ -1004,14 +1363,14 @@ export default function TribeMembersScreen() {
         <Ionicons name="caret-down" size={12} color="#1A1A1A" />
       </TouchableOpacity>
 
-      <View className="flex-row items-center px-2 mb-4">
-        <Text className="flex-1 text-[12px] font-medium text-[#64748B]">
+      <View className="flex-row items-center px-[10px] mb-4">
+        <Text className="flex-1 text-[12px] font-medium text-[#64748B] mr-2">
           Names
         </Text>
-        <Text className="w-24 text-[12px] font-medium text-[#64748B] text-center">
+        <Text className="w-[66px] text-[12px] font-medium text-[#64748B] text-center mr-4">
           Status
         </Text>
-        <Text className="w-24 text-[12px] font-medium text-[#64748B] text-right">
+        <Text className="w-[85px] text-[12px] font-medium text-[#64748B] text-right">
           Total savings
         </Text>
       </View>
@@ -1027,8 +1386,8 @@ export default function TribeMembersScreen() {
           bulkMode === "reminder"
             ? "Select Members to Remind"
             : bulkMode === "remove"
-            ? "Select Members to Remove"
-            : "Group Members"
+              ? "Select Members to Remove"
+              : "Group Members"
         }
         onBack={
           bulkMode
@@ -1047,18 +1406,33 @@ export default function TribeMembersScreen() {
               }}
               style={{ paddingRight: 16 }}
             >
-              <Text style={{ color: "#EF4444", fontWeight: "700", fontSize: 14 }}>
+              <Text
+                style={{ color: "#EF4444", fontWeight: "700", fontSize: 14 }}
+              >
                 Cancel
               </Text>
             </TouchableOpacity>
           ) : (
-            <View style={{ flexDirection: "row", alignItems: "center", paddingRight: 16 }}>
-              <TouchableOpacity onPress={handleShare} style={{ marginRight: isUserAdmin ? 20 : 0 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingRight: 16,
+              }}
+            >
+              <TouchableOpacity
+                onPress={handleShare}
+                style={{ marginRight: isUserAdmin ? 20 : 0 }}
+              >
                 <Ionicons name="person-add-outline" size={20} color="#1A1A1A" />
               </TouchableOpacity>
               {isUserAdmin && (
                 <TouchableOpacity onPress={() => setIsMoreOptionsVisible(true)}>
-                  <Ionicons name="ellipsis-vertical" size={24} color="#1A1A1A" />
+                  <Ionicons
+                    name="ellipsis-vertical"
+                    size={24}
+                    color="#1A1A1A"
+                  />
                 </TouchableOpacity>
               )}
             </View>
@@ -1117,8 +1491,13 @@ export default function TribeMembersScreen() {
                     />
                   )}
 
-                  <View className="flex-row items-center flex-1">
-                    {item.avatar && (item.avatar.startsWith("http") || item.avatar.startsWith("file")) ? (
+                  <View
+                    className="flex-row items-center flex-1 mr-2"
+                    style={{ minWidth: 0 }}
+                  >
+                    {item.avatar &&
+                    (item.avatar.startsWith("http") ||
+                      item.avatar.startsWith("file")) ? (
                       <Image
                         source={{ uri: item.avatar }}
                         style={{
@@ -1141,35 +1520,55 @@ export default function TribeMembersScreen() {
                           marginRight: 8,
                         }}
                       >
-                        <Text style={{ color: THEME, fontWeight: "bold", fontSize: 14 }}>
-                          {item.initial || (item.name ? item.name.charAt(0).toUpperCase() : "U")}
+                        <Text
+                          style={{
+                            color: THEME,
+                            fontWeight: "bold",
+                            fontSize: 14,
+                          }}
+                        >
+                          {item.initial ||
+                            (item.name
+                              ? item.name.charAt(0).toUpperCase()
+                              : "U")}
                         </Text>
                       </View>
                     )}
-                    <View className="flex-1 flex-row items-center">
+                    <View
+                      className="flex-1 flex-row items-center"
+                      style={{ minWidth: 0 }}
+                    >
                       <Text
-                        className="text-[#1A1A1A] font-medium text-[13px] mr-1"
+                        className="text-[#1A1A1A] font-medium text-[13px] mr-1.5"
                         numberOfLines={1}
+                        ellipsizeMode="tail"
+                        style={{ flexShrink: 1 }}
                       >
                         {item.name}
                       </Text>
                       {item.isAdmin && (
-                        <View className="bg-[#155D5F] px-1.5 py-0.5 rounded-md">
-                          <Text className="text-white text-[8px] font-bold">Admin</Text>
+                        <View className="bg-[#155D5F] px-1.5 py-0.5 rounded-md shrink-0">
+                          <Text className="text-white text-[8px] font-bold">
+                            Admin
+                          </Text>
                         </View>
                       )}
                     </View>
                   </View>
 
-                  <View className="w-24 items-center">
+                  <View className="w-[66px] items-center justify-center shrink-0 mr-4">
                     <StatusBadge status={item.status} />
                   </View>
 
-                  <View className="w-24 flex-row items-center justify-end">
-                    <Text className="text-[#155D5F] font-bold text-[12px]">
+                  <View className="w-[85px] flex-row items-center justify-end shrink-0">
+                    <Text
+                      className="text-[#155D5F] font-bold text-[12px]"
+                      numberOfLines={1}
+                      style={{ flexShrink: 1 }}
+                    >
                       {item.savings}
                     </Text>
-                    <View className="bg-[#E2F2F2] rounded-sm ml-1 self-center h-4 w-4 items-center justify-center">
+                    <View className="bg-[#E2F2F2] rounded-sm ml-1.5 self-center h-4 w-4 items-center justify-center shrink-0">
                       <Ionicons name="arrow-up" size={10} color={THEME} />
                     </View>
                   </View>
@@ -1201,14 +1600,18 @@ export default function TribeMembersScreen() {
         >
           <TouchableOpacity
             onPress={handleExecuteBulkAction}
-            disabled={isBulkReminding || isBulkRemoving || selectedMemberIds.length === 0}
+            disabled={
+              isBulkReminding ||
+              isBulkRemoving ||
+              selectedMemberIds.length === 0
+            }
             style={{
               backgroundColor:
                 selectedMemberIds.length === 0
                   ? "#9CA3AF"
                   : bulkMode === "remove"
-                  ? "#EF4444"
-                  : THEME,
+                    ? "#EF4444"
+                    : THEME,
               height: 50,
               borderRadius: 14,
               alignItems: "center",
@@ -1263,7 +1666,10 @@ export default function TribeMembersScreen() {
       />
 
       <AppToast toast={bulkToast} onDismiss={() => setBulkToast(null)} />
-      <AppConfirmModal confirm={bulkConfirm} onDismiss={() => setBulkConfirm(null)} />
+      <AppConfirmModal
+        confirm={bulkConfirm}
+        onDismiss={() => setBulkConfirm(null)}
+      />
     </SafeAreaView>
   );
 }

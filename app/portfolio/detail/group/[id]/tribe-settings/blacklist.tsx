@@ -43,9 +43,15 @@ export default function BlacklistScreen() {
         : "Member";
       const isBlacklisted = m.status === "BLACKLISTED" || (m.status as string) === "BANNED";
       const savingsNum = parseFloat(m.totalContributed?.toString() || "0") / 100;
+      const resolvedUserId =
+        typeof m.userId === "string" && m.userId
+          ? m.userId
+          : typeof m.user?.id === "string" && m.user.id
+          ? m.user.id
+          : "";
       return {
         id: m.id,
-        userId: m.userId,
+        userId: resolvedUserId,
         name,
         savings: `₦${savingsNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
         isBlacklisted,
@@ -62,6 +68,10 @@ export default function BlacklistScreen() {
   }, [mappedMembers, searchQuery]);
 
   const handleUnblacklist = (userId: string, name: string) => {
+    if (!userId) {
+      setToast({ type: "error", title: "Error", message: "Could not resolve valid user ID." });
+      return;
+    }
     setConfirm({
       title: "Remove from Blacklist",
       message: `Are you sure you want to unblock ${name}?`,

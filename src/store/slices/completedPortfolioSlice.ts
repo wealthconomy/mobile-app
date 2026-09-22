@@ -46,16 +46,31 @@ const completedPortfolioSlice = createSlice({
       let changed = false;
       action.payload.forEach((plan) => {
         if (plan && plan.id) {
-          const nextStatus = plan.status === "TERMINATED" ? "TERMINATED" : "COMPLETED";
+          const rawStatus = (plan.status || "").toUpperCase();
+          const nextStatus =
+            rawStatus === "TERMINATED"
+              ? "TERMINATED"
+              : rawStatus === "WITHDRAWN"
+              ? "WITHDRAWN"
+              : rawStatus === "CLOSED"
+              ? "CLOSED"
+              : "COMPLETED";
+
           const existing = state.completedMap[plan.id];
+          const resolvedType = plan.type || existing?.type;
+          const resolvedBalance = plan.balance || "0";
+
           if (
             !existing ||
             existing.status !== nextStatus ||
-            existing.balance !== (plan.balance || "0")
+            existing.balance !== resolvedBalance ||
+            (resolvedType && existing.type !== resolvedType)
           ) {
             state.completedMap[plan.id] = {
+              ...existing,
               ...plan,
-              balance: plan.balance || "0",
+              type: resolvedType || "",
+              balance: resolvedBalance,
               status: nextStatus,
             };
             changed = true;
@@ -69,21 +84,43 @@ const completedPortfolioSlice = createSlice({
     saveSingleCompletedPortfolio: (state, action: PayloadAction<Portfolio>) => {
       const plan = action.payload;
       if (plan && plan.id) {
-        const nextStatus = plan.status === "TERMINATED" ? "TERMINATED" : "COMPLETED";
+        const rawStatus = (plan.status || "").toUpperCase();
+        const nextStatus =
+          rawStatus === "TERMINATED"
+            ? "TERMINATED"
+            : rawStatus === "WITHDRAWN"
+            ? "WITHDRAWN"
+            : rawStatus === "CLOSED"
+            ? "CLOSED"
+            : "COMPLETED";
+
         const existing = state.completedMap[plan.id];
+        const resolvedType = plan.type || existing?.type;
+        const resolvedBalance = plan.balance || "0";
+
         if (
           existing &&
           existing.status === nextStatus &&
-          existing.balance === (plan.balance || "0") &&
-          existing.name === plan.name
+          existing.balance === resolvedBalance &&
+          existing.name === plan.name &&
+          (!resolvedType || existing.type === resolvedType)
         ) {
           return;
         }
         state.completedMap[plan.id] = {
+          ...existing,
           ...plan,
-          balance: plan.balance || "0",
+          type: resolvedType || "",
+          balance: resolvedBalance,
           status: nextStatus,
         };
+        persistCompletedMap(state.completedMap);
+      }
+    },
+    removeCompletedPortfolio: (state, action: PayloadAction<string>) => {
+      const id = action.payload;
+      if (id && state.completedMap[id]) {
+        delete state.completedMap[id];
         persistCompletedMap(state.completedMap);
       }
     },
@@ -101,8 +138,11 @@ const completedPortfolioSlice = createSlice({
   },
 });
 
-export const { saveCompletedPortfolios, saveSingleCompletedPortfolio } =
-  completedPortfolioSlice.actions;
+export const {
+  saveCompletedPortfolios,
+  saveSingleCompletedPortfolio,
+  removeCompletedPortfolio,
+} = completedPortfolioSlice.actions;
 
 export default completedPortfolioSlice.reducer;
 

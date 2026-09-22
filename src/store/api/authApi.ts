@@ -198,6 +198,29 @@ export const authApi = baseApi.injectEndpoints({
         }
       },
     }),
+    biometricLogin: builder.mutation<ApiResponse<AuthTokensData>, { signature?: string; deviceId?: string } | void>({
+      query: (body) => ({
+        url: "/auth/biometric-login",
+        method: "POST",
+        body: body || {},
+      }),
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data.data?.accessToken) {
+            dispatch(
+              setCredentials({
+                user: data.data.user,
+                token: data.data.accessToken,
+                refreshToken: data.data.refreshToken,
+              })
+            );
+          }
+        } catch {
+          // Silent catch
+        }
+      },
+    }),
   }),
   overrideExisting: true,
 });
@@ -211,4 +234,6 @@ export const {
   useResetPasswordMutation,
   useChangePasswordMutation,
   useLogoutSessionMutation,
+  useBiometricLoginMutation,
 } = authApi;
+

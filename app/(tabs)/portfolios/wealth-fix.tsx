@@ -1,12 +1,13 @@
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
 import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { useFocusEffect, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ArrowUp, Eye, EyeOff } from "lucide-react-native";
-import { useState, useEffect, useMemo } from "react";
-import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Image, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/src/store";
@@ -15,9 +16,15 @@ import {
   useGetPortfoliosQuery,
   useGetPortfolioConfigQuery,
 } from "@/src/store/api/portfolioApi";
+import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
 import { Portfolio } from "@/src/types/portfolio";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
-import { saveCompletedPortfolios, hydrateCompletedPortfolios } from "@/src/store/slices/completedPortfolioSlice";
+import {
+  saveCompletedPortfolios,
+  hydrateCompletedPortfolios,
+  removeCompletedPortfolio,
+} from "@/src/store/slices/completedPortfolioSlice";
+import { isPortfolioCompleted, getDynamicInterestRateLabel } from "@/src/utils/formatters";
 
 const UnlockedPadlock = () => (
   <Svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -67,6 +74,7 @@ export default function WealthFixScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [showTips, setShowTips] = useState(true);
   const [activeTab, setActiveTab] = useState("locked"); // 'locked' or 'unlocked'
+  const [refreshing, setRefreshing] = useState(false);
 
   const portfolioPreference = useSelector(
     (state: RootState) => state.portfolioPreference.fix
@@ -78,18 +86,28 @@ export default function WealthFixScreen() {
     (state: RootState) => state.completedPortfolio.completedMap
   );
 
-  const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthfix" });
+  const { data, isLoading: loading, refetch: refetchFix } = useGetPortfoliosQuery({ type: "wealthfix" });
   const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const fixRateLabel = rates?.wealthfix?.label || "15% P.A.";
+  const fixRateLabel = getDynamicInterestRateLabel("fix", systemConfigData, rates, 15);
   const allGoals = data?.items || [];
 
-  const isPlanCompleted = (g: Portfolio) =>
-    g.status === "COMPLETED" ||
-    g.status === "TERMINATED" ||
-    g.status === "WITHDRAWN" ||
-    g.status === "CLOSED" ||
-    (g.maturityDate && new Date(g.maturityDate).getTime() <= Date.now());
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetchFix();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchFix();
+      (dispatch as any)(hydrateCompletedPortfolios());
+    }, [refetchFix, dispatch])
+  );
 
   useEffect(() => {
     (dispatch as any)(hydrateCompletedPortfolios());
@@ -97,30 +115,49 @@ export default function WealthFixScreen() {
 
   useEffect(() => {
     if (allGoals.length > 0) {
-      const completed = allGoals.filter(isPlanCompleted);
+      const completed = allGoals.filter(isPortfolioCompleted);
       if (completed.length > 0) {
-        dispatch(saveCompletedPortfolios(completed));
+        dispatch(
+          saveCompletedPortfolios(
+            completed.map((p) => ({ ...p, type: p.type || "wealthfix" }))
+          )
+        );
       }
+      // Evict any active plan that was mistakenly stored in completedMap
+      allGoals.forEach((p) => {
+        if (!isPortfolioCompleted(p) && completedMap[p.id]) {
+          dispatch(removeCompletedPortfolio(p.id));
+        }
+      });
     }
-  }, [allGoals, dispatch]);
+  }, [allGoals, completedMap, dispatch]);
 
-  const lockedGoals = allGoals.filter(
-    (g) =>
-      !isPlanCompleted(g) &&
-      (!g.maturityDate || new Date(g.maturityDate).getTime() > Date.now())
-  );
+  const lockedGoals = allGoals.filter((g) => !isPortfolioCompleted(g));
 
   const unlockedGoals = useMemo(() => {
-    const fromApi = allGoals.filter(isPlanCompleted);
-    const fromCache = Object.values(completedMap).filter((g) => {
-      const type = g.type?.toLowerCase();
-      if (type === "wealthfix") return true;
-      if (g.metadata?.lockType || g.metadata?.category?.includes("Lock") || g.metadata?.category?.includes("Fix")) return true;
-      return false;
-    });
+    const fromApi = allGoals.filter(isPortfolioCompleted);
+    const fromCache = Object.values(completedMap)
+      .filter(isPortfolioCompleted)
+      .filter((g) => {
+        const normType = (g.type || "").toLowerCase().replace(/[-_]/g, "");
+        if (normType === "wealthfix" || normType === "fix") return true;
+        if (
+          g.metadata?.lockType ||
+          g.metadata?.category?.includes("Lock") ||
+          g.metadata?.category?.includes("Fix")
+        ) {
+          return true;
+        }
+        return false;
+      });
     const combined = new Map<string, Portfolio>();
     fromCache.forEach((item) => combined.set(item.id, item));
-    fromApi.forEach((item) => combined.set(item.id, item));
+    fromApi.forEach((item) =>
+      combined.set(item.id, {
+        ...item,
+        type: item.type || "wealthfix",
+      })
+    );
     return Array.from(combined.values());
   }, [allGoals, completedMap]);
 
@@ -161,7 +198,21 @@ export default function WealthFixScreen() {
         rightElement={<PortfolioPreferenceMenu portfolioType="fix" />}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        className="flex-1"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["#D48E00"]}
+            progressBackgroundColor="#FFFFFF"
+          />
+        }
+      >
         <View className="px-5 py-2">
           {/* Main Card (GOLD) */}
           <View
@@ -532,6 +583,7 @@ export default function WealthFixScreen() {
 
 function FixListItem({ goal, themeColor, isUnlocked }: { goal: Portfolio, themeColor: string, isUnlocked?: boolean }) {
   const initial = (goal.name || "W")[0].toUpperCase();
+  const unlocked = Boolean(isUnlocked || isPortfolioCompleted(goal));
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
@@ -539,7 +591,7 @@ function FixListItem({ goal, themeColor, isUnlocked }: { goal: Portfolio, themeC
     return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
-  const progress = isUnlocked
+  const progress = unlocked
     ? 1
     : parseFloat(goal.targetAmount) > 0
     ? parseFloat(goal.balance) / parseFloat(goal.targetAmount)

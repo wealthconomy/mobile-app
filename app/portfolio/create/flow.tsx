@@ -1,6 +1,9 @@
 import Header from "@/src/components/common/Header";
+import { AppCalendarModal, AppDatePickerField } from "@/src/components/common";
 import { ThemedButton } from "@/src/components/ThemedButton";
-import { useCreatePortfolioMutation } from "@/src/store/api/portfolioApi";
+import { useCreatePortfolioMutation, useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
+import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
+import { getDynamicInterestRateLabel, getDynamicPenaltyRate } from "@/src/utils/formatters";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { CreatePortfolioRequest } from "@/src/types/portfolio";
 import { Ionicons } from "@expo/vector-icons";
@@ -51,6 +54,19 @@ export default function CreateFlowScreen() {
   const [isManual, setIsManual] = useState(false);
   const [anytimeWithdrawal, setAnytimeWithdrawal] = useState(false);
   const [endDateText, setEndDateText] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(null);
+
+  const minTargetDate = new Date();
+  minTargetDate.setDate(minTargetDate.getDate() + 1);
+  minTargetDate.setHours(0, 0, 0, 0);
+
+  const handleSelectDate = (date: Date) => {
+    setSelectedEndDate(date);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setEndDateText(`${pad(date.getDate())} / ${pad(date.getMonth() + 1)} / ${date.getFullYear()}`);
+  };
+
   const [wealthPreference, setWealthPreference] = useState<"Interest Based" | "Impact Wealth">("Interest Based");
   const [isNavigating, setIsNavigating] = useState(false);
 
@@ -65,6 +81,20 @@ export default function CreateFlowScreen() {
   // API mutations
   const [createPortfolio, { isLoading: isCreating }] = useCreatePortfolioMutation();
   const [verifyPin] = useVerifyPinMutation();
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
+  const flowInterestRateLabel = getDynamicInterestRateLabel(
+    "flow",
+    systemConfigData,
+    configData?.rates || (configData as any)?.data?.rates,
+    10
+  );
+  const { penaltyRate: flowPenaltyRate } = getDynamicPenaltyRate(
+    "flow",
+    systemConfigData,
+    configData?.rates || (configData as any)?.data?.rates,
+    "2.5%"
+  );
 
   const formatAmount = (val: string) => {
     const n = val.replace(/\D/g, "");
@@ -169,7 +199,7 @@ export default function CreateFlowScreen() {
       {showInfoCard && (
         <View
           style={{
-            backgroundColor: TEAL_LIGHT,
+            backgroundColor: "#D5EDFF",
             borderRadius: 16,
             padding: 16,
             marginBottom: 24,
@@ -180,11 +210,11 @@ export default function CreateFlowScreen() {
             style={{ position: "absolute", top: 12, right: 12 }}
             onPress={() => setShowInfoCard(false)}
           >
-            <Ionicons name="close" size={18} color={TEAL} />
+            <Ionicons name="close" size={18} color="#005F61" />
           </TouchableOpacity>
           <Text
             style={{
-              color: TEAL,
+              color: "#005F61",
               fontWeight: "700",
               fontSize: 13,
               marginBottom: 10,
@@ -206,7 +236,12 @@ export default function CreateFlowScreen() {
             {
               icon: "🛡️",
               bold: "Secured Interest:",
-              text: " Lock down your funds until maturity or activate Anytime Withdrawal as needed.",
+              text: ` Earn up to ${flowInterestRateLabel} interest on your funds until maturity or activate Anytime Withdrawal as needed.`,
+            },
+            {
+              icon: "⚠️",
+              bold: "Early Exit / Breaking Fee:",
+              text: ` A ${flowPenaltyRate} early exit fee applies if liquidated before maturity date unless Anytime Withdrawal is enabled.`,
             },
           ].map((item, i) => (
             <View
@@ -220,13 +255,13 @@ export default function CreateFlowScreen() {
               <Text style={{ fontSize: 13, marginRight: 6 }}>{item.icon}</Text>
               <Text
                 style={{
-                  color: TEAL,
+                  color: "#005F61",
                   fontSize: 12,
                   lineHeight: 18,
                   flex: 1,
                 }}
               >
-                <Text style={{ fontWeight: "700" }}>{item.bold}</Text>
+                <Text style={{ fontWeight: "700", color: "#005F61" }}>{item.bold}</Text>
                 {item.text}
               </Text>
             </View>
@@ -342,21 +377,22 @@ export default function CreateFlowScreen() {
       </View>
 
       {/* End Date (Target Date) */}
-      <View style={{ marginBottom: 20 }}>
-        <Text style={styles.inputLabel}>Target End Date</Text>
-        <TextInput
-          placeholder="DD / MM / YYYY"
-          placeholderTextColor="#9CA3AF"
-          value={endDateText}
-          onChangeText={(v) => setEndDateText(formatDateInput(v))}
-          keyboardType="numeric"
-          maxLength={14}
-          style={styles.textInput}
-        />
-        <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4, fontStyle: "italic" }}>
-          Target maturity date in DD / MM / YYYY format (e.g. 31 / 12 / 2027)
-        </Text>
-      </View>
+      <AppDatePickerField
+        label="Target End Date"
+        placeholder="Select Target End Date"
+        value={endDateText}
+        onPress={() => setShowDatePicker(true)}
+        helperText="Target maturity date (must be in the future)"
+      />
+
+      <AppCalendarModal
+        visible={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        title="Select Target End Date"
+        selectedDate={selectedEndDate}
+        minDate={minTargetDate}
+        onSelectDate={handleSelectDate}
+      />
 
       {/* Wealth Preference Selector */}
       <View style={{ marginBottom: 24 }}>
@@ -622,7 +658,7 @@ export default function CreateFlowScreen() {
         >
           <View>
             <Text style={styles.previewLabel}>Interest Rate</Text>
-            <Text style={styles.previewValue}>12% P.A</Text>
+            <Text style={styles.previewValue}>{flowInterestRateLabel}</Text>
           </View>
         </View>
       </View>

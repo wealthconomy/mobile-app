@@ -1,9 +1,11 @@
-﻿import Header from "@/src/components/common/Header";
+import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCreatePortfolioMutation } from "@/src/store/api/portfolioApi";
+import { useCreatePortfolioMutation, useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
+import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
+import { getDynamicInterestRateLabel, getDynamicPenaltyRate } from "@/src/utils/formatters";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 import { useFocusEffect } from "@react-navigation/native";
@@ -55,6 +57,20 @@ export default function CreateGoalScreen() {
   const { data: walletData, refetch: refetchWallet } = useGetWalletSummaryQuery(undefined, {
     refetchOnMountOrArgChange: true,
   });
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
+  const goalInterestRateLabel = getDynamicInterestRateLabel(
+    "goal",
+    systemConfigData,
+    configData?.rates || (configData as any)?.data?.rates,
+    12
+  );
+  const { penaltyRate } = getDynamicPenaltyRate(
+    "goal",
+    systemConfigData,
+    configData?.rates || (configData as any)?.data?.rates,
+    "3%"
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -435,7 +451,7 @@ export default function CreateGoalScreen() {
                 >
                   Interest Rate:
                 </Text>{" "}
-                Currently, Target Savings offers around 12% per annum, paid daily
+                Currently, Target Savings offers around {goalInterestRateLabel}, paid daily
                 into your Flex account.
               </Text>
             )}
@@ -448,10 +464,10 @@ export default function CreateGoalScreen() {
                 style={{ color: "#F3007A" }}
                 className="font-bold text-[12px]"
               >
-                The 3% Breaking Fee:
+                The {penaltyRate} Breaking Fee:
               </Text>{" "}
               If you need to withdraw your money before the maturity date you
-              set, a 3% penalty fee applies to ensure financial discipline.
+              set, a {penaltyRate} penalty fee applies to ensure financial discipline.
             </Text>
             <Text
               style={{ color: "#F3007A" }}
@@ -1030,7 +1046,7 @@ export default function CreateGoalScreen() {
                 {wealthPreference === "Interest Based" ? "Interest Rate" : "Preference"}
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
-                {wealthPreference === "Interest Based" ? "12% P.A" : "Impact Wealth"}
+                {wealthPreference === "Interest Based" ? goalInterestRateLabel : "Impact Wealth"}
               </Text>
             </View>
             <View className="items-end">

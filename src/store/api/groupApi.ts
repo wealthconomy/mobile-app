@@ -5,6 +5,8 @@ import {
   GroupMember,
   GroupMemberFilter,
   GroupMemberStats,
+  GroupType,
+  SetGroupPositionsRequest,
   UpdateGroupSettingsRequest,
   WealthGroupModel,
   WithdrawGroupRequest,
@@ -17,6 +19,8 @@ interface ListGroupsArgs {
   limit?: number;
   after?: string;
   before?: string;
+  groupType?: GroupType;
+  isVetted?: boolean;
   sortBy?: "createdAt" | "name" | string;
   sortDir?: "asc" | "desc";
   populate?: string[];
@@ -42,8 +46,44 @@ export const groupApi = baseApi.injectEndpoints({
         params: params || {},
       }),
       providesTags: ["WealthGroup"],
-      transformResponse: (response: { data: KeysetPagination<WealthGroupModel> }) =>
-        response.data || response,
+      transformResponse: (response: any) => {
+        const payload = response?.data || response;
+        let rawItems: any[] = [];
+        if (Array.isArray(payload)) {
+          rawItems = payload;
+        } else if (Array.isArray(payload?.items)) {
+          rawItems = payload.items;
+        } else if (Array.isArray(response?.items)) {
+          rawItems = response.items;
+        }
+
+        const map = new Map<string, WealthGroupModel>();
+        rawItems.forEach((g: any) => {
+          if (!g) return;
+          const id = String(
+            g.id ||
+              g._id ||
+              g.groupId ||
+              g.group_id ||
+              (g.name ? `${g.name}_${g.createdAt || ""}` : "")
+          ).trim();
+          if (id) {
+            map.set(id, { ...g, id: String(g.id || g._id || id) });
+          }
+        });
+
+        const items = Array.from(map.values());
+        return {
+          items,
+          nextCursor: payload?.nextCursor ?? payload?.nextAfter ?? null,
+          prevCursor: payload?.prevCursor ?? null,
+          pageSize: payload?.pageSize ?? items.length,
+          hasNext: payload?.hasNext ?? Boolean(payload?.nextAfter || payload?.nextCursor),
+          hasPrev: payload?.hasPrev ?? false,
+          total: payload?.total ?? items.length,
+          nextAfter: payload?.nextAfter,
+        } as unknown as KeysetPagination<WealthGroupModel>;
+      },
     }),
 
     // Get single group details
@@ -262,6 +302,26 @@ export const groupApi = baseApi.injectEndpoints({
         body: { userIds },
       }),
     }),
+
+    // Get system configurations (rates & penalties configured by admin)
+    getSystemConfigs: builder.query<{ items: Array<{ key: string; value: string }> }, void>({
+      query: () => "/admin/system-config",
+      providesTags: ["WealthGroup"],
+      transformResponse: (response: any) => response?.data || response,
+    }),
+
+    // Set rotational payout positions (Admin/Owner only)
+    setGroupPositions: builder.mutation<
+      { message: string },
+      { id: string; body: SetGroupPositionsRequest }
+    >({
+      query: ({ id, body }) => ({
+        url: `/groups/${id}/positions`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["WealthGroup"],
+    }),
   }),
   overrideExisting: true,
 });
@@ -289,4 +349,6 @@ export const {
   useAddToGroupBlacklistMutation,
   useRemoveFromGroupBlacklistMutation,
   useSendGroupRemindersMutation,
+  useGetSystemConfigsQuery,
+  useSetGroupPositionsMutation,
 } = groupApi;

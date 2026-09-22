@@ -150,7 +150,7 @@ export default function RiskSettingsScreen() {
                     Allow Early Exit
                   </Text>
                   <Text className="text-[#64748B] text-xs">
-                    Allow members to leave before the tribe goal completes.
+                    Allow members to leave before the tribe goal completes. When enabled, the platform early exit penalty will apply upon exit.
                   </Text>
                 </View>
                 <Switch

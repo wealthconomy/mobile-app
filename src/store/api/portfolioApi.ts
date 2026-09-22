@@ -102,12 +102,30 @@ export const portfolioApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: (result, error, { id, type }) => [
-        { type: "Portfolio", id },
-        ...(type ? [{ type: "Portfolio" as const, id: type }] : []),
-        { type: "Portfolio", id: `${id}-txns` },
-        "Wallet",
-      ],
+      invalidatesTags: (result, error, { id, type }) => {
+        const ALL_PORTFOLIO_TYPES: PortfolioType[] = [
+          "wealthgoal",
+          "wealthfix",
+          "wealthflex",
+          "wealthfam",
+          "wealthflow",
+        ];
+        const tags: any[] = [
+          { type: "Portfolio", id },
+          { type: "Portfolio", id: `${id}-txns` },
+          { type: "Portfolio", id: "SUMMARY" },
+          "Wallet",
+        ];
+        if (type) {
+          tags.push({ type: "Portfolio" as const, id: type });
+        }
+        ALL_PORTFOLIO_TYPES.forEach((t) => {
+          if (t !== type) {
+            tags.push({ type: "Portfolio" as const, id: t });
+          }
+        });
+        return tags;
+      },
     }),
 
     // Withdraw from portfolio to wallet
@@ -120,12 +138,30 @@ export const portfolioApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: (result, error, { id, type }) => [
-        { type: "Portfolio", id },
-        ...(type ? [{ type: "Portfolio" as const, id: type }] : []),
-        { type: "Portfolio", id: `${id}-txns` },
-        "Wallet",
-      ],
+      invalidatesTags: (result, error, { id, type }) => {
+        const ALL_PORTFOLIO_TYPES: PortfolioType[] = [
+          "wealthgoal",
+          "wealthfix",
+          "wealthflex",
+          "wealthfam",
+          "wealthflow",
+        ];
+        const tags: any[] = [
+          { type: "Portfolio", id },
+          { type: "Portfolio", id: `${id}-txns` },
+          { type: "Portfolio", id: "SUMMARY" },
+          "Wallet",
+        ];
+        if (type) {
+          tags.push({ type: "Portfolio" as const, id: type });
+        }
+        ALL_PORTFOLIO_TYPES.forEach((t) => {
+          if (t !== type) {
+            tags.push({ type: "Portfolio" as const, id: t });
+          }
+        });
+        return tags;
+      },
     }),
 
     // Terminate/Break a portfolio early
@@ -138,12 +174,30 @@ export const portfolioApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: (result, error, { id, type }) => [
-        { type: "Portfolio", id },
-        ...(type ? [{ type: "Portfolio" as const, id: type }] : []),
-        { type: "Portfolio", id: `${id}-txns` },
-        "Wallet",
-      ],
+      invalidatesTags: (result, error, { id, type }) => {
+        const ALL_PORTFOLIO_TYPES: PortfolioType[] = [
+          "wealthgoal",
+          "wealthfix",
+          "wealthflex",
+          "wealthfam",
+          "wealthflow",
+        ];
+        const tags: any[] = [
+          { type: "Portfolio", id },
+          { type: "Portfolio", id: `${id}-txns` },
+          { type: "Portfolio", id: "SUMMARY" },
+          "Wallet",
+        ];
+        if (type) {
+          tags.push({ type: "Portfolio" as const, id: type });
+        }
+        ALL_PORTFOLIO_TYPES.forEach((t) => {
+          if (t !== type) {
+            tags.push({ type: "Portfolio" as const, id: t });
+          }
+        });
+        return tags;
+      },
     }),
 
     // Get portfolio transactions
@@ -171,28 +225,30 @@ export const portfolioApi = baseApi.injectEndpoints({
         body,
       }),
       invalidatesTags: (result, error, { id, type, body }) => {
+        const ALL_PORTFOLIO_TYPES: PortfolioType[] = [
+          "wealthgoal",
+          "wealthfix",
+          "wealthflex",
+          "wealthfam",
+          "wealthflow",
+        ];
         const tags: any[] = [
           { type: "Portfolio", id },
-          ...(type ? [{ type: "Portfolio" as const, id: type }] : []),
           { type: "Portfolio", id: `${id}-txns` },
           { type: "Portfolio", id: "SUMMARY" },
           "Wallet",
         ];
+        if (type) {
+          tags.push({ type: "Portfolio" as const, id: type });
+        }
+        ALL_PORTFOLIO_TYPES.forEach((t) => {
+          if (t !== type) {
+            tags.push({ type: "Portfolio" as const, id: t });
+          }
+        });
         if (body?.destinationType === "PORTFOLIO" && body?.destinationId) {
           tags.push({ type: "Portfolio", id: body.destinationId });
           tags.push({ type: "Portfolio", id: `${body.destinationId}-txns` });
-          // Destination's type is unknown here, so invalidate all portfolio-type list tags
-          // to guarantee whichever type it belongs to gets refetched on screen.
-          const ALL_PORTFOLIO_TYPES: PortfolioType[] = [
-            "wealthgoal",
-            "wealthfix",
-            "wealthflex",
-            "wealthfam",
-            "wealthflow",
-          ];
-          ALL_PORTFOLIO_TYPES.forEach((t) =>
-            tags.push({ type: "Portfolio", id: t })
-          );
         }
         return tags;
       },

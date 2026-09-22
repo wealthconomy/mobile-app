@@ -1,13 +1,14 @@
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
 import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { useFocusEffect, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ArrowUp, Eye, EyeOff } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
-import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Image, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/src/store";
@@ -15,8 +16,14 @@ import {
   useGetPortfoliosQuery,
   useGetPortfolioConfigQuery,
 } from "@/src/store/api/portfolioApi";
+import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
 import { Portfolio } from "@/src/types/portfolio";
-import { saveCompletedPortfolios, hydrateCompletedPortfolios } from "@/src/store/slices/completedPortfolioSlice";
+import {
+  saveCompletedPortfolios,
+  hydrateCompletedPortfolios,
+  removeCompletedPortfolio,
+} from "@/src/store/slices/completedPortfolioSlice";
+import { isPortfolioCompleted, getDynamicInterestRateLabel } from "@/src/utils/formatters";
 
 const CATEGORIES = [
   { id: "1", title: "Emergency", subtitle: "Save for life's rainy days" },
@@ -29,6 +36,7 @@ export default function WealthGoalScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [showTips, setShowTips] = useState(true);
   const [activeTab, setActiveTab] = useState("tracking"); // 'tracking' or 'completed'
+  const [refreshing, setRefreshing] = useState(false);
 
   const portfolioPreference = useSelector(
     (state: RootState) => state.portfolioPreference.goal
@@ -40,19 +48,28 @@ export default function WealthGoalScreen() {
     (state: RootState) => state.completedPortfolio.completedMap
   );
 
-  const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthgoal" });
+  const { data, isLoading: loading, refetch: refetchGoals } = useGetPortfoliosQuery({ type: "wealthgoal" });
   const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const goalRateLabel = rates?.wealthgoal?.label || "12% P.A.";
+  const goalRateLabel = getDynamicInterestRateLabel("goal", systemConfigData, rates, 12);
   const allGoals = data?.items || [];
 
-  const isPlanCompleted = (g: Portfolio) =>
-    g.status === "COMPLETED" ||
-    g.status === "TERMINATED" ||
-    g.status === "WITHDRAWN" ||
-    g.status === "CLOSED" ||
-    (g.maturityDate && new Date(g.maturityDate).getTime() <= Date.now()) ||
-    (parseFloat(g.targetAmount || "0") > 0 && parseFloat(g.balance || "0") >= parseFloat(g.targetAmount || "0"));
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetchGoals();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchGoals();
+      (dispatch as any)(hydrateCompletedPortfolios());
+    }, [refetchGoals, dispatch])
+  );
 
   useEffect(() => {
     (dispatch as any)(hydrateCompletedPortfolios());
@@ -60,26 +77,55 @@ export default function WealthGoalScreen() {
 
   useEffect(() => {
     if (allGoals.length > 0) {
-      const completed = allGoals.filter(isPlanCompleted);
+      const completed = allGoals.filter(isPortfolioCompleted);
       if (completed.length > 0) {
-        dispatch(saveCompletedPortfolios(completed));
+        dispatch(
+          saveCompletedPortfolios(
+            completed.map((p) => ({ ...p, type: p.type || "wealthgoal" }))
+          )
+        );
       }
+      // Evict any active plan that was mistakenly stored in completedMap
+      allGoals.forEach((p) => {
+        if (!isPortfolioCompleted(p) && completedMap[p.id]) {
+          dispatch(removeCompletedPortfolio(p.id));
+        }
+      });
     }
-  }, [allGoals, dispatch]);
+  }, [allGoals, completedMap, dispatch]);
 
-  const activeGoals = allGoals.filter((g) => !isPlanCompleted(g));
+  const activeGoals = allGoals.filter((g) => !isPortfolioCompleted(g));
   const completedGoals = useMemo(() => {
-    const fromApi = allGoals.filter((g: Portfolio) => isPlanCompleted(g));
-    const fromCache = Object.values(completedMap).filter((g) => {
-      const type = g.type?.toLowerCase();
-      if (type === "wealthgoal") return true;
-      if (g.metadata?.category && ["Rent", "Business", "School Fees", "Vacation", "Goal"].includes(g.metadata.category)) return true;
-      if (!type && !g.metadata?.familyMemberName && !g.metadata?.autoSaveFrequency && !g.metadata?.lockType) return true;
-      return false;
-    });
+    const fromApi = allGoals.filter(isPortfolioCompleted);
+    const fromCache = Object.values(completedMap)
+      .filter(isPortfolioCompleted)
+      .filter((g) => {
+        const normType = (g.type || "").toLowerCase().replace(/[-_]/g, "");
+        if (normType === "wealthgoal" || normType === "goal") return true;
+        if (
+          g.metadata?.category &&
+          ["Rent", "Business", "School Fees", "Vacation", "Goal"].includes(g.metadata.category)
+        ) {
+          return true;
+        }
+        if (
+          !normType &&
+          !g.metadata?.familyMemberName &&
+          !g.metadata?.autoSaveFrequency &&
+          !g.metadata?.lockType
+        ) {
+          return true;
+        }
+        return false;
+      });
     const combined = new Map<string, Portfolio>();
     fromCache.forEach((item) => combined.set(item.id, item));
-    fromApi.forEach((item) => combined.set(item.id, item));
+    fromApi.forEach((item) =>
+      combined.set(item.id, {
+        ...item,
+        type: item.type || "wealthgoal",
+      })
+    );
     return Array.from(combined.values());
   }, [allGoals, completedMap]);
 
@@ -113,7 +159,21 @@ export default function WealthGoalScreen() {
         rightElement={<PortfolioPreferenceMenu portfolioType="goal" />}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        className="flex-1"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["#F3007A"]}
+            progressBackgroundColor="#FFFFFF"
+          />
+        }
+      >
         <View className="px-5 py-2">
           {/* Main Card */}
           <View
@@ -461,7 +521,7 @@ export default function WealthGoalScreen() {
 }
 
 function GoalListItem({ goal }: { goal: Portfolio }) {
-  const isCompleted = goal.status === "COMPLETED" || parseFloat(goal.balance) >= parseFloat(goal.targetAmount);
+  const isCompleted = isPortfolioCompleted(goal);
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";

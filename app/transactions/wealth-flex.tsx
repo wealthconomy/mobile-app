@@ -1,4 +1,4 @@
-﻿import Header from "@/src/components/common/Header";
+import Header from "@/src/components/common/Header";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -199,7 +199,6 @@ export default function FlexTransactionsScreen() {
 
         <View
           className="flex-1 mx-2.5 mb-4 bg-[#F6F6F6] rounded-[20px] p-[10px]"
-          style={{ width: 383, alignSelf: "center" }}
         >
           <InfiniteScrollList
             data={transactions}
@@ -317,7 +316,7 @@ function FlexTransactionItem({ item }: { item: WalletTransaction }) {
   return (
     <TouchableOpacity
       style={{
-        width: 365,
+        alignSelf: "stretch",
         height: 66,
         backgroundColor: "#FFFFFF",
         borderRadius: 15,

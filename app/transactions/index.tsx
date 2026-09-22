@@ -1,4 +1,4 @@
-﻿import Header from "@/src/components/common/Header";
+import Header from "@/src/components/common/Header";
 import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { InfiniteScrollList } from "@/src/components/common/ui/InfiniteScrollList";
 import { useGetWalletTransactionsQuery } from "@/src/store/api/walletApi";
@@ -229,7 +229,6 @@ export default function TransactionsScreen() {
 
         <View
           className="flex-1 mx-2.5 mb-4 bg-[#F6F6F6] rounded-[20px] p-[10px]"
-          style={{ width: 383, alignSelf: "center" }}
         >
           <InfiniteScrollList
             data={displayList}
@@ -425,7 +424,7 @@ const TransactionItem = ({
       onPress={onPress}
       activeOpacity={0.7}
       className="flex-row items-center bg-white rounded-[15px] px-3 h-[66px] relative"
-      style={{ width: 365 }}
+      style={{ alignSelf: "stretch" }}
     >
       <View
         className={`w-[38px] h-[38px] rounded-full items-center justify-center mr-3 ${getIconBg()}`}

@@ -1,4 +1,4 @@
-﻿import Header from "@/src/components/common/Header";
+import Header from "@/src/components/common/Header";
 import { Trophy } from "@/src/components/icons/Trophy";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import {
@@ -12,7 +12,10 @@ import { StatusBar } from "expo-status-bar";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/src/store";
-import { saveSingleCompletedPortfolio } from "@/src/store/slices/completedPortfolioSlice";
+import {
+  saveSingleCompletedPortfolio,
+  removeCompletedPortfolio,
+} from "@/src/store/slices/completedPortfolioSlice";
 import {
   ActivityIndicator,
   Image,
@@ -20,6 +23,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,6 +34,7 @@ import {
   TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import {
   useGetPortfoliosQuery,
   useTerminatePortfolioMutation,
@@ -38,10 +43,14 @@ import {
   useGetPortfolioConfigQuery,
 } from "@/src/store/api/portfolioApi";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
+import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
 import {
   getCleanTransactionTitle,
   getPortfolioZeroBalanceBannerInfo,
   formatEarlyTerminationPenaltyRate,
+  getDynamicPenaltyRate,
+  getDynamicInterestRateLabel,
+  isPortfolioCompleted,
 } from "@/src/utils/formatters";
 import ManageFundsSheet from "@/src/components/portfolio/ManageFundsSheet";
 import { BlurView } from "expo-blur";
@@ -64,18 +73,33 @@ export default function GoalDetailScreen() {
   const [topUpPortfolio, { isLoading: isToppingUp }] = useTopUpPortfolioMutation();
   const { data, isLoading: loading, refetch: refetchPortfolios } = useGetPortfoliosQuery({ type: "wealthgoal" });
   const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const goalRate = rates?.wealthgoal;
-  const penaltyRate = formatEarlyTerminationPenaltyRate(
-    goalRate?.earlyLiquidationPenaltyRate ?? goalRate?.earlyWithdrawalPenaltyPercentage,
+  const { penaltyRate, penaltyRatio } = getDynamicPenaltyRate(
+    "goal",
+    systemConfigData,
+    rates,
     "2.5%"
   );
-  const penaltyRatio = (() => {
-    const n = parseFloat(penaltyRate.replace("%", ""));
-    return !isNaN(n) && n > 0 ? n / 100 : 0.025;
-  })();
+  const goalInterestRateLabel = getDynamicInterestRateLabel(
+    "goal",
+    systemConfigData,
+    rates,
+    12
+  );
   const { data: walletSummary, refetch: refetchWallet } = useGetWalletSummaryQuery();
   const walletBalance = (parseFloat(walletSummary?.currentBalance || "0")) / 100;
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([refetchPortfolios(), refetchTxns(), refetchWallet()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const { data: txnsData, isLoading: txnsLoading, refetch: refetchTxns } = useGetPortfolioTransactionsQuery(
     { id: id as string },
@@ -103,20 +127,67 @@ export default function GoalDetailScreen() {
   }
   const goal = fetchedGoal || savedCompletedPlan || lastGoalRef.current;
 
+  const isTransferredOrWithdrawnInTxns = Boolean(
+    txnsData?.items?.some((t) => {
+      const type = (t.type || "").toUpperCase();
+      const ref = (t.reference || "").toUpperCase();
+      const action = ((t as any).action || "").toUpperCase();
+      const reason = ((t as any).reason || "").toUpperCase();
+      const desc = ((t as any).description || "").toUpperCase();
+      return (
+        type === "DEBIT" ||
+        type.includes("DEBIT") ||
+        type.includes("WITHDRAW") ||
+        type.includes("TRANSFER") ||
+        ref.includes("WITHDRAW") ||
+        ref.includes("TRANSFER") ||
+        action.includes("WITHDRAW") ||
+        action.includes("TRANSFER") ||
+        reason.includes("WITHDRAW") ||
+        reason.includes("TRANSFER") ||
+        desc.includes("WITHDRAW") ||
+        desc.includes("TRANSFER")
+      );
+    })
+  );
+
+  const isCompleted =
+    goal?.status === "COMPLETED" ||
+    goal?.status === "TERMINATED" ||
+    goal?.status === "WITHDRAWN" ||
+    (goal?.maturityDate && new Date(goal.maturityDate).getTime() <= Date.now());
+
+  const isFullyWithdrawn =
+    goal?.status === "WITHDRAWN" ||
+    parseFloat(goal?.balance || "0") <= 0 ||
+    (isCompleted && isTransferredOrWithdrawnInTxns);
+
+  const displayBalance = isFullyWithdrawn ? "0" : goal?.balance || "0";
+  const hasRemainingBalance = !isFullyWithdrawn && parseFloat(displayBalance) > 0;
+
   useEffect(() => {
+    if (isFullyWithdrawn) {
+      if (savedCompletedPlan && (savedCompletedPlan.balance !== "0" || savedCompletedPlan.status !== "WITHDRAWN")) {
+        dispatch(
+          saveSingleCompletedPortfolio({
+            ...savedCompletedPlan,
+            type: savedCompletedPlan.type || "wealthgoal",
+            balance: "0",
+            status: "WITHDRAWN",
+          })
+        );
+      }
+      return;
+    }
     if (!fetchedGoal) return;
     const isMatured =
       fetchedGoal.maturityDate &&
       new Date(fetchedGoal.maturityDate).getTime() <= Date.now();
-    const isTargetReached =
-      parseFloat(fetchedGoal.targetAmount || "0") > 0 &&
-      parseFloat(fetchedGoal.balance || "0") >= parseFloat(fetchedGoal.targetAmount || "0");
     const isCompletedOrTerminated =
       fetchedGoal.status === "COMPLETED" ||
       fetchedGoal.status === "TERMINATED" ||
       fetchedGoal.status === "WITHDRAWN" ||
-      isMatured ||
-      isTargetReached;
+      isMatured;
 
     if (isCompletedOrTerminated) {
       const targetStatus =
@@ -126,14 +197,20 @@ export default function GoalDetailScreen() {
         savedCompletedPlan.status !== targetStatus ||
         savedCompletedPlan.balance !== fetchedGoal.balance
       ) {
-        dispatch(saveSingleCompletedPortfolio(fetchedGoal));
+        dispatch(saveSingleCompletedPortfolio({
+          ...fetchedGoal,
+          type: fetchedGoal.type || "wealthgoal",
+        }));
       }
+    } else if (savedCompletedPlan) {
+      // If plan is active on backend, ensure it's not stored in completedMap
+      dispatch(removeCompletedPortfolio(fetchedGoal.id));
     }
   }, [
+    isFullyWithdrawn,
     fetchedGoal?.id,
     fetchedGoal?.status,
     fetchedGoal?.balance,
-    fetchedGoal?.targetAmount,
     fetchedGoal?.maturityDate,
     savedCompletedPlan?.status,
     savedCompletedPlan?.balance,
@@ -180,11 +257,9 @@ export default function GoalDetailScreen() {
     );
   }
 
-  const isCompleted = goal.status === "COMPLETED" || parseFloat(goal.balance) >= parseFloat(goal.targetAmount);
-  const hasRemainingBalance = parseFloat(goal.balance || "0") > 0;
   const zeroBalanceBanner = getPortfolioZeroBalanceBannerInfo(txnsData?.items);
   
-  const progress = parseFloat(goal.targetAmount) > 0 ? parseFloat(goal.balance) / parseFloat(goal.targetAmount) : 0;
+  const progress = parseFloat(goal.targetAmount) > 0 ? parseFloat(displayBalance) / parseFloat(goal.targetAmount) : 0;
   
   const getDaysLeft = () => {
     const end = new Date(goal.maturityDate).getTime();
@@ -258,7 +333,7 @@ export default function GoalDetailScreen() {
             {goal.metadata?.category || "Goal"}
           </Text>
           <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 28 }}>
-            ₦{formatAmount(goal.balance)}
+            ₦{formatAmount(displayBalance)}
           </Text>
         </View>
         <Image
@@ -364,7 +439,7 @@ export default function GoalDetailScreen() {
         </Text>
         , your{" "}
         <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-          "₦{formatAmount(goal.targetAmount)}"
+          "₦{formatAmount(displayBalance)}"
         </Text>{" "}
         has been deposited into your Wealth Save account by {formattedDate}.
       </Text>
@@ -398,7 +473,18 @@ export default function GoalDetailScreen() {
         }
       />
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["transparent"]}
+          />
+        }
+      >
         <View style={{ paddingTop: 8, paddingBottom: 40 }}>
           {isCompleted ? renderCompletedHeader() : renderActiveHeader()}
 
@@ -444,7 +530,7 @@ export default function GoalDetailScreen() {
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Current Savings</Text>
-                <Text style={styles.value}>₦{formatAmount(goal.balance)}</Text>
+                <Text style={styles.value}>₦{formatAmount(displayBalance)}</Text>
               </View>
             </View>
 
@@ -482,7 +568,7 @@ export default function GoalDetailScreen() {
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Interest Rate</Text>
-                <Text style={styles.value}>{goal.interestRate || 12}% P.A</Text>
+                <Text style={styles.value}>{goal.interestRate ? `${goal.interestRate}% P.A` : goalInterestRateLabel}</Text>
               </View>
             </View>
 

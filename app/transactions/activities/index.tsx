@@ -1,4 +1,4 @@
-﻿import Header from "@/src/components/common/Header";
+import Header from "@/src/components/common/Header";
 import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { InfiniteScrollList } from "@/src/components/common/ui/InfiniteScrollList";
 import { useGetMyActivitiesQuery } from "@/src/store/api/activityApi";
@@ -240,7 +240,6 @@ export default function ActivitiesScreen() {
 
         <View
           className="flex-1 mx-2.5 mb-4 bg-[#F6F6F6] rounded-[20px] p-[10px]"
-          style={{ width: 383, alignSelf: "center" }}
         >
           <InfiniteScrollList
             data={displayList}

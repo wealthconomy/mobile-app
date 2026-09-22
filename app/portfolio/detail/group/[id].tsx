@@ -97,6 +97,10 @@ export default function GroupDetailScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [joinRequested, setJoinRequested] = useState(false);
 
+  // Screen focus & rotational group auto-polling state
+  const [isFocused, setIsFocused] = useState(true);
+  const [isRotationalActive, setIsRotationalActive] = useState(false);
+
   // Queries & Mutations
   const {
     data: group,
@@ -105,18 +109,24 @@ export default function GroupDetailScreen() {
   } = useGetGroupDetailsQuery(id as string, {
     skip: !id || id === "new",
     refetchOnMountOrArgChange: true,
+    pollingInterval: isFocused && isRotationalActive ? 15000 : 0,
   });
-
-  useEffect(() => {
-    if (group?.coverImage) {
-      console.log(`🖼️ [GroupDetail] [${group.name || id}] coverImage URI: "${group.coverImage}"`);
-    }
-  }, [group?.coverImage, group?.name, id]);
 
   const { data: membersData, isLoading: membersLoading, refetch: refetchMembers } = useGetGroupMembersQuery(
     { id: id as string, populate: ["user"] },
-    { skip: !id || id === "new", refetchOnMountOrArgChange: true }
+    {
+      skip: !id || id === "new",
+      refetchOnMountOrArgChange: true,
+      pollingInterval: isFocused && isRotationalActive ? 15000 : 0,
+    }
   );
+
+  useEffect(() => {
+    const isActive =
+      group?.groupType === "ROTATIONAL" &&
+      (group?.status || (group as any)?.state || "").toString().trim().toUpperCase() === "ACTIVE";
+    setIsRotationalActive(Boolean(isActive));
+  }, [group]);
 
   const { data: notificationsData } = useListNotificationsQuery(
     { limit: 50 },
@@ -137,6 +147,22 @@ export default function GroupDetailScreen() {
   const { data: walletSummary, refetch: refetchWallet } = useGetWalletSummaryQuery();
   const walletBalance = (parseFloat(walletSummary?.currentBalance || "0")) / 100;
 
+  useEffect(() => {
+    if (isDepositModalVisible && group) {
+      const isFixedOrRotational = group.groupType === "FIXED" || group.groupType === "ROTATIONAL";
+      if (isFixedOrRotational && group.contributionAmount) {
+        const amtKobo = typeof group.contributionAmount === "number"
+          ? group.contributionAmount
+          : parseFloat(String(group.contributionAmount));
+        const amtNaira = amtKobo / 100;
+        if (!isNaN(amtNaira) && amtNaira > 0) {
+          const rounded = Math.floor(amtNaira);
+          setDepositAmount(rounded.toLocaleString("en-US"));
+        }
+      }
+    }
+  }, [isDepositModalVisible, group]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -152,9 +178,13 @@ export default function GroupDetailScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setIsFocused(true);
       refetchGroup();
       refetchMembers();
       refetchWallet();
+      return () => {
+        setIsFocused(false);
+      };
     }, [refetchGroup, refetchMembers, refetchWallet])
   );
 
@@ -189,6 +219,31 @@ export default function GroupDetailScreen() {
       );
     }).length;
   }, [notificationsData, id]);
+
+  const hasRemovedNotification = useMemo(() => {
+    const allItems: any[] =
+      notificationsData?.data?.items ||
+      (notificationsData as any)?.items ||
+      [];
+    if (!id) return false;
+    const idStr = String(id).toLowerCase();
+    return allItems.some((item) => {
+      const dataGroupId = item.data?.groupId || item.data?.targetId || item.data?.id;
+      const matchesGroup = dataGroupId && String(dataGroupId).toLowerCase() === idStr;
+      const text = `${item.title || ""} ${item.body || ""}`.toLowerCase();
+      const isRemovalMsg =
+        (text.includes("removed") || text.includes("refunded") || text.includes("exited")) &&
+        (text.includes("tribe") || text.includes("group") || matchesGroup);
+      return matchesGroup && isRemovalMsg;
+    });
+  }, [notificationsData, id]);
+
+  // Payout positions have been set when the backend explicitly confirms it.
+  // positionsSet is now a real field on GET /groups/{id} (confirmed by backend).
+  const arePositionsSet = useMemo(() => {
+    if (group?.groupType !== "ROTATIONAL") return true;
+    return Boolean(group?.positionsSet);
+  }, [group]);
 
   if (loading) {
     return (
@@ -228,8 +283,22 @@ export default function GroupDetailScreen() {
   const effectiveKobo = (savingsNum > 0 ? savingsNum : membersTotal) || 0;
   const currentNaira = effectiveKobo / 100;
 
+  const fixedContribKobo = typeof group?.contributionAmount === "number"
+    ? group.contributionAmount
+    : parseFloat(String(group?.contributionAmount || "0"));
+  const fixedContribNaira = fixedContribKobo > 0 ? fixedContribKobo / 100 : 0;
+
   const currentMemberRecord = membersData?.items?.find(
-    (m) => currentUser?.id && m.userId === currentUser.id
+    (m) => {
+      const uid = currentUser?.id || (currentUser as any)?._id;
+      const mUserId =
+        typeof m.userId === "string" && m.userId
+          ? m.userId
+          : typeof (m as any).user?.id === "string" && (m as any).user.id
+          ? (m as any).user.id
+          : null;
+      return uid && (mUserId === uid || m.id === uid);
+    }
   );
   const userContributedKobo = parseFloat(
     currentMemberRecord?.totalContributed?.toString() || "0"
@@ -240,37 +309,141 @@ export default function GroupDetailScreen() {
   const isCreator =
     (currentUser?.id && group?.creatorId === currentUser.id) ||
     membersData?.items?.some(
-      (m) => m.userId === currentUser?.id && (m.role === "OWNER" || m.role === "CREATOR")
+      (m) =>
+        (m.userId === currentUser?.id || (m as any).user?.id === currentUser?.id) &&
+        (m.role === "OWNER" || m.role === "CREATOR")
     );
 
-  const isPendingJoin =
-    joinRequested ||
-    membersData?.items?.some(
-      (m) =>
-        m.userId === currentUser?.id &&
-        (m.status === "PENDING" || (m.status as string) === "Pending")
-    ) ||
-    (group as any)?.userStatus === "PENDING" ||
-    (group as any)?.memberStatus === "PENDING";
+  const currentMemberStatus = (
+    currentMemberRecord?.status ||
+    (currentMemberRecord as any)?.raw?.status ||
+    ""
+  )
+    .toString()
+    .trim()
+    .toUpperCase();
 
-  const isMember =
-    !isPendingJoin &&
-    (isCreator ||
-      (group?.isMember &&
-        (group as any)?.memberStatus !== "PENDING" &&
-        (group as any)?.userStatus !== "PENDING") ||
-      membersData?.items?.some(
-        (m) =>
-          m.userId === currentUser?.id &&
-          (m.status === "ACTIVE" || m.status === "PAID" || m.status === "UNPAID")
+  const groupUserStatus = (
+    (group as any)?.userStatus ||
+    (group as any)?.membershipStatus ||
+    (group as any)?.memberStatus ||
+    (group as any)?.userMembership?.status ||
+    ""
+  )
+    .toString()
+    .trim()
+    .toUpperCase();
+
+  // Temporary suspension (reversible) vs permanent removal (refunded)
+  const isBlacklisted =
+    !isCreator &&
+    (currentMemberStatus === "BLACKLISTED" ||
+      currentMemberStatus === "BLACKLIST" ||
+      currentMemberStatus === "SUSPENDED" ||
+      currentMemberStatus === "BANNED" ||
+      currentMemberStatus === "BLOCKED" ||
+      groupUserStatus === "BLACKLISTED" ||
+      groupUserStatus === "BLACKLIST" ||
+      groupUserStatus === "SUSPENDED" ||
+      groupUserStatus === "BANNED" ||
+      groupUserStatus === "BLOCKED" ||
+      Boolean((currentMemberRecord as any)?.isBlacklisted));
+
+  const isActiveMember =
+    Boolean(currentMemberRecord) &&
+    !isBlacklisted &&
+    (currentMemberStatus === "ACTIVE" ||
+      currentMemberStatus === "PAID" ||
+      currentMemberStatus === "UNPAID" ||
+      currentMemberStatus === "APPROVED");
+
+  const isMemberRecordRemoved =
+    Boolean(currentMemberRecord) &&
+    !isBlacklisted &&
+    !isActiveMember &&
+    (currentMemberStatus === "REMOVED" ||
+      currentMemberStatus === "EXITED" ||
+      currentMemberStatus === "PAST" ||
+      currentMemberStatus === "PAST MEMBER" ||
+      currentMemberStatus === "KICKED" ||
+      currentMemberStatus.includes("REMOVE") ||
+      currentMemberStatus.includes("EXIT") ||
+      Boolean((currentMemberRecord as any)?.leftAt) ||
+      Boolean((currentMemberRecord as any)?.removedAt));
+
+  const isGroupUserRemoved =
+    !isBlacklisted &&
+    !isActiveMember &&
+    (groupUserStatus === "REMOVED" ||
+      groupUserStatus === "EXITED" ||
+      groupUserStatus === "PAST" ||
+      groupUserStatus === "PAST MEMBER" ||
+      groupUserStatus === "KICKED" ||
+      groupUserStatus.includes("REMOVE") ||
+      groupUserStatus.includes("EXIT") ||
+      Boolean(
+        Array.isArray((group as any)?.removedMembers) &&
+          (group as any).removedMembers.some((m: any) => {
+            const uid = typeof m === "string" ? m : m?.userId || m?.id;
+            return uid === currentUser?.id;
+          })
+      ) ||
+      Boolean(
+        Array.isArray((group as any)?.pastMembers) &&
+          (group as any).pastMembers.some((m: any) => {
+            const uid = typeof m === "string" ? m : m?.userId || m?.id;
+            return uid === currentUser?.id;
+          })
       ));
 
+  const isRemoved =
+    !isCreator &&
+    !isBlacklisted &&
+    !isActiveMember &&
+    (isMemberRecordRemoved ||
+      isGroupUserRemoved ||
+      (!currentMemberRecord && hasRemovedNotification));
+
+  const isPendingJoin =
+    !isRemoved &&
+    !isBlacklisted &&
+    (joinRequested ||
+      membersData?.items?.some(
+        (m) =>
+          (m.userId === currentUser?.id || (m as any).user?.id === currentUser?.id) &&
+          (m.status === "PENDING" || (m.status as string) === "Pending")
+      ) ||
+      groupUserStatus === "PENDING");
+
+  const isMember =
+    !isRemoved &&
+    !isBlacklisted &&
+    !isPendingJoin &&
+    (isCreator ||
+      (Boolean(group?.isMember) &&
+        groupUserStatus !== "PENDING" &&
+        groupUserStatus !== "REMOVED" &&
+        groupUserStatus !== "EXITED" &&
+        groupUserStatus !== "PAST" &&
+        groupUserStatus !== "PAST MEMBER" &&
+        groupUserStatus !== "BANNED" &&
+        groupUserStatus !== "BLACKLISTED" &&
+        groupUserStatus !== "BLACKLIST" &&
+        groupUserStatus !== "SUSPENDED" &&
+        groupUserStatus !== "BLOCKED" &&
+        groupUserStatus !== "KICKED") ||
+      isActiveMember);
+
   const isAdmin =
-    isCreator ||
-    group?.isAdmin ||
-    membersData?.items?.some(
-      (m) => m.userId === currentUser?.id && (m.role === "OWNER" || m.role === "ADMIN")
-    );
+    !isRemoved &&
+    !isBlacklisted &&
+    (isCreator ||
+      group?.isAdmin ||
+      membersData?.items?.some(
+        (m) =>
+          (m.userId === currentUser?.id || (m as any).user?.id === currentUser?.id) &&
+          (m.role === "OWNER" || m.role === "ADMIN")
+      ));
 
   const activeMembersCount =
     membersData?.items?.filter(
@@ -554,7 +727,7 @@ export default function GroupDetailScreen() {
           {groupName}
         </Text>
 
-        {isMember && !isTerminated && !hasFullyWithdrawn ? (
+        {isMember && !isTerminated && !hasFullyWithdrawn && !isRemoved && !isBlacklisted ? (
           <TouchableOpacity
             onPress={() => setIsMenuVisible(true)}
             style={{ width: 40, height: 40, alignItems: "flex-end", justifyContent: "center" }}
@@ -585,7 +758,7 @@ export default function GroupDetailScreen() {
           {/* ── Sub-header: Group Details + Notification Bell ────────── */}
           <View className="flex-row justify-between items-center mb-4">
             <Text className="text-[20px] font-black text-[#1A1A1A]">Group Details</Text>
-            {isMember && (
+            {(isMember || isBlacklisted) && !isRemoved && (
               <TouchableOpacity
                 onPress={() =>
                   router.push(`/portfolio/detail/group/${id}/notifications` as any)
@@ -655,6 +828,105 @@ export default function GroupDetailScreen() {
             )}
           </View>
 
+          {/* ── Vetted Badge (if applicable) ───────────────────────── */}
+          {Boolean(group?.isVetted) && (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#F0FDF4",
+                borderColor: "#86EFAC",
+                borderWidth: 1,
+                borderRadius: 20,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                alignSelf: "flex-start",
+                marginBottom: 14,
+                gap: 6,
+              }}
+            >
+              <Text style={{ fontSize: 13 }}>🛡️</Text>
+              <Text style={{ color: "#166534", fontSize: 12, fontWeight: "800" }}>
+                Vetted & Established Process
+              </Text>
+            </View>
+          )}
+
+          {/* ── Rotational Cycle Indicator (if ROTATIONAL) ──────────── */}
+          {group?.groupType === "ROTATIONAL" && (
+            <View
+              style={{
+                backgroundColor: "#F0F9F9",
+                borderRadius: 16,
+                padding: 16,
+                borderWidth: 1,
+                borderColor: "#B2EBF2",
+                marginBottom: 16,
+              }}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Ionicons name="sync-circle" size={22} color={THEME} />
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: "#1A1A1A" }}>
+                    {(group.currentCycle ?? 0) === 0
+                      ? `Not started · 0 of ${group.totalCycles || group.membersLimit || 1} cycles`
+                      : `Cycle ${group.currentCycle} of ${group.totalCycles || group.membersLimit || 1}`}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: THEME }}>
+                  Rotational Ajo/Esusu
+                </Text>
+              </View>
+
+              {/* Ajo Cycle Payout & Contribution Summary */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  backgroundColor: "white",
+                  borderRadius: 12,
+                  padding: 10,
+                  marginVertical: 8,
+                  borderWidth: 1,
+                  borderColor: "#E0F2F1",
+                }}
+              >
+                <View>
+                  <Text style={{ fontSize: 11, color: "#64748B", fontWeight: "600" }}>Member Contrib. / Cycle</Text>
+                  <Text style={{ fontSize: 13, color: THEME, fontWeight: "800" }}>
+                    ₦{fixedContribNaira > 0 ? formatCurrency(fixedContribNaira) : formatCurrency(targetNaira / (group.membersLimit || 1))}
+                  </Text>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={{ fontSize: 11, color: "#64748B", fontWeight: "600" }}>Cycle Lump-Sum Payout</Text>
+                  <Text style={{ fontSize: 13, color: "#16A34A", fontWeight: "900" }}>
+                    ₦{formatCurrency(targetNaira)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Cycle progress bar — only fills when currentCycle is explicitly provided by backend */}
+              <View
+                style={{
+                  height: 8,
+                  width: "100%",
+                  backgroundColor: "#E0F2F1",
+                  borderRadius: 4,
+                  overflow: "hidden",
+                }}
+              >
+                <View
+                  style={{
+                    height: "100%",
+                    width: `${Math.min(100, Math.max(0, (((group.currentCycle ?? 0) / (group.totalCycles || group.membersLimit || 1)) * 100)))}%`,
+                    backgroundColor: THEME,
+                    borderRadius: 4,
+                  }}
+                />
+              </View>
+            </View>
+          )}
+
           {/* ── Total Group Savings Card ─────────────────────────────── */}
           <View
             className="w-full rounded-[20px] bg-white relative overflow-hidden mb-6"
@@ -714,7 +986,15 @@ export default function GroupDetailScreen() {
               </View>
 
               <View className="flex-row items-center space-x-1">
-                {isTerminated ? (
+                {isRemoved ? (
+                  <Text className="text-[#EF4444] text-[13px] font-extrabold">
+                    Removed from tribe • 100% savings refunded to Main Wallet
+                  </Text>
+                ) : isBlacklisted ? (
+                  <Text className="text-[#D97706] text-[13px] font-extrabold">
+                    Account suspended • Savings remain safe in group
+                  </Text>
+                ) : isTerminated ? (
                   <Text className="text-[#EF4444] text-[13px] font-extrabold">
                     Tribe dissolved • 100% savings refunded to Main Wallets
                   </Text>
@@ -765,8 +1045,50 @@ export default function GroupDetailScreen() {
             </View>
           </View>
 
-          {/* ── Action Buttons for Members (Deposit / Withdraw / Terminated Notice) ─────── */}
-          {hasFullyWithdrawn ? (
+          {/* ── Action Buttons for Members (Deposit / Withdraw / Terminated / Suspended / Removed Notice) ─────── */}
+          {isRemoved ? (
+            <View
+              style={{
+                backgroundColor: "#FEF2F2",
+                borderWidth: 1,
+                borderColor: "#FCA5A5",
+                borderRadius: 16,
+                padding: 18,
+                marginBottom: 20,
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <Ionicons name="person-remove" size={30} color="#EF4444" />
+              <Text style={{ color: "#991B1B", fontWeight: "900", fontSize: 16, textAlign: "center", marginTop: 2 }}>
+                Removed from Tribe
+              </Text>
+              <Text style={{ color: "#B91C1C", fontSize: 13, textAlign: "center", lineHeight: 19 }}>
+                You've been removed from this group. 100% of your accumulated savings have been refunded directly into your Main Wallet.
+              </Text>
+            </View>
+          ) : isBlacklisted ? (
+            <View
+              style={{
+                backgroundColor: "#FFFBEB",
+                borderWidth: 1,
+                borderColor: "#FCD34D",
+                borderRadius: 16,
+                padding: 18,
+                marginBottom: 20,
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <Ionicons name="pause-circle" size={32} color="#D97706" />
+              <Text style={{ color: "#92400E", fontWeight: "900", fontSize: 16, textAlign: "center", marginTop: 2 }}>
+                Temporarily Suspended
+              </Text>
+              <Text style={{ color: "#B45309", fontSize: 13, textAlign: "center", lineHeight: 19 }}>
+                You've been temporarily suspended from this group. Your savings remain safe. Contact the group admin for more information.
+              </Text>
+            </View>
+          ) : hasFullyWithdrawn ? (
             <View
               style={{
                 backgroundColor: "#F0FDF4",
@@ -809,32 +1131,85 @@ export default function GroupDetailScreen() {
             </View>
           ) : isMember ? (
             <View style={{ gap: 12, marginBottom: 20 }}>
-              {/* Deposit funds (Disabled after group maturity) */}
-              <TouchableOpacity
-                onPress={isGroupEnded ? undefined : () => setIsDepositModalVisible(true)}
-                disabled={isGroupEnded}
-                activeOpacity={isGroupEnded ? 1 : 0.85}
-                style={{
-                  backgroundColor: isGroupEnded ? "#F3F4F6" : THEME,
-                  height: 52,
-                  borderRadius: 14,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexDirection: "row",
-                  gap: 8,
-                  borderWidth: isGroupEnded ? 1 : 0,
-                  borderColor: isGroupEnded ? "#E5E7EB" : "transparent",
-                }}
-              >
-                {isGroupEnded ? (
-                  <Ionicons name="lock-closed" size={18} color="#9CA3AF" />
-                ) : (
-                  <Plus size={20} color="white" strokeWidth={2.5} />
-                )}
-                <Text style={{ color: isGroupEnded ? "#9CA3AF" : "white", fontWeight: "800", fontSize: 15 }}>
-                  {isGroupEnded ? "Deposits Closed (Group Completed)" : "Deposit funds"}
-                </Text>
-              </TouchableOpacity>
+              {/* Deposit funds (Disabled after group maturity or if ROTATIONAL positions are not set) */}
+              {(() => {
+                const isRotational = group?.groupType === "ROTATIONAL";
+                const isPositionsPending = isRotational && !arePositionsSet;
+                const isDepositDisabled = isGroupEnded || isPositionsPending;
+
+                const depositButtonText = isGroupEnded
+                  ? "Deposits Closed (Group Completed)"
+                  : isPositionsPending
+                  ? "Contributions open once admin sets payout order"
+                  : "Deposit funds";
+
+                return (
+                  <View style={{ gap: 8 }}>
+                    <TouchableOpacity
+                      onPress={isDepositDisabled ? undefined : () => setIsDepositModalVisible(true)}
+                      disabled={isDepositDisabled}
+                      activeOpacity={isDepositDisabled ? 1 : 0.85}
+                      style={{
+                        backgroundColor: isDepositDisabled ? "#F3F4F6" : THEME,
+                        height: 52,
+                        borderRadius: 14,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexDirection: "row",
+                        gap: 8,
+                        borderWidth: isDepositDisabled ? 1 : 0,
+                        borderColor: isDepositDisabled ? "#E5E7EB" : "transparent",
+                      }}
+                    >
+                      {isDepositDisabled ? (
+                        <Ionicons name="lock-closed" size={18} color="#9CA3AF" />
+                      ) : (
+                        <Plus size={20} color="white" strokeWidth={2.5} />
+                      )}
+                      <Text style={{ color: isDepositDisabled ? "#9CA3AF" : "white", fontWeight: "800", fontSize: 14 }}>
+                        {depositButtonText}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {isPositionsPending && (
+                      <View
+                        style={{
+                          backgroundColor: "#FEF3C7",
+                          borderColor: "#F59E0B",
+                          borderWidth: 1,
+                          borderRadius: 12,
+                          padding: 12,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <Ionicons name="alert-circle" size={20} color="#B45309" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 12, color: "#92400E", fontWeight: "700" }}>
+                            Payout Order Pending
+                          </Text>
+                          <Text style={{ fontSize: 11, color: "#B45309", marginTop: 2, lineHeight: 15 }}>
+                            Rotational payout schedule must be confirmed by the admin before member contributions can begin.
+                          </Text>
+                          {isAdmin && (
+                            <TouchableOpacity
+                              onPress={() =>
+                                router.push(`/portfolio/detail/group/${id}/positions` as any)
+                              }
+                              style={{ marginTop: 6 }}
+                            >
+                              <Text style={{ fontSize: 12, fontWeight: "800", color: THEME, textDecorationLine: "underline" }}>
+                                Set Payout Order Now →
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
 
               {/* Withdraw funds (Active only if matured, or if emergency withdrawal is permitted) */}
               {(() => {
@@ -902,7 +1277,7 @@ export default function GroupDetailScreen() {
                 );
               })()}
             </View>
-          ) : !isMember ? (
+          ) : !isMember && !isRemoved && !isBlacklisted ? (
             <View style={{ marginBottom: 20 }}>
               <ThemedButton
                 title={
@@ -950,21 +1325,40 @@ export default function GroupDetailScreen() {
             }}
           >
             <SpecRow label="Group Name" value={groupName} />
-            <SpecRow label="Category" value={group?.category || "Business"} />
+            <SpecRow label="Category" value={group?.category || "General"} />
+            <SpecRow
+              label="Group Type"
+              value={
+                group?.groupType === "ROTATIONAL"
+                  ? "Rotational Savings (Ajo/Esusu)"
+                  : group?.groupType === "FIXED"
+                  ? "Fixed Contribution Group"
+                  : "Flex Contribution Group"
+              }
+            />
             <SpecRow label="Started by" value={formatDateDisplay(group?.startDate)} />
             <SpecRow label="Ends by" value={formatDateDisplay(group?.endDate)} />
-            <SpecRow label="Target 🎯" value={`₦${formatCurrency(targetNaira)}`} />
+            <SpecRow
+              label={group?.groupType === "ROTATIONAL" ? "Cycle Pool Payout 🎯" : "Target Amount 🎯"}
+              value={`₦${formatCurrency(targetNaira)}`}
+            />
+            {(group?.groupType === "FIXED" || group?.groupType === "ROTATIONAL") && fixedContribNaira > 0 ? (
+              <SpecRow
+                label="Member Cycle Contribution"
+                value={`₦${formatCurrency(fixedContribNaira)}`}
+              />
+            ) : (
+              <SpecRow
+                label="Individual Savings Target"
+                value={`₦${formatCurrency(
+                  targetNaira / (group?.membersLimit || 10)
+                )}`}
+              />
+            )}
             <SpecRow label="Wealth Group" value={`${group?.accessType || "Public"} Group`} />
             <SpecRow
               label="Members Capacity"
               value={membersLimitNum > 0 ? `${activeMembersCount} / ${membersLimitNum}` : `${activeMembersCount} (Unlimited)`}
-            />
-            <SpecRow label="Daily Wealth Growth" value="20%" />
-            <SpecRow
-              label="Individual Savings"
-              value={`₦${formatCurrency(
-                (targetNaira / (group?.membersLimit || 10))
-              )}`}
             />
             <SpecRow
               label="Group Total Contribution"
@@ -973,7 +1367,11 @@ export default function GroupDetailScreen() {
             <SpecRow
               label="My Contribution"
               value={
-                hasFullyWithdrawn
+                isRemoved
+                  ? "Refunded to Wallet"
+                  : isBlacklisted
+                  ? `₦${formatCurrency(userContributedNaira)}`
+                  : hasFullyWithdrawn
                   ? "Withdrawn to Wallet"
                   : isTerminated
                   ? "Refunded to Wallet"
@@ -1004,7 +1402,19 @@ export default function GroupDetailScreen() {
               label="Emergency Withdrawal"
               value={group?.allowEmergencyWithdrawal ? "Allowed" : "Not Allowed"}
             />
-            <SpecRow label="Status" value={isTerminated ? "Terminated (Refunded)" : (group?.status || "Active")} isLast />
+            <SpecRow
+              label="Status"
+              value={
+                isRemoved
+                  ? "Removed (Refunded)"
+                  : isBlacklisted
+                  ? "Suspended (Freeze)"
+                  : isTerminated
+                  ? "Terminated (Refunded)"
+                  : (group?.status || "Active")
+              }
+              isLast
+            />
           </View>
         </View>
       </ScrollView>
@@ -1051,6 +1461,15 @@ export default function GroupDetailScreen() {
                 onPress={() => {
                   setIsMenuVisible(false);
                   router.push(`/portfolio/detail/group/${id}/tribe-settings` as any);
+                }}
+              />
+            )}
+            {group?.groupType === "ROTATIONAL" && isAdmin && (
+              <MenuItem
+                title="Payout Positions"
+                onPress={() => {
+                  setIsMenuVisible(false);
+                  router.push(`/portfolio/detail/group/${id}/positions` as any);
                 }}
               />
             )}
@@ -1112,6 +1531,7 @@ export default function GroupDetailScreen() {
                 </Text>
 
                 {(() => {
+                  const isFixedOrRotational = group?.groupType === "FIXED" || group?.groupType === "ROTATIONAL";
                   const numDeposit = parseFloat(depositAmount.replace(/,/g, "")) || 0;
                   const isExceeding = numDeposit > walletBalance;
                   const isValid = numDeposit > 0 && !isExceeding;
@@ -1119,6 +1539,28 @@ export default function GroupDetailScreen() {
 
                   return (
                     <>
+                      {isFixedOrRotational && (
+                        <View
+                          style={{
+                            width: "100%",
+                            backgroundColor: "#F0F9F9",
+                            borderColor: "#B2EBF2",
+                            borderWidth: 1,
+                            borderRadius: 12,
+                            padding: 10,
+                            marginBottom: 14,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <Ionicons name="lock-closed" size={16} color={THEME} />
+                          <Text style={{ fontSize: 12, color: "#155D5F", fontWeight: "600", flex: 1 }}>
+                            Fixed Contribution Group: Deposit amount is fixed per cycle.
+                          </Text>
+                        </View>
+                      )}
+
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 6 }}>
                         <Text style={{ fontSize: 13, fontWeight: "700", color: "#4B5563" }}>Amount (₦)</Text>
                         <Text style={{ fontSize: 12, fontWeight: "600", color: "#6B7280" }}>
@@ -1130,7 +1572,7 @@ export default function GroupDetailScreen() {
                         style={{
                           flexDirection: "row",
                           alignItems: "center",
-                          backgroundColor: "#F3F4F6",
+                          backgroundColor: isFixedOrRotational ? "#EFEFEF" : "#F3F4F6",
                           borderRadius: 12,
                           paddingHorizontal: 16,
                           height: 56,
@@ -1145,13 +1587,15 @@ export default function GroupDetailScreen() {
                           placeholder="₦0.00"
                           placeholderTextColor="#9CA3AF"
                           keyboardType="numeric"
+                          editable={!isFixedOrRotational}
                           returnKeyType="done"
                           inputAccessoryViewID={KEYBOARD_ACCESSORY_ID}
                           onSubmitEditing={() => Keyboard.dismiss()}
                           blurOnSubmit={true}
-                          autoFocus
+                          autoFocus={!isFixedOrRotational}
                           value={depositAmount ? `₦${depositAmount}` : ""}
                           onChangeText={(v) => {
+                            if (isFixedOrRotational) return;
                             const n = v.replace(/\D/g, "");
                             setDepositAmount(n ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "");
                           }}

@@ -1,13 +1,15 @@
 import Header from "@/src/components/common/Header";
-import { useCreateGroupMutation } from "@/src/store/api/groupApi";
+import { AppCalendarModal, AppDatePickerField } from "@/src/components/common";
+import { useCreateGroupMutation, useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
 import { useImageUpload } from "@/src/hooks/useImageUpload";
 import { CreateGroupRequest, GroupFrequency } from "@/src/types/group";
+import { formatEarlyTerminationPenaltyRate } from "@/src/utils/formatters";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Check, Share2, Upload, X } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -31,6 +33,8 @@ const THEME_BG = "#F2FFFF";
 type GroupData = {
   name: string;
   category: string;
+  groupType: "FLEX" | "FIXED" | "ROTATIONAL";
+  contributionAmount: string;
   coverImage: string | null;
   description: string;
   amount: string;
@@ -52,6 +56,17 @@ type GroupData = {
 
 export default function CreateGroupScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ groupType?: string }>();
+
+  const paramGroupType = useMemo(() => {
+    if (!params.groupType) return null;
+    const upper = params.groupType.toUpperCase();
+    if (upper === "FIXED" || upper === "FLEX" || upper === "ROTATIONAL") {
+      return upper as "FIXED" | "FLEX" | "ROTATIONAL";
+    }
+    return null;
+  }, [params.groupType]);
+
   const [step, setStep] = useState(1);
   const [isInfoVisible, setIsInfoVisible] = useState(true);
   const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
@@ -59,9 +74,35 @@ export default function CreateGroupScreen() {
   const [createGroup, { isLoading: isCreating }] = useCreateGroupMutation();
   const { uploadImage } = useImageUpload();
 
+  const { data: systemConfigData, refetch: refetchSystemConfig } = useGetSystemConfigsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchSystemConfig();
+    }, [refetchSystemConfig])
+  );
+
+  const rawItems: any[] =
+    systemConfigData?.items ||
+    (Array.isArray((systemConfigData as any)?.data?.items) ? (systemConfigData as any).data.items : []) ||
+    (Array.isArray(systemConfigData) ? systemConfigData : []);
+
+  const penaltyConfigItem = rawItems.find(
+    (item: any) => item?.key === "PENALTY_RATE_WEALTH_GROUP"
+  );
+
+  const groupPenaltyRate = formatEarlyTerminationPenaltyRate(
+    penaltyConfigItem?.value,
+    "1%"
+  );
+
   const [formData, setFormData] = useState<GroupData>({
     name: "",
     category: "",
+    groupType: paramGroupType || "FLEX",
+    contributionAmount: "",
     coverImage: null,
     description: "",
     amount: "",
@@ -78,6 +119,12 @@ export default function CreateGroupScreen() {
     agreed: false,
     wealthPreference: "Interest Based",
   });
+
+  useEffect(() => {
+    if (paramGroupType) {
+      setFormData((prev) => ({ ...prev, groupType: paramGroupType }));
+    }
+  }, [paramGroupType]);
 
   const updateFormData = (field: string, value: any) => {
     if (value && typeof value === "object" && value.nativeEvent) {
@@ -104,6 +151,9 @@ export default function CreateGroupScreen() {
     if (step === 5) {
       try {
         const amountKobo = Math.round((parseFloat(formData.amount.replace(/,/g, "")) || 0) * 100);
+        const contribKobo = (formData.groupType === "FIXED" || formData.groupType === "ROTATIONAL")
+          ? Math.round((parseFloat(formData.contributionAmount.replace(/,/g, "")) || 0) * 100)
+          : undefined;
 
         let mappedPenalty = "NONE";
         if (formData.penalty.toLowerCase().includes("immediate") || formData.penalty.toLowerCase().includes("5%")) {
@@ -137,6 +187,8 @@ export default function CreateGroupScreen() {
           name: formData.name.trim(),
           category: formData.category.trim() || "General",
           description: formData.description.trim(),
+          groupType: formData.groupType,
+          contributionAmount: contribKobo,
           coverImage: uploadedCoverUrl,
           targetAmount: amountKobo,
           frequency: (formData.frequency ? formData.frequency.toUpperCase() : "MONTHLY") as GroupFrequency,
@@ -176,13 +228,16 @@ export default function CreateGroupScreen() {
   const isStepValid = useMemo(() => {
     switch (step) {
       case 1:
-        return !!(formData.name && formData.category && formData.description);
+        return !!(formData.name && formData.category && formData.description && formData.groupType);
       case 2:
+        const isFixedOrRotational = formData.groupType === "FIXED" || formData.groupType === "ROTATIONAL";
+        const validFixedAmount = !isFixedOrRotational || (formData.contributionAmount && parseFloat(formData.contributionAmount.replace(/,/g, "")) > 0);
         return !!(
           formData.amount &&
           formData.frequency &&
           formData.startDate.length >= 10 &&
-          formData.endDate.length >= 10
+          formData.endDate.length >= 10 &&
+          validFixedAmount
         );
       case 3:
         const limit = parseInt(formData.memberLimit);
@@ -266,7 +321,11 @@ export default function CreateGroupScreen() {
             )}
 
             {step === 1 && (
-              <Step1Identity data={formData} update={updateFormData} />
+              <Step1Identity
+                data={formData}
+                update={updateFormData}
+                hideGroupTypeSelector={!!paramGroupType}
+              />
             )}
             {step === 2 && (
               <Step2Financial data={formData} update={updateFormData} />
@@ -275,7 +334,7 @@ export default function CreateGroupScreen() {
               <Step3Membership data={formData} update={updateFormData} />
             )}
             {step === 4 && (
-              <Step4Risk data={formData} update={updateFormData} />
+              <Step4Risk data={formData} update={updateFormData} groupPenaltyRate={groupPenaltyRate} />
             )}
             {step === 5 && (
               <Step5Review data={formData} update={updateFormData} />
@@ -308,7 +367,7 @@ export default function CreateGroupScreen() {
 
 // ── Step Components ─────────────────────────────────────────────────────────
 
-function Step1Identity({ data, update }: any) {
+function Step1Identity({ data, update, hideGroupTypeSelector }: any) {
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
@@ -321,8 +380,139 @@ function Step1Identity({ data, update }: any) {
     }
   };
 
+  const groupTypes = [
+    {
+      id: "FLEX",
+      title: "Flex Contribution Groups",
+      subtitle: "Flexible individual contribution amounts per cycle.",
+      icon: "cash-outline",
+    },
+    {
+      id: "FIXED",
+      title: "Fixed Contribution Groups",
+      subtitle: "All members contribute the exact same fixed amount per cycle.",
+      icon: "people-outline",
+    },
+    {
+      id: "ROTATIONAL",
+      title: "Rotational Savings (Ajo/Esusu Model)",
+      subtitle: "Contributions rotate as lump-sum payouts to members in turn order.",
+      icon: "people-circle-outline",
+    },
+  ];
+
   return (
     <View className="space-y-6">
+      {hideGroupTypeSelector ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            padding: 14,
+            borderRadius: 14,
+            backgroundColor: "#F2FFFF",
+            borderWidth: 1,
+            borderColor: THEME,
+            marginBottom: 16,
+          }}
+        >
+          <View
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: THEME,
+              alignItems: "center",
+              justifyContent: "center",
+              marginRight: 12,
+            }}
+          >
+            <Ionicons
+              name={
+                data.groupType === "ROTATIONAL"
+                  ? "people-circle-outline"
+                  : data.groupType === "FIXED"
+                  ? "people-outline"
+                  : "cash-outline"
+              }
+              size={20}
+              color="white"
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 11, fontWeight: "700", color: "#64748B", textTransform: "uppercase" }}>
+              Selected Group Type
+            </Text>
+            <Text style={{ fontSize: 14, fontWeight: "800", color: "#1A1A1A", marginTop: 2 }}>
+              {data.groupType === "ROTATIONAL"
+                ? "Rotational Savings (Ajo/Esusu Model)"
+                : data.groupType === "FIXED"
+                ? "Fixed Contribution Group"
+                : "Flex Contribution Group"}
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ color: "#64748B", fontWeight: "700", fontSize: 13, marginBottom: 10 }}>
+            Group Type
+          </Text>
+          <View style={{ gap: 10 }}>
+            {groupTypes.map((item) => {
+              const isSelected = data.groupType === item.id;
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  activeOpacity={0.8}
+                  onPress={() => update("groupType", item.id)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    padding: 14,
+                    borderRadius: 14,
+                    backgroundColor: isSelected ? "#F2FFFF" : "#F9FAFB",
+                    borderWidth: isSelected ? 2 : 1,
+                    borderColor: isSelected ? THEME : "#E5E7EB",
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      backgroundColor: isSelected ? THEME : "#E2E8F0",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginRight: 12,
+                    }}
+                  >
+                    <Ionicons name={item.icon as any} size={20} color={isSelected ? "white" : "#64748B"} />
+                  </View>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#1A1A1A" }}>
+                      {item.title}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: "#64748B", marginTop: 2, lineHeight: 15 }}>
+                      {item.subtitle}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      borderWidth: isSelected ? 6 : 2,
+                      borderColor: isSelected ? THEME : "#9CA3AF",
+                      backgroundColor: "white",
+                    }}
+                  />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
       <FormField
         label="Group Name"
         placeholder='e.g., "The 2026 Homeowners Circle"'
@@ -394,6 +584,8 @@ function Step1Identity({ data, update }: any) {
 
 function Step2Financial({ data, update }: any) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
   const options = ["Daily", "Weekly", "Monthly"];
 
   const formatAmount = (val: string) => {
@@ -402,23 +594,73 @@ function Step2Financial({ data, update }: any) {
     return n ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "";
   };
 
-  const formatDate = (val: string) => {
-    if (typeof val !== "string") return "";
-    const n = val.replace(/\D/g, "");
-    if (n.length <= 2) return n;
-    if (n.length <= 4) return `${n.slice(0, 2)} / ${n.slice(2)}`;
-    return `${n.slice(0, 2)} / ${n.slice(2, 4)} / ${n.slice(4, 8)}`;
+  const parseDateString = (str: string): Date | null => {
+    if (!str) return null;
+    const parts = str.split("/").map((p) => p.trim());
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year) && year >= 2020) {
+        return new Date(year, month, day);
+      }
+    }
+    return null;
   };
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const formatDateToDisplay = (d: Date) =>
+    `${pad(d.getDate())} / ${pad(d.getMonth() + 1)} / ${d.getFullYear()}`;
+
+  const startDateObj = parseDateString(data.startDate);
+  const endDateObj = parseDateString(data.endDate);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Min start date is today
+  const minStartDate = today;
+
+  // Min end date: must be at least 1 day after start date, or tomorrow
+  const minEndDate = startDateObj
+    ? new Date(startDateObj.getTime() + 86400000)
+    : new Date(today.getTime() + 86400000);
+
+  const handleSelectStartDate = (picked: Date) => {
+    update("startDate", formatDateToDisplay(picked));
+    if (endDateObj && endDateObj <= picked) {
+      const autoEnd = new Date(picked);
+      autoEnd.setFullYear(autoEnd.getFullYear() + 1);
+      update("endDate", formatDateToDisplay(autoEnd));
+    }
+  };
+
+  const handleSelectEndDate = (picked: Date) => {
+    update("endDate", formatDateToDisplay(picked));
+  };
+
+  const isFixedOrRotational = data.groupType === "FIXED" || data.groupType === "ROTATIONAL";
 
   return (
     <View className="space-y-6">
       <FormField
-        label="Wealth Amount(₦)"
+        label="Wealth Target Amount (₦)"
         placeholder="e.g, ₦3,500,000.00"
         value={data.amount}
         onChange={(t: string) => update("amount", formatAmount(t))}
         keyboardType="numeric"
       />
+
+      {isFixedOrRotational && (
+        <FormField
+          label="Fixed Contribution Amount per Cycle (₦)"
+          placeholder="e.g, ₦50,000.00"
+          value={data.contributionAmount}
+          onChange={(t: string) => update("contributionAmount", formatAmount(t))}
+          keyboardType="numeric"
+          helperText="Mandatory contribution amount required from each member per cycle."
+        />
+      )}
 
       <View className="mb-4">
         <Text className="text-[#64748B] text-[13px] font-bold mb-2">
@@ -477,21 +719,38 @@ function Step2Financial({ data, update }: any) {
         </View>
       </View>
 
-      <FormField
+      <AppDatePickerField
         label="Start Date"
-        placeholder="DD / MM / YYYY"
+        placeholder="Select Start Date"
         value={data.startDate}
-        onChange={(t: string) => update("startDate", formatDate(t))}
-        keyboardType="numeric"
-        maxLength={14}
+        onPress={() => setShowStartPicker(true)}
+        helperText="Date contributions begin (cannot be in the past)"
       />
-      <FormField
+
+      <AppDatePickerField
         label="End Date"
-        placeholder="DD / MM / YYYY"
+        placeholder="Select End Date"
         value={data.endDate}
-        onChange={(t: string) => update("endDate", formatDate(t))}
-        keyboardType="numeric"
-        maxLength={14}
+        onPress={() => setShowEndPicker(true)}
+        helperText="Group maturity date (must be after start date)"
+      />
+
+      <AppCalendarModal
+        visible={showStartPicker}
+        onClose={() => setShowStartPicker(false)}
+        title="Select Start Date"
+        selectedDate={startDateObj}
+        minDate={minStartDate}
+        onSelectDate={handleSelectStartDate}
+      />
+
+      <AppCalendarModal
+        visible={showEndPicker}
+        onClose={() => setShowEndPicker(false)}
+        title="Select End Date"
+        selectedDate={endDateObj}
+        minDate={minEndDate}
+        onSelectDate={handleSelectEndDate}
       />
 
       {data.wealthPreference === "Interest Based" && (
@@ -594,7 +853,7 @@ function Step3Membership({ data, update }: any) {
   );
 }
 
-function Step4Risk({ data, update }: any) {
+function Step4Risk({ data, update, groupPenaltyRate = "10%" }: any) {
   const [isPenaltyOpen, setIsPenaltyOpen] = useState(false);
   const [isExitOpen, setIsExitOpen] = useState(false);
 
@@ -606,7 +865,7 @@ function Step4Risk({ data, update }: any) {
 
   const exitOptions = [
     "No Withdrawal",
-    "Allow with Fixed Penalty (1.5%)",
+    `Allow with Fixed Penalty (${groupPenaltyRate})`,
     "Allow without Penalty",
   ];
 
@@ -667,6 +926,9 @@ function Step4Risk({ data, update }: any) {
             color="#64748B"
           />
         </TouchableOpacity>
+        <Text className="text-[#64748B] text-[11px] mt-1.5 px-1 leading-4">
+          Choose whether members can exit early before maturity and whether the platform exit penalty ({groupPenaltyRate}) applies.
+        </Text>
         {isExitOpen && (
           <View className="bg-white rounded-xl mt-2 border border-gray-100 overflow-hidden shadow-sm">
             {exitOptions.map((opt) => (
@@ -705,6 +967,13 @@ function Step4Risk({ data, update }: any) {
 }
 
 function Step5Review({ data, update }: any) {
+  const groupTypeLabel =
+    data.groupType === "ROTATIONAL"
+      ? "Rotational Savings (Ajo/Esusu)"
+      : data.groupType === "FIXED"
+      ? "Fixed Contribution"
+      : "Flex Contribution";
+
   return (
     <View className="space-y-6">
       <View className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
@@ -714,13 +983,20 @@ function Step5Review({ data, update }: any) {
 
         <ReviewRow label="Name" value={data.name} />
         <ReviewRow label="Category" value={data.category} />
+        <ReviewRow label="Group Type" value={groupTypeLabel} />
+        {(data.groupType === "FIXED" || data.groupType === "ROTATIONAL") && (
+          <ReviewRow label="Fixed Contribution" value={`₦${data.contributionAmount}`} />
+        )}
         <ReviewRow label="Target Amount" value={`₦${data.amount}`} />
         <ReviewRow label="Frequency" value={data.frequency} />
         <ReviewRow label="Dates" value={`${data.startDate} - ${data.endDate}`} />
         <ReviewRow label="Access" value={data.accessType} />
         <ReviewRow label="Member Limit" value={`${data.memberLimit} members`} />
         <ReviewRow label="Penalty" value={data.penalty} />
-        <ReviewRow label="Exit Rule" value={data.earlyExit} />
+        <ReviewRow
+          label="Exit Rule"
+          value={data.earlyExit || "None"}
+        />
       </View>
 
       <TouchableOpacity

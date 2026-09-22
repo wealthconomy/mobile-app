@@ -83,7 +83,7 @@ export default function OtpScreen() {
 
       if (context === "signup") {
         if (res.data?.accessToken) {
-          router.replace("/(tabs)" as any);
+          router.replace("/(auth)/biometric-setup" as any);
         } else {
           router.replace("/(auth)/login" as any);
         }

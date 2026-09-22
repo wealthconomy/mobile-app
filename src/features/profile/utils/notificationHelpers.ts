@@ -19,6 +19,24 @@ export const getNotificationVisuals = (item: NotificationItem) => {
   const kind = (item.kind || item.data?.type || "").toLowerCase();
   const title = (item.title || "").toLowerCase();
 
+  // Rotational payout & Vetted notification mappings
+  if (kind.includes("group_cycle_payout") || kind.includes("payout") || title.includes("payout")) {
+    return {
+      iconName: "gift-outline",
+      iconFamily: "Ionicons" as const,
+      iconColor: "#FFFFFF",
+      circleColor: "#16A34A",
+    };
+  }
+  if (kind.includes("group_vetted") || kind.includes("vetted") || title.includes("vetted")) {
+    return {
+      iconName: "shield-checkmark",
+      iconFamily: "Ionicons" as const,
+      iconColor: "#FFFFFF",
+      circleColor: "#155D5F",
+    };
+  }
+
   // Group/Tribe specific mappings
   if (kind.includes("payment") || title.includes("payment") || title.includes("paid")) {
     return {

@@ -1,13 +1,14 @@
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
 import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { useFocusEffect, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ArrowUp, Eye, EyeOff } from "lucide-react-native";
-import { useState, useEffect, useMemo } from "react";
-import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Image, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/src/store";
@@ -15,8 +16,14 @@ import {
   useGetPortfoliosQuery,
   useGetPortfolioConfigQuery,
 } from "@/src/store/api/portfolioApi";
+import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
 import { Portfolio } from "@/src/types/portfolio";
-import { saveCompletedPortfolios, hydrateCompletedPortfolios } from "@/src/store/slices/completedPortfolioSlice";
+import {
+  saveCompletedPortfolios,
+  hydrateCompletedPortfolios,
+  removeCompletedPortfolio,
+} from "@/src/store/slices/completedPortfolioSlice";
+import { isPortfolioCompleted, getDynamicInterestRateLabel } from "@/src/utils/formatters";
 
 const THEME = "#005F61"; // Dark teal for text/buttons
 const THEME_BG = "#D5EDFF"; // Theme light blue
@@ -84,6 +91,7 @@ export default function WealthFlowScreen() {
   const [activeTab, setActiveTab] = useState<"ongoing" | "completed">(
     "ongoing",
   );
+  const [refreshing, setRefreshing] = useState(false);
 
   const portfolioPreference = useSelector(
     (state: RootState) => state.portfolioPreference.flow
@@ -95,18 +103,28 @@ export default function WealthFlowScreen() {
     (state: RootState) => state.completedPortfolio.completedMap
   );
 
-  const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthflow" });
+  const { data, isLoading: loading, refetch: refetchFlow } = useGetPortfoliosQuery({ type: "wealthflow" });
   const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const flowRateLabel = rates?.wealthflow?.label || "10% P.A.";
+  const flowRateLabel = getDynamicInterestRateLabel("flow", systemConfigData, rates, 10);
   const allGoals = data?.items || [];
 
-  const isPlanCompleted = (g: Portfolio) =>
-    g.status === "COMPLETED" ||
-    g.status === "TERMINATED" ||
-    g.status === "WITHDRAWN" ||
-    g.status === "CLOSED" ||
-    (g.maturityDate && new Date(g.maturityDate).getTime() <= Date.now());
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetchFlow();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchFlow();
+      (dispatch as any)(hydrateCompletedPortfolios());
+    }, [refetchFlow, dispatch])
+  );
 
   useEffect(() => {
     (dispatch as any)(hydrateCompletedPortfolios());
@@ -114,25 +132,42 @@ export default function WealthFlowScreen() {
 
   useEffect(() => {
     if (allGoals.length > 0) {
-      const completed = allGoals.filter(isPlanCompleted);
+      const completed = allGoals.filter(isPortfolioCompleted);
       if (completed.length > 0) {
-        dispatch(saveCompletedPortfolios(completed));
+        dispatch(
+          saveCompletedPortfolios(
+            completed.map((p) => ({ ...p, type: p.type || "wealthflow" }))
+          )
+        );
       }
+      // Evict any active plan that was mistakenly stored in completedMap
+      allGoals.forEach((p) => {
+        if (!isPortfolioCompleted(p) && completedMap[p.id]) {
+          dispatch(removeCompletedPortfolio(p.id));
+        }
+      });
     }
-  }, [allGoals, dispatch]);
+  }, [allGoals, completedMap, dispatch]);
 
-  const ongoingPlans = allGoals.filter((g) => !isPlanCompleted(g));
+  const ongoingPlans = allGoals.filter((g) => !isPortfolioCompleted(g));
   const completedPlans = useMemo(() => {
-    const fromApi = allGoals.filter(isPlanCompleted);
-    const fromCache = Object.values(completedMap).filter((g) => {
-      const type = g.type?.toLowerCase();
-      if (type === "wealthflow") return true;
-      if (g.metadata?.autoSaveFrequency || g.metadata?.category?.includes("Flow") || g.metadata?.category?.includes("Auto")) return true;
-      return false;
-    });
+    const fromApi = allGoals.filter(isPortfolioCompleted);
+    const fromCache = Object.values(completedMap)
+      .filter(isPortfolioCompleted)
+      .filter((g) => {
+        const normType = (g.type || "").toLowerCase().replace(/[-_]/g, "");
+        if (normType === "wealthflow" || normType === "flow") return true;
+        if (g.metadata?.autoSaveFrequency || g.metadata?.category?.includes("Flow") || g.metadata?.category?.includes("Auto")) return true;
+        return false;
+      });
     const combined = new Map<string, Portfolio>();
     fromCache.forEach((item) => combined.set(item.id, item));
-    fromApi.forEach((item) => combined.set(item.id, item));
+    fromApi.forEach((item) =>
+      combined.set(item.id, {
+        ...item,
+        type: item.type || "wealthflow",
+      })
+    );
     return Array.from(combined.values());
   }, [allGoals, completedMap]);
 
@@ -167,7 +202,21 @@ export default function WealthFlowScreen() {
         rightElement={<PortfolioPreferenceMenu portfolioType="flow" />}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        className="flex-1"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["#005F61"]}
+            progressBackgroundColor="#FFFFFF"
+          />
+        }
+      >
         <View className="px-5 py-2">
           {/* ── Hero Card ────────────────────────────────────────── */}
           <View
@@ -534,6 +583,7 @@ function AutoListItem({
   isCompleted?: boolean;
 }) {
   const THEME_BG = "#D5EDFF";
+  const completed = Boolean(isCompleted || isPortfolioCompleted(plan));
   
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
@@ -541,7 +591,7 @@ function AutoListItem({
     return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
-  const progress = isCompleted
+  const progress = completed
     ? 1
     : parseFloat(plan.targetAmount) > 0
     ? parseFloat(plan.balance) / parseFloat(plan.targetAmount)

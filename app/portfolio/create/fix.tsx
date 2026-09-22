@@ -1,6 +1,8 @@
-﻿import Header from "@/src/components/common/Header";
+import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
-import { useCreatePortfolioMutation } from "@/src/store/api/portfolioApi";
+import { useCreatePortfolioMutation, useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
+import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
+import { getDynamicInterestRateLabel, getDynamicPenaltyRate } from "@/src/utils/formatters";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 import { useFocusEffect } from "@react-navigation/native";
@@ -67,6 +69,20 @@ export default function CreateFixScreen() {
   const [createPortfolio, { isLoading: isCreating }] = useCreatePortfolioMutation();
   const [verifyPin, { isLoading: isVerifyingPin }] = useVerifyPinMutation();
   const loading = isCreating || isVerifyingPin;
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
+  const fixInterestRateLabel = getDynamicInterestRateLabel(
+    "fix",
+    systemConfigData,
+    configData?.rates || (configData as any)?.data?.rates,
+    15
+  );
+  const { penaltyRate } = getDynamicPenaltyRate(
+    "fix",
+    systemConfigData,
+    configData?.rates || (configData as any)?.data?.rates,
+    "2.5%"
+  );
 
   // Wallet Query & Balance
   const { data: walletData, refetch: refetchWallet } = useGetWalletSummaryQuery(undefined, {
@@ -363,23 +379,21 @@ export default function CreateFixScreen() {
               lineHeight: 17,
             }}
           >
-            SafeLock is unique because the interest is paid upfront.{"\n\n"}
+            Wealth Fix is unique because the interest is paid upfront.{"\n\n"}
             <Text style={{ fontWeight: "700" }}>Calculation:</Text> The interest
-            is calculated based on how long you lock the funds.{"\n"}•{" "}
+            is calculated based on how long you lock the funds (rates up to {fixInterestRateLabel}).{"\n"}•{" "}
             <Text style={{ fontWeight: "700" }}>Short term (10–90 days):</Text>{" "}
-            Lower rates (around 6%–9% p.a.).{"\n"}•{" "}
+            Standard competitive rates.{"\n"}•{" "}
             <Text style={{ fontWeight: "700" }}>Long term (1–3 years):</Text>{" "}
-            Higher rates (currently up to 20%–22% per annum).{"\n\n"}
+            Maximum yield rates (up to {fixInterestRateLabel}).{"\n\n"}
             <Text style={{ fontWeight: "700" }}>Payment:</Text> As soon as you
             create the Wealth Fix, the interest is immediately credited to your
             Wealthconomy wallet, while the "capital" remains locked until the
             maturity date.{"\n\n"}⚠️{" "}
-            <Text style={{ fontWeight: "700" }}>The "No-Break" Rule:</Text> It
-            is critical to know that Wealthconomy cannot be broken. Unlike
-            "Wealth Flex or Wealth Goal" where you can pay a penalty fee to get
-            your money early, a Wealth Fix is legally and technically locked
-            until the end date. You should only use this for money you are 100%
-            sure you won't need until the date you set.
+            <Text style={{ fontWeight: "700" }}>Early Exit / Termination:</Text> If
+            you terminate or break your Wealth Fix before maturity date, an early
+            exit penalty fee ({penaltyRate}) applies and unearned upfront interest is
+            adjusted from your principal balance.
           </Text>
         </View>
       )}
@@ -863,7 +877,7 @@ export default function CreateFixScreen() {
               {wealthPreference === "Interest Based" ? "Interest Rate" : "Preference"}
             </Text>
             <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
-              {wealthPreference === "Interest Based" ? "12% P.A" : "Impact Wealth"}
+              {wealthPreference === "Interest Based" ? fixInterestRateLabel : "Impact Wealth"}
             </Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>

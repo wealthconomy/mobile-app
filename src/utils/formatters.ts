@@ -1,3 +1,5 @@
+import { Portfolio } from "@/src/types/portfolio";
+
 /**
  * Converts a kobo numeric value or string to formatted Naira (e.g. 200000 -> ₦2,000.00).
  */
@@ -405,14 +407,145 @@ export const formatEarlyTerminationPenaltyRate = (
     if (trimmed.includes("%")) return trimmed;
     const num = parseFloat(trimmed);
     if (!isNaN(num)) {
-      const pct = num <= 1 && num > 0 ? num * 100 : num;
+      // Backend values: "7", "2.0", "1.0", "2.5", "5" are ALREADY percentage rates!
+      // Only fractional decimal ratios < 0.5 (e.g. 0.025 for 2.5%, 0.05 for 5%) require multiplying by 100.
+      const pct = num < 0.5 && num > 0 ? num * 100 : num;
       return `${pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(1)}%`;
     }
     return trimmed;
   }
   if (typeof rateVal === "number") {
-    const pct = rateVal <= 1 && rateVal > 0 ? rateVal * 100 : rateVal;
+    const pct = rateVal < 0.5 && rateVal > 0 ? rateVal * 100 : rateVal;
     return `${pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(1)}%`;
   }
   return fallback;
 };
+
+/**
+ * Dynamically extracts and calculates early termination penalty rate & ratio
+ * from backend system configs (/admin/system-config) and portfolio config rates (/portfolios/config).
+ */
+export const getDynamicPenaltyRate = (
+  portfolioType: string,
+  systemConfigs?: { items?: Array<{ key: string; value: string }> } | any,
+  portfolioConfigRates?: any,
+  fallback = "2.5%"
+): { penaltyRate: string; penaltyRatio: number } => {
+  const normType = (portfolioType || "")
+    .toUpperCase()
+    .replace(/^WEALTH_?/, "")
+    .replace(/[-_]/g, ""); // e.g. "GOAL", "FAM", "FLOW", "FIX", "GROUP"
+
+  const rawItems: any[] =
+    systemConfigs?.items ||
+    systemConfigs?.data?.items ||
+    (Array.isArray(systemConfigs) ? systemConfigs : []);
+
+  const typeKey = `PENALTY_RATE_WEALTH_${normType}`;
+  const specificConfig = rawItems.find((i: any) => i?.key === typeKey);
+  const generalConfig = rawItems.find((i: any) => i?.key === "EARLY_TERMINATION_PENALTY_PCT");
+
+  const lowerKey = `wealth${normType.toLowerCase()}`;
+  const rateObj = portfolioConfigRates?.[lowerKey];
+
+  const rawRate =
+    specificConfig?.value ??
+    rateObj?.earlyLiquidationPenaltyRate ??
+    rateObj?.earlyWithdrawalPenaltyPercentage ??
+    generalConfig?.value;
+
+  const penaltyRate = formatEarlyTerminationPenaltyRate(rawRate, fallback);
+  const n = parseFloat(penaltyRate.replace("%", ""));
+  const penaltyRatio = !isNaN(n) && n > 0 ? n / 100 : 0.025;
+
+  return { penaltyRate, penaltyRatio };
+};
+
+/**
+ * Retrieves the annual interest rate label (e.g. "12% P.A", "10% P.A", "15% P.A") dynamically
+ * from portfolio config or system config.
+ */
+export const getDynamicInterestRateLabel = (
+  portfolioType: string,
+  systemConfigs?: { items?: Array<{ key: string; value: string }> } | any,
+  portfolioConfigRates?: any,
+  fallbackRate = 12
+): string => {
+  const normType = (portfolioType || "")
+    .toUpperCase()
+    .replace(/^WEALTH_?/, "")
+    .replace(/[-_]/g, "");
+  const lowerKey = `wealth${normType.toLowerCase()}`;
+
+  // 1. Check portfolio config rates first
+  const configRateObj = portfolioConfigRates?.[lowerKey];
+  if (configRateObj?.label) {
+    return configRateObj.label;
+  }
+  if (configRateObj?.rate !== undefined && configRateObj.rate !== null) {
+    return `${configRateObj.rate}% P.A`;
+  }
+
+  // 2. Check system config items
+  const rawItems: any[] =
+    systemConfigs?.items ||
+    systemConfigs?.data?.items ||
+    (Array.isArray(systemConfigs) ? systemConfigs : []);
+  const specificConfig = rawItems.find(
+    (i: any) => i?.key === `INTEREST_RATE_WEALTH_${normType}`
+  );
+  if (specificConfig?.value && parseFloat(specificConfig.value) > 0) {
+    return `${specificConfig.value}% P.A`;
+  }
+
+  return `${fallbackRate}% P.A`;
+};
+
+/**
+ * Client-side date check: true when the portfolio's maturityDate or endDate has passed.
+ * Supports both ISO-8601 strings and DD/MM/YYYY formats.
+ */
+export const isPortfolioDateEnded = (dateStr?: string | null): boolean => {
+  if (!dateStr) return false;
+  const trimmed = dateStr.toString().trim();
+  if (!trimmed) return false;
+
+  // Handle DD/MM/YYYY format
+  if (trimmed.includes("/")) {
+    const parts = trimmed.split("/").map((p) => parseInt(p.trim(), 10));
+    if (parts.length === 3) {
+      const [day, month, year] = parts;
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+        return new Date(year, month - 1, day, 23, 59, 59).getTime() <= Date.now();
+      }
+    }
+  }
+
+  const d = new Date(trimmed);
+  return !isNaN(d.getTime()) && d.getTime() <= Date.now();
+};
+
+/**
+ * Robust completion check for any portfolio.
+ * Identifies completed status or matured/ended date.
+ * Reaching target balance does NOT mean the plan is completed before maturity.
+ */
+export const isPortfolioCompleted = (g?: Portfolio | null): boolean => {
+  if (!g) return false;
+  const s = (g.status || (g as any).state || "").toString().trim().toUpperCase();
+  const isCompletedStatus =
+    s === "COMPLETED" ||
+    s === "TERMINATED" ||
+    s === "WITHDRAWN" ||
+    s === "CLOSED" ||
+    s === "MATURED" ||
+    s === "INACTIVE" ||
+    s === "LIQUIDATED";
+
+  const isDateEnded = isPortfolioDateEnded(
+    g.maturityDate || (g as any).endDate || (g as any).targetDate
+  );
+
+  return isCompletedStatus || isDateEnded;
+};
+

@@ -1,13 +1,14 @@
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
 import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { useFocusEffect, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ArrowUp, Eye, EyeOff } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
-import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Image, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/src/store";
@@ -15,8 +16,14 @@ import {
   useGetPortfoliosQuery,
   useGetPortfolioConfigQuery,
 } from "@/src/store/api/portfolioApi";
+import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
 import { Portfolio } from "@/src/types/portfolio";
-import { saveCompletedPortfolios, hydrateCompletedPortfolios } from "@/src/store/slices/completedPortfolioSlice";
+import {
+  saveCompletedPortfolios,
+  hydrateCompletedPortfolios,
+  removeCompletedPortfolio,
+} from "@/src/store/slices/completedPortfolioSlice";
+import { isPortfolioCompleted, getDynamicInterestRateLabel } from "@/src/utils/formatters";
 
 const THEME = "#560FF1";
 const THEME_BG = "#F3EEFF";
@@ -68,6 +75,7 @@ export default function WealthFamScreen() {
   const [activeTab, setActiveTab] = useState<"ongoing" | "completed">(
     "ongoing",
   );
+  const [refreshing, setRefreshing] = useState(false);
 
   const portfolioPreference = useSelector(
     (state: RootState) => state.portfolioPreference.fam
@@ -79,18 +87,28 @@ export default function WealthFamScreen() {
     (state: RootState) => state.completedPortfolio.completedMap
   );
 
-  const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthfam" });
+  const { data, isLoading: loading, refetch: refetchFam } = useGetPortfoliosQuery({ type: "wealthfam" });
   const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const famRateLabel = rates?.wealthfam?.label || "10% P.A.";
+  const famRateLabel = getDynamicInterestRateLabel("fam", systemConfigData, rates, 10);
   const allGoals = data?.items || [];
 
-  const isPlanCompleted = (g: Portfolio) =>
-    g.status === "COMPLETED" ||
-    g.status === "TERMINATED" ||
-    g.status === "WITHDRAWN" ||
-    g.status === "CLOSED" ||
-    (g.maturityDate && new Date(g.maturityDate).getTime() <= Date.now());
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetchFam();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchFam();
+      (dispatch as any)(hydrateCompletedPortfolios());
+    }, [refetchFam, dispatch])
+  );
 
   useEffect(() => {
     (dispatch as any)(hydrateCompletedPortfolios());
@@ -98,38 +116,55 @@ export default function WealthFamScreen() {
 
   useEffect(() => {
     if (allGoals.length > 0) {
-      const completed = allGoals.filter(isPlanCompleted);
+      const completed = allGoals.filter(isPortfolioCompleted);
       if (completed.length > 0) {
-        dispatch(saveCompletedPortfolios(completed));
+        dispatch(
+          saveCompletedPortfolios(
+            completed.map((p) => ({ ...p, type: p.type || "wealthfam" }))
+          )
+        );
       }
+      // Evict any active plan that was mistakenly stored in completedMap
+      allGoals.forEach((p) => {
+        if (!isPortfolioCompleted(p) && completedMap[p.id]) {
+          dispatch(removeCompletedPortfolio(p.id));
+        }
+      });
     }
-  }, [allGoals, dispatch]);
+  }, [allGoals, completedMap, dispatch]);
 
-  const ongoingPlans = allGoals.filter((g: Portfolio) => !isPlanCompleted(g));
+  const ongoingPlans = allGoals.filter((g: Portfolio) => !isPortfolioCompleted(g));
   const completedPlans = useMemo(() => {
-    const fromApi = allGoals.filter((g: Portfolio) => isPlanCompleted(g));
-    const fromCache = Object.values(completedMap).filter((g) => {
-      const type = g.type?.toLowerCase();
-      if (type === "wealthfam") return true;
-      if (g.metadata?.familyMemberName || g.metadata?.familyCategory) return true;
-      if (
-        !type &&
-        !g.metadata?.autoSaveFrequency &&
-        !g.metadata?.lockType &&
-        (g.name?.includes("Kids") ||
-          g.name?.includes("Spouse") ||
-          g.name?.includes("Parent") ||
-          g.name?.includes("Sibling") ||
-          g.name?.includes("Fam") ||
-          g.name?.includes("Family"))
-      ) {
-        return true;
-      }
-      return false;
-    });
+    const fromApi = allGoals.filter(isPortfolioCompleted);
+    const fromCache = Object.values(completedMap)
+      .filter(isPortfolioCompleted)
+      .filter((g) => {
+        const normType = (g.type || "").toLowerCase().replace(/[-_]/g, "");
+        if (normType === "wealthfam" || normType === "fam") return true;
+        if (g.metadata?.familyMemberName || g.metadata?.familyCategory) return true;
+        if (
+          !normType &&
+          !g.metadata?.autoSaveFrequency &&
+          !g.metadata?.lockType &&
+          (g.name?.includes("Kids") ||
+            g.name?.includes("Spouse") ||
+            g.name?.includes("Parent") ||
+            g.name?.includes("Sibling") ||
+            g.name?.includes("Fam") ||
+            g.name?.includes("Family"))
+        ) {
+          return true;
+        }
+        return false;
+      });
     const combined = new Map<string, Portfolio>();
     fromCache.forEach((item) => combined.set(item.id, item));
-    fromApi.forEach((item) => combined.set(item.id, item));
+    fromApi.forEach((item) =>
+      combined.set(item.id, {
+        ...item,
+        type: item.type || "wealthfam",
+      })
+    );
     return Array.from(combined.values());
   }, [allGoals, completedMap]);
 
@@ -160,7 +195,21 @@ export default function WealthFamScreen() {
         rightElement={<PortfolioPreferenceMenu portfolioType="fam" />}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        className="flex-1"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["#560FF1"]}
+            progressBackgroundColor="#FFFFFF"
+          />
+        }
+      >
         <View className="px-5 py-2">
           {/* ── Hero Card (same size/structure as WealthGoal) ─────── */}
           <View
@@ -511,8 +560,9 @@ function FamListItem({
   isCompleted,
 }: {
   plan: Portfolio;
-  isCompleted: boolean;
+  isCompleted?: boolean;
 }) {
+  const completed = Boolean(isCompleted || isPortfolioCompleted(plan));
   const icon = (plan.name || "").includes("Kids")
     ? "👨‍👩‍👧‍👦"
     : (plan.name || "").includes("Spouse")
@@ -527,7 +577,7 @@ function FamListItem({
     return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
-  const progress = isCompleted
+  const progress = completed
     ? 1
     : parseFloat(plan.targetAmount) > 0
     ? parseFloat(plan.balance) / parseFloat(plan.targetAmount)
