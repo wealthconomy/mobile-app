@@ -10,7 +10,7 @@ export interface UploadImageOptions {
   type?: string;
   /**
    * If true, if network upload fails during dev or offline mode, returns the local URI as a fallback.
-   * Defaults to false so broken local paths are not saved to remote databases.
+   * Defaults to false so production flows never leak local device URIs.
    */
   allowFallback?: boolean;
 }
@@ -20,7 +20,7 @@ export function useImageUpload() {
   const token = useSelector((state: RootState) => state.auth.token);
 
   /**
-   * Uploads any local image URI (`file://` or `content://`) to the cloud server and returns the `https://` URL.
+   * Uploads any local image URI (`file://` or `content://`) to the cloud server and returns the public `https://` URL.
    * If the URI is already a remote `http://` or `https://` URL, returns it immediately without re-uploading.
    */
   const uploadImage = useCallback(
@@ -81,7 +81,7 @@ export function useImageUpload() {
       }
 
       try {
-        const uploadRes = await uploadFileMutation(formData).unwrap();
+        const uploadRes: any = await uploadFileMutation(formData).unwrap();
 
         // Log immediately after upload resolves on Android
         if (Platform.OS === "android") {
@@ -93,9 +93,15 @@ export function useImageUpload() {
         }
 
         const cloudUrl =
+          (typeof uploadRes === "string" && uploadRes.startsWith("http") ? uploadRes : null) ||
+          (typeof uploadRes?.data === "string" && uploadRes.data.startsWith("http") ? uploadRes.data : null) ||
           uploadRes?.data?.url ||
-          (uploadRes as any)?.url ||
-          (typeof uploadRes?.data === "string" ? uploadRes.data : null);
+          uploadRes?.data?.fileUrl ||
+          uploadRes?.data?.secure_url ||
+          uploadRes?.data?.imageUrl ||
+          uploadRes?.url ||
+          uploadRes?.fileUrl ||
+          uploadRes?.secure_url;
 
         if (cloudUrl) {
           console.log("✅ [useImageUpload] Image uploaded successfully:", cloudUrl);
@@ -154,7 +160,7 @@ export function useImageUpload() {
 
         console.log("Image upload error:", err);
         if (allowFallback) {
-          console.log("Falling back to local URI for testing/dev mode.");
+          console.warn("Falling back to local URI for testing/dev mode.");
           return uri;
         }
         throw err;

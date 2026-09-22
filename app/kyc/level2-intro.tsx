@@ -24,9 +24,10 @@ export default function KYCLevel2Intro() {
       (user?.kycLevel !== undefined && user.kycLevel >= 2) ||
       kycDocsResponse?.data?.faceVerified === true;
 
-    if (isLevel2Complete) {
-      router.replace("/kyc/level3-intro");
-    }
+    // Note: Auto-redirect disabled so KYC Level 2 can be tested repeatedly
+    // if (isLevel2Complete) {
+    //   router.replace("/kyc/level3-intro");
+    // }
   }, [user, kycDocsResponse]);
 
   const benefits = [

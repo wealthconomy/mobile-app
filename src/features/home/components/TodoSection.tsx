@@ -88,17 +88,28 @@ export const TodoSection = () => {
       onPress: () => router.push("/kyc/level2-intro"),
       isComplete: false,
     });
-  } else if (userState.kycLevel === 2) {
+  } else {
     onboardingTasks.push({
-      id: "kyc3",
-      title: "Proceed to level 3",
-      description: "Upgrade your account for higher limits and features",
-      icon: (
-        <Ionicons name="shield-checkmark-outline" size={18} color="#1A1A1A" />
-      ),
-      onPress: () => router.push("/kyc/level3-intro"),
+      id: "kyc2-test",
+      title: "Test / Retake KYC Level 2",
+      description: "Scan your ID document and complete face verification",
+      icon: <Ionicons name="id-card-outline" size={18} color="#155D5F" />,
+      onPress: () => router.push("/kyc/level2-intro"),
       isComplete: false,
     });
+
+    if (userState.kycLevel === 2) {
+      onboardingTasks.push({
+        id: "kyc3",
+        title: "Proceed to level 3",
+        description: "Upgrade your account for higher limits and features",
+        icon: (
+          <Ionicons name="shield-checkmark-outline" size={18} color="#1A1A1A" />
+        ),
+        onPress: () => router.push("/kyc/level3-intro"),
+        isComplete: false,
+      });
+    }
   }
 
   // 2. Security

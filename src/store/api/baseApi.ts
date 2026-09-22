@@ -176,6 +176,6 @@ const baseQueryWithLockout: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQu
 export const baseApi = createApi({
   reducerPath: "baseApi",
   baseQuery: baseQueryWithLockout,
-  tagTypes: ["User", "WealthGroup", "Portfolio", "Payment", "Auth", "Kyc", "File", "Notification", "Referral", "Blog", "Library", "Wallet", "PayoutAccount", "Withdrawal", "Activity"],
+  tagTypes: ["User", "WealthGroup", "Portfolio", "Payment", "Auth", "Kyc", "File", "Notification", "Referral", "Blog", "Library", "Wallet", "PayoutAccount", "Withdrawal", "Activity", "SupportChat"],
   endpoints: () => ({}),
 });

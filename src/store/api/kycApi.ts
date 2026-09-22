@@ -73,14 +73,15 @@ export const kycApi = baseApi.injectEndpoints({
         body,
       }),
       invalidatesTags: ["Kyc", "User"],
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
+          console.log("[kycApi:submitLevel2Info SUCCESS]:", data);
           if (data?.data?.currentLevel !== undefined) {
             dispatch(updateKycLevel(data.data.currentLevel));
           }
-        } catch {
-          // submit failed
+        } catch (err: any) {
+          console.log("[kycApi:submitLevel2Info FAILED]:", err?.error || err);
         }
       },
     }),
@@ -91,14 +92,15 @@ export const kycApi = baseApi.injectEndpoints({
         body,
       }),
       invalidatesTags: ["Kyc", "User"],
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
+          console.log("[kycApi:scanId SUCCESS]:", data);
           if (data?.data?.currentLevel !== undefined) {
             dispatch(updateKycLevel(data.data.currentLevel));
           }
-        } catch {
-          // scan failed
+        } catch (err: any) {
+          console.log("[kycApi:scanId FAILED]:", err?.error || err);
         }
       },
     }),
@@ -109,14 +111,15 @@ export const kycApi = baseApi.injectEndpoints({
         body,
       }),
       invalidatesTags: ["Kyc", "User"],
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
+          console.log("[kycApi:faceVerify SUCCESS]:", data);
           if (data?.data?.currentLevel !== undefined) {
             dispatch(updateKycLevel(data.data.currentLevel));
           }
-        } catch {
-          // verify failed
+        } catch (err: any) {
+          console.log("[kycApi:faceVerify FAILED]:", err?.error || err);
         }
       },
     }),

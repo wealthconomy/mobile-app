@@ -78,10 +78,11 @@ export default function KYCLevel2Screen() {
       (user?.kycLevel !== undefined && user.kycLevel >= 2) ||
       kycDocsResponse?.data?.faceVerified === true;
 
-    if (isLevel2Complete && step < 7) {
-      router.replace("/kyc/level3-intro");
-      return;
-    }
+    // Note: Auto-redirect disabled so KYC Level 2 can be tested repeatedly
+    // if (isLevel2Complete && step < 7) {
+    //   router.replace("/kyc/level3-intro");
+    //   return;
+    // }
 
     const kycData = kycDocsResponse?.data;
     if (user || kycData) {
@@ -207,7 +208,16 @@ export default function KYCLevel2Screen() {
         nextOfKinPhone: formData.nextOfKinPhone || user?.nextOfKinPhone || "",
       };
 
-      await submitLevel2Info(payload).unwrap();
+      console.log("\n================ [KYC 2 - STEP 1: SUBMIT INFO REQUEST] ================");
+      console.log("Endpoint: POST /kyc/level-2/submit-info");
+      console.log("Payload:", JSON.stringify(payload, null, 2));
+      console.log("=======================================================================\n");
+
+      const response = await submitLevel2Info(payload).unwrap();
+
+      console.log("\n================ [KYC 2 - STEP 1: SUBMIT INFO RESPONSE] ================");
+      console.log(JSON.stringify(response, null, 2));
+      console.log("========================================================================\n");
 
       setScannedData((prev) => ({
         ...prev,
@@ -215,8 +225,9 @@ export default function KYCLevel2Screen() {
         dateOfBirth: formData.dateOfBirth,
       }));
       setStep(2);
-    } catch {
-      // handled by mutation error state
+    } catch (err: any) {
+      console.log("\n❌ [KYC 2 - STEP 1: SUBMIT INFO ERROR]:", err);
+      console.log("=======================================================================\n");
     }
   };
 
@@ -224,11 +235,29 @@ export default function KYCLevel2Screen() {
   const handleStep3Confirm = async (data: ScannedData) => {
     setLocalError(null);
     try {
-      const fallbackPhoto = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=80";
-      const imageUrl = await uploadImage(capturedIdPhoto || fallbackPhoto, {
+      console.log("\n================ [KYC 2 - STEP 3: ID CONFIRMATION] ================");
+      console.log("Local capturedIdPhoto:", capturedIdPhoto);
+      console.log("Form data:", JSON.stringify(data, null, 2));
+      console.log("====================================================================\n");
+
+      if (!capturedIdPhoto) {
+        throw new Error("Please scan or take a photo of your ID before confirming.");
+      }
+
+      console.log("[KYC 2] Uploading ID image to cloud server...");
+      const imageUrl = await uploadImage(capturedIdPhoto, {
         name: "id_card.jpg",
         allowFallback: false,
       });
+
+      console.log("\n================ [KYC 2 - STEP 3: CLOUD UPLOAD RESULT] ================");
+      console.log("Resolved imageUrl:", imageUrl);
+      console.log("=======================================================================\n");
+
+      // Strict validation: Must be a remote public http(s) URL
+      if (!imageUrl || (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://"))) {
+        throw new Error("Could not obtain a valid public cloud URL for your ID image. Please try again.");
+      }
 
       const payload = {
         idType: data.idType,
@@ -236,11 +265,22 @@ export default function KYCLevel2Screen() {
         idImageUrl: imageUrl,
       };
 
-      await scanId(payload).unwrap();
+      console.log("\n================ [KYC 2 - STEP 3: SCAN ID REQUEST] ================");
+      console.log("Endpoint: POST /kyc/level-2/scan-id");
+      console.log("Payload:", JSON.stringify(payload, null, 2));
+      console.log("===================================================================\n");
+
+      const response = await scanId(payload).unwrap();
+
+      console.log("\n================ [KYC 2 - STEP 3: SCAN ID RESPONSE] ================");
+      console.log("Response from server:", JSON.stringify(response, null, 2));
+      console.log("====================================================================\n");
 
       setScannedData(data);
       setStep(4);
     } catch (err: any) {
+      console.log("\n❌ [KYC 2 - STEP 3: SCAN ID ERROR]:", err);
+      console.log("===================================================================\n");
       setLocalError(err?.data?.message || err?.message || "Failed to upload ID image. Please try again.");
     }
   };
@@ -265,11 +305,22 @@ export default function KYCLevel2Screen() {
         imageBase64: capturedSelfieBase64 || "mock_base64_string",
       };
 
-      await faceVerify(payload).unwrap();
+      console.log("\n================ [KYC 2 - STEP 6: FACE VERIFY REQUEST] ================");
+      console.log("Endpoint: POST /kyc/level-2/face-verify");
+      console.log("biometricSessionId:", sessionId);
+      console.log("imageBase64 length:", capturedSelfieBase64?.length || 0);
+      console.log("=======================================================================\n");
+
+      const response = await faceVerify(payload).unwrap();
+
+      console.log("\n================ [KYC 2 - STEP 6: FACE VERIFY RESPONSE] ================");
+      console.log("Response from server:", JSON.stringify(response, null, 2));
+      console.log("========================================================================\n");
 
       setStep(7);
-    } catch {
-      // handled by mutation error state
+    } catch (err: any) {
+      console.log("\n❌ [KYC 2 - STEP 6: FACE VERIFY ERROR]:", err);
+      console.log("=======================================================================\n");
     }
   };
 
