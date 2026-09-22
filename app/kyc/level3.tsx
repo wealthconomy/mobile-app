@@ -72,8 +72,23 @@ export default function KYCLevel3Screen() {
     setLocalError(null);
     setIsUploading(true);
     try {
-      const addressDocUrl = await uploadImage(proofOfAddress, { name: "address_proof.jpg" });
-      const passportUrl = await uploadImage(passport, { name: "passport.jpg" });
+      const addressDocUrl = await uploadImage(proofOfAddress, {
+        name: "address_proof.jpg",
+        allowFallback: false,
+      });
+      const passportUrl = await uploadImage(passport, {
+        name: "passport.jpg",
+        allowFallback: false,
+      });
+
+      if (
+        !addressDocUrl ||
+        !passportUrl ||
+        (!addressDocUrl.startsWith("http://") && !addressDocUrl.startsWith("https://")) ||
+        (!passportUrl.startsWith("http://") && !passportUrl.startsWith("https://"))
+      ) {
+        throw new Error("Could not obtain valid public cloud URLs for your documents. Please try again.");
+      }
 
       await uploadLevel3Docs({
         addressDocUrl,

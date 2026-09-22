@@ -34,7 +34,7 @@ export interface ScannedData {
   dateOfBirth: string;
   idType: string;
   idNumber: string;
-  expires: string;
+  expires?: string;
 }
 
 interface Step3ScanSuccessfulProps {
@@ -54,7 +54,6 @@ export const Step3ScanSuccessful: React.FC<Step3ScanSuccessfulProps> = ({
     dateOfBirth: "",
     idType: "",
     idNumber: "",
-    expires: "",
   },
   photoUri,
   onConfirm,
@@ -63,6 +62,7 @@ export const Step3ScanSuccessful: React.FC<Step3ScanSuccessfulProps> = ({
 }) => {
   const [data, setData] = useState<ScannedData>(initialData);
   const [showIdTypeModal, setShowIdTypeModal] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialData) {
@@ -71,8 +71,40 @@ export const Step3ScanSuccessful: React.FC<Step3ScanSuccessfulProps> = ({
   }, [initialData]);
 
   const handleChange = (key: keyof ScannedData, value: string) => {
+    setValidationError(null);
     setData((prev) => ({ ...prev, [key]: value }));
   };
+
+  const handleConfirmPress = () => {
+    setValidationError(null);
+
+    if (!data.idType) {
+      setValidationError("Please select your ID document type.");
+      return;
+    }
+
+    const cleanIdNumber = data.idNumber ? data.idNumber.replace(/\s+/g, "") : "";
+    if (!cleanIdNumber) {
+      setValidationError("Please enter your ID / document number.");
+      return;
+    }
+
+    // NIN-specific validation
+    if (data.idType === "National Identification" || data.idType === "NIN Slip") {
+      if (!/^\d{11}$/.test(cleanIdNumber)) {
+        setValidationError("National Identification Number (NIN) must be exactly 11 numeric digits.");
+        return;
+      }
+      if (/^(\d)\1{10}$/.test(cleanIdNumber) || cleanIdNumber === "12345678901") {
+        setValidationError("Please enter a valid, authentic 11-digit NIN.");
+        return;
+      }
+    }
+
+    onConfirm({ ...data, idNumber: cleanIdNumber });
+  };
+
+  const displayError = validationError || error;
 
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
@@ -113,7 +145,7 @@ export const Step3ScanSuccessful: React.FC<Step3ScanSuccessfulProps> = ({
             Scanning data
           </Text>
 
-          {/* Large Outer Gray Form Wrapper Card (#F6F8FA) matching Image 2 100% */}
+          {/* Large Outer Gray Form Wrapper Card (#F6F8FA) */}
           <View
             style={{
               backgroundColor: "#F6F8FA",
@@ -124,19 +156,19 @@ export const Step3ScanSuccessful: React.FC<Step3ScanSuccessfulProps> = ({
               gap: 16,
             }}
           >
-            {/* First Name */}
+            {/* Full Name (Display only from profile) */}
             <KycFormInput
-              label="First Name"
+              label="Full Name"
               value={data.firstName}
-              onChangeText={(text) => handleChange("firstName", text)}
+              editable={false}
               bgVariant="white"
             />
 
-            {/* Date of Birth */}
+            {/* Date of Birth (Display only from Step 1) */}
             <KycFormInput
               label="Date of Birth"
               value={data.dateOfBirth}
-              onChangeText={(text) => handleChange("dateOfBirth", text)}
+              editable={false}
               bgVariant="white"
             />
 
@@ -153,36 +185,29 @@ export const Step3ScanSuccessful: React.FC<Step3ScanSuccessfulProps> = ({
               label={data.idType ? `${data.idType} Number` : "ID Number"}
               value={data.idNumber}
               onChangeText={(text) => handleChange("idNumber", text)}
+              keyboardType={data.idType === "National Identification" || data.idType === "NIN Slip" ? "numeric" : "default"}
               bgVariant="white"
             />
 
-            {/* Expires */}
-            <KycFormInput
-              label="Expires"
-              value={data.expires}
-              onChangeText={(text) => handleChange("expires", text)}
-              bgVariant="white"
-            />
-
-            {/* API Error Display */}
-            {error ? (
+            {/* Error Display */}
+            {displayError ? (
               <Text
                 style={{
                   fontSize: 13,
                   color: "#EF4444",
-                  marginTop: 8,
+                  marginTop: 4,
                   fontWeight: "600",
                   textAlign: "center",
                 }}
               >
-                {error}
+                {displayError}
               </Text>
             ) : null}
 
-            {/* Confirm Button exactly matching Image 2 inside outer container */}
+            {/* Confirm Button */}
             <KycButton
               title="Confirm"
-              onPress={() => onConfirm(data)}
+              onPress={handleConfirmPress}
               loading={isLoading}
               style={{ marginTop: 10 }}
             />
