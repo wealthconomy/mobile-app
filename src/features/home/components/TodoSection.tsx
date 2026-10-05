@@ -170,8 +170,8 @@ export const TodoSection = () => {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        className="-mx-5 px-5"
-        contentContainerStyle={{ paddingRight: 20 }}
+        className="-mx-5"
+        contentContainerStyle={{ paddingHorizontal: 20 }}
       >
         {onboardingTasks.map((task) => (
           <TodoCard

@@ -70,7 +70,7 @@ interface WiseUpSectionProps {
 export const WiseUpSection = ({
   hideViewAll = false,
   containerClassName = "",
-  scrollClassName = "-mx-5 px-5",
+  scrollClassName = "-mx-5",
 }: WiseUpSectionProps = {}) => {
   const { data: response, isLoading } = useGetBlogsQuery({ publishToApp: true });
   const blogs = response?.data?.items || [];
@@ -91,6 +91,7 @@ export const WiseUpSection = ({
         horizontal
         showsHorizontalScrollIndicator={false}
         className={scrollClassName}
+        contentContainerStyle={{ paddingHorizontal: 20 }}
       >
         {isLoading ? (
           <WiseUpSkeleton />

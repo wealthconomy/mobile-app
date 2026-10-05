@@ -91,6 +91,63 @@ export default function WealthFixScreen() {
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
   const fixRateLabel = getDynamicInterestRateLabel("fix", systemConfigData, rates, 15);
+
+  const fixConfig = rates?.wealthfix || (rates as any)?.fix;
+  const minTargetKobo = fixConfig?.minTargetAmount ?? fixConfig?.minimumAmount ?? 100000;
+  const minDuration = fixConfig?.minDurationDays ?? fixConfig?.minimumTenureDays ?? 30;
+  const maxDuration = fixConfig?.maxDurationDays ?? fixConfig?.maximumTenureDays ?? 730;
+  const penaltyRate = fixConfig?.earlyLiquidationPenaltyRate ?? fixConfig?.earlyWithdrawalPenaltyPercentage ?? 2;
+  const annualRatePct = fixConfig?.annualInterestRate ?? 2;
+
+  const minTargetNaira = minTargetKobo / 100;
+  const minTargetNairaFormatted = minTargetNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const dynamicRecommendations = useMemo(() => {
+    // Approach B: Multiples of minTargetAmount (1x, 5x, 10x)
+    const rec1Amount = minTargetNaira;
+    const rec1Duration = minDuration;
+    const rec1Earn = Math.round(rec1Amount * (annualRatePct / 100) * (rec1Duration / 365));
+
+    const rec2Amount = minTargetNaira * 5;
+    const rec2Duration = Math.min(365, maxDuration);
+    const rec2Earn = Math.round(rec2Amount * (annualRatePct / 100) * (rec2Duration / 365));
+
+    const rec3Amount = minTargetNaira * 10;
+    const rec3Duration = maxDuration;
+    const rec3Earn = Math.round(rec3Amount * (annualRatePct / 100) * (rec3Duration / 365));
+
+    return [
+      {
+        id: "1",
+        title: "Starter Lock",
+        subtitle: `Lock ₦${rec1Amount.toLocaleString("en-US")} for ${rec1Duration} days`,
+        earn: `₦${rec1Earn.toLocaleString("en-US")}`,
+        amount: String(rec1Amount),
+        duration: String(rec1Duration),
+      },
+      {
+        id: "2",
+        title: "Mid-Term Growth",
+        subtitle: `Lock ₦${rec2Amount.toLocaleString("en-US")} for ${rec2Duration} days`,
+        earn: `₦${rec2Earn.toLocaleString("en-US")}`,
+        amount: String(rec2Amount),
+        duration: String(rec2Duration),
+      },
+      {
+        id: "3",
+        title: "Long-Term Fix",
+        subtitle: `Lock ₦${rec3Amount.toLocaleString("en-US")} for ${rec3Duration} days`,
+        earn: `₦${rec3Earn.toLocaleString("en-US")}`,
+        amount: String(rec3Amount),
+        duration: String(rec3Duration),
+      },
+    ];
+  }, [minTargetNaira, minDuration, maxDuration, annualRatePct]);
+
+  const handleBack = () => {
+    router.replace("/(tabs)/portfolios" as any);
+  };
+
   const allGoals = data?.items || [];
 
   const handleRefresh = async () => {
@@ -162,7 +219,7 @@ export default function WealthFixScreen() {
   }, [allGoals, completedMap]);
 
   const THEME_COLOR = "#D48E00"; // Primary Gold
-  const THEME_BG = "#FFCF6566"; // Gold with opacity
+  const THEME_BG = "#FFF7E1"; // Light pastel gold background
 
   const formatAmount = (val?: string) => {
     if (!val) return "0.00";
@@ -181,7 +238,7 @@ export default function WealthFixScreen() {
         <StatusBar style="dark" />
         <Header
           title="WealthFix"
-          onBack={() => router.back()}
+          onBack={handleBack}
           rightElement={<PortfolioPreferenceMenu portfolioType="fix" />}
         />
         <PortfolioDetailSkeleton />
@@ -194,7 +251,7 @@ export default function WealthFixScreen() {
       <StatusBar style="dark" />
       <Header
         title="WealthFix"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="fix" />}
       />
 
@@ -220,7 +277,7 @@ export default function WealthFixScreen() {
             style={{
               width: "100%",
               maxWidth: 365,
-              height: 170,
+              height: 190,
               borderTopLeftRadius: 50,
               borderTopRightRadius: 20,
               borderBottomRightRadius: 50,
@@ -258,7 +315,7 @@ export default function WealthFixScreen() {
             <View
               style={{
                 position: "absolute",
-                top: 28,
+                top: 22,
                 left: 20,
                 right: 20,
                 zIndex: 10,
@@ -266,13 +323,13 @@ export default function WealthFixScreen() {
             >
               <View className="flex-row items-center justify-between mb-1">
                 <View className="flex-row items-center gap-2">
-                  <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-70">
+                  <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-90">
                     Total Savings
                   </Text>
                   {showInterest && (
                     <View
                       style={{
-                        backgroundColor: "#D97706",
+                        backgroundColor: THEME_COLOR,
                         paddingHorizontal: 8,
                         paddingVertical: 2.5,
                         borderRadius: 20,
@@ -296,26 +353,33 @@ export default function WealthFixScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View className="flex-row items-baseline mb-1">
+              <TouchableOpacity
+                onPress={() => router.push("/education/win-up" as any)}
+                activeOpacity={0.8}
+                className="flex-row items-baseline mb-1"
+              >
                 {showBalance ? (
                   <BalanceText
                     amount={`₦${formatAmount(totalBalance.toString())}`}
-                    fontSize={34}
+                    fontSize={31}
                     color="#1A1A1A"
                   />
                 ) : (
-                  <Text className="text-[#1A1A1A] text-[34px] font-extrabold tracking-tight">
+                  <Text className="text-[#1A1A1A] text-[31px] font-extrabold tracking-tight">
                     ***
                   </Text>
                 )}
-              </View>
+                <Text className="text-[#1A1A1A] text-[34px] font-light ml-4 mb-1">
+                  ›
+                </Text>
+              </TouchableOpacity>
 
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
                   <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-80">
                     Your wealth grew by ₦{dailyGrowthFormatted} today
                   </Text>
-                  <ArrowUp size={14} color="#4CAF50" />
+                  <ArrowUp size={14} color="#4CAF50" style={{ marginLeft: 4 }} />
                 </View>
               )}
             </View>
@@ -324,9 +388,9 @@ export default function WealthFixScreen() {
               className="absolute bg-white items-center justify-center"
               style={{
                 width: 190,
-                height: 38,
-                borderRadius: 10,
-                bottom: 15,
+                height: 40,
+                borderRadius: 18,
+                bottom: 16,
                 right: 20,
                 elevation: 3,
                 zIndex: 20,
@@ -334,8 +398,8 @@ export default function WealthFixScreen() {
               onPress={() => router.push("/portfolio/create/fix" as any)}
             >
               <Text
-                style={{ color: "#323232" }}
-                className="font-bold text-[13px]"
+                style={{ color: THEME_COLOR }}
+                className="font-bold text-[14px]"
               >
                 Create a WealthFix
               </Text>
@@ -365,16 +429,16 @@ export default function WealthFixScreen() {
               <View>
                 {[
                   {
-                    title: "Long-term Wealth Building:",
-                    text: "You can now lock funds for up to 1,000 days to secure your future.",
+                    title: `Guaranteed Returns (${fixRateLabel}):`,
+                    text: `Lock your funds and earn dynamic returns up to ${fixRateLabel}.`,
                   },
                   {
-                    title: "Maturity Rewards:",
-                    text: "For all locks over 365 days, your interest or impact growth is paid at maturity.",
+                    title: "Fixed Terms & Rules:",
+                    text: `Minimum target amount is ₦${minTargetNairaFormatted}. Lock durations range from ${minDuration} to ${maxDuration} days.`,
                   },
                   {
-                    title: "Flexible Payouts:",
-                    text: "Choose to receive your returns upfront or at maturity for funds locked between 10 and 365 days.",
+                    title: `Early Liquidation Rule:`,
+                    text: `Early termination attracts an early withdrawal penalty of ${penaltyRate}%.`,
                   },
                 ].map((tip, i) => (
                   <View key={i} className="flex-row mb-3 items-start">
@@ -402,7 +466,7 @@ export default function WealthFixScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingRight: 20 }}
             >
-              {RECOMMENDATIONS.map((cat) => (
+              {dynamicRecommendations.map((cat) => (
                 <TouchableOpacity
                   key={cat.id}
                   onPress={() =>
@@ -481,7 +545,7 @@ export default function WealthFixScreen() {
               onPress={() => setActiveTab("locked")}
               activeOpacity={1}
               style={{
-                width: 182,
+                width: "49%",
                 height: 40,
                 justifyContent: "center",
                 alignItems: "center",
@@ -507,7 +571,7 @@ export default function WealthFixScreen() {
               onPress={() => setActiveTab("unlocked")}
               activeOpacity={1}
               style={{
-                width: 182,
+                width: "49%",
                 height: 40,
                 justifyContent: "center",
                 alignItems: "center",
@@ -532,7 +596,7 @@ export default function WealthFixScreen() {
           </View>
 
           {/* Fix List View */}
-          <View style={{ width: 355, alignSelf: "center" }}>
+          <View style={{ width: "100%" }}>
             {activeTab === "locked"
               ? lockedGoals.length === 0 ? (
                 <View className="items-center justify-center py-20 px-10">
@@ -628,8 +692,8 @@ function FixListItem({ goal, themeColor, isUnlocked }: { goal: Portfolio, themeC
         })
       }
       style={{
-        width: 355,
-        height: 60,
+        width: "100%",
+        minHeight: 60,
         backgroundColor: "white",
         marginBottom: 20,
         flexDirection: "row",
@@ -662,7 +726,10 @@ function FixListItem({ goal, themeColor, isUnlocked }: { goal: Portfolio, themeC
             alignItems: "center",
           }}
         >
-          <Text style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A" }}>
+          <Text
+            style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A", flex: 1, marginRight: 8 }}
+            numberOfLines={1}
+          >
             {goal.name}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center" }}>

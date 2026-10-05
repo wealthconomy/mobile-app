@@ -59,7 +59,13 @@ const authSlice = createSlice({
       state,
       action: PayloadAction<{ user: any; token: string; refreshToken?: string }>
     ) => {
-      state.user = action.payload.user;
+      const u = action.payload.user ? { ...action.payload.user } : null;
+      if (u && !u.firstName && u.name) {
+        const parts = String(u.name).trim().split(" ");
+        u.firstName = parts[0];
+        u.lastName = parts.slice(1).join(" ");
+      }
+      state.user = u;
       state.token = action.payload.token;
       if (action.payload.refreshToken) {
         state.refreshToken = action.payload.refreshToken;

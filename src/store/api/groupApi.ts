@@ -8,6 +8,7 @@ import {
   GroupType,
   SetGroupPositionsRequest,
   UpdateGroupSettingsRequest,
+  UserGroupReportItem,
   WealthGroupModel,
   WithdrawGroupRequest,
 } from "@/src/types/group";
@@ -237,6 +238,7 @@ export const groupApi = baseApi.injectEndpoints({
         method: "POST",
         body: { reason },
       }),
+      invalidatesTags: ["GroupReport"],
     }),
 
     // Add admin (Creator only)
@@ -322,6 +324,44 @@ export const groupApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["WealthGroup"],
     }),
+
+    // Get user's submitted group reports with resolution notes & status
+    getMyGroupReports: builder.query<
+      KeysetPagination<UserGroupReportItem>,
+      { page?: number; limit?: number } | void
+    >({
+      query: (params) => ({
+        url: "/groups/reports/my-reports",
+        params: {
+          page: params?.page || 1,
+          limit: params?.limit || 20,
+        },
+      }),
+      providesTags: ["GroupReport"],
+      transformResponse: (response: any) => {
+        const payload = response?.data || response;
+        let rawItems: UserGroupReportItem[] = [];
+        if (Array.isArray(payload)) {
+          rawItems = payload;
+        } else if (Array.isArray(payload?.items)) {
+          rawItems = payload.items;
+        } else if (Array.isArray(response?.items)) {
+          rawItems = response.items;
+        }
+
+        const total = payload?.total ?? rawItems.length;
+        const page = payload?.page ?? 1;
+        const limit = payload?.limit ?? 20;
+
+        return {
+          items: rawItems,
+          total,
+          page,
+          limit,
+          totalPages: payload?.totalPages ?? Math.ceil(total / limit),
+        } as unknown as KeysetPagination<UserGroupReportItem>;
+      },
+    }),
   }),
   overrideExisting: true,
 });
@@ -351,4 +391,5 @@ export const {
   useSendGroupRemindersMutation,
   useGetSystemConfigsQuery,
   useSetGroupPositionsMutation,
+  useGetMyGroupReportsQuery,
 } = groupApi;

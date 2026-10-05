@@ -231,6 +231,18 @@ function RootLayoutNav() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
+              name="profile/about"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="profile/terms"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="profile/privacy"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
               name="support/reading-list"
               options={{ headerShown: false }}
             />

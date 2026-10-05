@@ -59,16 +59,24 @@ export default function CreateGoalScreen() {
   });
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const goalConfig = rates?.wealthgoal || (rates as any)?.goal;
+  const minGoalKobo = goalConfig?.minTargetAmount ?? goalConfig?.minimumAmount ?? 50000;
+  const minGoalDuration = goalConfig?.minDurationDays ?? goalConfig?.minimumTenureDays ?? 30;
+  const maxGoalDuration = goalConfig?.maxDurationDays ?? goalConfig?.maximumTenureDays ?? 730;
+  const minGoalNaira = minGoalKobo / 100;
+  const minGoalNairaFormatted = minGoalNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const goalInterestRateLabel = getDynamicInterestRateLabel(
     "goal",
     systemConfigData,
-    configData?.rates || (configData as any)?.data?.rates,
+    rates,
     12
   );
   const { penaltyRate } = getDynamicPenaltyRate(
     "goal",
     systemConfigData,
-    configData?.rates || (configData as any)?.data?.rates,
+    rates,
     "3%"
   );
 
@@ -91,18 +99,16 @@ export default function CreateGoalScreen() {
   const [isManual, setIsManual] = useState(false);
   
   // Date State
-  const minDate = new Date();
-  minDate.setDate(minDate.getDate() + 1); // at least tomorrow
   const [endDate, setEndDate] = useState<Date>(() => {
     const d = new Date();
-    d.setFullYear(d.getFullYear() + 1);
+    d.setDate(d.getDate() + minGoalDuration);
     return d;
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [calMode, setCalMode] = useState<"days" | "months" | "years">("days");
   const [calViewDate, setCalViewDate] = useState<Date>(() => {
     const d = new Date();
-    d.setFullYear(d.getFullYear() + 1);
+    d.setDate(d.getDate() + minGoalDuration);
     return d;
   });
 
@@ -169,6 +175,8 @@ export default function CreateGoalScreen() {
     const firstDay = getFirstDayOfMonth(month, year);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const minAllowedDate = new Date(today);
+    minAllowedDate.setDate(minAllowedDate.getDate() + minGoalDuration);
     const dayNames = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
     const days: React.ReactElement[] = [];
 
@@ -179,7 +187,7 @@ export default function CreateGoalScreen() {
     for (let day = 1; day <= daysInMonth; day++) {
       const cellDate = new Date(year, month, day);
       cellDate.setHours(0, 0, 0, 0);
-      const isPast = cellDate <= today;
+      const isPast = cellDate < minAllowedDate;
       const isSelected =
         endDate.getDate() === day &&
         endDate.getMonth() === month &&
@@ -567,9 +575,9 @@ export default function CreateGoalScreen() {
             }}
           />
           {parseFloat(amount.replace(/[^\d.]/g, "")) > 0 &&
-            parseFloat(amount.replace(/[^\d.]/g, "")) < 1000 && (
+            parseFloat(amount.replace(/[^\d.]/g, "")) < minGoalNaira && (
               <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
-                Minimum target goal is ₦1,000.00
+                Minimum target goal is ₦{minGoalNairaFormatted}
               </Text>
             )}
         </View>
@@ -818,32 +826,60 @@ export default function CreateGoalScreen() {
         )}
 
         {/* End Date Picker */}
-        <View>
-          <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
-            Target End Date
-          </Text>
-          <TouchableOpacity
-            onPress={() => {
-              setCalViewDate(new Date(endDate));
-              setShowDatePicker(true);
-            }}
-            activeOpacity={0.7}
-            className="bg-[#F3F4F6] p-4 rounded-xl flex-row justify-between items-center"
-          >
-            <Text className="text-[#1A1A1A] font-medium text-sm">
-              {endDate.toLocaleDateString("en-US", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}
-            </Text>
-            <Ionicons name="calendar-outline" size={20} color="#155D5F" />
-          </TouchableOpacity>
-          <Text className="text-[#9CA3AF] text-[10px] mt-1.5 italic">
-            Note: To earn the full interest, you must meet your target amount
-            and reach this date
-          </Text>
-        </View>
+        {(() => {
+          const nowZero = new Date();
+          nowZero.setHours(0, 0, 0, 0);
+          const endZero = new Date(endDate);
+          endZero.setHours(0, 0, 0, 0);
+          const durationDays = Math.max(1, Math.ceil((endZero.getTime() - nowZero.getTime()) / (1000 * 3600 * 24)));
+          const isBelowMinDuration = durationDays < minGoalDuration;
+          const isAboveMaxDuration = durationDays > maxGoalDuration;
+
+          return (
+            <View>
+              <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
+                Target End Date
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setCalViewDate(new Date(endDate));
+                  setShowDatePicker(true);
+                }}
+                activeOpacity={0.7}
+                className="bg-[#F3F4F6] p-4 rounded-xl flex-row justify-between items-center"
+                style={{
+                  borderWidth: (isBelowMinDuration || isAboveMaxDuration) ? 1 : 0,
+                  borderColor: (isBelowMinDuration || isAboveMaxDuration) ? "#EF4444" : "transparent",
+                }}
+              >
+                <Text className="text-[#1A1A1A] font-medium text-sm">
+                  {endDate.toLocaleDateString("en-US", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })} ({durationDays} days)
+                </Text>
+                <Ionicons name="calendar-outline" size={20} color="#155D5F" />
+              </TouchableOpacity>
+              {isBelowMinDuration && (
+                <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                  Minimum lock duration is {minGoalDuration} days
+                </Text>
+              )}
+              {isAboveMaxDuration && (
+                <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                  Maximum lock duration is {maxGoalDuration} days
+                </Text>
+              )}
+              {!isBelowMinDuration && !isAboveMaxDuration && (
+                <Text className="text-[#9CA3AF] text-[10px] mt-1.5 italic">
+                  Note: To earn the full interest, you must meet your target amount
+                  and reach this date
+                </Text>
+              )}
+            </View>
+          );
+        })()}
       </View>
 
       {/* Custom Calendar Modal */}
@@ -953,13 +989,20 @@ export default function CreateGoalScreen() {
         const targetVal = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
         const autoSaveVal = parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) || 0;
         const manualDepositVal = parseFloat(manualDepositAmount.replace(/[^\d.]/g, "")) || 0;
-        const isTargetValid = targetVal >= 1000;
+        const isTargetValid = targetVal >= minGoalNaira;
+        const nowZero = new Date();
+        nowZero.setHours(0, 0, 0, 0);
+        const endZero = new Date(endDate);
+        endZero.setHours(0, 0, 0, 0);
+        const durationDays = Math.max(1, Math.ceil((endZero.getTime() - nowZero.getTime()) / (1000 * 3600 * 24)));
+        const isDurationValid = durationDays >= minGoalDuration && durationDays <= maxGoalDuration;
         const isAutoSaveValid = !isManual && autoSaveVal >= 100 && autoSaveVal <= targetVal && autoSaveVal <= walletBalanceNaira;
         const isManualDepositValid = isManual && manualDepositVal >= 100 && manualDepositVal <= targetVal && manualDepositVal <= walletBalanceNaira;
         const isFormValid =
           goalName.trim().length > 0 &&
           category.trim().length > 0 &&
           isTargetValid &&
+          isDurationValid &&
           (isManual ? isManualDepositValid : isAutoSaveValid);
         
         return (

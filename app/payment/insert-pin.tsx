@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Header from "@/src/components/common/Header";
 import { TransferSuccessModal } from "@/src/features/payment/components/PaymentModals";
 import {
@@ -7,10 +8,11 @@ import {
 import {
   useTerminatePortfolioMutation,
   useTopUpPortfolioMutation,
-  useWithdrawToWalletMutation,
   useTransferPortfolioFundsMutation,
+  useWithdrawToWalletMutation,
 } from "@/src/store/api/portfolioApi";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
+import { saveSingleCompletedPortfolio } from "@/src/store/slices/completedPortfolioSlice";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -26,9 +28,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useDispatch } from "react-redux";
-import { saveSingleCompletedPortfolio } from "@/src/store/slices/completedPortfolioSlice";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState } from "@/src/store";
 
 const TEAL = "#155D5F";
 const TEXT_DARK = "#1A1A1A";
@@ -60,6 +62,7 @@ export default function InsertPinScreen() {
   }>();
 
   const dispatch = useDispatch();
+  const currentUser = useSelector((state: RootState) => state.auth.user);
   const [pin, setPin] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -115,6 +118,13 @@ export default function InsertPinScreen() {
           id: targetId,
           body: { amount: amountKobo },
         }).unwrap();
+        // TEMPORARY: Store cooldown timestamp keyed to userId+groupId.
+        // Non-authoritative — remove once backend exposes canContributeNow.
+        const uid = currentUser?.id ?? (currentUser as any)?._id ?? "anon";
+        await AsyncStorage.setItem(
+          `deposit_cooldown_${uid}_${targetId}`,
+          Date.now().toString(),
+        );
       } else if (action === "GROUP_WITHDRAW" && targetId) {
         await withdrawFromGroup({
           id: targetId,
@@ -131,10 +141,10 @@ export default function InsertPinScreen() {
           action === "FAM_TOPUP"
             ? "wealthfam"
             : action === "FLOW_TOPUP"
-            ? "wealthflow"
-            : action === "FIX_TOPUP"
-            ? "wealthfix"
-            : "wealthgoal";
+              ? "wealthflow"
+              : action === "FIX_TOPUP"
+                ? "wealthfix"
+                : "wealthgoal";
 
         await topUpPortfolio({
           id: targetId,
@@ -147,16 +157,15 @@ export default function InsertPinScreen() {
           action === "WITHDRAW_TO_WALLET") &&
         targetId
       ) {
-        const portfolioType =
-          action?.includes("FAM")
-            ? "wealthfam"
-            : action?.includes("FLOW")
+        const portfolioType = action?.includes("FAM")
+          ? "wealthfam"
+          : action?.includes("FLOW")
             ? "wealthflow"
             : action?.includes("FIX")
-            ? "wealthfix"
-            : action?.includes("GOAL")
-            ? "wealthgoal"
-            : undefined;
+              ? "wealthfix"
+              : action?.includes("GOAL")
+                ? "wealthgoal"
+                : undefined;
 
         await withdrawToWallet({
           id: targetId,
@@ -176,12 +185,12 @@ export default function InsertPinScreen() {
           action === "FAM_TERMINATE"
             ? "wealthfam"
             : action === "FLOW_TERMINATE"
-            ? "wealthflow"
-            : action === "FIX_TERMINATE"
-            ? "wealthfix"
-            : action === "GOAL_TERMINATE"
-            ? "wealthgoal"
-            : undefined;
+              ? "wealthflow"
+              : action === "FIX_TERMINATE"
+                ? "wealthfix"
+                : action === "GOAL_TERMINATE"
+                  ? "wealthgoal"
+                  : undefined;
 
         await terminatePortfolio({
           id: targetId,
@@ -211,7 +220,11 @@ export default function InsertPinScreen() {
       }
 
       // 3. Save completed/withdrawn/terminated plan to Redux & AsyncStorage (for individual portfolios only, NOT shared groups)
-      if (targetId && action !== "GROUP_WITHDRAW" && (action?.includes("WITHDRAW") || action?.includes("TERMINATE"))) {
+      if (
+        targetId &&
+        action !== "GROUP_WITHDRAW" &&
+        (action?.includes("WITHDRAW") || action?.includes("TERMINATE"))
+      ) {
         dispatch(
           saveSingleCompletedPortfolio({
             id: targetId,
@@ -223,14 +236,14 @@ export default function InsertPinScreen() {
             type: action?.includes("FAM")
               ? "wealthfam"
               : action?.includes("FLOW")
-              ? "wealthflow"
-              : action?.includes("FIX")
-              ? "wealthfix"
-              : "wealthgoal",
+                ? "wealthflow"
+                : action?.includes("FIX")
+                  ? "wealthfix"
+                  : "wealthgoal",
             metadata: {
               category: targetName || "Completed",
             },
-          } as any)
+          } as any),
         );
       }
 
@@ -258,14 +271,16 @@ export default function InsertPinScreen() {
     Alert.alert(
       "Biometric Authentication",
       "Please enter your 4-digit transaction PIN to proceed securely.",
-      [{
-        text: "OK",
-        onPress: () => {
-          if (!isProcessing && !showSuccessModal) {
-            inputRef.current?.focus();
-          }
+      [
+        {
+          text: "OK",
+          onPress: () => {
+            if (!isProcessing && !showSuccessModal) {
+              inputRef.current?.focus();
+            }
+          },
         },
-      }]
+      ],
     );
   };
 
@@ -331,7 +346,11 @@ export default function InsertPinScreen() {
     if (action === "FLOW_TOPUP") {
       return `Enter your transaction PIN to confirm top-up of ₦${formattedAmount} into your ${targetName || "WealthFlow"} savings goal.`;
     }
-    if (action === "FAM_WITHDRAW" || action === "FLOW_WITHDRAW" || action?.endsWith("_WITHDRAW")) {
+    if (
+      action === "FAM_WITHDRAW" ||
+      action === "FLOW_WITHDRAW" ||
+      action?.endsWith("_WITHDRAW")
+    ) {
       return `Enter your transaction PIN to confirm withdrawal of ₦${formattedAmount} from ${targetName || "your plan"} to your wallet.`;
     }
     if (
@@ -561,10 +580,10 @@ export default function InsertPinScreen() {
           action === "GROUP_DEPOSIT"
             ? "Deposit Successful ✅"
             : action?.includes("TOPUP")
-            ? "Top-Up Successful ✅"
-            : action?.includes("TERMINATE")
-            ? "Plan Terminated Successfully ✅"
-            : "Withdrawal Successful ✅"
+              ? "Top-Up Successful ✅"
+              : action?.includes("TERMINATE")
+                ? "Plan Terminated Successfully ✅"
+                : "Withdrawal Successful ✅"
         }
         description={getSuccessDescription()}
       />

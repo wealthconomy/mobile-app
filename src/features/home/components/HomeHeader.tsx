@@ -59,6 +59,15 @@ export const HomeHeader = () => {
     }).length;
   }, [notificationsData]);
 
+  const displayName =
+    user?.firstName
+      ? `${user.firstName} ${user.lastName || ""}`.trim()
+      : user?.name
+      ? user.name
+      : user?.email
+      ? user.email.split("@")[0]
+      : "Wealth Builder";
+
   return (
     <View className="flex-row justify-between items-center mb-5 ml-[10px]">
       {/* Left: Greeting */}
@@ -67,7 +76,7 @@ export const HomeHeader = () => {
           Hello, WealthBuilder!
         </Text>
         <Text className="text-[#323232] text-[20px] font-extrabold tracking-[-0.5px]">
-          {user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : "Wealth Builder"}
+          {displayName}
         </Text>
       </View>
 

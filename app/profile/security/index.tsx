@@ -1,4 +1,4 @@
-﻿import Header from "@/src/components/common/Header";
+import Header from "@/src/components/common/Header";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
@@ -14,15 +14,29 @@ import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useState } from "react";
+import { ActivityIndicator, Alert } from "react-native";
+import { useDispatch } from "react-redux";
+import { useDeleteAccountMutation } from "@/src/store/api/userApi";
+import { logout } from "@/src/store/slices/authSlice";
 
 export default function SecurityScreen() {
   const router = useRouter();
+  const dispatch = useDispatch();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteAccount, { isLoading: isDeleting }] = useDeleteAccountMutation();
 
-  const handleDeleteAccount = () => {
-    // Simulate deletion and navigate to login
-    setShowDeleteModal(false);
-    router.replace("/(auth)/login");
+  const handleDeleteAccount = async () => {
+    try {
+      await deleteAccount().unwrap();
+      setShowDeleteModal(false);
+      dispatch(logout());
+      Alert.alert("Account Deleted", "Your account has been permanently deleted.");
+      router.replace("/(auth)/login");
+    } catch (err: any) {
+      console.error("Failed to delete account:", err);
+      const msg = err?.data?.message || err?.message || "Failed to delete account. Please try again.";
+      Alert.alert("Error", msg);
+    }
   };
 
   return (
@@ -139,12 +153,17 @@ export default function SecurityScreen() {
             <View className="w-full gap-y-3">
               <TouchableOpacity
                 onPress={handleDeleteAccount}
+                disabled={isDeleting}
                 activeOpacity={0.8}
-                className="bg-[#CA1212] py-4 rounded-xl items-center w-full"
+                className={`py-4 rounded-xl items-center w-full ${isDeleting ? "bg-[#CA1212]/60" : "bg-[#CA1212]"}`}
               >
-                <Text className="text-white font-bold text-[16px]">
-                  Yes, Delete Account
-                </Text>
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text className="text-white font-bold text-[16px]">
+                    Yes, Delete Account
+                  </Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity

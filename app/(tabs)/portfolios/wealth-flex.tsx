@@ -1,12 +1,13 @@
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
 import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
-import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
+import { RootState } from "@/src/store";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect, router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ArrowUp, Eye, EyeOff } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -17,9 +18,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSelector } from "react-redux";
-import { RootState } from "@/src/store";
 import Svg, { Path, Rect } from "react-native-svg";
+import { useSelector } from "react-redux";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -59,28 +59,62 @@ const TransferMoneyIcon = () => (
   </Svg>
 );
 
-import {
-  useGetPortfoliosQuery,
-  useGetPortfolioConfigQuery,
-} from "@/src/store/api/portfolioApi";
-import { useGetWalletSummaryQuery, useGetWalletTransactionsQuery } from "@/src/store/api/walletApi";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
+import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
+import {
+  useGetPortfolioConfigQuery,
+  useGetPortfoliosQuery,
+} from "@/src/store/api/portfolioApi";
+import {
+  useGetWalletSummaryQuery,
+  useGetWalletTransactionsQuery,
+} from "@/src/store/api/walletApi";
 import { WalletTransaction } from "@/src/types/wallet";
-import { getCleanTransactionTitle } from "@/src/utils/formatters";
+import {
+  getCleanTransactionTitle,
+  getDynamicInterestRateLabel,
+} from "@/src/utils/formatters";
 
 export default function WealthFlexScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [showTips, setShowTips] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
-  const { data: walletData, refetch: refetchWallet } = useGetWalletSummaryQuery();
-  const { data, isLoading: loading, refetch: refetchFlex } = useGetPortfoliosQuery({ type: "wealthflex", limit: 1 });
+
+  const { data: walletData, refetch: refetchWallet } =
+    useGetWalletSummaryQuery();
+  const {
+    data,
+    isLoading: loading,
+    refetch: refetchFlex,
+  } = useGetPortfoliosQuery({ type: "wealthflex", limit: 1 });
   const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const flexRateLabel = rates?.wealthflex?.label || "5% P.A.";
+  const flexRateLabel = getDynamicInterestRateLabel(
+    "flex",
+    systemConfigData,
+    rates,
+    5,
+  );
+  const flexConfig = rates?.wealthflex || (rates as any)?.flex;
+  const minDepositKobo =
+    flexConfig?.minDeposit ?? flexConfig?.minimumAmount ?? 10000;
+  const maxDepositKobo =
+    flexConfig?.maxDeposit ?? flexConfig?.maximumAmount ?? 500000000;
+  const minDepositNaira = (minDepositKobo / 100).toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const maxDepositNaira = (maxDepositKobo / 100).toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
   const flexPortfolio = data?.items?.[0];
 
-  const { data: txData, refetch: refetchTx } = useGetWalletTransactionsQuery({ limit: 3 });
+  const { data: txData, refetch: refetchTx } = useGetWalletTransactionsQuery({
+    limit: 3,
+  });
   const transactions = txData?.items || [];
 
   const handleRefresh = async () => {
@@ -97,8 +131,12 @@ export default function WealthFlexScreen() {
       refetchFlex();
       refetchWallet();
       refetchTx();
-    }, [refetchFlex, refetchWallet, refetchTx])
+    }, [refetchFlex, refetchWallet, refetchTx]),
   );
+
+  const handleBack = () => {
+    router.replace("/(tabs)/portfolios" as any);
+  };
 
   const formatAmount = (val?: string) => {
     if (!val) return "0.00";
@@ -112,12 +150,15 @@ export default function WealthFlexScreen() {
     flexPortfolio?.dailyGrowth
       ? parseFloat(flexPortfolio.dailyGrowth.toString()) / 100
       : walletData?.dailyGrowth
-      ? parseFloat(walletData.dailyGrowth.toString()) / 100
-      : 0
-  ).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  
+        ? parseFloat(walletData.dailyGrowth.toString()) / 100
+        : 0
+  ).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
   const portfolioPreference = useSelector(
-    (state: RootState) => state.portfolioPreference.flex
+    (state: RootState) => state.portfolioPreference.flex,
   );
   const showInterest = portfolioPreference !== "Impact Wealth";
 
@@ -127,7 +168,7 @@ export default function WealthFlexScreen() {
         <StatusBar style="dark" />
         <Header
           title="WealthFlex"
-          onBack={() => router.back()}
+          onBack={handleBack}
           rightElement={<PortfolioPreferenceMenu portfolioType="flex" />}
         />
         <PortfolioDetailSkeleton />
@@ -140,7 +181,7 @@ export default function WealthFlexScreen() {
       <StatusBar style="dark" />
       <Header
         title="WealthFlex"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="flex" />}
       />
 
@@ -149,7 +190,11 @@ export default function WealthFlexScreen() {
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 100 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 10,
+          paddingBottom: 100,
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -166,12 +211,12 @@ export default function WealthFlexScreen() {
           style={{
             width: "100%",
             maxWidth: 365,
-            height: 170,
+            height: 190,
             borderTopLeftRadius: 50,
             borderTopRightRadius: 20,
             borderBottomRightRadius: 50,
             borderBottomLeftRadius: 20,
-            backgroundColor: "#F4433633", // Red with 20% opacity
+            backgroundColor: "#FFF0EF",
             shadowColor: "#323232",
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.12,
@@ -200,11 +245,11 @@ export default function WealthFlexScreen() {
             />
           </View>
 
-          {/* Text Container - Restored absolute positioning */}
+          {/* Text Container */}
           <View
             style={{
               position: "absolute",
-              top: 28,
+              top: 22,
               left: 20,
               right: 20,
               zIndex: 10,
@@ -224,7 +269,13 @@ export default function WealthFlexScreen() {
                       borderRadius: 20,
                     }}
                   >
-                    <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                    <Text
+                      style={{
+                        color: "#FFFFFF",
+                        fontWeight: "700",
+                        fontSize: 9,
+                      }}
+                    >
                       {flexRateLabel}
                     </Text>
                   </View>
@@ -243,25 +294,56 @@ export default function WealthFlexScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Amount Section */}
-            <View className="mb-2">
+            {/* Amount Section with Chevron */}
+            <TouchableOpacity
+              onPress={() => router.push("/education/win-up" as any)}
+              activeOpacity={0.8}
+              className="flex-row items-baseline mb-1"
+            >
               {showBalance ? (
-                <BalanceText amount={amount} fontSize={32} color="#1A1A1A" />
+                <BalanceText amount={amount} fontSize={31} color="#1A1A1A" />
               ) : (
-                <Text className="text-[#1A1A1A] text-[32px] font-extrabold tracking-tight">
+                <Text className="text-[#1A1A1A] text-[31px] font-extrabold tracking-tight">
                   ***
                 </Text>
               )}
-              {showInterest && (
-              <View className="flex-row items-center space-x-1 mt-1">
-                <Text className="text-[#64748B] text-[13px] font-medium opacity-80">
+              <Text className="text-[#1A1A1A] text-[34px] font-light ml-4 mb-1">
+                ›
+              </Text>
+            </TouchableOpacity>
+
+            {showInterest && (
+              <View className="flex-row items-center space-x-1">
+                <Text className="text-[#64748B] text-[12px] font-medium opacity-80">
                   Your wealth grew by ₦{dailyGrowthFormatted} today
                 </Text>
                 <ArrowUp size={14} color="#4CAF50" style={{ marginLeft: 4 }} />
               </View>
-              )}
-            </View>
+            )}
           </View>
+
+          <TouchableOpacity
+            className="absolute bg-white items-center justify-center"
+            style={{
+              width: 170,
+              height: 40,
+              borderRadius: 18,
+              bottom: 16,
+              right: 20,
+              elevation: 3,
+              zIndex: 20,
+            }}
+            onPress={() =>
+              router.push({
+                pathname: "/wallet/deposit",
+                params: { plan: "WealthFlex" },
+              })
+            }
+          >
+            <Text className="text-[#F44336] font-bold text-[14px]">
+              Wealth Deposit
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Whats on wealthflex card (Tips Box) */}
@@ -299,14 +381,29 @@ export default function WealthFlexScreen() {
                 </Text>
               </View>
 
-              <View className="flex-row items-start">
+              <View className="flex-row mb-3 items-start">
                 <Text className="mr-2 text-[10px]">👉</Text>
                 <Text
                   className="text-[10px] flex-1 leading-[15px]"
                   style={{ color: "#F44336" }}
                 >
                   <Text className="font-bold">Instant Impact:</Text> Watch your
-                  funds reflect in seconds and start growing immediately.
+                  funds reflect in seconds and start growing immediately at{" "}
+                  <Text className="font-bold">{flexRateLabel}</Text>.
+                </Text>
+              </View>
+
+              <View className="flex-row items-start">
+                <Text className="mr-2 text-[10px]">👉</Text>
+                <Text
+                  className="text-[10px] flex-1 leading-[15px]"
+                  style={{ color: "#F44336" }}
+                >
+                  <Text className="font-bold">Deposit Limits:</Text> Minimum
+                  deposit is{" "}
+                  <Text className="font-bold">₦{minDepositNaira}</Text> and
+                  maximum is{" "}
+                  <Text className="font-bold">₦{maxDepositNaira}</Text>.
                 </Text>
               </View>
             </View>
@@ -385,7 +482,7 @@ export default function WealthFlexScreen() {
                 Withdraw Funds
               </Text>
               <Text className="text-[10px] mt-2" style={{ color: "#F06358" }}>
-                {"Move or send to other\nportfolios"}
+                {"Move or send to your\ntraditional bank"}
               </Text>
             </View>
           </TouchableOpacity>
@@ -419,9 +516,13 @@ export default function WealthFlexScreen() {
             }}
           >
             {transactions.length === 0 ? (
-              <Text className="text-center text-gray-500 py-4">No transactions found</Text>
+              <Text className="text-center text-gray-500 py-4">
+                No transactions found
+              </Text>
             ) : (
-              transactions.map((tx) => <TransactionItem key={tx.id} item={tx} />)
+              transactions.map((tx) => (
+                <TransactionItem key={tx.id} item={tx} />
+              ))
             )}
           </View>
         </View>
@@ -435,9 +536,12 @@ function TransactionItem({ item }: { item: WalletTransaction }) {
 
   const getIcon = () => {
     switch (item.reason) {
-      case "WALLET_TOPUP": return <CardDepositIcon />;
-      case "WITHDRAWAL": return <TransferMoneyIcon />;
-      default: return isCredit ? <ReceivedMoneyIcon /> : <TransferMoneyIcon />;
+      case "WALLET_TOPUP":
+        return <CardDepositIcon />;
+      case "WITHDRAWAL":
+        return <TransferMoneyIcon />;
+      default:
+        return isCredit ? <ReceivedMoneyIcon /> : <TransferMoneyIcon />;
     }
   };
 
@@ -458,7 +562,7 @@ function TransactionItem({ item }: { item: WalletTransaction }) {
   const formattedDate = new Date(item.createdAt).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric"
+    year: "numeric",
   });
 
   const getTitle = () => {
@@ -477,7 +581,12 @@ function TransactionItem({ item }: { item: WalletTransaction }) {
         alignItems: "center",
       }}
       activeOpacity={0.9}
-      onPress={() => router.push({ pathname: "/transactions/detail", params: { id: item.id } } as any)}
+      onPress={() =>
+        router.push({
+          pathname: "/transactions/detail",
+          params: { id: item.id },
+        } as any)
+      }
     >
       <View
         className={`w-11 h-11 items-center justify-center mr-3 ${getIconBg()} rounded-full`}
@@ -491,7 +600,9 @@ function TransactionItem({ item }: { item: WalletTransaction }) {
         >
           {getTitle()}
         </Text>
-        <Text className="text-[#9CA3AF] text-[10px] font-medium">{formattedDate}</Text>
+        <Text className="text-[#9CA3AF] text-[10px] font-medium">
+          {formattedDate}
+        </Text>
       </View>
       <View className="items-end">
         <Text

@@ -75,18 +75,6 @@ export default function FixDetailScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const { penaltyRate, penaltyRatio } = getDynamicPenaltyRate(
-    "fix",
-    systemConfigData,
-    rates,
-    "2.5%"
-  );
-  const fixInterestRateLabel = getDynamicInterestRateLabel(
-    "fix",
-    systemConfigData,
-    rates,
-    15
-  );
   const { data: txnsData, isLoading: txnsLoading, refetch: refetchTxns } = useGetPortfolioTransactionsQuery(
     { id: id as string },
     { skip: !id, refetchOnMountOrArgChange: true }
@@ -112,6 +100,21 @@ export default function FixDetailScreen() {
     lastFixRef.current = fetchedFix;
   }
   const fix = fetchedFix || savedCompletedPlan || lastFixRef.current;
+
+  const { penaltyRate, penaltyRatio } = getDynamicPenaltyRate(
+    "fix",
+    systemConfigData,
+    rates,
+    "2.5%",
+    fix
+  );
+  const fixInterestRateLabel = getDynamicInterestRateLabel(
+    "fix",
+    systemConfigData,
+    rates,
+    15,
+    fix
+  );
 
   const isTransferredOrWithdrawnInTxns = Boolean(
     txnsData?.items?.some((t) => {
@@ -596,9 +599,7 @@ export default function FixDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Interest Rate</Text>
-                <Text style={styles.value}>
-                  {fix.interestRate ? `${fix.interestRate}% P.A` : fixInterestRateLabel}
-                </Text>
+                <Text style={styles.value}>{fixInterestRateLabel}</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Funding Source:</Text>

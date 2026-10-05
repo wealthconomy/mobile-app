@@ -80,7 +80,11 @@ export default function HomeScreen() {
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 16,
+          paddingBottom: 40,
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -117,28 +121,9 @@ export default function HomeScreen() {
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                className="-mx-5 px-5"
+                className="-mx-5"
+                contentContainerStyle={{ paddingHorizontal: 20 }}
               >
-                <View className="mr-4">
-                  <PortfolioCard
-                    width={179}
-                    type="goal"
-                    title="WealthGoal"
-                    description="Save with focus and smash every target."
-                    interestRate={getRateLabel("goal")}
-                    hideInterest={preferences["goal"] === "Impact Wealth"}
-                  />
-                </View>
-                <View className="mr-4">
-                  <PortfolioCard
-                    width={179}
-                    type="flow"
-                    title="WealthFlow"
-                    description="Automated savings for a continuous wealth flow."
-                    interestRate={getRateLabel("flow")}
-                    hideInterest={preferences["flow"] === "Impact Wealth"}
-                  />
-                </View>
                 <View className="mr-4">
                   <PortfolioCard
                     width={179}
@@ -152,6 +137,27 @@ export default function HomeScreen() {
                 <View className="mr-4">
                   <PortfolioCard
                     width={179}
+                    type="fam"
+                    title="WealthFam"
+                    description="Build a wealthy family; save for kids, spouse, and loved ones."
+                    interestRate={getRateLabel("fam")}
+                    hideInterest={preferences["fam"] === "Impact Wealth"}
+                  />
+                </View>
+                <View className="mr-4">
+                  <PortfolioCard
+                    width={179}
+                    type="goal"
+                    title="WealthGoal"
+                    description="Save with focus and smash every target."
+                    interestRate={getRateLabel("goal")}
+                    hideInterest={preferences["goal"] === "Impact Wealth"}
+                  />
+                </View>
+
+                <View className="mr-4">
+                  <PortfolioCard
+                    width={179}
                     type="fix"
                     title="WealthFix"
                     description="Lock it in, block temptation, and watch your money grow."
@@ -162,14 +168,14 @@ export default function HomeScreen() {
                 <View className="mr-4">
                   <PortfolioCard
                     width={179}
-                    type="fam"
-                    title="WealthFam"
-                    description="Build a wealthy family; save for kids, spouse, and loved ones."
-                    interestRate={getRateLabel("fam")}
-                    hideInterest={preferences["fam"] === "Impact Wealth"}
+                    type="flow"
+                    title="WealthFlow"
+                    description="Automated savings for a continuous wealth flow."
+                    interestRate={getRateLabel("flow")}
+                    hideInterest={preferences["flow"] === "Impact Wealth"}
                   />
                 </View>
-                <View className="mr-4">
+                <View>
                   <PortfolioCard
                     width={179}
                     type="group"

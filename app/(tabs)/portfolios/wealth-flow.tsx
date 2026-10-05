@@ -108,6 +108,18 @@ export default function WealthFlowScreen() {
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
   const flowRateLabel = getDynamicInterestRateLabel("flow", systemConfigData, rates, 10);
+
+  const flowConfig = rates?.wealthflow || (rates as any)?.flow;
+  const minFlowKobo = flowConfig?.minTargetAmount ?? flowConfig?.minimumAmount ?? 50000;
+  const minFlowDuration = flowConfig?.minDurationDays ?? flowConfig?.minimumTenureDays ?? 30;
+  const maxFlowDuration = flowConfig?.maxDurationDays ?? flowConfig?.maximumTenureDays ?? 365;
+  const flowPenaltyRate = flowConfig?.earlyLiquidationPenaltyRate ?? flowConfig?.earlyWithdrawalPenaltyPercentage ?? 2;
+  const minFlowNairaFormatted = (minFlowKobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const handleBack = () => {
+    router.replace("/(tabs)/portfolios" as any);
+  };
+
   const allGoals = data?.items || [];
 
   const handleRefresh = async () => {
@@ -185,7 +197,7 @@ export default function WealthFlowScreen() {
         <StatusBar style="dark" />
         <Header
           title="WealthFlow"
-          onBack={() => router.back()}
+          onBack={handleBack}
           rightElement={<PortfolioPreferenceMenu portfolioType="flow" />}
         />
         <PortfolioDetailSkeleton />
@@ -198,7 +210,7 @@ export default function WealthFlowScreen() {
       <StatusBar style="dark" />
       <Header
         title="WealthFlow"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="flow" />}
       />
 
@@ -224,7 +236,7 @@ export default function WealthFlowScreen() {
             style={{
               width: "100%",
               maxWidth: 365,
-              height: 170,
+              height: 190,
               borderTopLeftRadius: 50,
               borderTopRightRadius: 20,
               borderBottomRightRadius: 50,
@@ -259,7 +271,7 @@ export default function WealthFlowScreen() {
             </View>
 
             <View
-              style={{ position: "absolute", top: 25, left: 20, right: 20, zIndex: 10 }}
+              style={{ position: "absolute", top: 22, left: 20, right: 20, zIndex: 10 }}
             >
               <View
                 className="flex-row items-center justify-between mb-1"
@@ -296,7 +308,11 @@ export default function WealthFlowScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View className="flex-row items-baseline mb-1">
+              <TouchableOpacity
+                onPress={() => router.push("/education/win-up" as any)}
+                activeOpacity={0.8}
+                className="flex-row items-baseline mb-1"
+              >
                 {showBalance ? (
                   <BalanceText
                     amount={`₦${formatAmount(totalBalance.toString())}`}
@@ -308,14 +324,17 @@ export default function WealthFlowScreen() {
                     ***
                   </Text>
                 )}
-              </View>
+                <Text className="text-[#1A1A1A] text-[34px] font-light ml-4 mb-1">
+                  ›
+                </Text>
+              </TouchableOpacity>
 
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
                   <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-70">
                     Your wealth grew to ₦0.00 today
                   </Text>
-                  <ArrowUp size={14} color="#4CAF50" />
+                  <ArrowUp size={14} color="#4CAF50" style={{ marginLeft: 4 }} />
                 </View>
               )}
             </View>
@@ -326,7 +345,7 @@ export default function WealthFlowScreen() {
                 width: 160,
                 height: 40,
                 borderRadius: 18,
-                bottom: 20,
+                bottom: 16,
                 right: 20,
                 elevation: 3,
                 zIndex: 20,
@@ -357,19 +376,32 @@ export default function WealthFlowScreen() {
               >
                 What's on WealthFlow? 🚀
               </Text>
-              <Text
-                className="text-[10px] leading-[15px] mb-4"
-                style={{ color: THEME }}
-              >
-                To make saving effortless and consistent,{" "}
-                <Text className="font-bold">Wealth Flow</Text> allows you to put
-                your{" "}
-                <Text className="font-bold">wealth-building on autopilot.</Text>{" "}
-                It is designed to{" "}
-                <Text className="font-bold">remove the "decision fatigue"</Text>{" "}
-                of saving manually, ensuring you stay disciplined without having
-                to remember.
-              </Text>
+              <View>
+                {[
+                  {
+                    title: `Autopilot Wealth (${flowRateLabel}):`,
+                    text: `Put your wealth-building on autopilot and earn up to ${flowRateLabel} interest.`,
+                  },
+                  {
+                    title: "Flow Limits & Rules:",
+                    text: `Minimum target amount is ₦${minFlowNairaFormatted}. Lock duration ranges from ${minFlowDuration} to ${maxFlowDuration} days.`,
+                  },
+                  {
+                    title: "Early Liquidation Rule:",
+                    text: `Breaking a WealthFlow plan early attracts an early withdrawal penalty of ${flowPenaltyRate}%.`,
+                  },
+                ].map((tip, i) => (
+                  <View key={i} className="flex-row mb-3 items-start">
+                    <Text className="mr-2 text-[10px]">🚀</Text>
+                    <Text
+                      className="text-[10px] flex-1 leading-[15px]"
+                      style={{ color: THEME }}
+                    >
+                      <Text className="font-bold">{tip.title}</Text> {tip.text}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
           )}
 
@@ -647,7 +679,7 @@ function AutoListItem({
 
       <View className="flex-1">
         <View className="flex-row justify-between items-center mb-1">
-          <Text className="text-[14px] font-bold text-[#1A1A1A]">
+          <Text className="text-[14px] font-bold text-[#1A1A1A] flex-1 mr-2" numberOfLines={1}>
             {plan.name}
           </Text>
           <Text className="text-[14px] font-bold text-[#1A1A1A]">

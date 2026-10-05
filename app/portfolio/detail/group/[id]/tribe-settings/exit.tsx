@@ -1,6 +1,8 @@
-﻿import Header from "@/src/components/common/Header";
+import Header from "@/src/components/common/Header";
 import { AppToast, ToastState } from "@/src/components/common/AppToast";
-import { useExitGroupMutation, useGetGroupDetailsQuery } from "@/src/store/api/groupApi";
+import { useExitGroupMutation, useGetGroupDetailsQuery, useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
+import { useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
+import { getDynamicPenaltyRate } from "@/src/utils/formatters";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
@@ -30,6 +32,16 @@ export default function ExitGroupScreen() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [exitGroup, { isLoading: isExiting }] = useExitGroupMutation();
   const { data: group } = useGetGroupDetailsQuery(id as string, { skip: !id });
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const { penaltyRate: groupPenaltyRate } = getDynamicPenaltyRate(
+    "group",
+    systemConfigData,
+    rates,
+    "2.5%",
+    group
+  );
 
   const handleConfirmExit = async () => {
     try {
@@ -125,7 +137,7 @@ export default function ExitGroupScreen() {
                 </Text>
               </View>
               <Text style={{ color: "#78350F", fontSize: 12, lineHeight: 18 }}>
-                A <Text style={{ fontWeight: "700" }}>5% penalty</Text> will be deducted from your accumulated savings for exiting early. The remaining balance will be credited directly to your Main Wallet.
+                A <Text style={{ fontWeight: "700" }}>{groupPenaltyRate} penalty</Text> will be deducted from your accumulated savings for exiting early. The remaining balance will be credited directly to your Main Wallet.
               </Text>
             </View>
           )}
@@ -198,8 +210,8 @@ export default function ExitGroupScreen() {
                     lineHeight: 18,
                   }}
                 >
-                  {(group as any)?.penaltySetting === "IMMEDIATE_5"
-                    ? "Are you sure you want to leave this tribe? A 5% penalty will be deducted from your accumulated savings before your refund is credited to your Main Wallet."
+                  {(group as any)?.penaltySetting === "IMMEDIATE_5" || (group as any)?.penaltySetting?.includes("IMMEDIATE")
+                    ? `Are you sure you want to leave this tribe? A ${groupPenaltyRate} penalty will be deducted from your accumulated savings before your refund is credited to your Main Wallet.`
                     : "Are you sure you want to leave this tribe? Your accumulated savings will be refunded directly into your Main Wallet immediately."}
                 </Text>
 
@@ -228,7 +240,7 @@ export default function ExitGroupScreen() {
                         lineHeight: 18,
                       }}
                     >
-                      A <Text style={{ fontWeight: "800" }}>5% early exit penalty</Text> will be deducted from your accumulated savings. The remaining balance will be sent to your Main Wallet.
+                      A <Text style={{ fontWeight: "800" }}>{groupPenaltyRate} early exit penalty</Text> will be deducted from your accumulated savings. The remaining balance will be sent to your Main Wallet.
                     </Text>
                   </View>
                 ) : (

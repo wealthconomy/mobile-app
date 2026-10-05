@@ -1,18 +1,18 @@
 import {
-  useGetLibraryItemQuery,
-  useRecordDownloadMutation,
   useAddLibraryCommentMutation,
   useAddLibraryLikeMutation,
+  useGetLibraryItemQuery,
+  useRecordDownloadMutation,
   useRemoveLibraryLikeMutation,
 } from "@/src/store/api/libraryApi";
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
-import { StatusBar } from "expo-status-bar";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import React, { useState, useEffect } from "react";
+import { StatusBar } from "expo-status-bar";
+import * as WebBrowser from "expo-web-browser";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -48,11 +48,16 @@ export default function LibraryMaterialDetailScreen() {
   const [likesCount, setLikesCount] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const { data: response, isLoading, refetch } = useGetLibraryItemQuery(id as string, { skip: !id });
+  const {
+    data: response,
+    isLoading,
+    refetch,
+  } = useGetLibraryItemQuery(id as string, { skip: !id });
   const material = response?.data;
 
   const [recordDownload] = useRecordDownloadMutation();
-  const [addLibraryComment, { isLoading: isCommenting }] = useAddLibraryCommentMutation();
+  const [addLibraryComment, { isLoading: isCommenting }] =
+    useAddLibraryCommentMutation();
   const [addLibraryLike] = useAddLibraryLikeMutation();
   const [removeLibraryLike] = useRemoveLibraryLikeMutation();
 
@@ -74,7 +79,7 @@ export default function LibraryMaterialDetailScreen() {
         await addLibraryLike(id as string).unwrap();
         try {
           const { sound } = await Audio.Sound.createAsync(
-            require("../../assets/like.mp3")
+            require("../../assets/like.mp3"),
           );
           await sound.playAsync();
           sound.setOnPlaybackStatusUpdate(async (status) => {
@@ -96,15 +101,24 @@ export default function LibraryMaterialDetailScreen() {
   const handleCommentSubmit = async () => {
     if (!id || !newComment.trim()) return;
     try {
-      await addLibraryComment({ id: id as string, content: newComment.trim() }).unwrap();
+      await addLibraryComment({
+        id: id as string,
+        content: newComment.trim(),
+      }).unwrap();
       setNewComment("");
       refetch();
     } catch (error: any) {
       const status = error?.status;
       if (status === 404 || status === 405) {
-        Alert.alert("Not Available", "Comments are not yet supported. Please check back later.");
+        Alert.alert(
+          "Not Available",
+          "Comments are not yet supported. Please check back later.",
+        );
       } else {
-        Alert.alert("Error", error?.data?.message || "Failed to add comment. Please try again.");
+        Alert.alert(
+          "Error",
+          error?.data?.message || "Failed to add comment. Please try again.",
+        );
       }
     }
   };
@@ -122,11 +136,16 @@ export default function LibraryMaterialDetailScreen() {
     if (!material?.documentUrl) return;
     setIsDownloading(true);
     try {
-      const ext = material.fileType ? `.${material.fileType.toLowerCase()}` : ".pdf";
+      const ext = material.fileType
+        ? `.${material.fileType.toLowerCase()}`
+        : ".pdf";
       const fileName = material.title.replace(/[^a-z0-9]/gi, "_") + ext;
       const fileUri = FileSystem.documentDirectory + fileName;
 
-      const downloadResult = await FileSystem.downloadAsync(material.documentUrl, fileUri);
+      const downloadResult = await FileSystem.downloadAsync(
+        material.documentUrl,
+        fileUri,
+      );
 
       if (downloadResult.status === 200) {
         recordDownload(id as string);
@@ -137,14 +156,23 @@ export default function LibraryMaterialDetailScreen() {
             dialogTitle: `Open ${material.title}`,
           });
         } else {
-          Alert.alert("Downloaded", `"${material.title}" saved to your device.`);
+          Alert.alert(
+            "Downloaded",
+            `"${material.title}" saved to your device.`,
+          );
         }
       } else {
-        Alert.alert("Download Failed", "Could not download the file. Please try again.");
+        Alert.alert(
+          "Download Failed",
+          "Could not download the file. Please try again.",
+        );
       }
     } catch (error) {
       console.error("Download error:", error);
-      Alert.alert("Download Failed", "Something went wrong. Please check your connection and try again.");
+      Alert.alert(
+        "Download Failed",
+        "Something went wrong. Please check your connection and try again.",
+      );
     } finally {
       setIsDownloading(false);
     }
@@ -161,7 +189,10 @@ export default function LibraryMaterialDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={{ flex: 1 }} className="bg-white justify-center items-center">
+      <SafeAreaView
+        style={{ flex: 1 }}
+        className="bg-white justify-center items-center"
+      >
         <ActivityIndicator size="large" color="#155D5F" />
       </SafeAreaView>
     );
@@ -169,7 +200,10 @@ export default function LibraryMaterialDetailScreen() {
 
   if (!material) {
     return (
-      <SafeAreaView style={{ flex: 1 }} className="bg-white justify-center items-center px-5">
+      <SafeAreaView
+        style={{ flex: 1 }}
+        className="bg-white justify-center items-center px-5"
+      >
         <Ionicons name="alert-circle-outline" size={48} color="#D1D5DB" />
         <Text className="text-gray-500 mt-4 text-center">
           Material not found or has been removed.
@@ -184,7 +218,9 @@ export default function LibraryMaterialDetailScreen() {
     );
   }
 
-  const dateDisplay = formatDate(material.createdAt || material.timePosted || material.timeAgo);
+  const dateDisplay = formatDate(
+    material.createdAt || material.timePosted || material.timeAgo,
+  );
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
@@ -193,10 +229,15 @@ export default function LibraryMaterialDetailScreen() {
 
       {/* Header */}
       <View className="px-5 py-4 flex-row items-center justify-between border-b border-gray-100">
-        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 rounded-full bg-gray-50">
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="p-2 -ml-2 rounded-full bg-gray-50"
+        >
           <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
         </TouchableOpacity>
-        <Text className="text-lg font-bold text-gray-900">Material Details</Text>
+        <Text className="text-lg font-bold text-gray-900">
+          Material Details
+        </Text>
         <View className="w-10" />
       </View>
 
@@ -230,7 +271,9 @@ export default function LibraryMaterialDetailScreen() {
               <Text className="text-gray-500 text-sm">
                 By {material.author}
                 {dateDisplay ? ` • ${dateDisplay}` : ""}
-                {material.readingDuration ? ` • ${material.readingDuration}` : ""}
+                {material.readingDuration
+                  ? ` • ${material.readingDuration}`
+                  : ""}
               </Text>
             </View>
 
@@ -246,7 +289,9 @@ export default function LibraryMaterialDetailScreen() {
                   className="flex-1 bg-red-500 py-3.5 rounded-xl flex-row items-center justify-center"
                 >
                   <Ionicons name="logo-youtube" size={22} color="#FFFFFF" />
-                  <Text className="text-white font-bold ml-2 text-base">Watch on YouTube</Text>
+                  <Text className="text-white font-bold ml-2 text-base">
+                    Watch on YouTube
+                  </Text>
                 </TouchableOpacity>
               ) : (
                 <>
@@ -255,7 +300,9 @@ export default function LibraryMaterialDetailScreen() {
                     className="flex-1 bg-[#155D5F] py-3.5 rounded-xl flex-row items-center justify-center mr-3"
                   >
                     <Ionicons name="book-outline" size={20} color="#FFFFFF" />
-                    <Text className="text-white font-bold ml-2">Read in App</Text>
+                    <Text className="text-white font-bold ml-2">
+                      Read in App
+                    </Text>
                   </TouchableOpacity>
 
                   {material.isDownloadable && (
@@ -268,7 +315,11 @@ export default function LibraryMaterialDetailScreen() {
                       {isDownloading ? (
                         <ActivityIndicator size="small" color="#155D5F" />
                       ) : (
-                        <Ionicons name="download-outline" size={20} color="#155D5F" />
+                        <Ionicons
+                          name="download-outline"
+                          size={20}
+                          color="#155D5F"
+                        />
                       )}
                       <Text className="text-[#155D5F] font-bold ml-2">
                         {isDownloading ? "Downloading..." : "Download"}
@@ -283,47 +334,88 @@ export default function LibraryMaterialDetailScreen() {
             {material.contentType === "document" && (
               <>
                 <View className="flex-row items-center justify-between border-y border-gray-100 py-4 mb-6">
-                  <TouchableOpacity onPress={handleLike} className="flex-row items-center bg-gray-50 px-4 py-2 rounded-full">
-                    <Ionicons name={isLiked ? "heart" : "heart-outline"} size={20} color={isLiked ? "#EF4444" : "#155D5F"} />
-                    <Text className="text-gray-700 font-bold ml-2">{likesCount}</Text>
+                  <TouchableOpacity
+                    onPress={handleLike}
+                    className="flex-row items-center bg-gray-50 px-4 py-2 rounded-full"
+                  >
+                    <Ionicons
+                      name={isLiked ? "heart" : "heart-outline"}
+                      size={20}
+                      color={isLiked ? "#EF4444" : "#155D5F"}
+                    />
+                    <Text className="text-gray-700 font-bold ml-2">
+                      {likesCount}
+                    </Text>
                   </TouchableOpacity>
 
                   {material.isDownloadable && (
                     <View className="flex-row items-center px-4 py-2">
-                      <Ionicons name="download-outline" size={20} color="#9CA3AF" />
-                      <Text className="text-gray-500 font-bold ml-2">{material.downloadsCount || 0}</Text>
+                      <Ionicons
+                        name="download-outline"
+                        size={20}
+                        color="#9CA3AF"
+                      />
+                      <Text className="text-gray-500 font-bold ml-2">
+                        {material.downloadsCount || 0}
+                      </Text>
                     </View>
                   )}
 
                   <View className="flex-row items-center px-4 py-2">
-                    <Ionicons name="chatbubble-outline" size={20} color="#9CA3AF" />
-                    <Text className="text-gray-500 font-bold ml-2">{material.commentsCount} Comments</Text>
+                    <Ionicons
+                      name="chatbubble-outline"
+                      size={20}
+                      color="#9CA3AF"
+                    />
+                    <Text className="text-gray-500 font-bold ml-2">
+                      {material.commentsCount} Comments
+                    </Text>
                   </View>
                 </View>
 
-                <Text className="text-lg font-bold text-gray-900 mb-4">Comments</Text>
+                <Text className="text-lg font-bold text-gray-900 mb-4">
+                  Comments
+                </Text>
                 {material.comments && material.comments.length > 0 ? (
                   material.comments.map((comment) => (
                     <View key={comment.id} className="mb-5 flex-row">
                       <Image
-                        source={{ uri: comment.userImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.userName)}&background=155D5F&color=fff` }}
+                        source={{
+                          uri:
+                            comment.userImage ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.userName)}&background=155D5F&color=fff`,
+                        }}
                         className="w-10 h-10 rounded-full bg-gray-200 mr-3 mt-1"
                       />
                       <View className="flex-1 bg-gray-50 rounded-2xl p-4">
                         <View className="flex-row items-center justify-between mb-1">
-                          <Text className="font-bold text-gray-900">{comment.userName}</Text>
+                          <Text className="font-bold text-gray-900">
+                            {comment.userName}
+                          </Text>
                           <Text className="text-xs text-gray-400">
-                            {formatDate(comment.createdAt || comment.timePosted || comment.timeAgo)}
+                            {formatDate(
+                              comment.createdAt ||
+                                comment.timePosted ||
+                                comment.timeAgo,
+                            )}
                           </Text>
                         </View>
-                        <Text className="text-gray-600 text-sm leading-relaxed">{comment.content || comment.text}</Text>
+                        <Text className="text-gray-600 text-sm leading-relaxed">
+                          {comment.content || comment.text}
+                        </Text>
                       </View>
                     </View>
                   ))
                 ) : (
                   <View className="items-center justify-center py-8">
-                    <Ionicons name="chatbubbles-outline" size={40} color="#E5E7EB" />
-                    <Text className="text-gray-400 mt-2">No comments yet. Be the first!</Text>
+                    <Ionicons
+                      name="chatbubbles-outline"
+                      size={40}
+                      color="#E5E7EB"
+                    />
+                    <Text className="text-gray-400 mt-2">
+                      No comments yet. Be the first!
+                    </Text>
                   </View>
                 )}
               </>

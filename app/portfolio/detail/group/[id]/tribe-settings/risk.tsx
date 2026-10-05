@@ -143,43 +143,59 @@ export default function RiskSettingsScreen() {
               )}
             </View>
 
-            <View className="mb-6">
-              <View className="flex-row justify-between items-center bg-[#F3F4F6] rounded-2xl p-5">
-                <View className="flex-1 mr-4">
-                  <Text className="text-[#1A1A1A] font-bold text-base mb-1">
-                    Allow Early Exit
-                  </Text>
-                  <Text className="text-[#64748B] text-xs">
-                    Allow members to leave before the tribe goal completes. When enabled, the platform early exit penalty will apply upon exit.
+            {group?.groupType === "ROTATIONAL" ? (
+              <View className="mb-6 p-4 bg-[#EFF7F8] border border-[#B2EBF2] rounded-2xl">
+                <View className="flex-row items-center mb-1">
+                  <Ionicons name="information-circle-outline" size={18} color="#155D5F" style={{ marginRight: 6 }} />
+                  <Text className="text-[#155D5F] font-bold text-xs">
+                    Rotational Savings Policy
                   </Text>
                 </View>
-                <Switch
-                  value={allowEarlyExit}
-                  onValueChange={setAllowEarlyExit}
-                  trackColor={{ false: "#D1D5DB", true: "#155D5F" }}
-                  thumbColor="white"
-                />
+                <Text className="text-[#155D5F] text-xs leading-5">
+                  Early exit and emergency withdrawal features do not apply to Rotational Groups because payouts are automated per cycle based on rotation order.
+                </Text>
               </View>
-            </View>
+            ) : (
+              <>
+                <View className="mb-6">
+                  <View className="flex-row justify-between items-center bg-[#F3F4F6] rounded-2xl p-5">
+                    <View className="flex-1 mr-4">
+                      <Text className="text-[#1A1A1A] font-bold text-base mb-1">
+                        Allow Early Exit
+                      </Text>
+                      <Text className="text-[#64748B] text-xs">
+                        Allow members to leave before the tribe goal completes. When enabled, the platform early exit penalty will apply upon exit.
+                      </Text>
+                    </View>
+                    <Switch
+                      value={allowEarlyExit}
+                      onValueChange={setAllowEarlyExit}
+                      trackColor={{ false: "#D1D5DB", true: "#155D5F" }}
+                      thumbColor="white"
+                    />
+                  </View>
+                </View>
 
-            <View className="mb-8">
-              <View className="flex-row justify-between items-center bg-[#F3F4F6] rounded-2xl p-5">
-                <View className="flex-1 mr-4">
-                  <Text className="text-[#1A1A1A] font-bold text-base mb-1">
-                    Emergency Withdrawal
-                  </Text>
-                  <Text className="text-[#64748B] text-xs">
-                    Allow emergency access to savings in critical cases.
-                  </Text>
+                <View className="mb-8">
+                  <View className="flex-row justify-between items-center bg-[#F3F4F6] rounded-2xl p-5">
+                    <View className="flex-1 mr-4">
+                      <Text className="text-[#1A1A1A] font-bold text-base mb-1">
+                        Emergency Withdrawal
+                      </Text>
+                      <Text className="text-[#64748B] text-xs">
+                        Allow emergency access to savings in critical cases.
+                      </Text>
+                    </View>
+                    <Switch
+                      value={allowEmergencyWithdrawal}
+                      onValueChange={setAllowEmergencyWithdrawal}
+                      trackColor={{ false: "#D1D5DB", true: "#155D5F" }}
+                      thumbColor="white"
+                    />
+                  </View>
                 </View>
-                <Switch
-                  value={allowEmergencyWithdrawal}
-                  onValueChange={setAllowEmergencyWithdrawal}
-                  trackColor={{ false: "#D1D5DB", true: "#155D5F" }}
-                  thumbColor="white"
-                />
-              </View>
-            </View>
+              </>
+            )}
 
             <ThemedButton
               title={isSaving ? "Saving..." : "Save"}

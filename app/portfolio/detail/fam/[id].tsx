@@ -89,18 +89,6 @@ export default function FamilyGoalDetailScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const { penaltyRate, penaltyRatio } = getDynamicPenaltyRate(
-    "fam",
-    systemConfigData,
-    rates,
-    "2.5%"
-  );
-  const famInterestRateLabel = getDynamicInterestRateLabel(
-    "fam",
-    systemConfigData,
-    rates,
-    10
-  );
   const { data: walletSummary, refetch: refetchWallet } = useGetWalletSummaryQuery();
   const walletBalance = (parseFloat(walletSummary?.currentBalance || "0")) / 100;
 
@@ -143,6 +131,21 @@ export default function FamilyGoalDetailScreen() {
     lastPlanRef.current = fetchedPlan;
   }
   const plan = fetchedPlan || savedCompletedPlan || lastPlanRef.current;
+
+  const { penaltyRate, penaltyRatio } = getDynamicPenaltyRate(
+    "fam",
+    systemConfigData,
+    rates,
+    "2.5%",
+    plan
+  );
+  const famInterestRateLabel = getDynamicInterestRateLabel(
+    "fam",
+    systemConfigData,
+    rates,
+    10,
+    plan
+  );
 
   const isTransferredOrWithdrawnInTxns = Boolean(
     txnsData?.items?.some((t) => {
@@ -586,7 +589,7 @@ export default function FamilyGoalDetailScreen() {
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Interest Rate</Text>
-                <Text style={styles.value}>{plan.interestRate ? `${plan.interestRate}% P.A` : famInterestRateLabel}</Text>
+                <Text style={styles.value}>{famInterestRateLabel}</Text>
               </View>
             </View>
 

@@ -56,10 +56,6 @@ export default function CreateFamScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(null);
 
-  const minTargetDate = new Date();
-  minTargetDate.setDate(minTargetDate.getDate() + 1);
-  minTargetDate.setHours(0, 0, 0, 0);
-
   const handleSelectDate = (date: Date) => {
     setSelectedEndDate(date);
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -83,18 +79,30 @@ export default function CreateFamScreen() {
   const [verifyPin] = useVerifyPinMutation();
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const famConfig = rates?.wealthfam || rates?.fam;
+  const minFamKobo = famConfig?.minTargetAmount ?? famConfig?.minimumAmount ?? 50000;
+  const minFamNaira = minFamKobo / 100;
+  const minFamNairaFormatted = minFamNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const minFamDuration = famConfig?.minDurationDays ?? famConfig?.minimumTenureDays ?? 30;
+  const maxFamDuration = famConfig?.maxDurationDays ?? famConfig?.maximumTenureDays ?? 730;
+
   const famInterestRateLabel = getDynamicInterestRateLabel(
     "fam",
     systemConfigData,
-    configData?.rates || (configData as any)?.data?.rates,
+    rates,
     10
   );
   const { penaltyRate: famPenaltyRate } = getDynamicPenaltyRate(
     "fam",
     systemConfigData,
-    configData?.rates || (configData as any)?.data?.rates,
+    rates,
     "2.5%"
   );
+
+  const minTargetDate = new Date();
+  minTargetDate.setDate(minTargetDate.getDate() + minFamDuration);
+  minTargetDate.setHours(0, 0, 0, 0);
 
   const formatAmount = (val: string) => {
     const n = val.replace(/\D/g, "");
@@ -131,13 +139,23 @@ export default function CreateFamScreen() {
   const isFormValid = () => {
     const targetAmt = parseFloat(targetAmount.replace(/,/g, "")) || 0;
     const initialAmt = parseFloat(initialDeposit.replace(/,/g, "")) || 0;
+    let durationDays = 0;
+    if (selectedEndDate) {
+      const todayZero = new Date();
+      todayZero.setHours(0, 0, 0, 0);
+      const selZero = new Date(selectedEndDate);
+      selZero.setHours(0, 0, 0, 0);
+      durationDays = Math.max(1, Math.ceil((selZero.getTime() - todayZero.getTime()) / (1000 * 3600 * 24)));
+    }
+    const isDurationValid = selectedEndDate ? (durationDays >= minFamDuration && durationDays <= maxFamDuration) : endDateText.length >= 10;
     return (
       familyCategory.length > 0 &&
       membersName.trim().length > 0 &&
-      targetAmt > 0 &&
+      targetAmt >= minFamNaira &&
       initialAmt >= 100 &&
       frequency.length > 0 &&
-      endDateText.length >= 10
+      endDateText.length >= 10 &&
+      isDurationValid
     );
   };
 
@@ -342,20 +360,36 @@ export default function CreateFamScreen() {
       </View>
 
       {/* Target Amount */}
-      <View style={{ marginBottom: 20 }}>
-        <Text style={styles.inputLabel}>Target Goal Amount (₦)</Text>
-        <TextInput
-          placeholder="e.g. 1,000,000"
-          placeholderTextColor="#9CA3AF"
-          value={targetAmount}
-          onChangeText={(v) => setTargetAmount(formatAmount(v))}
-          keyboardType="numeric"
-          style={styles.textInput}
-        />
-        <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>
-          The final target milestone you want to reach
-        </Text>
-      </View>
+      {(() => {
+        const targetAmtNum = parseFloat(targetAmount.replace(/,/g, "")) || 0;
+        const isBelowMinTarget = targetAmtNum > 0 && targetAmtNum < minFamNaira;
+
+        return (
+          <View style={{ marginBottom: 20 }}>
+            <Text style={styles.inputLabel}>Target Goal Amount (₦)</Text>
+            <TextInput
+              placeholder="e.g. 1,000,000"
+              placeholderTextColor="#9CA3AF"
+              value={targetAmount}
+              onChangeText={(v) => setTargetAmount(formatAmount(v))}
+              keyboardType="numeric"
+              style={[
+                styles.textInput,
+                isBelowMinTarget && { borderWidth: 1, borderColor: "#EF4444" },
+              ]}
+            />
+            {isBelowMinTarget ? (
+              <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                Minimum target goal amount is ₦{minFamNairaFormatted}
+              </Text>
+            ) : (
+              <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>
+                The final target milestone you want to reach
+              </Text>
+            )}
+          </View>
+        );
+      })()}
 
       {/* Starting / Initial Deposit */}
       <View style={{ marginBottom: 20 }}>
@@ -437,13 +471,46 @@ export default function CreateFamScreen() {
       </View>
 
       {/* End Date (Target Date) */}
-      <AppDatePickerField
-        label="Target End Date"
-        placeholder="Select Target End Date"
-        value={endDateText}
-        onPress={() => setShowDatePicker(true)}
-        helperText="Target maturity date (must be in the future)"
-      />
+      {(() => {
+        let durationDays = 0;
+        if (selectedEndDate) {
+          const todayZero = new Date();
+          todayZero.setHours(0, 0, 0, 0);
+          const selZero = new Date(selectedEndDate);
+          selZero.setHours(0, 0, 0, 0);
+          durationDays = Math.max(1, Math.ceil((selZero.getTime() - todayZero.getTime()) / (1000 * 3600 * 24)));
+        }
+        const isBelowMinDuration = selectedEndDate && durationDays < minFamDuration;
+        const isAboveMaxDuration = selectedEndDate && durationDays > maxFamDuration;
+
+        return (
+          <View style={{ marginBottom: 20 }}>
+            <AppDatePickerField
+              label="Target End Date"
+              placeholder="Select Target End Date"
+              value={selectedEndDate ? `${endDateText} (${durationDays} days)` : endDateText}
+              onPress={() => setShowDatePicker(true)}
+              helperText={
+                isBelowMinDuration
+                  ? `Minimum lock duration is ${minFamDuration} days`
+                  : isAboveMaxDuration
+                  ? `Maximum lock duration is ${maxFamDuration} days`
+                  : "Target maturity date (must be in the future)"
+              }
+            />
+            {isBelowMinDuration && (
+              <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                Minimum lock duration is {minFamDuration} days
+              </Text>
+            )}
+            {isAboveMaxDuration && (
+              <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                Maximum lock duration is {maxFamDuration} days
+              </Text>
+            )}
+          </View>
+        );
+      })()}
 
       <AppCalendarModal
         visible={showDatePicker}

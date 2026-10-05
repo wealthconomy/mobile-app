@@ -23,21 +23,21 @@ const PORTFOLIOS = [
   },
   {
     id: "2",
-    type: "fix" as const,
-    title: "WealthFix",
-    description: "Lock it in, block temptation, and watch your money grow.",
-  },
-  {
-    id: "3",
     type: "goal" as const,
     title: "WealthGoal",
     description: "Save with discipline and smash every goals.",
   },
   {
-    id: "4",
+    id: "3",
     type: "fam" as const,
     title: "WealthFam",
     description: "Build a wealthy family; save for kids, spouse, and loved ones.",
+  },
+  {
+    id: "4",
+    type: "fix" as const,
+    title: "WealthFix",
+    description: "Lock it in, block temptation, and watch your money grow.",
   },
   {
     id: "5",

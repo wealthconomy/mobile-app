@@ -69,16 +69,18 @@ export const MenuItem = React.memo(
         color={isDestructive ? "#EF4444" : "#155D5F"}
       />
     </TouchableOpacity>
-  )
+  ),
 );
 
 MenuItem.displayName = "MenuItem";
 
-export const MenuGroup = React.memo(({ children }: { children: React.ReactNode }) => (
-  <View className="mb-4 rounded-[20px] bg-[#EEF7F8] border border-[#E5F3F4] p-5 gap-y-2">
-    {children}
-  </View>
-));
+export const MenuGroup = React.memo(
+  ({ children }: { children: React.ReactNode }) => (
+    <View className="mb-4 rounded-[20px] bg-[#EEF7F8] border border-[#E5F3F4] p-5 gap-y-2">
+      {children}
+    </View>
+  ),
+);
 
 MenuGroup.displayName = "MenuGroup";
 
@@ -89,7 +91,11 @@ interface AccountMenuSectionsProps {
 }
 
 export const AccountMenuSections = React.memo(
-  ({ unreadNotificationsCount = 0, onNavigate, onLogoutPress }: AccountMenuSectionsProps) => {
+  ({
+    unreadNotificationsCount = 0,
+    onNavigate,
+    onLogoutPress,
+  }: AccountMenuSectionsProps) => {
     return (
       <>
         {/* Menu Items Group 1 */}
@@ -116,6 +122,36 @@ export const AccountMenuSections = React.memo(
               onPress={() => onNavigate("/profile/invite")}
             />
             <MenuItem
+              icon="flag"
+              iconBgColor="#E0F2F1"
+              iconColor="#155D5F"
+              label="Wealth group reports"
+              subtitle="Track tribe violation status & feedback"
+              onPress={() => onNavigate("/profile/reports")}
+            />
+            <MenuItem
+              icon="people"
+              iconBgColor="#E0F2F1"
+              iconColor="#155D5F"
+              label="Customer Service Center"
+              onPress={() => onNavigate("/support")}
+            />
+          </MenuGroup>
+        </Animated.View>
+
+        <View className="h-[1px] bg-[#E5E5E5] mb-6" />
+
+        {/* Menu Items Group 2 */}
+        <Animated.View entering={FadeInDown.duration(600).delay(500)}>
+          <MenuGroup>
+            <MenuItem
+              icon="list"
+              iconBgColor="#E0F2F1"
+              iconColor="#155D5F"
+              label="Transaction History"
+              onPress={() => onNavigate("/transactions")}
+            />
+            <MenuItem
               icon="notifications"
               iconBgColor="#E0F2F1"
               iconColor="#155D5F"
@@ -134,28 +170,6 @@ export const AccountMenuSections = React.memo(
 
         <View className="h-[1px] bg-[#E5E5E5] mb-6" />
 
-        {/* Menu Items Group 2 */}
-        <Animated.View entering={FadeInDown.duration(600).delay(500)}>
-          <MenuGroup>
-            <MenuItem
-              icon="list"
-              iconBgColor="#E0F2F1"
-              iconColor="#155D5F"
-              label="Transaction History"
-              onPress={() => onNavigate("/transactions")}
-            />
-            <MenuItem
-              icon="wallet"
-              iconBgColor="#E0F2F1"
-              iconColor="#155D5F"
-              label="Wallet & Payment Settings"
-              onPress={() => onNavigate("/payment")}
-            />
-          </MenuGroup>
-        </Animated.View>
-
-        <View className="h-[1px] bg-[#E5E5E5] mb-6" />
-
         {/* Menu Items Group 3 */}
         <Animated.View entering={FadeInDown.duration(600).delay(600)}>
           <MenuGroup>
@@ -168,11 +182,11 @@ export const AccountMenuSections = React.memo(
               onPress={() => onNavigate("/profile/security")}
             />
             <MenuItem
-              icon="people"
+              icon="wallet"
               iconBgColor="#E0F2F1"
               iconColor="#155D5F"
-              label="Customer Service Center"
-              onPress={() => onNavigate("/support")}
+              label="Wallet & Payment Settings"
+              onPress={() => onNavigate("/payment")}
             />
           </MenuGroup>
         </Animated.View>
@@ -180,6 +194,14 @@ export const AccountMenuSections = React.memo(
         {/* Logout Group */}
         <Animated.View entering={FadeInDown.duration(600).delay(700)}>
           <MenuGroup>
+            <MenuItem
+              icon="information-circle"
+              iconBgColor="#E0F2F1"
+              iconColor="#155D5F"
+              label="About Wealthconomy"
+              subtitle="Terms, Privacy Policy & App Updates"
+              onPress={() => onNavigate("/profile/about")}
+            />
             <MenuItem
               icon="log-out"
               iconBgColor="#FEE2E2"
@@ -192,7 +214,7 @@ export const AccountMenuSections = React.memo(
         </Animated.View>
       </>
     );
-  }
+  },
 );
 
 AccountMenuSections.displayName = "AccountMenuSections";

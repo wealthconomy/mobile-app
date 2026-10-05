@@ -27,7 +27,7 @@ import { isPortfolioCompleted, getDynamicInterestRateLabel } from "@/src/utils/f
 
 const THEME = "#560FF1";
 const THEME_BG = "#F3EEFF";
-const THEME_CARD_BG = "#9C6EFF66";
+const THEME_CARD_BG = "#F3EEFF";
 
 const SUGGESTIONS = [
   {
@@ -92,6 +92,18 @@ export default function WealthFamScreen() {
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
   const famRateLabel = getDynamicInterestRateLabel("fam", systemConfigData, rates, 10);
+
+  const famConfig = rates?.wealthfam || (rates as any)?.fam;
+  const minFamKobo = famConfig?.minTargetAmount ?? famConfig?.minimumAmount ?? 50000;
+  const minFamDuration = famConfig?.minDurationDays ?? famConfig?.minimumTenureDays ?? 30;
+  const maxFamDuration = famConfig?.maxDurationDays ?? famConfig?.maximumTenureDays ?? 365;
+  const famPenaltyRate = famConfig?.earlyLiquidationPenaltyRate ?? famConfig?.earlyWithdrawalPenaltyPercentage ?? 2;
+  const minFamNairaFormatted = (minFamKobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const handleBack = () => {
+    router.replace("/(tabs)/portfolios" as any);
+  };
+
   const allGoals = data?.items || [];
 
   const handleRefresh = async () => {
@@ -180,7 +192,7 @@ export default function WealthFamScreen() {
     return (
       <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
         <StatusBar style="dark" />
-        <Header title="WealthFam" onBack={() => router.back()} />
+        <Header title="WealthFam" onBack={handleBack} />
         <PortfolioDetailSkeleton />
       </SafeAreaView>
     );
@@ -191,7 +203,7 @@ export default function WealthFamScreen() {
       <StatusBar style="dark" />
       <Header
         title="WealthFam"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="fam" />}
       />
 
@@ -217,7 +229,7 @@ export default function WealthFamScreen() {
             style={{
               width: "100%",
               maxWidth: 365,
-              height: 170,
+              height: 190,
               borderTopLeftRadius: 50,
               borderTopRightRadius: 20,
               borderBottomRightRadius: 50,
@@ -255,7 +267,7 @@ export default function WealthFamScreen() {
             <View
               style={{
                 position: "absolute",
-                top: 28,
+                top: 22,
                 left: 20,
                 right: 20,
                 zIndex: 10,
@@ -269,7 +281,7 @@ export default function WealthFamScreen() {
                   {showInterest && (
                     <View
                       style={{
-                        backgroundColor: "#6366F1",
+                        backgroundColor: THEME,
                         paddingHorizontal: 8,
                         paddingVertical: 2.5,
                         borderRadius: 20,
@@ -293,7 +305,11 @@ export default function WealthFamScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View className="flex-row items-baseline mb-1">
+              <TouchableOpacity
+                onPress={() => router.push("/education/win-up" as any)}
+                activeOpacity={0.8}
+                className="flex-row items-baseline mb-1"
+              >
                 {showBalance ? (
                   <BalanceText
                     amount={`₦${formatAmount(totalBalance.toString())}`}
@@ -305,14 +321,17 @@ export default function WealthFamScreen() {
                     ***
                   </Text>
                 )}
-              </View>
+                <Text className="text-[#1A1A1A] text-[34px] font-light ml-4 mb-1">
+                  ›
+                </Text>
+              </TouchableOpacity>
 
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
                   <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-80">
                     Your wealth grew to ₦0.00 today
                   </Text>
-                  <ArrowUp size={14} color="#4CAF50" />
+                  <ArrowUp size={14} color="#4CAF50" style={{ marginLeft: 4 }} />
                 </View>
               )}
             </View>
@@ -323,7 +342,7 @@ export default function WealthFamScreen() {
                 width: 200,
                 height: 40,
                 borderRadius: 18,
-                bottom: 15,
+                bottom: 16,
                 right: 20,
                 elevation: 3,
                 zIndex: 20,
@@ -357,16 +376,16 @@ export default function WealthFamScreen() {
               <View>
                 {[
                   {
-                    title: "Automated Contributions:",
-                    text: "Use the Wealth Auto feature to set daily, weekly, or monthly deposits into your family pots effortlessly.",
+                    title: `Family Wealth Growth (${famRateLabel}):`,
+                    text: `Build long-term family wealth while earning up to ${famRateLabel} interest.`,
                   },
                   {
-                    title: "Goal-Based Discipline:",
-                    text: "Set specific amounts and timelines for family needs, like school fees or a family home.",
+                    title: "Contribution & Duration Rules:",
+                    text: `Minimum target amount is ₦${minFamNairaFormatted}. Target duration ranges from ${minFamDuration} to ${maxFamDuration} days.`,
                   },
                   {
-                    title: "Community-Driven Growth:",
-                    text: "Leverage group saving options to reach family targets faster through collective discipline.",
+                    title: "Early Liquidation Rule:",
+                    text: `Breaking a family wealth plan early incurs a penalty of ${famPenaltyRate}%.`,
                   },
                 ].map((tip, i) => (
                   <View key={i} className="flex-row mb-3 items-start">
@@ -463,7 +482,7 @@ export default function WealthFamScreen() {
               onPress={() => setActiveTab("ongoing")}
               activeOpacity={1}
               style={{
-                width: 182,
+                width: "49%",
                 height: 40,
                 justifyContent: "center",
                 alignItems: "center",
@@ -489,7 +508,7 @@ export default function WealthFamScreen() {
               onPress={() => setActiveTab("completed")}
               activeOpacity={1}
               style={{
-                width: 182,
+                width: "49%",
                 height: 40,
                 justifyContent: "center",
                 alignItems: "center",
@@ -514,7 +533,7 @@ export default function WealthFamScreen() {
           </View>
 
           {/* ── Plan List (same structure as GoalListItem) ─────────── */}
-          <View style={{ width: 355, alignSelf: "center" }}>
+          <View style={{ width: "100%" }}>
             {activeTab === "ongoing" ? (
               ongoingPlans.length === 0 ? (
                 <View className="items-center justify-center py-20 px-10">
@@ -614,8 +633,8 @@ function FamListItem({
         })
       }
       style={{
-        width: 355,
-        height: 51,
+        width: "100%",
+        minHeight: 51,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
@@ -641,7 +660,7 @@ function FamListItem({
       </View>
 
       {/* Text Area */}
-      <View style={{ width: 292, height: 51, justifyContent: "space-between" }}>
+      <View style={{ flex: 1, marginLeft: 12, minHeight: 51, justifyContent: "space-between" }}>
         {/* Row 1: Title & Amount */}
         <View
           style={{
@@ -650,7 +669,10 @@ function FamListItem({
             alignItems: "center",
           }}
         >
-          <Text style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A" }}>
+          <Text
+            style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A", flex: 1, marginRight: 8 }}
+            numberOfLines={1}
+          >
             {plan.name}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center" }}>

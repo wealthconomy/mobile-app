@@ -131,48 +131,64 @@ export const isGroupCompleted = (g: WealthGroupModel) => {
   return (s === "COMPLETED" && dateEnded) || isGroupTerminated(g);
 };
 
-// Client-side date check: true when the group's endDate has passed, regardless of backend status
+// Client-side date check: true when the group's endDate has passed,
+// treating endDate as inclusive of the whole end day (ends at 23:59:59 UTC).
 export const isGroupDateEnded = (g: WealthGroupModel) => {
   if (!g.endDate) return false;
   const trimmed = g.endDate.toString().trim();
   // Handle DD/MM/YYYY format
-  if (trimmed.includes("/")) {
+  if (trimmed.includes("/") && !trimmed.includes("T")) {
     const parts = trimmed.split("/").map((p) => parseInt(p.trim(), 10));
     if (parts.length === 3) {
       const [day, month, year] = parts;
       if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-        return new Date(year, month - 1, day, 23, 59, 59).getTime() < Date.now();
+        // End of that day in UTC
+        return new Date(Date.UTC(year, month - 1, day, 23, 59, 59)).getTime() < Date.now();
       }
     }
   }
   const d = new Date(trimmed);
-  return !isNaN(d.getTime()) && d.getTime() < Date.now();
+  if (isNaN(d.getTime())) return false;
+  // If the stored date is already end-of-day (23:59:59) use as-is.
+  // If it's midnight (00:00:00) treat the whole day as still active.
+  const isStartOfDay = d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+  if (isStartOfDay) {
+    // The group is active through the end of that UTC day
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59)).getTime() < Date.now();
+  }
+  return d.getTime() < Date.now();
 };
 
-// Extract the total savings in kobo for a group, with fallback to populated members
+// Extract the display active savings in kobo for a group.
+// For ROTATIONAL: active vault balance is ONLY currentCycleSavings during active cycles.
+//   Once closed, completed, date-ended, or cycles finished, active balance is strictly 0
+//   because payouts were already distributed to members. Never fall back to cumulative totalSavings.
+// For FIXED/FLEX: use totalSavings.
 export const getGroupTotalSavingsKobo = (g: WealthGroupModel): number => {
-  const rawVal = g.totalSavings ?? g.currentBalance ?? 0;
-  const num = typeof rawVal === "string" ? parseFloat(rawVal) : Number(rawVal);
-  if (!isNaN(num) && num > 0) return num;
-
-  const membersList =
-    (g as any).members ||
-    (g as any).groupMembers ||
-    (g as any).membersList;
-  if (Array.isArray(membersList) && membersList.length > 0) {
-    const sum = membersList.reduce((acc: number, m: any) => {
-      const c = parseFloat(m?.totalContributed?.toString() || "0");
-      return acc + (isNaN(c) ? 0 : c);
-    }, 0);
-    if (!isNaN(sum) && sum > 0) return sum;
+  const isRotational = (g.groupType ?? (g as any).type) === "ROTATIONAL";
+  if (isRotational) {
+    if (isGroupCompleted(g) || isGroupTerminated(g) || isGroupDateEnded(g)) {
+      return 0;
+    }
+    const rawCycle = (g as any).currentCycleSavings;
+    if (rawCycle !== undefined && rawCycle !== null) {
+      const n = typeof rawCycle === "string" ? parseFloat(rawCycle) : Number(rawCycle);
+      return isNaN(n) ? 0 : n;
+    }
+    if (g.currentCycle && g.totalCycles && g.currentCycle >= g.totalCycles) {
+      return 0;
+    }
+    return 0;
   }
-  return 0;
+  const rawVal = g.totalSavings ?? g.currentBalance ?? 0;
+  return typeof rawVal === "string" ? parseFloat(rawVal) : Number(rawVal);
 };
 
 // Check if a user has already fully withdrawn their funds from a completed group
 export const isUserFullySettledInGroup = (g: WealthGroupModel, uid?: string): boolean => {
   if (!uid) return false;
   if (isGroupTerminated(g)) return true;
+  if ((g.groupType ?? (g as any).type) === "ROTATIONAL") return true;
 
   const membersList =
     (g as any).members ||
@@ -265,6 +281,14 @@ export default function WealthGroupScreen() {
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
   const groupRateLabel = getDynamicInterestRateLabel("group", systemConfigData, rates, 15);
+
+  const groupConfig = rates?.wealthgroup || (rates as any)?.group;
+  const groupMinMembers = groupConfig?.membersLimitRange?.[0] ?? 2;
+  const groupMaxMembers = groupConfig?.membersLimitRange?.[1] ?? 50;
+
+  const handleBack = () => {
+    router.replace("/(tabs)/portfolios" as any);
+  };
 
   const [refreshing, setRefreshing] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
@@ -425,11 +449,11 @@ export default function WealthGroupScreen() {
     const contribNaira = rawContrib > 0 ? (rawContrib / 100).toLocaleString() : null;
 
     const formattedEnd = g.endDate
-      ? new Date(g.endDate).toLocaleDateString("en-US", {
-          month: "numeric",
-          day: "numeric",
-          year: "2-digit",
-        })
+      ? (() => {
+          const d = new Date(g.endDate);
+          if (isNaN(d.getTime())) return "Flexible";
+          return `${d.getUTCMonth() + 1}/${d.getUTCDate()}/${String(d.getUTCFullYear()).slice(-2)}`;
+        })()
       : "Flexible";
 
     return {
@@ -515,6 +539,7 @@ export default function WealthGroupScreen() {
   // 2. Completed groups savings: include ONLY if NOT terminated and current user has NOT withdrawn
   const unwithdrawnCompletedSavingsKobo = completedGroups.reduce((acc, g) => {
     if (isGroupTerminated(g)) return acc;
+    if ((g.groupType ?? (g as any).type) === "ROTATIONAL") return acc;
 
     const status = completedStatusMap[g.id];
     if (status) {
@@ -541,7 +566,7 @@ export default function WealthGroupScreen() {
         <StatusBar style="dark" />
       <Header
         title="WealthGroup"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="group" />}
       />
         <PortfolioDetailSkeleton />
@@ -554,7 +579,7 @@ export default function WealthGroupScreen() {
       <StatusBar style="dark" />
       <Header
         title="WealthGroup"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="group" />}
       />
 
@@ -657,19 +682,26 @@ export default function WealthGroupScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View className="flex-row items-baseline mb-2">
+              <TouchableOpacity
+                onPress={() => router.push("/education/win-up" as any)}
+                activeOpacity={0.8}
+                className="flex-row items-baseline mb-2"
+              >
                 {showBalance ? (
                   <BalanceText
                     amount={`₦${(totalSavingsKobo / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                    fontSize={34}
+                    fontSize={31}
                     color="#1A1A1A"
                   />
                 ) : (
-                  <Text className="text-[#1A1A1A] text-[34px] font-black tracking-tight">
+                  <Text className="text-[#1A1A1A] text-[31px] font-black tracking-tight">
                     ***
                   </Text>
                 )}
-              </View>
+                <Text className="text-[#1A1A1A] text-[34px] font-light ml-4 mb-1">
+                  ›
+                </Text>
+              </TouchableOpacity>
 
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
@@ -732,37 +764,34 @@ export default function WealthGroupScreen() {
           {/* ── Tips Card ─────────────────────────────────────────── */}
           {showTips && (
             <View
-              className="relative p-6 mb-10"
+              className="relative p-5 mb-8"
               style={{
                 width: "100%",
-                minHeight: 226,
                 backgroundColor: THEME_BG,
-                borderRadius: 15,
+                borderRadius: 16,
                 borderWidth: 1,
                 borderColor: BORDER_COLOR,
               }}
             >
               <TouchableOpacity
-                className="absolute right-4 top-4 z-10"
+                className="absolute right-3 top-3 z-10 p-1"
                 onPress={() => setShowTips(false)}
               >
                 <Ionicons name="close" size={20} color={THEME} />
               </TouchableOpacity>
               <Text
-                className="font-extrabold text-[14px] mb-4"
+                className="font-extrabold text-[14px] mb-2 pr-8"
                 style={{ color: "#155D5F" }}
               >
                 What's on Wealth Group?
               </Text>
               <Text
-                className="text-[11px] leading-[16px] mb-4 font-medium"
-                style={{ color: "#155D5F", opacity: 0.8 }}
+                className="text-[12px] leading-[18px] mb-4 font-medium pr-6"
+                style={{ color: "#155D5F", opacity: 0.9 }}
               >
-                A community-powered savings feature that enables users to create
-                or join structured group savings models for collective financial
-                goals.
+                A community-powered savings feature ({groupRateLabel}) for collective financial goals. Groups support between <Text className="font-bold">{groupMinMembers} to {groupMaxMembers} members</Text>.
               </Text>
-              <View className="space-y-3">
+              <View style={{ gap: 10 }}>
                 <TipRow
                   label="Fixed Contribution Groups"
                   text="All members save the same amount at the same frequency (e.g., ₦20,000 monthly for 12 months)."
@@ -896,8 +925,14 @@ export default function WealthGroupScreen() {
               <View className="space-y-6 mb-10">
                 {ongoingGroups.map((g: WealthGroupModel) => {
                   const targetNum = (parseFloat(g.targetAmount?.toString() || "10000000")) / 100;
-                  const rawSavings = g.totalSavings ?? g.currentBalance ?? 0;
-                  const currentNum = (typeof rawSavings === "string" ? parseFloat(rawSavings) : Number(rawSavings)) / 100;
+
+                  // For ROTATIONAL: show active cycle savings via getGroupTotalSavingsKobo(g).
+                  // For FIXED/FLEX: show totalSavings.
+                  const displayKobo = getGroupTotalSavingsKobo(g);
+
+                  const currentNum = displayKobo / 100;
+
+                  // Progress bar: always against targetAmount (lifetime for all types)
                   const progressRatio = targetNum > 0 ? (currentNum / targetNum) * 100 : 0;
                   const formattedPct = progressRatio >= 100 ? "100%" : `${progressRatio.toFixed(1)}%`;
                   const barWidth = Math.min(Math.max(progressRatio, 2), 100);
@@ -1011,18 +1046,16 @@ export default function WealthGroupScreen() {
 
 function TipRow({ label, text }: { label: string; text: string }) {
   return (
-    <View className="flex-row items-start space-x-2">
+    <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
       <Text
-        style={{ color: "#155D5F" }}
-        className="text-[11px] font-black mt-0.5"
+        style={{ color: "#155D5F", marginRight: 6, fontSize: 12, fontWeight: "900", lineHeight: 17 }}
       >
         •
       </Text>
       <Text
-        className="flex-1 text-[10.5px] leading-[15px]"
-        style={{ color: "#155D5F" }}
+        style={{ color: "#155D5F", flex: 1, flexShrink: 1, fontSize: 11.5, lineHeight: 17 }}
       >
-        <Text className="font-extrabold">{label}:</Text> {text}
+        <Text style={{ fontWeight: "800" }}>{label}:</Text> {text}
       </Text>
     </View>
   );

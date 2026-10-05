@@ -43,7 +43,14 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
   let result = await rawBaseQuery(args, api, extraOptions);
 
   if (result.error && result.error.status === 401) {
-    const refreshToken = (api.getState() as RootState).auth.refreshToken;
+    const state = api.getState() as RootState;
+    const token = state.auth.token;
+    const refreshToken = state.auth.refreshToken;
+
+    // Do not force logout if operating with mock tokens or without backend URL configured
+    if (token?.startsWith("mock-jwt-token") || !process.env.EXPO_PUBLIC_API_URL) {
+      return result;
+    }
 
     if (refreshToken) {
       // Attempt to get a new pair of tokens
@@ -176,6 +183,6 @@ const baseQueryWithLockout: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQu
 export const baseApi = createApi({
   reducerPath: "baseApi",
   baseQuery: baseQueryWithLockout,
-  tagTypes: ["User", "WealthGroup", "Portfolio", "Payment", "Auth", "Kyc", "File", "Notification", "Referral", "Blog", "Library", "Wallet", "PayoutAccount", "Withdrawal", "Activity", "SupportChat"],
+  tagTypes: ["User", "WealthGroup", "Portfolio", "Payment", "Auth", "Kyc", "File", "Notification", "Referral", "Blog", "Library", "Wallet", "PayoutAccount", "Withdrawal", "Activity", "SupportChat", "GroupReport"],
   endpoints: () => ({}),
 });

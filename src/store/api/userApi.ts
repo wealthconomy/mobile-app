@@ -26,6 +26,7 @@ export interface UserProfile {
   walletBalance?: string;
   totalSavings?: string;
   totalInterest?: string;
+  kycLevel?: number;
 }
 
 export interface UpdateProfileRequest {

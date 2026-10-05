@@ -53,6 +53,18 @@ export default function WealthGoalScreen() {
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
   const goalRateLabel = getDynamicInterestRateLabel("goal", systemConfigData, rates, 12);
+
+  const goalConfig = rates?.wealthgoal || (rates as any)?.goal;
+  const minGoalKobo = goalConfig?.minTargetAmount ?? goalConfig?.minimumAmount ?? 50000;
+  const minGoalDuration = goalConfig?.minDurationDays ?? goalConfig?.minimumTenureDays ?? 30;
+  const maxGoalDuration = goalConfig?.maxDurationDays ?? goalConfig?.maximumTenureDays ?? 365;
+  const goalPenaltyRate = goalConfig?.earlyLiquidationPenaltyRate ?? goalConfig?.earlyWithdrawalPenaltyPercentage ?? 2;
+  const minGoalNairaFormatted = (minGoalKobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const handleBack = () => {
+    router.replace("/(tabs)/portfolios" as any);
+  };
+
   const allGoals = data?.items || [];
 
   const handleRefresh = async () => {
@@ -144,7 +156,7 @@ export default function WealthGoalScreen() {
     return (
       <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
         <StatusBar style="dark" />
-        <Header title="WealthGoal" onBack={() => router.back()} />
+        <Header title="WealthGoal" onBack={handleBack} />
         <PortfolioDetailSkeleton />
       </SafeAreaView>
     );
@@ -155,7 +167,7 @@ export default function WealthGoalScreen() {
       <StatusBar style="dark" />
       <Header
         title="WealthGoal"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="goal" />}
       />
 
@@ -181,7 +193,7 @@ export default function WealthGoalScreen() {
             style={{
               width: "100%",
               maxWidth: 365,
-              height: 170,
+              height: 190,
               borderTopLeftRadius: 50,
               borderTopRightRadius: 20,
               borderBottomRightRadius: 50,
@@ -216,7 +228,15 @@ export default function WealthGoalScreen() {
               />
             </View>
 
-            <View style={{ padding: 24, zIndex: 10 }}>
+            <View
+              style={{
+                position: "absolute",
+                top: 22,
+                left: 20,
+                right: 20,
+                zIndex: 10,
+              }}
+            >
               <View className="flex-row items-center justify-between mb-1">
                 <View className="flex-row items-center gap-2">
                   <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-90">
@@ -276,7 +296,7 @@ export default function WealthGoalScreen() {
                   <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-80">
                     Your wealth grew by ₦{dailyGrowthFormatted} today
                   </Text>
-                  <ArrowUp size={14} color="#4CAF50" />
+                  <ArrowUp size={14} color="#4CAF50" style={{ marginLeft: 4 }} />
                 </View>
               )}
             </View>
@@ -287,7 +307,7 @@ export default function WealthGoalScreen() {
                 width: 200,
                 height: 40,
                 borderRadius: 18,
-                bottom: 15,
+                bottom: 16,
                 right: 20,
                 elevation: 3,
                 zIndex: 20,
@@ -321,16 +341,16 @@ export default function WealthGoalScreen() {
               <View>
                 {[
                   {
-                    title: "Targeted Discipline:",
-                    text: 'It helps users "smash every target" by providing a dedicated space for specific financial needs like rent, business startup costs, or education.',
+                    title: `Targeted Discipline (${goalRateLabel}):`,
+                    text: `Smash every goal while earning up to ${goalRateLabel} growth on your savings.`,
                   },
                   {
-                    title: "Visual Progress:",
-                    text: 'The platform uses progress bars and milestone tracking to help users visualize their journey toward their "Win".',
+                    title: "Goal Limits & Rules:",
+                    text: `Minimum target goal is ₦${minGoalNairaFormatted}. Lock duration ranges from ${minGoalDuration} to ${maxGoalDuration} days.`,
                   },
                   {
                     title: "Blocked Temptation:",
-                    text: "To ensure success, funds are locked until the user-defined target date is reached, preventing impulsive spending.",
+                    text: `Funds are locked until your target date. Early liquidation incurs an early exit penalty of ${goalPenaltyRate}%.`,
                   },
                 ].map((tip, i) => (
                   <View key={i} className="flex-row mb-3 items-start">
@@ -430,7 +450,7 @@ export default function WealthGoalScreen() {
               onPress={() => setActiveTab("tracking")}
               activeOpacity={1}
               style={{
-                width: 182,
+                width: "49%",
                 height: 40,
                 justifyContent: "center",
                 alignItems: "center",
@@ -456,7 +476,7 @@ export default function WealthGoalScreen() {
               onPress={() => setActiveTab("completed")}
               activeOpacity={1}
               style={{
-                width: 182,
+                width: "49%",
                 height: 40,
                 justifyContent: "center",
                 alignItems: "center",
@@ -481,7 +501,7 @@ export default function WealthGoalScreen() {
           </View>
 
           {/* Goal List */}
-          <View style={{ width: 355, alignSelf: "center" }}>
+          <View style={{ width: "100%" }}>
             {activeTab === "tracking" ? (
               activeGoals.length === 0 ? (
                 <View className="items-center justify-center py-20 px-10">
@@ -561,8 +581,8 @@ function GoalListItem({ goal }: { goal: Portfolio }) {
       activeOpacity={0.9}
       onPress={() => router.push(`/portfolio/detail/goal/${goal.id}` as any)}
       style={{
-        width: 355,
-        height: 51,
+        width: "100%",
+        minHeight: 51,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
@@ -587,8 +607,8 @@ function GoalListItem({ goal }: { goal: Portfolio }) {
         <Text style={{ fontSize: 20 }}>🎯</Text>
       </View>
 
-      {/* Text Area (Width 292) */}
-      <View style={{ width: 292, height: 51, justifyContent: "space-between" }}>
+      {/* Text Area */}
+      <View style={{ flex: 1, marginLeft: 12, minHeight: 51, justifyContent: "space-between" }}>
         {/* Row 1: Title & Right Side (Arrow/Amount) */}
         <View
           style={{
@@ -597,7 +617,10 @@ function GoalListItem({ goal }: { goal: Portfolio }) {
             alignItems: "center",
           }}
         >
-          <Text style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A" }}>
+          <Text
+            style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A", flex: 1, marginRight: 8 }}
+            numberOfLines={1}
+          >
             {goal.name}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center" }}>

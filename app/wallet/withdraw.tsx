@@ -1,31 +1,29 @@
-﻿import {
+import Header from "@/src/components/common/Header";
+import { ThemedButton } from "@/src/components/ThemedButton";
+import {
   useAddPayoutAccountMutation,
   useGetSupportedBanksQuery,
   useGetUserPayoutAccountsQuery,
   useResolveBankAccountMutation,
 } from "@/src/store/api/payoutAccountApi";
-import { useInitiateWithdrawalMutation } from "@/src/store/api/withdrawalApi";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
-import { useVerifyPinMutation } from "@/src/store/api/userApi";
-import Header from "@/src/components/common/Header";
-import { ThemedButton } from "@/src/components/ThemedButton";
+import { useInitiateWithdrawalMutation } from "@/src/store/api/withdrawalApi";
+import { PayoutAccount, PayoutBank } from "@/src/types/wallet";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
   Modal,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { BlurView } from "expo-blur";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -33,14 +31,11 @@ type Step =
   | "select-recipient"
   | "recipient-details"
   | "select-bank"
-  | "preview"
-  | "pin";
+  | "preview";
 
 export default function WithdrawScreen() {
   const { plan } = useLocalSearchParams<{ plan: string }>();
   const [step, setStep] = useState<Step>("select-recipient");
-  const pinRefs = useRef<Array<TextInput | null>>([]);
-  const [pinValues, setPinValues] = useState(["", "", "", ""]);
 
   const [showSuccess, setShowSuccess] = useState(false);
   const [amount, setAmount] = useState("");
@@ -50,32 +45,43 @@ export default function WithdrawScreen() {
   const [userName, setUserName] = useState("");
   const [narrative, setNarrative] = useState("");
   const [bankSearchQuery, setBankSearchQuery] = useState("");
-  const [resolveError, setResolveError] = useState<string | null>(null);
   const [wealthPlan] = useState(plan || "WealthFlex");
-
-  // Selected existing payout account id (if any)
-  const [selectedPayoutAccountId, setSelectedPayoutAccountId] = useState<string | null>(null);
+  const [selectedPayoutAccountId, setSelectedPayoutAccountId] = useState<
+    string | null
+  >(null);
 
   // RTK Query Hooks
-  const { data: walletData } = useGetWalletSummaryQuery();
-  const { data: payoutAccountsData, refetch: refetchPayoutAccounts } = useGetUserPayoutAccountsQuery();
-  const recipients = payoutAccountsData?.items || [];
+  const { data: walletSummary } = useGetWalletSummaryQuery();
+  const { data: savedPayoutsData, isLoading: isLoadingPayouts } =
+    useGetUserPayoutAccountsQuery();
+  const {
+    data: banksData,
+    isLoading: isLoadingBanks,
+    isError: isBankError,
+    refetch: refetchBanks,
+  } = useGetSupportedBanksQuery();
+  const [resolveAccount, { isLoading: isVerifying }] =
+    useResolveBankAccountMutation();
+  const [addPayoutAccount, { isLoading: isAddingPayout }] =
+    useAddPayoutAccountMutation();
+  const [initiateWithdrawal, { isLoading: isSubmittingWithdrawal }] =
+    useInitiateWithdrawalMutation();
 
-  const { data: banksData, isLoading: isLoadingBanks, isError: isBankError, refetch: refetchBanks } = useGetSupportedBanksQuery();
+  const savedPayouts = savedPayoutsData?.items || [];
   const banks = banksData?.items || [];
 
-  const [verifyPin, { isLoading: isVerifyingPin }] = useVerifyPinMutation();
-  const [resolveAccount, { isLoading: isVerifying }] = useResolveBankAccountMutation();
-  const [addPayoutAccount, { isLoading: isAddingAccount }] = useAddPayoutAccountMutation();
-  const [initiateWithdrawal, { isLoading: isWithdrawing }] = useInitiateWithdrawalMutation();
-
-  const loading = isWithdrawing || isVerifyingPin || isAddingAccount;
+  const formattedWalletBalance = walletSummary?.currentBalance
+    ? (parseFloat(walletSummary.currentBalance) / 100).toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : "0.00";
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
     const cleaned = val.replace(/[^\d.]/g, "");
-    const amountNum = parseFloat(cleaned) || 0;
-    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+    const amountVal = parseFloat(cleaned) || 0;
+    return amountVal.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
   const clearInputs = () => {
@@ -84,49 +90,36 @@ export default function WithdrawScreen() {
     setSelectedBank("Select bank");
     setSelectedBankCode("");
     setUserName("");
-    setResolveError(null);
     setNarrative("");
     setSelectedPayoutAccountId(null);
   };
 
-  // Auto-fetch account name
+  // Auto-resolve bank account name from backend
   useEffect(() => {
     let isMounted = true;
-    const resolveName = async () => {
-      // If we already selected an existing payout account, we don't need to resolve
-      if (selectedPayoutAccountId) return;
-      
-      if (accountNumber.length === 10 && selectedBankCode) {
-        setResolveError(null);
+    const resolve = async () => {
+      if (accountNumber.length === 10 && selectedBankCode && !userName) {
         try {
           const res = await resolveAccount({
             accountNumber,
             bankCode: selectedBankCode,
           }).unwrap();
-          if (isMounted) {
+          if (isMounted && res?.accountName) {
             setUserName(res.accountName);
-            setResolveError(null);
           }
         } catch (error: any) {
           console.warn("Verification failed:", error);
           if (isMounted) {
-            setUserName(""); // Clear on failure
-            setResolveError(
-              error?.data?.message ||
-                error?.message ||
-                "Unable to resolve account details. Please verify your account number."
-            );
+            setUserName("");
           }
         }
-      } else {
-        setResolveError(null);
       }
     };
-    resolveName();
+    resolve();
     return () => {
       isMounted = false;
     };
-  }, [accountNumber, selectedBankCode, resolveAccount, selectedPayoutAccountId]);
+  }, [accountNumber, selectedBankCode, resolveAccount, userName]);
 
   useEffect(() => {
     if (accountNumber.length === 10 && selectedBank === "Select bank") {
@@ -135,8 +128,7 @@ export default function WithdrawScreen() {
   }, [accountNumber, selectedBank]);
 
   const handleBack = () => {
-    if (step === "pin") setStep("preview");
-    else if (step === "preview") setStep("recipient-details");
+    if (step === "preview") setStep("recipient-details");
     else if (step === "select-bank") setStep("recipient-details");
     else if (step === "recipient-details") setStep("select-recipient");
     else router.back();
@@ -147,13 +139,15 @@ export default function WithdrawScreen() {
     if (step === "recipient-details") return "Wealth Withdrawal";
     if (step === "select-bank") return "Select Bank";
     if (step === "preview") return `${wealthPlan} Preview`;
-    if (step === "pin") return "";
     return "";
   };
 
   const renderSelectRecipient = () => (
-    <Animated.View entering={FadeInDown.duration(600).delay(150)} className="px-5">
-      <Text className="text-[#4B5563] text-[14px] font-extrabold mb-1 mt-4">
+    <Animated.View
+      entering={FadeInDown.duration(600).delay(150)}
+      className="px-5"
+    >
+      <Text className="text-[#6B7280] text-[13px] mb-1 mt-4">
         Send to a recipient
       </Text>
 
@@ -173,7 +167,7 @@ export default function WithdrawScreen() {
             <Text className="text-[#1A1A1A] font-bold text-[15px]">
               Send to new recipient
             </Text>
-            <Text className="text-[#4B5563] text-[13px] font-bold mt-1">
+            <Text className="text-[#6B7280] text-[11px] mt-0.5">
               Transfer funds to a bank account not in your recent list
             </Text>
           </View>
@@ -181,189 +175,234 @@ export default function WithdrawScreen() {
         </TouchableOpacity>
       </View>
 
-      {recipients.length > 0 && (
-        <>
-          <Text className="text-[#1A1A1A] font-extrabold text-[16px] mb-5 mt-6">
-            Recent Recipients
-          </Text>
+      <Text className="text-[#1A1A1A] font-extrabold text-[16px] mb-5 mt-6">
+        Saved Recipient Accounts
+      </Text>
 
-          <View className="space-y-4 gap-4">
-            {recipients.map((item, index) => (
-              <TouchableOpacity
-                key={item.id || index}
-                className="flex-row items-center"
-                onPress={() => {
-                  setSelectedPayoutAccountId(item.id);
-                  setAccountNumber(item.accountNumber);
-                  setSelectedBank(item.bankName);
-                  setSelectedBankCode(item.bankCode);
-                  setUserName(item.accountName);
-                  setStep("recipient-details");
-                }}
-              >
-                <View className="w-10 h-10 bg-[#E6F4F4] rounded-full items-center justify-center mr-4">
-                  <MaterialCommunityIcons
-                    name="bank-outline"
-                    size={20}
-                    color="#155D5F"
-                  />
-                </View>
-                <View>
-                  <Text className="text-[#1A1A1A] font-bold text-sm">
-                    {item.accountName}
-                  </Text>
-                  <Text className="text-[#4B5563] text-[13px] font-bold">
-                    {item.bankName} - {item.accountNumber}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </>
+      {isLoadingPayouts ? (
+        <View className="items-center justify-center py-8">
+          <ActivityIndicator color="#155D5F" size="small" />
+        </View>
+      ) : savedPayouts.length === 0 ? (
+        <View className="items-center justify-center py-8 px-4 bg-[#F9FAFB] rounded-2xl border border-gray-100 mb-6">
+          <MaterialCommunityIcons
+            name="account-clock-outline"
+            size={36}
+            color="#9CA3AF"
+          />
+          <Text className="text-[#1A1A1A] font-medium text-xs mt-2">
+            No saved recipients
+          </Text>
+          <Text className="text-[#6B7280] text-[11px] text-center mt-1">
+            Bank accounts you add or use will appear here for easy selection.
+          </Text>
+        </View>
+      ) : (
+        <View className="space-y-4 gap-4">
+          {savedPayouts.map((item: PayoutAccount, index: number) => (
+            <TouchableOpacity
+              key={item.id || `payout-${index}`}
+              className="flex-row items-center p-3 rounded-xl bg-[#F8F8F8]"
+              onPress={() => {
+                setAccountNumber(item.accountNumber);
+                setSelectedBank(item.bankName);
+                setSelectedBankCode(item.bankCode);
+                setUserName(item.accountName);
+                setSelectedPayoutAccountId(item.id);
+                setStep("recipient-details");
+              }}
+            >
+              <View className="w-10 h-10 bg-[#E6F4F4] rounded-full items-center justify-center mr-4">
+                <MaterialCommunityIcons
+                  name="bank-outline"
+                  size={20}
+                  color="#155D5F"
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[#1A1A1A] font-bold text-sm">
+                  {item.accountName}
+                </Text>
+                <Text className="text-[#6B7280] text-[11px]">
+                  {item.bankName} - {item.accountNumber}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+            </TouchableOpacity>
+          ))}
+        </View>
       )}
     </Animated.View>
   );
 
+  const handleAmountChange = (val: string) => {
+    const cleaned = val.replace(/[^\d]/g, "");
+    if (!cleaned) {
+      setAmount("");
+      return;
+    }
+    const num = parseInt(cleaned, 10);
+    setAmount(num.toLocaleString("en-US"));
+  };
+
   const renderRecipientDetails = () => (
-    <Animated.View entering={FadeInDown.duration(600).delay(150)} className="px-5">
-      <Text className="text-[#374151] text-[14px] font-extrabold mb-8 mt-4">
-        Amount(₦) <Text className="font-extrabold">₦3,500,000.00 max</Text>
+    <Animated.View
+      entering={FadeInDown.duration(600).delay(150)}
+      className="px-5"
+    >
+      <Text className="text-[#6B7280] text-[13px] mb-8 mt-4">
+        Wallet Balance:{" "}
+        <Text className="font-bold text-[#155D5F]">
+          ₦{formattedWalletBalance}
+        </Text>
       </Text>
 
-      <View className="space-y-6 gap-5">
-        <View>
-          <TextInput
-            placeholder="₦0.00"
-            placeholderTextColor="#9CA3AF"
-            className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
-            keyboardType="numeric"
-            value={amount}
-            onChangeText={setAmount}
-          />
-        </View>
-
-        <View>
-          <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
-            Bank Account Number
-          </Text>
-          <TextInput
-            placeholder="0000000000"
-            placeholderTextColor="#9CA3AF"
-            className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
-            keyboardType="numeric"
-            maxLength={10}
-            value={accountNumber}
-            onChangeText={(val) => {
-              setAccountNumber(val);
-              setSelectedPayoutAccountId(null); // Clear selected account if they edit
-            }}
-          />
-        </View>
-
-        <View>
-          <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
-            Select Bank
-          </Text>
-          <TouchableOpacity
-            onPress={() => {
-              setStep("select-bank");
-            }}
-            className="bg-[#F8F8F8] p-4 rounded-xl flex-row justify-between items-center"
-          >
-            <View className="flex-row items-center">
-              <View className="w-6 h-6 bg-gray-200 rounded-full items-center justify-center mr-3">
-                <MaterialCommunityIcons
-                  name="bank-outline"
-                  size={14}
-                  color="#6B7280"
-                />
-              </View>
-              <Text className="text-[#1A1A1A]">{selectedBank}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#1A1A1A" />
-          </TouchableOpacity>
-        </View>
-
-        <View>
-          <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
-            Bank User's Name
-          </Text>
-          <View
-            className={`bg-[#F8F8F8] p-4 rounded-xl flex-row items-center justify-between border ${resolveError ? "border-red-300" : userName ? "border-emerald-300" : "border-transparent"}`}
-          >
-            <TextInput
-              placeholder={isVerifying ? "Resolving account name..." : "Account name will appear here"}
-              placeholderTextColor="#9CA3AF"
-              className="text-[#1A1A1A] flex-1 font-semibold"
-              value={userName}
-              editable={false}
-            />
-            {isVerifying && (
-              <ActivityIndicator size="small" color="#155D5F" />
-            )}
-            {!isVerifying && userName ? (
-              <View className="w-5 h-5 bg-emerald-100 rounded-full items-center justify-center">
-                <Ionicons name="checkmark" size={12} color="#059669" />
-              </View>
-            ) : null}
-          </View>
-          {resolveError && (
-            <Text className="text-[12px] text-red-500 font-medium mt-1.5 px-1">
-              {resolveError}
-            </Text>
-          )}
-        </View>
-
-        <View>
-          <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
-            Narrative (Optional)
-          </Text>
-          <TextInput
-            placeholder="Purpose (e.g. Rent)"
-            placeholderTextColor="#9CA3AF"
-            className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
-            value={narrative}
-            onChangeText={setNarrative}
-          />
-        </View>
-      </View>
-
       {(() => {
-        const enteredAmount = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
+        const walletBalanceInNaira = walletSummary?.currentBalance
+          ? parseFloat(walletSummary.currentBalance) / 100
+          : 0;
+        const numericAmount = parseFloat(amount.replace(/,/g, "")) || 0;
+        const isAmountExceeded = numericAmount > walletBalanceInNaira;
+
         const isFormValid =
-          enteredAmount > 0 &&
+          numericAmount > 0 &&
+          !isAmountExceeded &&
           accountNumber.length === 10 &&
           selectedBank !== "Select bank" &&
-          userName.trim().length > 0 &&
-          !resolveError;
-
-        const handleProceed = () => {
-          const walletBalanceNaira = (parseFloat(walletData?.currentBalance || "0") / 100);
-          if (enteredAmount > walletBalanceNaira) {
-            Alert.alert(
-              "Insufficient Balance",
-              `Your available balance is ₦${walletBalanceNaira.toLocaleString("en-NG", {
-                minimumFractionDigits: 2,
-              })}. You entered ₦${enteredAmount.toLocaleString("en-NG", {
-                minimumFractionDigits: 2,
-              })}.`
-            );
-            return;
-          }
-          setStep("preview");
-        };
+          !!userName.trim();
 
         return (
-          <ThemedButton
-            title="Proceed"
-            onPress={handleProceed}
-            disabled={!isFormValid || isVerifying}
-            style={{
-              backgroundColor: !isFormValid || isVerifying ? "#E0E0E0" : "#155D5F",
-              opacity: !isFormValid || isVerifying ? 0.45 : 1,
-            }}
-            className="mt-10"
-          />
+          <View className="space-y-6 gap-5">
+            <View>
+              <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
+                Amount (₦)
+              </Text>
+              <View
+                className={`bg-[#F8F8F8] px-4 py-3.5 rounded-xl flex-row items-center ${
+                  isAmountExceeded ? "border border-red-500" : ""
+                }`}
+              >
+                <Text className="text-[#1A1A1A] font-semibold text-[16px] mr-1">
+                  ₦
+                </Text>
+                <TextInput
+                  placeholder="0.00"
+                  placeholderTextColor="#9CA3AF"
+                  className="flex-1 text-[#1A1A1A] font-semibold text-[16px] p-0"
+                  keyboardType="numeric"
+                  value={amount}
+                  onChangeText={handleAmountChange}
+                />
+              </View>
+              {isAmountExceeded && (
+                <Text className="text-red-500 text-[12px] font-medium mt-1 px-1">
+                  Amount is greater than wallet balance
+                </Text>
+              )}
+            </View>
+
+            <View>
+              <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
+                Bank Account Number
+              </Text>
+              <TextInput
+                placeholder="0000000000"
+                placeholderTextColor="#9CA3AF"
+                className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] font-semibold text-[15px]"
+                keyboardType="numeric"
+                maxLength={10}
+                value={accountNumber}
+                onChangeText={(val) => {
+                  setAccountNumber(val);
+                  setUserName("");
+                  setSelectedPayoutAccountId(null);
+                }}
+              />
+            </View>
+
+            <View>
+              <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
+                Select Bank
+              </Text>
+              <TouchableOpacity
+                onPress={() => setStep("select-bank")}
+                className="bg-[#F8F8F8] p-4 rounded-xl flex-row justify-between items-center"
+              >
+                <View className="flex-row items-center">
+                  <View className="w-6 h-6 bg-gray-200 rounded-full items-center justify-center mr-3">
+                    <MaterialCommunityIcons
+                      name="bank-outline"
+                      size={14}
+                      color="#6B7280"
+                    />
+                  </View>
+                  <Text
+                    className={`font-semibold ${
+                      selectedBank !== "Select bank"
+                        ? "text-[#1A1A1A]"
+                        : "text-[#9CA3AF]"
+                    }`}
+                  >
+                    {selectedBank}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#1A1A1A" />
+              </TouchableOpacity>
+            </View>
+
+            <View>
+              <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
+                Account Holder Name
+              </Text>
+              <View className="relative">
+                <TextInput
+                  placeholder={
+                    isVerifying
+                      ? "Resolving account name..."
+                      : "Account name will appear here"
+                  }
+                  placeholderTextColor="#9CA3AF"
+                  className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] pr-12 font-semibold"
+                  value={userName}
+                  onChangeText={setUserName}
+                  editable={false}
+                />
+                {isVerifying && (
+                  <View className="absolute right-4 top-4">
+                    <ActivityIndicator size="small" color="#155D5F" />
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View>
+              <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
+                Narrative (Optional)
+              </Text>
+              <TextInput
+                placeholder="Purpose (e.g. Withdrawal)"
+                placeholderTextColor="#9CA3AF"
+                className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
+                value={narrative}
+                onChangeText={setNarrative}
+              />
+            </View>
+
+            <ThemedButton
+              title="Proceed to Preview"
+              onPress={() => setStep("preview")}
+              disabled={!isFormValid}
+              textStyle={{
+                color: !isFormValid ? "#1A1A1A" : "#FFFFFF",
+                fontWeight: "600",
+              }}
+              style={{
+                backgroundColor: !isFormValid ? "#E0E0E0" : "#155D5F",
+                opacity: 1,
+              }}
+              className="mt-6"
+            />
+          </View>
         );
       })()}
     </Animated.View>
@@ -372,7 +411,7 @@ export default function WithdrawScreen() {
   const getFilteredBanks = () => {
     if (!banks) return [];
     if (!bankSearchQuery) return banks;
-    return banks.filter((bank) =>
+    return banks.filter((bank: PayoutBank) =>
       bank.name.toLowerCase().includes(bankSearchQuery.toLowerCase()),
     );
   };
@@ -412,18 +451,19 @@ export default function WithdrawScreen() {
           </View>
 
           <View className="space-y-4 gap-4">
-            {getFilteredBanks().map((bank, index) => (
+            {getFilteredBanks().map((bank: PayoutBank, index: number) => (
               <TouchableOpacity
-                key={`${bank.code || ""}-${index}`}
+                key={`${bank.code || "bank"}-${index}`}
                 onPress={() => {
                   setSelectedBank(bank.name);
                   setSelectedBankCode(bank.code);
+                  setUserName(""); // reset username to trigger resolve
                   setStep("recipient-details");
-                  setSelectedPayoutAccountId(null);
                 }}
-                className="bg-[#F8F8F8] p-4 rounded-xl"
+                className="bg-[#F8F8F8] p-4 rounded-xl flex-row items-center justify-between"
               >
                 <Text className="text-[#1A1A1A] font-medium">{bank.name}</Text>
+                <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
               </TouchableOpacity>
             ))}
             {getFilteredBanks().length === 0 && (
@@ -439,17 +479,61 @@ export default function WithdrawScreen() {
     </View>
   );
 
+  const handleConfirmWithdrawal = async () => {
+    const numericAmount = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
+    if (numericAmount <= 0) {
+      Alert.alert("Invalid Amount", "Please enter a valid amount.");
+      return;
+    }
+
+    try {
+      let payoutIdToUse = selectedPayoutAccountId;
+
+      // If user typed a payout account that isn't saved yet, save it first
+      if (!payoutIdToUse) {
+        const addedPayout = await addPayoutAccount({
+          accountNumber,
+          bankCode: selectedBankCode,
+          bankName: selectedBank,
+        }).unwrap();
+        payoutIdToUse = addedPayout?.id;
+      }
+
+      if (!payoutIdToUse) {
+        throw new Error("Unable to establish payout account details.");
+      }
+
+      // Initiate real withdrawal
+      await initiateWithdrawal({
+        payoutAccountId: payoutIdToUse,
+        amount: numericAmount,
+      }).unwrap();
+
+      setShowSuccess(true);
+    } catch (error: any) {
+      console.error("Withdrawal error:", error);
+      Alert.alert(
+        "Withdrawal Failed",
+        error?.data?.message ||
+          error?.message ||
+          "Failed to complete withdrawal. Please try again.",
+      );
+    }
+  };
+
   const renderPreview = () => (
-    <Animated.View entering={FadeInDown.duration(600).delay(150)} className="px-5">
+    <Animated.View
+      entering={FadeInDown.duration(600).delay(150)}
+      className="px-5"
+    >
       <Text className="text-[#6B7280] text-[13px] mb-8 mt-4">
         Please, recheck and confirm before making the transaction.
       </Text>
 
       <View
-        className="bg-[#F8F8F8] p-6 rounded-t-[24px] relative self-center"
+        className="bg-[#F6F6F6] p-6 rounded-t-[24px] relative w-full"
         style={{
-          width: 350,
-          minHeight: 220,
+          minHeight: 180,
           borderColor: "#fefcfc40",
           borderWidth: 0.8,
           borderBottomWidth: 0,
@@ -460,61 +544,53 @@ export default function WithdrawScreen() {
           elevation: 2,
         }}
       >
-        <View className="flex-row mb-6 mt-2">
-          <View className="flex-1">
-            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
-              Wealth to Withdraw
+        <View className="flex-row justify-between mb-6 mt-2 items-start">
+          <View>
+            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
+              Amount To Transfer
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[15px]">
+            <Text className="text-[#1A1A1A] font-bold text-[16px]">
               ₦{formatAmount(amount)}
             </Text>
           </View>
-          <View className="flex-1">
-            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
+          <View className="items-end">
+            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
               Account No.
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[15px]">
+            <Text className="text-[#1A1A1A] font-bold text-[16px]">
               {accountNumber || "0000000000"}
             </Text>
           </View>
         </View>
 
-        <View className="flex-row mb-6">
-          <View className="flex-1">
-            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
+        <View className="flex-row justify-between mb-6">
+          <View className="flex-1 mr-2">
+            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
               Account Name
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[15px] pr-2">
-              {userName || "Unknown"}
+            <Text
+              className="text-[#1A1A1A] font-bold text-[15px]"
+              numberOfLines={1}
+            >
+              {userName || "Unknown Recipient"}
             </Text>
           </View>
-          <View className="flex-1">
-            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
+          <View className="items-end">
+            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
               Bank Name
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[15px] pr-2">
+            <Text
+              className="text-[#1A1A1A] font-bold text-[15px]"
+              numberOfLines={1}
+            >
               {selectedBank === "Select bank" ? "---" : selectedBank}
             </Text>
           </View>
         </View>
 
-        <View className="flex-row">
-          <View className="flex-1">
-            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
-              Narrative
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[15px]">
-              {narrative || "---"}
-            </Text>
-          </View>
-        </View>
-
         {/* Jagged Edge Components */}
-        <View
-          className="flex-row absolute -bottom-[10px] left-0 right-0 overflow-hidden"
-          style={{ width: 350.1 }}
-        >
-          {Array.from({ length: 38 }).map((_, i) => (
+        <View className="flex-row absolute -bottom-[10px] left-0 right-0 overflow-hidden w-full">
+          {Array.from({ length: 40 }).map((_, i) => (
             <View
               key={i}
               style={{
@@ -530,129 +606,10 @@ export default function WithdrawScreen() {
       </View>
 
       <ThemedButton
-        title="Confirm"
-        onPress={() => setStep("pin")}
+        title="Confirm Withdrawal"
+        onPress={handleConfirmWithdrawal}
+        loading={isAddingPayout || isSubmittingWithdrawal}
         className="mt-14"
-      />
-    </Animated.View>
-  );
-
-  const renderPin = () => (
-    <Animated.View entering={FadeInDown.duration(600).delay(150)} className="px-5 items-center mt-6">
-      <Image
-        source={require("@/assets/images/change-pin.png")}
-        style={{ width: 120, height: 120, marginBottom: 10 }}
-        resizeMode="contain"
-      />
-      <Text className="text-[#155D5F] font-extrabold text-[24px] mb-2 mt-4">
-        Insert your Pin
-      </Text>
-      <Text className="text-[#6B7280] text-[13px] mb-8 text-center">
-        Please insert pin to complete transaction
-      </Text>
-
-      <View className="flex-row justify-center mb-8 w-full px-2" style={{ gap: 16 }}>
-        {[0, 1, 2, 3].map((i) => (
-          <TextInput
-            key={i}
-            value={pinValues[i]}
-            ref={(el) => { pinRefs.current[i] = el; }}
-            className="w-[55px] h-[55px] bg-[#F8F8F8] rounded-xl text-center text-[24px] font-bold text-[#1A1A1A]"
-            keyboardType="numeric"
-            maxLength={1}
-            secureTextEntry
-            onChangeText={(val) => {
-              const newPins = [...pinValues];
-              newPins[i] = val;
-              setPinValues(newPins);
-              if (val && i < 3) {
-                pinRefs.current[i + 1]?.focus();
-              }
-            }}
-          />
-        ))}
-      </View>
-
-      <ThemedButton
-        title="Confirm"
-        disabled={pinValues.join("").length !== 4 || loading}
-        loading={loading}
-        className="mt-6 w-full"
-        onPress={async () => {
-          const pin = pinValues.join("");
-          if (pin.length !== 4) return;
-
-          try {
-            // 1. Verify PIN upfront
-            await verifyPin({ pin }).unwrap();
-
-            // 2. Resolve or create payout account ID
-            let accountId = selectedPayoutAccountId;
-
-            if (!accountId) {
-              // Check if account already exists in current recipients list
-              const existing = recipients.find(
-                (r) => r.accountNumber === accountNumber
-              );
-              if (existing) {
-                accountId = existing.id;
-              } else {
-                try {
-                  const newAccount = await addPayoutAccount({
-                    accountNumber,
-                    bankCode: selectedBankCode,
-                    bankName: selectedBank,
-                  }).unwrap();
-                  accountId = newAccount.id;
-                } catch (addErr: any) {
-                  // If backend says account already added (400), find it in refreshed list
-                  const refreshed = await refetchPayoutAccounts();
-                  const found = refreshed.data?.items?.find(
-                    (r) => r.accountNumber === accountNumber
-                  );
-                  if (found) {
-                    accountId = found.id;
-                  } else {
-                    throw addErr;
-                  }
-                }
-              }
-            }
-
-            if (!accountId) {
-              throw new Error("Unable to resolve payout account.");
-            }
-
-            // 3. Clean amount in kobo
-            const cleanAmount = parseFloat(amount.replace(/[^\d.]/g, "")) * 100;
-
-            // 4. Initiate withdrawal
-            await initiateWithdrawal({
-              amount: cleanAmount,
-              payoutAccountId: accountId,
-            }).unwrap();
-
-            setShowSuccess(true);
-          } catch (e: any) {
-            console.error("Failed to withdraw:", e);
-            if (e?.data?.message?.toLowerCase()?.includes("not set")) {
-              Alert.alert(
-                "Transaction PIN Required",
-                "You have not set up a transaction PIN yet. Would you like to set one now to authorize withdrawals?",
-                [
-                  { text: "Set PIN Now", onPress: () => router.push("/profile/security/change-pin" as any) },
-                  { text: "Cancel", style: "cancel" },
-                ]
-              );
-            } else {
-              Alert.alert(
-                "Withdrawal Failed",
-                e?.data?.message || e?.message || "Failed to process withdrawal. Please verify your PIN and try again."
-              );
-            }
-            setPinValues(["", "", "", ""]);
-          }
-        }}
       />
     </Animated.View>
   );
@@ -667,29 +624,29 @@ export default function WithdrawScreen() {
         {step === "recipient-details" && renderRecipientDetails()}
         {step === "select-bank" && renderSelectBank()}
         {step === "preview" && renderPreview()}
-        {step === "pin" && renderPin()}
       </ScrollView>
 
       <Modal visible={showSuccess} transparent animationType="fade">
-        <View className="flex-1 justify-center items-center px-6">
-          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-          <View className="bg-white rounded-[32px] p-8 items-center w-full max-w-[340px]">
+        <View className="flex-1 bg-black/50 justify-center items-center px-10">
+          <View className="bg-white rounded-[32px] p-8 items-center w-full">
             <Image
               source={require("@/assets/images/funds.png")}
-              style={{ width: 140, height: 140, marginBottom: 20 }}
+              style={{ width: 120, height: 120, marginBottom: 20 }}
               resizeMode="contain"
             />
-            <Text className="text-[#1A1A1A] font-extrabold text-[22px] text-center mb-4 leading-[28px]">
-              Wealth Withdrawal Successful! ✅
+            <Text className="text-[#1A1A1A] font-bold text-[20px] text-center mb-2">
+              Withdrawal Initiated ✅
             </Text>
-            <Text className="text-[#4B5563] text-[14px] text-center mb-8 leading-[22px]">
-              Dear WealthBuilder, you have successfully withdrawn ₦{formatAmount(amount)} from your {wealthPlan} savings portfolio. Keep building!
+            <Text className="text-[#6B7280] text-[12px] text-center mb-8 px-4">
+              Your withdrawal of ₦{formatAmount(amount)} from your wallet
+              account to {userName} ({selectedBank} - {accountNumber}) has been
+              submitted successfully.
             </Text>
             <ThemedButton
-              title="Confirm"
+              title="Done"
               onPress={() => {
                 setShowSuccess(false);
-                router.replace("/education/win-up"); // Standard success redirect, adjust as needed
+                router.replace("/(tabs)/my-account");
               }}
               className="w-full"
             />

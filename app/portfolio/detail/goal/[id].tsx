@@ -75,18 +75,6 @@ export default function GoalDetailScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const { penaltyRate, penaltyRatio } = getDynamicPenaltyRate(
-    "goal",
-    systemConfigData,
-    rates,
-    "2.5%"
-  );
-  const goalInterestRateLabel = getDynamicInterestRateLabel(
-    "goal",
-    systemConfigData,
-    rates,
-    12
-  );
   const { data: walletSummary, refetch: refetchWallet } = useGetWalletSummaryQuery();
   const walletBalance = (parseFloat(walletSummary?.currentBalance || "0")) / 100;
 
@@ -126,6 +114,21 @@ export default function GoalDetailScreen() {
     lastGoalRef.current = fetchedGoal;
   }
   const goal = fetchedGoal || savedCompletedPlan || lastGoalRef.current;
+
+  const { penaltyRate, penaltyRatio } = getDynamicPenaltyRate(
+    "goal",
+    systemConfigData,
+    rates,
+    "2.5%",
+    goal
+  );
+  const goalInterestRateLabel = getDynamicInterestRateLabel(
+    "goal",
+    systemConfigData,
+    rates,
+    12,
+    goal
+  );
 
   const isTransferredOrWithdrawnInTxns = Boolean(
     txnsData?.items?.some((t) => {
@@ -568,7 +571,7 @@ export default function GoalDetailScreen() {
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Interest Rate</Text>
-                <Text style={styles.value}>{goal.interestRate ? `${goal.interestRate}% P.A` : goalInterestRateLabel}</Text>
+                <Text style={styles.value}>{goalInterestRateLabel}</Text>
               </View>
             </View>
 

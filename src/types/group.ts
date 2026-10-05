@@ -168,3 +168,20 @@ export interface WithdrawGroupRequest {
   amount: number;
   reason?: string;
 }
+
+export interface UserGroupReportItem {
+  id: string;
+  groupId: string;
+  reporterId: string;
+  reason: string;
+  status: "PENDING" | "INVESTIGATING" | "RESOLVED" | "DISMISSED";
+  resolutionNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  group?: {
+    id: string;
+    name: string;
+    imageUrl?: string | null;
+    coverImage?: string | null;
+  };
+}

@@ -1,43 +1,42 @@
-import { BalanceText } from "@/src/components/common/BalanceText";
-import Header from "@/src/components/common/Header";
-import { ConfirmActionModal } from "@/src/components/common/ConfirmActionModal";
-import { AppToast, ToastState } from "@/src/components/common/AppToast";
+import { ThemedButton } from "@/src/components/ThemedButton";
 import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
+import { AppToast, ToastState } from "@/src/components/common/AppToast";
+import { BalanceText } from "@/src/components/common/BalanceText";
+import { ConfirmActionModal } from "@/src/components/common/ConfirmActionModal";
+import Header from "@/src/components/common/Header";
+import {
+  KEYBOARD_ACCESSORY_ID,
+  KeyboardDoneAccessory,
+} from "@/src/components/common/KeyboardDoneAccessory";
+import { RootState } from "@/src/store";
 import {
   useContributeToGroupMutation,
   useExitGroupMutation,
-  useTerminateGroupMutation,
   useGetGroupDetailsQuery,
   useGetGroupMembersQuery,
+  useGetSystemConfigsQuery,
   useJoinGroupMutation,
   useReportGroupMutation,
+  useTerminateGroupMutation,
   useToggleGroupMuteMutation,
   useWithdrawFromGroupMutation,
 } from "@/src/store/api/groupApi";
-import { useVerifyPinMutation } from "@/src/store/api/userApi";
+import { useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
+import { getDynamicPenaltyRate } from "@/src/utils/formatters";
 import { useListNotificationsQuery } from "@/src/store/api/notificationApi";
+import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
-import { ThemedButton } from "@/src/components/ThemedButton";
-import {
-  KeyboardDoneAccessory,
-  KEYBOARD_ACCESSORY_ID,
-} from "@/src/components/common/KeyboardDoneAccessory";
-import { RootState } from "@/src/store";
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BlurView } from "expo-blur";
 import {
-  ArrowUp,
-  Bell,
-  Check,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  MoreVertical,
-  Plus,
-  Share2,
-  Users,
-} from "lucide-react-native";
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { ArrowUp, Eye, EyeOff, Plus, Users } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -56,7 +55,6 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
@@ -79,13 +77,14 @@ export default function GroupDetailScreen() {
   // Modals state
   const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
   const [isDepositModalVisible, setIsDepositModalVisible] = useState(false);
-  const [isReportModalVisible, setIsReportModalVisible] = useState(false);
   const [isWithdrawModalVisible, setIsWithdrawModalVisible] = useState(false);
   const [isExitModalVisible, setIsExitModalVisible] = useState(false);
   const [isTerminateModalVisible, setIsTerminateModalVisible] = useState(false);
   const [showConfirmDepositModal, setShowConfirmDepositModal] = useState(false);
-  const [showConfirmWithdrawModal, setShowConfirmWithdrawModal] = useState(false);
-  const [showJoinRequestSentModal, setShowJoinRequestSentModal] = useState(false);
+  const [showConfirmWithdrawModal, setShowConfirmWithdrawModal] =
+    useState(false);
+  const [showJoinRequestSentModal, setShowJoinRequestSentModal] =
+    useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [coverImageError, setCoverImageError] = useState(false);
@@ -93,7 +92,6 @@ export default function GroupDetailScreen() {
   // Deposit / Withdraw Form state
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [reportReason, setReportReason] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [joinRequested, setJoinRequested] = useState(false);
 
@@ -112,19 +110,37 @@ export default function GroupDetailScreen() {
     pollingInterval: isFocused && isRotationalActive ? 15000 : 0,
   });
 
-  const { data: membersData, isLoading: membersLoading, refetch: refetchMembers } = useGetGroupMembersQuery(
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const { penaltyRate: groupPenaltyRate, penaltyRatio: groupPenaltyRatio } = getDynamicPenaltyRate(
+    "group",
+    systemConfigData,
+    rates,
+    "2.5%",
+    group
+  );
+
+  const {
+    data: membersData,
+    isLoading: membersLoading,
+    refetch: refetchMembers,
+  } = useGetGroupMembersQuery(
     { id: id as string, populate: ["user"] },
     {
       skip: !id || id === "new",
       refetchOnMountOrArgChange: true,
       pollingInterval: isFocused && isRotationalActive ? 15000 : 0,
-    }
+    },
   );
 
   useEffect(() => {
     const isActive =
       group?.groupType === "ROTATIONAL" &&
-      (group?.status || (group as any)?.state || "").toString().trim().toUpperCase() === "ACTIVE";
+      (group?.status || (group as any)?.state || "")
+        .toString()
+        .trim()
+        .toUpperCase() === "ACTIVE";
     setIsRotationalActive(Boolean(isActive));
   }, [group]);
 
@@ -132,7 +148,7 @@ export default function GroupDetailScreen() {
     { limit: 50 },
     {
       refetchOnFocus: true,
-    }
+    },
   );
 
   const [joinGroup, { isLoading: isJoining }] = useJoinGroupMutation();
@@ -140,20 +156,31 @@ export default function GroupDetailScreen() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [toggleGroupMute] = useToggleGroupMuteMutation();
   const [exitGroup, { isLoading: isExiting }] = useExitGroupMutation();
-  const [terminateGroup, { isLoading: isTerminating }] = useTerminateGroupMutation();
+  const [terminateGroup, { isLoading: isTerminating }] =
+    useTerminateGroupMutation();
   const [reportGroup, { isLoading: isReporting }] = useReportGroupMutation();
-  const [withdrawFromGroup, { isLoading: isWithdrawing }] = useWithdrawFromGroupMutation();
+  const [withdrawFromGroup, { isLoading: isWithdrawing }] =
+    useWithdrawFromGroupMutation();
   const [verifyPin] = useVerifyPinMutation();
-  const { data: walletSummary, refetch: refetchWallet } = useGetWalletSummaryQuery();
-  const walletBalance = (parseFloat(walletSummary?.currentBalance || "0")) / 100;
+  const { data: walletSummary, refetch: refetchWallet } =
+    useGetWalletSummaryQuery();
+  const walletBalance = parseFloat(walletSummary?.currentBalance || "0") / 100;
+
+  // Deposit cooldown timestamp (loaded from AsyncStorage, keyed to userId+groupId).
+  // TEMPORARY: non-authoritative local hint until backend provides canContributeNow.
+  const [lastDepositTs, setLastDepositTs] = useState<number | null>(null);
+  // Tick counter that increments every minute so the deposit button countdown refreshes.
+  const [, setMinuteTick] = useState(0);
 
   useEffect(() => {
     if (isDepositModalVisible && group) {
-      const isFixedOrRotational = group.groupType === "FIXED" || group.groupType === "ROTATIONAL";
+      const isFixedOrRotational =
+        group.groupType === "FIXED" || group.groupType === "ROTATIONAL";
       if (isFixedOrRotational && group.contributionAmount) {
-        const amtKobo = typeof group.contributionAmount === "number"
-          ? group.contributionAmount
-          : parseFloat(String(group.contributionAmount));
+        const amtKobo =
+          typeof group.contributionAmount === "number"
+            ? group.contributionAmount
+            : parseFloat(String(group.contributionAmount));
         const amtNaira = amtKobo / 100;
         if (!isNaN(amtNaira) && amtNaira > 0) {
           const rounded = Math.floor(amtNaira);
@@ -182,26 +209,40 @@ export default function GroupDetailScreen() {
       refetchGroup();
       refetchMembers();
       refetchWallet();
+
+      // Load cooldown key from AsyncStorage (scoped to userId+groupId).
+      const uid = currentUser?.id ?? (currentUser as any)?._id ?? "";
+      const cooldownKey = `deposit_cooldown_${uid}_${id}`;
+      AsyncStorage.getItem(cooldownKey).then((val) => {
+        setLastDepositTs(val ? parseInt(val, 10) : null);
+      });
+
+      // Re-evaluate the cooldown countdown every minute so the button
+      // automatically re-enables at the boundary without leaving the screen.
+      const ticker = setInterval(() => setMinuteTick((t) => t + 1), 60000);
+
       return () => {
         setIsFocused(false);
+        clearInterval(ticker);
       };
-    }, [refetchGroup, refetchMembers, refetchWallet])
+    }, [refetchGroup, refetchMembers, refetchWallet, id, currentUser]),
   );
 
   const groupUnreadCount = useMemo(() => {
     const allItems: any[] =
-      notificationsData?.data?.items ||
-      (notificationsData as any)?.items ||
-      [];
+      notificationsData?.data?.items || (notificationsData as any)?.items || [];
     if (!id) return 0;
     const idStr = String(id).toLowerCase();
 
     return allItems.filter((item) => {
-      const isUnread = !item.isRead && !item.read && !item.readAt && item.status !== "READ";
+      const isUnread =
+        !item.isRead && !item.read && !item.readAt && item.status !== "READ";
       if (!isUnread) return false;
 
-      const dataGroupId = item.data?.groupId || item.data?.targetId || item.data?.id;
-      if (dataGroupId && String(dataGroupId).toLowerCase() === idStr) return true;
+      const dataGroupId =
+        item.data?.groupId || item.data?.targetId || item.data?.id;
+      if (dataGroupId && String(dataGroupId).toLowerCase() === idStr)
+        return true;
 
       const kindStr = (item.kind || item.type || "").toLowerCase();
       if (kindStr.includes("group") || kindStr.includes("tribe")) return true;
@@ -222,17 +263,19 @@ export default function GroupDetailScreen() {
 
   const hasRemovedNotification = useMemo(() => {
     const allItems: any[] =
-      notificationsData?.data?.items ||
-      (notificationsData as any)?.items ||
-      [];
+      notificationsData?.data?.items || (notificationsData as any)?.items || [];
     if (!id) return false;
     const idStr = String(id).toLowerCase();
     return allItems.some((item) => {
-      const dataGroupId = item.data?.groupId || item.data?.targetId || item.data?.id;
-      const matchesGroup = dataGroupId && String(dataGroupId).toLowerCase() === idStr;
+      const dataGroupId =
+        item.data?.groupId || item.data?.targetId || item.data?.id;
+      const matchesGroup =
+        dataGroupId && String(dataGroupId).toLowerCase() === idStr;
       const text = `${item.title || ""} ${item.body || ""}`.toLowerCase();
       const isRemovalMsg =
-        (text.includes("removed") || text.includes("refunded") || text.includes("exited")) &&
+        (text.includes("removed") ||
+          text.includes("refunded") ||
+          text.includes("exited")) &&
         (text.includes("tribe") || text.includes("group") || matchesGroup);
       return matchesGroup && isRemovalMsg;
     });
@@ -247,11 +290,16 @@ export default function GroupDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "white" }} edges={["top"]}>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: "white" }}
+        edges={["top"]}
+      >
         <StatusBar style="dark" />
         <Stack.Screen options={{ headerShown: false }} />
         <Header title="Group Details" onBack={() => router.back()} />
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <View
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
           <ActivityIndicator size="large" color={THEME} />
         </View>
       </SafeAreaView>
@@ -262,7 +310,10 @@ export default function GroupDetailScreen() {
   const targetKobo = parseFloat(group?.targetAmount?.toString() || "100000000");
   const targetNaira = targetKobo / 100;
 
-  const groupStatus = (group?.status || (group as any)?.state || "").toString().trim().toUpperCase();
+  const groupStatus = (group?.status || (group as any)?.state || "")
+    .toString()
+    .trim()
+    .toUpperCase();
   const isTerminated =
     groupStatus === "TERMINATED" ||
     groupStatus === "DISSOLVED" ||
@@ -274,34 +325,62 @@ export default function GroupDetailScreen() {
     Boolean((group as any)?.isTerminated) ||
     Boolean((group as any)?.is_terminated);
 
+  const isRotationalGroup = group?.groupType === "ROTATIONAL";
+
+
+
+  // For ROTATIONAL: use currentCycleSavings (the active cycle pot, can be "0").
+  // cycleSavingsNum === -1 means the field is absent from the response.
+  // Do NOT use || or > 0 as fallbacks — "0" / 0 is a valid value (payout just happened).
+  const rawCycleSavings = (group as any)?.currentCycleSavings;
+  const cycleSavingsPresent =
+    rawCycleSavings !== undefined && rawCycleSavings !== null;
+  const cycleSavingsNum = cycleSavingsPresent
+    ? typeof rawCycleSavings === "string"
+      ? parseFloat(rawCycleSavings)
+      : Number(rawCycleSavings)
+    : -1; // sentinel: field absent
+
   const rawSavings = group?.totalSavings ?? group?.currentBalance ?? 0;
-  const savingsNum = typeof rawSavings === "string" ? parseFloat(rawSavings) : Number(rawSavings);
-  const membersTotal = membersData?.items?.reduce(
-    (sum, m) => sum + (parseFloat(m.totalContributed?.toString() || "0") || 0),
-    0
-  ) || 0;
-  const effectiveKobo = (savingsNum > 0 ? savingsNum : membersTotal) || 0;
+  const savingsNum =
+    typeof rawSavings === "string"
+      ? parseFloat(rawSavings)
+      : Number(rawSavings);
+  const membersTotal =
+    membersData?.items?.reduce(
+      (sum, m) =>
+        sum + (parseFloat(m.totalContributed?.toString() || "0") || 0),
+      0,
+    ) ?? 0;
+
+  // effectiveKobo:
+  //  ROTATIONAL — currentCycleSavings when present (0 is valid); else 0 (never cumulative totalSavings).
+  //  FIXED/FLEX — totalSavings; membersTotal only if totalSavings is undefined.
+  const effectiveKobo = isRotationalGroup
+    ? (cycleSavingsPresent && cycleSavingsNum > 0 ? cycleSavingsNum : 0)
+    : savingsNum !== 0
+      ? savingsNum
+      : (membersTotal ?? 0);
   const currentNaira = effectiveKobo / 100;
 
-  const fixedContribKobo = typeof group?.contributionAmount === "number"
-    ? group.contributionAmount
-    : parseFloat(String(group?.contributionAmount || "0"));
+  const fixedContribKobo =
+    typeof group?.contributionAmount === "number"
+      ? group.contributionAmount
+      : parseFloat(String(group?.contributionAmount || "0"));
   const fixedContribNaira = fixedContribKobo > 0 ? fixedContribKobo / 100 : 0;
 
-  const currentMemberRecord = membersData?.items?.find(
-    (m) => {
-      const uid = currentUser?.id || (currentUser as any)?._id;
-      const mUserId =
-        typeof m.userId === "string" && m.userId
-          ? m.userId
-          : typeof (m as any).user?.id === "string" && (m as any).user.id
+  const currentMemberRecord = membersData?.items?.find((m) => {
+    const uid = currentUser?.id || (currentUser as any)?._id;
+    const mUserId =
+      typeof m.userId === "string" && m.userId
+        ? m.userId
+        : typeof (m as any).user?.id === "string" && (m as any).user.id
           ? (m as any).user.id
           : null;
-      return uid && (mUserId === uid || m.id === uid);
-    }
-  );
+    return uid && (mUserId === uid || m.id === uid);
+  });
   const userContributedKobo = parseFloat(
-    currentMemberRecord?.totalContributed?.toString() || "0"
+    currentMemberRecord?.totalContributed?.toString() || "0",
   );
   const userContributedNaira = userContributedKobo / 100;
 
@@ -310,8 +389,9 @@ export default function GroupDetailScreen() {
     (currentUser?.id && group?.creatorId === currentUser.id) ||
     membersData?.items?.some(
       (m) =>
-        (m.userId === currentUser?.id || (m as any).user?.id === currentUser?.id) &&
-        (m.role === "OWNER" || m.role === "CREATOR")
+        (m.userId === currentUser?.id ||
+          (m as any).user?.id === currentUser?.id) &&
+        (m.role === "OWNER" || m.role === "CREATOR"),
     );
 
   const currentMemberStatus = (
@@ -383,17 +463,17 @@ export default function GroupDetailScreen() {
       groupUserStatus.includes("EXIT") ||
       Boolean(
         Array.isArray((group as any)?.removedMembers) &&
-          (group as any).removedMembers.some((m: any) => {
-            const uid = typeof m === "string" ? m : m?.userId || m?.id;
-            return uid === currentUser?.id;
-          })
+        (group as any).removedMembers.some((m: any) => {
+          const uid = typeof m === "string" ? m : m?.userId || m?.id;
+          return uid === currentUser?.id;
+        }),
       ) ||
       Boolean(
         Array.isArray((group as any)?.pastMembers) &&
-          (group as any).pastMembers.some((m: any) => {
-            const uid = typeof m === "string" ? m : m?.userId || m?.id;
-            return uid === currentUser?.id;
-          })
+        (group as any).pastMembers.some((m: any) => {
+          const uid = typeof m === "string" ? m : m?.userId || m?.id;
+          return uid === currentUser?.id;
+        }),
       ));
 
   const isRemoved =
@@ -410,8 +490,9 @@ export default function GroupDetailScreen() {
     (joinRequested ||
       membersData?.items?.some(
         (m) =>
-          (m.userId === currentUser?.id || (m as any).user?.id === currentUser?.id) &&
-          (m.status === "PENDING" || (m.status as string) === "Pending")
+          (m.userId === currentUser?.id ||
+            (m as any).user?.id === currentUser?.id) &&
+          (m.status === "PENDING" || (m.status as string) === "Pending"),
       ) ||
       groupUserStatus === "PENDING");
 
@@ -441,8 +522,9 @@ export default function GroupDetailScreen() {
       group?.isAdmin ||
       membersData?.items?.some(
         (m) =>
-          (m.userId === currentUser?.id || (m as any).user?.id === currentUser?.id) &&
-          (m.role === "OWNER" || m.role === "ADMIN")
+          (m.userId === currentUser?.id ||
+            (m as any).user?.id === currentUser?.id) &&
+          (m.role === "OWNER" || m.role === "ADMIN"),
       ));
 
   const activeMembersCount =
@@ -452,34 +534,69 @@ export default function GroupDetailScreen() {
         m.status === "PAID" ||
         m.status === "UNPAID" ||
         m.role === "CREATOR" ||
-        m.role === "OWNER"
+        m.role === "OWNER",
     ).length ||
     (group as any)?.membersCount ||
     (group as any)?.activeMembersCount ||
     0;
 
   const membersLimitNum = group?.membersLimit ? Number(group.membersLimit) : 0;
-  const isGroupFull = membersLimitNum > 0 && activeMembersCount >= membersLimitNum;
+  const isGroupFull =
+    membersLimitNum > 0 && activeMembersCount >= membersLimitNum;
 
   // Calculations
   const progress = targetNaira > 0 ? (currentNaira / targetNaira) * 100 : 0;
   const progressPct = Math.min(Math.max(Math.round(progress), 0), 100);
 
+  // Parse a date string to a Date object, always treating ISO strings as UTC
+  // to avoid timezone +1 day offset when display functions use UTC getters.
   const parseGroupDate = (dateString?: string): Date | null => {
     if (!dateString) return null;
     const trimmed = dateString.trim();
-    if (trimmed.includes("/")) {
+    // DD/MM/YYYY format — construct as UTC end-of-day to match creation intent
+    if (trimmed.includes("/") && !trimmed.includes("T")) {
       const parts = trimmed.split("/").map((p) => parseInt(p.trim(), 10));
       if (parts.length === 3) {
         const [day, month, year] = parts;
         if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-          const d = new Date(year, month - 1, day, 23, 59, 59);
+          // Treat as end-of-day UTC (23:59:59) so the day is still active
+          const d = new Date(Date.UTC(year, month - 1, day, 23, 59, 59));
           if (!isNaN(d.getTime())) return d;
         }
       }
     }
+    // ISO / any other format — parse as-is (already UTC from backend)
     const d = new Date(trimmed);
-    return isNaN(d.getTime()) ? null : d;
+    if (isNaN(d.getTime())) return null;
+    // If stored as midnight UTC (startDate convention), treat end-of-that-day for endDate comparisons.
+    // We cannot distinguish startDate from endDate here, so if the caller passes endDate at 00:00:00Z
+    // it will be treated as end-of-day. This matches parseDateToIsoEnd (23:59:59Z stored by creation).
+    // For newly created groups the endDate IS 23:59:59Z, so this path only affects legacy data.
+    const isStartOfDay =
+      d.getUTCHours() === 0 &&
+      d.getUTCMinutes() === 0 &&
+      d.getUTCSeconds() === 0;
+    if (isStartOfDay) {
+      return new Date(
+        Date.UTC(
+          d.getUTCFullYear(),
+          d.getUTCMonth(),
+          d.getUTCDate(),
+          23,
+          59,
+          59,
+        ),
+      );
+    }
+    return d;
+  };
+
+  // Display a Date using UTC getters to match the stored UTC date exactly
+  const formatDateDisplay = (dateString?: string) => {
+    if (!dateString) return "N/A";
+    const d = parseGroupDate(dateString);
+    if (!d || isNaN(d.getTime())) return dateString;
+    return `${d.getUTCDate()}/${d.getUTCMonth() + 1}/${d.getUTCFullYear()}`;
   };
 
   const getTimelineLeft = () => {
@@ -496,13 +613,6 @@ export default function GroupDetailScreen() {
       return `${weeks} Weeks Left`;
     }
     return `${diffDays} Days Left`;
-  };
-
-  const formatDateDisplay = (dateString?: string) => {
-    if (!dateString) return "N/A";
-    const d = parseGroupDate(dateString);
-    if (!d || isNaN(d.getTime())) return dateString;
-    return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
   };
 
   const formatCurrency = (amount: number) => {
@@ -522,7 +632,7 @@ export default function GroupDetailScreen() {
     try {
       await Share.share({
         message: `Join my Wealth Group "${groupName}" on Wealthconomy! 🚀\n\nTarget: ₦${formatCurrency(
-          targetNaira
+          targetNaira,
         )}\n\nJoin here: wealthconomy://group/join/${id}`,
       });
     } catch (error: any) {
@@ -542,7 +652,9 @@ export default function GroupDetailScreen() {
     }
     setIsProcessing(true);
     try {
-      console.log(`👥 [WealthGroup Join Request] POST /api/v1/groups/${id}/join`);
+      console.log(
+        `👥 [WealthGroup Join Request] POST /api/v1/groups/${id}/join`,
+      );
       await joinGroup(id as string).unwrap();
       if (isPublicGroup) {
         setToast({
@@ -600,34 +712,10 @@ export default function GroupDetailScreen() {
 
   const handleReportGroup = () => {
     setIsMenuVisible(false);
-    setIsReportModalVisible(true);
-  };
-
-  const handleSubmitReport = async () => {
-    if (!reportReason.trim()) {
-      setToast({
-        type: "warning",
-        title: "Reason Required",
-        message: "Please describe the issue before submitting.",
-      });
-      return;
-    }
-    try {
-      await reportGroup({ id: id as string, reason: reportReason.trim() }).unwrap();
-      setToast({
-        type: "success",
-        title: "Report Submitted",
-        message: "Your report has been sent to our support team for review.",
-      });
-      setIsReportModalVisible(false);
-      setReportReason("");
-    } catch (err: any) {
-      setToast({
-        type: "error",
-        title: "Report Failed",
-        message: err?.data?.message || err?.message || "Failed to submit report. Please try again.",
-      });
-    }
+    router.push({
+      pathname: "/profile/reports",
+      params: { groupId: id as string, groupName },
+    });
   };
 
   const handleExitGroup = () => {
@@ -642,7 +730,8 @@ export default function GroupDetailScreen() {
       setToast({
         type: "success",
         title: "Exited Tribe",
-        message: "You have left the tribe. Your refunded savings have been credited directly to your Main Wallet.",
+        message:
+          "You have left the tribe. Your refunded savings have been credited directly to your Main Wallet.",
       });
       setTimeout(() => {
         router.back();
@@ -652,7 +741,8 @@ export default function GroupDetailScreen() {
       setToast({
         type: "error",
         title: "Notice",
-        message: err?.data?.message || "Failed to exit group. Please try again.",
+        message:
+          err?.data?.message || "Failed to exit group. Please try again.",
       });
     }
   };
@@ -669,7 +759,8 @@ export default function GroupDetailScreen() {
       setToast({
         type: "success",
         title: "Group Terminated",
-        message: "The tribe has been terminated. 100% of all members' saved contributions have been refunded directly into their Main Wallets.",
+        message:
+          "The tribe has been terminated. 100% of all members' saved contributions have been refunded directly into their Main Wallets.",
       });
       setTimeout(() => {
         router.back();
@@ -679,7 +770,8 @@ export default function GroupDetailScreen() {
       setToast({
         type: "error",
         title: "Notice",
-        message: err?.data?.message || "Failed to terminate group. Please try again.",
+        message:
+          err?.data?.message || "Failed to terminate group. Please try again.",
       });
     }
   };
@@ -689,7 +781,10 @@ export default function GroupDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#FAFAFA" }} edges={["top"]}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: "#FAFAFA" }}
+      edges={["top"]}
+    >
       <StatusBar style="dark" />
       <Stack.Screen options={{ headerShown: false }} />
 
@@ -727,10 +822,19 @@ export default function GroupDetailScreen() {
           {groupName}
         </Text>
 
-        {isMember && !isTerminated && !hasFullyWithdrawn && !isRemoved && !isBlacklisted ? (
+        {isMember &&
+        !isTerminated &&
+        !hasFullyWithdrawn &&
+        !isRemoved &&
+        !isBlacklisted ? (
           <TouchableOpacity
             onPress={() => setIsMenuVisible(true)}
-            style={{ width: 40, height: 40, alignItems: "flex-end", justifyContent: "center" }}
+            style={{
+              width: 40,
+              height: 40,
+              alignItems: "flex-end",
+              justifyContent: "center",
+            }}
           >
             <Ionicons name="ellipsis-vertical" size={22} color="#1A1A1A" />
           </TouchableOpacity>
@@ -757,11 +861,15 @@ export default function GroupDetailScreen() {
         <View className="px-5 py-4 pb-16">
           {/* ── Sub-header: Group Details + Notification Bell ────────── */}
           <View className="flex-row justify-between items-center mb-4">
-            <Text className="text-[20px] font-black text-[#1A1A1A]">Group Details</Text>
+            <Text className="text-[20px] font-black text-[#1A1A1A]">
+              Group Details
+            </Text>
             {(isMember || isBlacklisted) && !isRemoved && (
               <TouchableOpacity
                 onPress={() =>
-                  router.push(`/portfolio/detail/group/${id}/notifications` as any)
+                  router.push(
+                    `/portfolio/detail/group/${id}/notifications` as any,
+                  )
                 }
                 style={{
                   width: 40,
@@ -773,7 +881,11 @@ export default function GroupDetailScreen() {
                   position: "relative",
                 }}
               >
-                <Ionicons name="notifications-outline" size={20} color={THEME} />
+                <Ionicons
+                  name="notifications-outline"
+                  size={20}
+                  color={THEME}
+                />
                 {groupUnreadCount > 0 && (
                   <View
                     style={{
@@ -791,7 +903,9 @@ export default function GroupDetailScreen() {
                       justifyContent: "center",
                     }}
                   >
-                    <Text style={{ color: "white", fontSize: 9, fontWeight: "800" }}>
+                    <Text
+                      style={{ color: "white", fontSize: 9, fontWeight: "800" }}
+                    >
                       {groupUnreadCount > 99 ? "99+" : groupUnreadCount}
                     </Text>
                   </View>
@@ -813,16 +927,31 @@ export default function GroupDetailScreen() {
           >
             {group?.coverImage && !coverImageError ? (
               <Image
-                source={{ uri: group.coverImage.startsWith("http://") ? group.coverImage.replace("http://", "https://") : group.coverImage }}
+                source={{
+                  uri: group.coverImage.startsWith("http://")
+                    ? group.coverImage.replace("http://", "https://")
+                    : group.coverImage,
+                }}
                 onError={(e) => {
-                  console.warn(`❌ [GroupDetail CoverImage Error] [${group?.name || id}]:`, e.nativeEvent?.error, `| URI: "${group?.coverImage}"`);
+                  console.warn(
+                    `❌ [GroupDetail CoverImage Error] [${group?.name || id}]:`,
+                    e.nativeEvent?.error,
+                    `| URI: "${group?.coverImage}"`,
+                  );
                   setCoverImageError(true);
                 }}
                 style={{ width: "100%", height: "100%" }}
                 resizeMode="cover"
               />
             ) : (
-              <View style={{ flex: 1, backgroundColor: THEME_BG, alignItems: "center", justifyContent: "center" }}>
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: THEME_BG,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
                 <Users size={64} color={THEME} />
               </View>
             )}
@@ -846,7 +975,9 @@ export default function GroupDetailScreen() {
               }}
             >
               <Text style={{ fontSize: 13 }}>🛡️</Text>
-              <Text style={{ color: "#166534", fontSize: 12, fontWeight: "800" }}>
+              <Text
+                style={{ color: "#166534", fontSize: 12, fontWeight: "800" }}
+              >
                 Vetted & Established Process
               </Text>
             </View>
@@ -864,10 +995,25 @@ export default function GroupDetailScreen() {
                 marginBottom: 16,
               }}
             >
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 6,
+                }}
+              >
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+                >
                   <Ionicons name="sync-circle" size={22} color={THEME} />
-                  <Text style={{ fontSize: 14, fontWeight: "800", color: "#1A1A1A" }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "800",
+                      color: "#1A1A1A",
+                    }}
+                  >
                     {(group.currentCycle ?? 0) === 0
                       ? `Not started · 0 of ${group.totalCycles || group.membersLimit || 1} cycles`
                       : `Cycle ${group.currentCycle} of ${group.totalCycles || group.membersLimit || 1}`}
@@ -892,14 +1038,41 @@ export default function GroupDetailScreen() {
                 }}
               >
                 <View>
-                  <Text style={{ fontSize: 11, color: "#64748B", fontWeight: "600" }}>Member Contrib. / Cycle</Text>
-                  <Text style={{ fontSize: 13, color: THEME, fontWeight: "800" }}>
-                    ₦{fixedContribNaira > 0 ? formatCurrency(fixedContribNaira) : formatCurrency(targetNaira / (group.membersLimit || 1))}
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: "#64748B",
+                      fontWeight: "600",
+                    }}
+                  >
+                    Member Contrib. / Cycle
+                  </Text>
+                  <Text
+                    style={{ fontSize: 13, color: THEME, fontWeight: "800" }}
+                  >
+                    ₦
+                    {fixedContribNaira > 0
+                      ? formatCurrency(fixedContribNaira)
+                      : formatCurrency(targetNaira / (group.membersLimit || 1))}
                   </Text>
                 </View>
                 <View style={{ alignItems: "flex-end" }}>
-                  <Text style={{ fontSize: 11, color: "#64748B", fontWeight: "600" }}>Cycle Lump-Sum Payout</Text>
-                  <Text style={{ fontSize: 13, color: "#16A34A", fontWeight: "900" }}>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: "#64748B",
+                      fontWeight: "600",
+                    }}
+                  >
+                    Cycle Lump-Sum Payout
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: "#16A34A",
+                      fontWeight: "900",
+                    }}
+                  >
                     ₦{formatCurrency(targetNaira)}
                   </Text>
                 </View>
@@ -918,7 +1091,16 @@ export default function GroupDetailScreen() {
                 <View
                   style={{
                     height: "100%",
-                    width: `${Math.min(100, Math.max(0, (((group.currentCycle ?? 0) / (group.totalCycles || group.membersLimit || 1)) * 100)))}%`,
+                    // Cycle bar: currentCycleSavings / (contributionAmount × membersLimit)
+                    // This shows how full the current cycle pot is, not lifetime progress.
+                    width: (() => {
+                      const potTarget =
+                        fixedContribKobo > 0 && membersLimitNum > 0
+                          ? fixedContribKobo * membersLimitNum
+                          : targetKobo || 1;
+                      const fill = cycleSavingsPresent ? cycleSavingsNum : 0;
+                      return `${Math.min(100, Math.max(0, (fill / potTarget) * 100))}%`;
+                    })(),
                     backgroundColor: THEME,
                     borderRadius: 4,
                   }}
@@ -957,7 +1139,9 @@ export default function GroupDetailScreen() {
             <View style={{ padding: 22 }}>
               <View className="flex-row items-center justify-between mb-1">
                 <Text className="text-[#4B5563] text-[14px] font-extrabold">
-                  Total Group Savings
+                  {isRotationalGroup
+                    ? "Current Cycle Pool"
+                    : "Total Group Savings"}
                 </Text>
                 <TouchableOpacity
                   onPress={() => setShowBalance(!showBalance)}
@@ -1001,9 +1185,28 @@ export default function GroupDetailScreen() {
                 ) : (
                   <>
                     <Text className="text-[#4B5563] text-[13px] font-extrabold">
-                      Group wealth grew by ₦{group?.dailyWealthGrowth ? (parseFloat(group.dailyWealthGrowth.toString()) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"} today
+                      {isRotationalGroup
+                        ? `Lifetime saved: ₦${(savingsNum / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : `Group wealth grew by ₦${
+                            group?.dailyWealthGrowth
+                              ? (
+                                  parseFloat(
+                                    group.dailyWealthGrowth.toString(),
+                                  ) / 100
+                                ).toLocaleString("en-US", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })
+                              : "0.00"
+                          } today`}
                     </Text>
-                    <ArrowUp size={14} color="#4CAF50" style={{ marginLeft: 4 }} />
+                    {!isRotationalGroup && (
+                      <ArrowUp
+                        size={14}
+                        color="#4CAF50"
+                        style={{ marginLeft: 4 }}
+                      />
+                    )}
                   </>
                 )}
               </View>
@@ -1012,7 +1215,14 @@ export default function GroupDetailScreen() {
 
           {/* ── Progress Bar & Timeline Row ──────────────────────────── */}
           <View style={{ marginBottom: 20 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 6,
+              }}
+            >
               <Text style={{ fontSize: 18 }}>➡️</Text>
               <Text style={{ fontSize: 18 }}>🏆</Text>
             </View>
@@ -1035,11 +1245,21 @@ export default function GroupDetailScreen() {
                 }}
               />
             </View>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <Text style={{ fontSize: 13, fontWeight: "700", color: "#64748B" }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{ fontSize: 13, fontWeight: "700", color: "#64748B" }}
+              >
                 {progressPct}%
               </Text>
-              <Text style={{ fontSize: 13, fontWeight: "700", color: "#64748B" }}>
+              <Text
+                style={{ fontSize: 13, fontWeight: "700", color: "#64748B" }}
+              >
                 {getTimelineLeft()}
               </Text>
             </View>
@@ -1060,11 +1280,27 @@ export default function GroupDetailScreen() {
               }}
             >
               <Ionicons name="person-remove" size={30} color="#EF4444" />
-              <Text style={{ color: "#991B1B", fontWeight: "900", fontSize: 16, textAlign: "center", marginTop: 2 }}>
+              <Text
+                style={{
+                  color: "#991B1B",
+                  fontWeight: "900",
+                  fontSize: 16,
+                  textAlign: "center",
+                  marginTop: 2,
+                }}
+              >
                 Removed from Tribe
               </Text>
-              <Text style={{ color: "#B91C1C", fontSize: 13, textAlign: "center", lineHeight: 19 }}>
-                You've been removed from this group. 100% of your accumulated savings have been refunded directly into your Main Wallet.
+              <Text
+                style={{
+                  color: "#B91C1C",
+                  fontSize: 13,
+                  textAlign: "center",
+                  lineHeight: 19,
+                }}
+              >
+                You've been removed from this group. 100% of your accumulated
+                savings have been refunded directly into your Main Wallet.
               </Text>
             </View>
           ) : isBlacklisted ? (
@@ -1081,11 +1317,27 @@ export default function GroupDetailScreen() {
               }}
             >
               <Ionicons name="pause-circle" size={32} color="#D97706" />
-              <Text style={{ color: "#92400E", fontWeight: "900", fontSize: 16, textAlign: "center", marginTop: 2 }}>
+              <Text
+                style={{
+                  color: "#92400E",
+                  fontWeight: "900",
+                  fontSize: 16,
+                  textAlign: "center",
+                  marginTop: 2,
+                }}
+              >
                 Temporarily Suspended
               </Text>
-              <Text style={{ color: "#B45309", fontSize: 13, textAlign: "center", lineHeight: 19 }}>
-                You've been temporarily suspended from this group. Your savings remain safe. Contact the group admin for more information.
+              <Text
+                style={{
+                  color: "#B45309",
+                  fontSize: 13,
+                  textAlign: "center",
+                  lineHeight: 19,
+                }}
+              >
+                You've been temporarily suspended from this group. Your savings
+                remain safe. Contact the group admin for more information.
               </Text>
             </View>
           ) : hasFullyWithdrawn ? (
@@ -1102,11 +1354,27 @@ export default function GroupDetailScreen() {
               }}
             >
               <Ionicons name="checkmark-circle" size={32} color="#16A34A" />
-              <Text style={{ color: "#15803D", fontWeight: "900", fontSize: 16, textAlign: "center", marginTop: 2 }}>
+              <Text
+                style={{
+                  color: "#15803D",
+                  fontWeight: "900",
+                  fontSize: 16,
+                  textAlign: "center",
+                  marginTop: 2,
+                }}
+              >
                 Tribe Completed — Savings Withdrawn
               </Text>
-              <Text style={{ color: "#166534", fontSize: 13, textAlign: "center", lineHeight: 19 }}>
-                You've fully withdrawn your savings from this tribe. Your funds have been credited to your Main Wallet.
+              <Text
+                style={{
+                  color: "#166534",
+                  fontSize: 13,
+                  textAlign: "center",
+                  lineHeight: 19,
+                }}
+              >
+                You've fully withdrawn your savings from this tribe. Your funds
+                have been credited to your Main Wallet.
               </Text>
             </View>
           ) : isTerminated ? (
@@ -1121,32 +1389,163 @@ export default function GroupDetailScreen() {
                 alignItems: "center",
               }}
             >
-              <Ionicons name="information-circle-outline" size={28} color="#EF4444" />
-              <Text style={{ color: "#991B1B", fontWeight: "800", fontSize: 16, marginTop: 4, textAlign: "center" }}>
+              <Ionicons
+                name="information-circle-outline"
+                size={28}
+                color="#EF4444"
+              />
+              <Text
+                style={{
+                  color: "#991B1B",
+                  fontWeight: "800",
+                  fontSize: 16,
+                  marginTop: 4,
+                  textAlign: "center",
+                }}
+              >
                 Tribe Terminated
               </Text>
-              <Text style={{ color: "#B91C1C", fontSize: 13, marginTop: 4, textAlign: "center", lineHeight: 18 }}>
-                This tribe has been terminated by the creator. 100% of all members' saved contributions have been refunded directly into their Main Wallets.
+              <Text
+                style={{
+                  color: "#B91C1C",
+                  fontSize: 13,
+                  marginTop: 4,
+                  textAlign: "center",
+                  lineHeight: 18,
+                }}
+              >
+                This tribe has been terminated by the creator. 100% of all
+                members' saved contributions have been refunded directly into
+                their Main Wallets.
               </Text>
             </View>
           ) : isMember ? (
             <View style={{ gap: 12, marginBottom: 20 }}>
-              {/* Deposit funds (Disabled after group maturity or if ROTATIONAL positions are not set) */}
+              {/* Deposit funds */}
               {(() => {
-                const isRotational = group?.groupType === "ROTATIONAL";
-                const isPositionsPending = isRotational && !arePositionsSet;
-                const isDepositDisabled = isGroupEnded || isPositionsPending;
+                const isPositionsPending =
+                  isRotationalGroup && !arePositionsSet;
+                const freq = (group?.frequency ?? "").toUpperCase();
+                const isFlex = group?.groupType === "FLEX";
+
+                // ── Backend-authoritative cooldown check ─────────────────────────
+                // If the backend provides canContributeNow / nextContributionAt,
+                // use those and skip all local logic.
+                const canContributeNow = (group as any)?.canContributeNow;
+                const nextContributionAt = (group as any)?.nextContributionAt;
+                let backendCooldown = false;
+                let backendCooldownLabel = "";
+                if (canContributeNow === false && nextContributionAt) {
+                  backendCooldown = true;
+                  const opens = new Date(nextContributionAt);
+                  const msLeft = opens.getTime() - Date.now();
+                  if (msLeft > 0) {
+                    const h = Math.floor(msLeft / 3600000);
+                    const m = Math.floor((msLeft % 3600000) / 60000);
+                    backendCooldownLabel = `Next deposit opens in ${h}h ${m}m`;
+                  } else {
+                    backendCooldown = false;
+                  }
+                }
+
+                // ── ROTATIONAL: already contributed for this cycle ────────────────
+                // totalContributed >= contributionAmount × currentCycle
+                const myContribKobo = parseFloat(
+                  currentMemberRecord?.totalContributed?.toString() ?? "0",
+                );
+                const currentCycleNum = group?.currentCycle ?? 1;
+                const expectedTotalKobo =
+                  fixedContribKobo > 0 ? fixedContribKobo * currentCycleNum : 0;
+                const alreadyContributedThisCycle =
+                  isRotationalGroup &&
+                  expectedTotalKobo > 0 &&
+                  myContribKobo >= expectedTotalKobo;
+
+                // ── Local AsyncStorage cooldown (TEMPORARY, non-authoritative) ───
+                // TODO: Remove once backend exposes canContributeNow / nextContributionAt.
+                // Key scoped to userId + groupId to prevent cross-user bleed.
+                let localCooldown = false;
+                let localCooldownLabel = "";
+                if (
+                  !isFlex &&
+                  !backendCooldown &&
+                  !alreadyContributedThisCycle &&
+                  lastDepositTs
+                ) {
+                  const paid = new Date(lastDepositTs);
+                  const now = new Date();
+                  let expiry: Date | null = null;
+                  if (freq === "DAILY") {
+                    expiry = new Date(
+                      paid.getFullYear(),
+                      paid.getMonth(),
+                      paid.getDate() + 1,
+                      0,
+                      0,
+                      0,
+                      0,
+                    );
+                  } else if (freq === "WEEKLY") {
+                    expiry = new Date(
+                      paid.getFullYear(),
+                      paid.getMonth(),
+                      paid.getDate() + 7,
+                      0,
+                      0,
+                      0,
+                      0,
+                    );
+                  } else if (freq === "MONTHLY") {
+                    expiry = new Date(
+                      paid.getFullYear(),
+                      paid.getMonth() + 1,
+                      paid.getDate(),
+                      0,
+                      0,
+                      0,
+                      0,
+                    );
+                  }
+                  if (expiry && now < expiry) {
+                    localCooldown = true;
+                    const msLeft = expiry.getTime() - now.getTime();
+                    const totalH = Math.floor(msLeft / 3600000);
+                    const m = Math.floor((msLeft % 3600000) / 60000);
+                    localCooldownLabel =
+                      totalH >= 24
+                        ? `Next deposit in ${Math.floor(totalH / 24)}d ${totalH % 24}h ${m}m`
+                        : `Next deposit opens in ${totalH}h ${m}m`;
+                  }
+                }
+
+                const isCooldown = backendCooldown || localCooldown;
+                const cooldownLabel =
+                  backendCooldownLabel || localCooldownLabel;
+
+                const isDepositDisabled =
+                  isGroupEnded ||
+                  isPositionsPending ||
+                  isCooldown ||
+                  alreadyContributedThisCycle;
 
                 const depositButtonText = isGroupEnded
                   ? "Deposits Closed (Group Completed)"
                   : isPositionsPending
-                  ? "Contributions open once admin sets payout order"
-                  : "Deposit funds";
+                    ? "Contributions open once admin sets payout order"
+                    : alreadyContributedThisCycle
+                      ? `✓ Contributed for Cycle ${currentCycleNum}`
+                      : isCooldown
+                        ? cooldownLabel
+                        : "Deposit funds";
 
                 return (
                   <View style={{ gap: 8 }}>
                     <TouchableOpacity
-                      onPress={isDepositDisabled ? undefined : () => setIsDepositModalVisible(true)}
+                      onPress={
+                        isDepositDisabled
+                          ? undefined
+                          : () => setIsDepositModalVisible(true)
+                      }
                       disabled={isDepositDisabled}
                       activeOpacity={isDepositDisabled ? 1 : 0.85}
                       style={{
@@ -1158,15 +1557,27 @@ export default function GroupDetailScreen() {
                         flexDirection: "row",
                         gap: 8,
                         borderWidth: isDepositDisabled ? 1 : 0,
-                        borderColor: isDepositDisabled ? "#E5E7EB" : "transparent",
+                        borderColor: isDepositDisabled
+                          ? "#E5E7EB"
+                          : "transparent",
                       }}
                     >
                       {isDepositDisabled ? (
-                        <Ionicons name="lock-closed" size={18} color="#9CA3AF" />
+                        <Ionicons
+                          name="lock-closed"
+                          size={18}
+                          color="#9CA3AF"
+                        />
                       ) : (
                         <Plus size={20} color="white" strokeWidth={2.5} />
                       )}
-                      <Text style={{ color: isDepositDisabled ? "#9CA3AF" : "white", fontWeight: "800", fontSize: 14 }}>
+                      <Text
+                        style={{
+                          color: isDepositDisabled ? "#9CA3AF" : "white",
+                          fontWeight: "800",
+                          fontSize: 14,
+                        }}
+                      >
                         {depositButtonText}
                       </Text>
                     </TouchableOpacity>
@@ -1184,23 +1595,49 @@ export default function GroupDetailScreen() {
                           gap: 10,
                         }}
                       >
-                        <Ionicons name="alert-circle" size={20} color="#B45309" />
+                        <Ionicons
+                          name="alert-circle"
+                          size={20}
+                          color="#B45309"
+                        />
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, color: "#92400E", fontWeight: "700" }}>
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: "#92400E",
+                              fontWeight: "700",
+                            }}
+                          >
                             Payout Order Pending
                           </Text>
-                          <Text style={{ fontSize: 11, color: "#B45309", marginTop: 2, lineHeight: 15 }}>
-                            Rotational payout schedule must be confirmed by the admin before member contributions can begin.
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color: "#B45309",
+                              marginTop: 2,
+                              lineHeight: 15,
+                            }}
+                          >
+                            Rotational payout schedule must be confirmed by the
+                            admin before member contributions can begin.
                           </Text>
                           {isAdmin && (
                             <TouchableOpacity
                               onPress={() =>
-                                router.push(`/portfolio/detail/group/${id}/positions` as any)
+                                router.push(
+                                  `/portfolio/detail/group/${id}/positions` as any,
+                                )
                               }
                               style={{ marginTop: 6 }}
                             >
-                              <Text style={{ fontSize: 12, fontWeight: "800", color: THEME, textDecorationLine: "underline" }}>
-                                Set Payout Order Now →
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: "800",
+                                  color: THEME,
+                                }}
+                              >
+                                Click to Set Payout Order Now
                               </Text>
                             </TouchableOpacity>
                           )}
@@ -1211,71 +1648,76 @@ export default function GroupDetailScreen() {
                 );
               })()}
 
-              {/* Withdraw funds (Active only if matured, or if emergency withdrawal is permitted) */}
-              {(() => {
-                const isEmergencyAllowed = !!group?.allowEmergencyWithdrawal;
-                const canWithdraw = isGroupEnded || isEmergencyAllowed;
+              {/* Withdraw funds — hidden for ROTATIONAL groups (payout is automatic) */}
+              {group?.groupType !== "ROTATIONAL" &&
+                (() => {
+                  const isEmergencyAllowed = !!group?.allowEmergencyWithdrawal;
+                  const canWithdraw = isGroupEnded || isEmergencyAllowed;
 
-                const buttonText = isGroupEnded
-                  ? "↗ Withdraw to Wallet"
-                  : isEmergencyAllowed
-                  ? "⚠ Emergency Withdrawal"
-                  : "🔒 Withdrawals Locked (Available after maturity)";
+                  const buttonText = isGroupEnded
+                    ? "↗ Withdraw to Wallet"
+                    : isEmergencyAllowed
+                      ? "⚠ Emergency Withdrawal"
+                      : "🔒 Withdrawals Locked (Available after maturity)";
 
-                const handlePressWithdraw = () => {
-                  if (!canWithdraw) {
-                    setToast({
-                      type: "warning",
-                      title: "Withdrawals Locked",
-                      message: `Funds in this tribe are locked until maturity (${formatDateDisplay(
-                        group?.endDate
-                      )}). Emergency withdrawal is not allowed for this group.`,
-                    });
-                    return;
-                  }
-                  handleWithdraw();
-                };
+                  const handlePressWithdraw = () => {
+                    if (!canWithdraw) {
+                      setToast({
+                        type: "warning",
+                        title: "Withdrawals Locked",
+                        message: `Funds in this tribe are locked until maturity (${formatDateDisplay(
+                          group?.endDate,
+                        )}). Emergency withdrawal is not allowed for this group.`,
+                      });
+                      return;
+                    }
+                    handleWithdraw();
+                  };
 
-                return (
-                  <TouchableOpacity
-                    onPress={handlePressWithdraw}
-                    activeOpacity={canWithdraw ? 0.85 : 1}
-                    style={{
-                      backgroundColor: isGroupEnded
-                        ? "#EEF7F8"
-                        : isEmergencyAllowed
-                        ? "#FEF3C7"
-                        : "#F3F4F6",
-                      height: 52,
-                      borderRadius: 14,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexDirection: "row",
-                      gap: 8,
-                      borderWidth: isGroupEnded ? 1 : isEmergencyAllowed ? 1 : 0,
-                      borderColor: isGroupEnded
-                        ? "#155D5F"
-                        : isEmergencyAllowed
-                        ? "#F59E0B"
-                        : "transparent",
-                    }}
-                  >
-                    <Text
+                  return (
+                    <TouchableOpacity
+                      onPress={handlePressWithdraw}
+                      activeOpacity={canWithdraw ? 0.85 : 1}
                       style={{
-                        color: isGroupEnded
+                        backgroundColor: isGroupEnded
+                          ? "#EEF7F8"
+                          : isEmergencyAllowed
+                            ? "#FEF3C7"
+                            : "#F3F4F6",
+                        height: 52,
+                        borderRadius: 14,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexDirection: "row",
+                        gap: 8,
+                        borderWidth: isGroupEnded
+                          ? 1
+                          : isEmergencyAllowed
+                            ? 1
+                            : 0,
+                        borderColor: isGroupEnded
                           ? "#155D5F"
                           : isEmergencyAllowed
-                          ? "#B45309"
-                          : "#9CA3AF",
-                        fontWeight: "700",
-                        fontSize: 14,
+                            ? "#F59E0B"
+                            : "transparent",
                       }}
                     >
-                      {buttonText}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })()}
+                      <Text
+                        style={{
+                          color: isGroupEnded
+                            ? "#155D5F"
+                            : isEmergencyAllowed
+                              ? "#B45309"
+                              : "#9CA3AF",
+                          fontWeight: "700",
+                          fontSize: 14,
+                        }}
+                      >
+                        {buttonText}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })()}
             </View>
           ) : !isMember && !isRemoved && !isBlacklisted ? (
             <View style={{ marginBottom: 20 }}>
@@ -1284,10 +1726,10 @@ export default function GroupDetailScreen() {
                   isGroupFull
                     ? `Group Full (${activeMembersCount}/${membersLimitNum})`
                     : isPublicGroup
-                    ? "Join Group"
-                    : isPendingJoin || joinRequested
-                    ? "Request Sent"
-                    : "Request to Join Group"
+                      ? "Join Group"
+                      : isPendingJoin || joinRequested
+                        ? "Request Sent"
+                        : "Request to Join Group"
                 }
                 loading={isJoining || isProcessing}
                 disabled={
@@ -1299,13 +1741,15 @@ export default function GroupDetailScreen() {
                 onPress={handleJoinSubmit}
                 style={{
                   backgroundColor:
-                    isGroupFull || (!isPublicGroup && (isPendingJoin || joinRequested))
+                    isGroupFull ||
+                    (!isPublicGroup && (isPendingJoin || joinRequested))
                       ? "#9CA3AF"
                       : THEME,
                   height: 52,
                   borderRadius: 14,
                   opacity:
-                    isGroupFull || (!isPublicGroup && (isPendingJoin || joinRequested))
+                    isGroupFull ||
+                    (!isPublicGroup && (isPendingJoin || joinRequested))
                       ? 0.7
                       : 1,
                 }}
@@ -1332,17 +1776,29 @@ export default function GroupDetailScreen() {
                 group?.groupType === "ROTATIONAL"
                   ? "Rotational Savings (Ajo/Esusu)"
                   : group?.groupType === "FIXED"
-                  ? "Fixed Contribution Group"
-                  : "Flex Contribution Group"
+                    ? "Fixed Contribution Group"
+                    : "Flex Contribution Group"
               }
             />
-            <SpecRow label="Started by" value={formatDateDisplay(group?.startDate)} />
-            <SpecRow label="Ends by" value={formatDateDisplay(group?.endDate)} />
             <SpecRow
-              label={group?.groupType === "ROTATIONAL" ? "Cycle Pool Payout 🎯" : "Target Amount 🎯"}
+              label="Started by"
+              value={formatDateDisplay(group?.startDate)}
+            />
+            <SpecRow
+              label="Ends by"
+              value={formatDateDisplay(group?.endDate)}
+            />
+            <SpecRow
+              label={
+                group?.groupType === "ROTATIONAL"
+                  ? "Cycle Pool Payout 🎯"
+                  : "Target Amount 🎯"
+              }
               value={`₦${formatCurrency(targetNaira)}`}
             />
-            {(group?.groupType === "FIXED" || group?.groupType === "ROTATIONAL") && fixedContribNaira > 0 ? (
+            {(group?.groupType === "FIXED" ||
+              group?.groupType === "ROTATIONAL") &&
+            fixedContribNaira > 0 ? (
               <SpecRow
                 label="Member Cycle Contribution"
                 value={`₦${formatCurrency(fixedContribNaira)}`}
@@ -1351,18 +1807,29 @@ export default function GroupDetailScreen() {
               <SpecRow
                 label="Individual Savings Target"
                 value={`₦${formatCurrency(
-                  targetNaira / (group?.membersLimit || 10)
+                  targetNaira / (group?.membersLimit || 10),
                 )}`}
               />
             )}
-            <SpecRow label="Wealth Group" value={`${group?.accessType || "Public"} Group`} />
+            <SpecRow
+              label="Wealth Group"
+              value={`${group?.accessType || "Public"} Group`}
+            />
             <SpecRow
               label="Members Capacity"
-              value={membersLimitNum > 0 ? `${activeMembersCount} / ${membersLimitNum}` : `${activeMembersCount} (Unlimited)`}
+              value={
+                membersLimitNum > 0
+                  ? `${activeMembersCount} / ${membersLimitNum}`
+                  : `${activeMembersCount} (Unlimited)`
+              }
             />
             <SpecRow
               label="Group Total Contribution"
-              value={isTerminated ? "All savings refunded" : `₦${formatCurrency(currentNaira)}`}
+              value={
+                isTerminated
+                  ? "All savings refunded"
+                  : `₦${formatCurrency(currentNaira)}`
+              }
             />
             <SpecRow
               label="My Contribution"
@@ -1370,22 +1837,22 @@ export default function GroupDetailScreen() {
                 isRemoved
                   ? "Refunded to Wallet"
                   : isBlacklisted
-                  ? `₦${formatCurrency(userContributedNaira)}`
-                  : hasFullyWithdrawn
-                  ? "Withdrawn to Wallet"
-                  : isTerminated
-                  ? "Refunded to Wallet"
-                  : `₦${formatCurrency(userContributedNaira)}`
+                    ? `₦${formatCurrency(userContributedNaira)}`
+                    : hasFullyWithdrawn
+                      ? "Withdrawn to Wallet"
+                      : isTerminated
+                        ? "Refunded to Wallet"
+                        : `₦${formatCurrency(userContributedNaira)}`
               }
             />
             <SpecRow
               label="Late Payment Rule"
               value={
-                group?.penaltySetting === "IMMEDIATE_5"
-                  ? "Immediate (5%)"
+                group?.penaltySetting === "IMMEDIATE_5" || (group as any)?.penaltySetting?.includes("IMMEDIATE")
+                  ? `Immediate (${groupPenaltyRate})`
                   : group?.penaltySetting === "GRACE_24"
-                  ? "Grace period (24h)"
-                  : "No Penalty"
+                    ? "Grace period (24h)"
+                    : "No Penalty"
               }
             />
             <SpecRow
@@ -1393,14 +1860,16 @@ export default function GroupDetailScreen() {
               value={
                 !group?.allowEarlyExit
                   ? "Locked (No Exit)"
-                  : group?.penaltySetting === "IMMEDIATE_5"
-                  ? "Allowed (5% Penalty)"
-                  : "Allowed (No Penalty)"
+                  : group?.penaltySetting === "IMMEDIATE_5" || (group as any)?.penaltySetting?.includes("IMMEDIATE")
+                    ? `Allowed (${groupPenaltyRate} Penalty)`
+                    : "Allowed (No Penalty)"
               }
             />
             <SpecRow
               label="Emergency Withdrawal"
-              value={group?.allowEmergencyWithdrawal ? "Allowed" : "Not Allowed"}
+              value={
+                group?.allowEmergencyWithdrawal ? "Allowed" : "Not Allowed"
+              }
             />
             <SpecRow
               label="Status"
@@ -1408,10 +1877,10 @@ export default function GroupDetailScreen() {
                 isRemoved
                   ? "Removed (Refunded)"
                   : isBlacklisted
-                  ? "Suspended (Freeze)"
-                  : isTerminated
-                  ? "Terminated (Refunded)"
-                  : (group?.status || "Active")
+                    ? "Suspended (Freeze)"
+                    : isTerminated
+                      ? "Terminated (Refunded)"
+                      : group?.status || "Active"
               }
               isLast
             />
@@ -1420,9 +1889,19 @@ export default function GroupDetailScreen() {
       </ScrollView>
 
       {/* ─── OPTIONS MENU MODAL ────────────────────────────────────────── */}
-      <Modal visible={isMenuVisible} transparent animationType="fade" onRequestClose={() => setIsMenuVisible(false)}>
+      <Modal
+        visible={isMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsMenuVisible(false)}
+      >
         <View style={{ flex: 1 }}>
-          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView
+            experimentalBlurMethod="dimezisBlurView"
+            intensity={25}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             activeOpacity={1}
@@ -1451,7 +1930,7 @@ export default function GroupDetailScreen() {
               onPress={() => {
                 setIsMenuVisible(false);
                 router.push(
-                  `/portfolio/detail/group/${id}/tribe-settings/members-list` as any
+                  `/portfolio/detail/group/${id}/tribe-settings/members-list` as any,
                 );
               }}
             />
@@ -1460,7 +1939,9 @@ export default function GroupDetailScreen() {
                 title="Tribe Settings"
                 onPress={() => {
                   setIsMenuVisible(false);
-                  router.push(`/portfolio/detail/group/${id}/tribe-settings` as any);
+                  router.push(
+                    `/portfolio/detail/group/${id}/tribe-settings` as any,
+                  );
                 }}
               />
             )}
@@ -1473,8 +1954,9 @@ export default function GroupDetailScreen() {
                 }}
               />
             )}
-            {!isTerminated && (
-              isCreator ? (
+            {!isTerminated &&
+              group?.groupType !== "ROTATIONAL" &&
+              (isCreator ? (
                 <MenuItem
                   title="Terminate Group"
                   textColor="#EF4444"
@@ -1482,12 +1964,15 @@ export default function GroupDetailScreen() {
                 />
               ) : (
                 <MenuItem
-                  title={!group?.allowEarlyExit ? "Exit Group (Locked)" : "Exit Group"}
+                  title={
+                    !group?.allowEarlyExit
+                      ? "Exit Group (Locked)"
+                      : "Exit Group"
+                  }
                   textColor={!group?.allowEarlyExit ? "#94A3B8" : "#F59E0B"}
                   onPress={handleExitGroup}
                 />
-              )
-            )}
+              ))}
             <MenuItem
               title="Report Group"
               textColor="#EF4444"
@@ -1505,16 +1990,33 @@ export default function GroupDetailScreen() {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.modalOverlay}
           >
-            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView
+              experimentalBlurMethod="dimezisBlurView"
+              intensity={40}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+            />
             <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.modalCard}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 12 }}>
-                  <Text style={styles.modalTitle}>Deposit to Tribe: {groupName}</Text>
-                  <TouchableOpacity onPress={() => {
-                    Keyboard.dismiss();
-                    setIsDepositModalVisible(false);
-                    setDepositAmount("");
-                  }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    width: "100%",
+                    marginBottom: 12,
+                  }}
+                >
+                  <Text style={styles.modalTitle}>
+                    Deposit to Tribe: {groupName}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setIsDepositModalVisible(false);
+                      setDepositAmount("");
+                    }}
+                  >
                     <Ionicons name="close" size={24} color="#6B7280" />
                   </TouchableOpacity>
                 </View>
@@ -1531,11 +2033,16 @@ export default function GroupDetailScreen() {
                 </Text>
 
                 {(() => {
-                  const isFixedOrRotational = group?.groupType === "FIXED" || group?.groupType === "ROTATIONAL";
-                  const numDeposit = parseFloat(depositAmount.replace(/,/g, "")) || 0;
+                  const isFixedOrRotational =
+                    group?.groupType === "FIXED" ||
+                    group?.groupType === "ROTATIONAL";
+                  const numDeposit =
+                    parseFloat(depositAmount.replace(/,/g, "")) || 0;
                   const isExceeding = numDeposit > walletBalance;
                   const isValid = numDeposit > 0 && !isExceeding;
-                  const formattedBal = walletBalance.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+                  const formattedBal = walletBalance
+                    .toFixed(2)
+                    .replace(/\d(?=(\d{3})+\.)/g, "$&,");
 
                   return (
                     <>
@@ -1554,17 +2061,54 @@ export default function GroupDetailScreen() {
                             gap: 8,
                           }}
                         >
-                          <Ionicons name="lock-closed" size={16} color={THEME} />
-                          <Text style={{ fontSize: 12, color: "#155D5F", fontWeight: "600", flex: 1 }}>
-                            Fixed Contribution Group: Deposit amount is fixed per cycle.
+                          <Ionicons
+                            name="lock-closed"
+                            size={16}
+                            color={THEME}
+                          />
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: "#155D5F",
+                              fontWeight: "600",
+                              flex: 1,
+                            }}
+                          >
+                            Fixed Contribution Group: Deposit amount is fixed
+                            per cycle.
                           </Text>
                         </View>
                       )}
 
-                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 6 }}>
-                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#4B5563" }}>Amount (₦)</Text>
-                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#6B7280" }}>
-                          Wallet Balance: <Text style={{ fontWeight: "700", color: "#059669" }}>₦{formattedBal}</Text>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          width: "100%",
+                          marginBottom: 6,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: "700",
+                            color: "#4B5563",
+                          }}
+                        >
+                          Amount (₦)
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: "600",
+                            color: "#6B7280",
+                          }}
+                        >
+                          Wallet Balance:{" "}
+                          <Text style={{ fontWeight: "700", color: "#059669" }}>
+                            ₦{formattedBal}
+                          </Text>
                         </Text>
                       </View>
 
@@ -1572,7 +2116,9 @@ export default function GroupDetailScreen() {
                         style={{
                           flexDirection: "row",
                           alignItems: "center",
-                          backgroundColor: isFixedOrRotational ? "#EFEFEF" : "#F3F4F6",
+                          backgroundColor: isFixedOrRotational
+                            ? "#EFEFEF"
+                            : "#F3F4F6",
                           borderRadius: 12,
                           paddingHorizontal: 16,
                           height: 56,
@@ -1583,7 +2129,13 @@ export default function GroupDetailScreen() {
                         }}
                       >
                         <TextInput
-                          style={{ flex: 1, fontSize: 22, fontWeight: "700", textAlign: "center", color: isExceeding ? "#EF4444" : TEXT_DARK }}
+                          style={{
+                            flex: 1,
+                            fontSize: 22,
+                            fontWeight: "700",
+                            textAlign: "center",
+                            color: isExceeding ? "#EF4444" : TEXT_DARK,
+                          }}
                           placeholder="₦0.00"
                           placeholderTextColor="#9CA3AF"
                           keyboardType="numeric"
@@ -1597,28 +2149,55 @@ export default function GroupDetailScreen() {
                           onChangeText={(v) => {
                             if (isFixedOrRotational) return;
                             const n = v.replace(/\D/g, "");
-                            setDepositAmount(n ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "");
+                            setDepositAmount(
+                              n ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "",
+                            );
                           }}
                         />
                         {depositAmount.length > 0 && (
                           <TouchableOpacity
                             onPress={() => Keyboard.dismiss()}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            hitSlop={{
+                              top: 10,
+                              bottom: 10,
+                              left: 10,
+                              right: 10,
+                            }}
                             style={{
-                              backgroundColor: isExceeding ? "#FEE2E2" : "#E2E8F0",
+                              backgroundColor: isExceeding
+                                ? "#FEE2E2"
+                                : "#E2E8F0",
                               borderRadius: 999,
                               padding: 4,
                               marginLeft: 8,
                             }}
                           >
-                            <Ionicons name={isExceeding ? "alert-circle" : "checkmark"} size={14} color={isExceeding ? "#EF4444" : "#0B575B"} />
+                            <Ionicons
+                              name={isExceeding ? "alert-circle" : "checkmark"}
+                              size={14}
+                              color={isExceeding ? "#EF4444" : "#0B575B"}
+                            />
                           </TouchableOpacity>
                         )}
                       </View>
 
                       {isExceeding && (
-                        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 16 }}>
-                          <Text style={{ color: "#EF4444", fontSize: 12, fontWeight: "600" }}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            width: "100%",
+                            marginBottom: 16,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: "#EF4444",
+                              fontSize: 12,
+                              fontWeight: "600",
+                            }}
+                          >
                             Insufficient wallet balance
                           </Text>
                           <TouchableOpacity
@@ -1639,8 +2218,18 @@ export default function GroupDetailScreen() {
                               gap: 4,
                             }}
                           >
-                            <Ionicons name="wallet-outline" size={14} color="#059669" />
-                            <Text style={{ color: "#059669", fontSize: 12, fontWeight: "700" }}>
+                            <Ionicons
+                              name="wallet-outline"
+                              size={14}
+                              color="#059669"
+                            />
+                            <Text
+                              style={{
+                                color: "#059669",
+                                fontSize: 12,
+                                fontWeight: "700",
+                              }}
+                            >
                               Fund Wallet
                             </Text>
                           </TouchableOpacity>
@@ -1658,7 +2247,8 @@ export default function GroupDetailScreen() {
                           setShowConfirmDepositModal(true);
                         }}
                         style={{
-                          backgroundColor: isValid && !isNavigating ? THEME : "#9CA3AF",
+                          backgroundColor:
+                            isValid && !isNavigating ? THEME : "#9CA3AF",
                           borderRadius: 14,
                           height: 52,
                           width: "100%",
@@ -1702,7 +2292,9 @@ export default function GroupDetailScreen() {
         summaryRows={[
           {
             label: "Amount",
-            value: `₦${(parseFloat(depositAmount.replace(/,/g, "")) || 0).toLocaleString("en-NG", {
+            value: `₦${(
+              parseFloat(depositAmount.replace(/,/g, "")) || 0
+            ).toLocaleString("en-NG", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}`,
@@ -1715,7 +2307,12 @@ export default function GroupDetailScreen() {
       {/* ─── JOIN MODAL ────────────────────────────────────────────────── */}
       <Modal visible={isJoinModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView
+            experimentalBlurMethod="dimezisBlurView"
+            intensity={40}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Join {groupName}</Text>
             <Text
@@ -1727,10 +2324,18 @@ export default function GroupDetailScreen() {
                 lineHeight: 20,
               }}
             >
-              You are requesting to join this tribe savings circle. The group admin will review and approve your membership.
+              You are requesting to join this tribe savings circle. The group
+              admin will review and approve your membership.
             </Text>
 
-            <View style={{ flexDirection: "row", gap: 12, width: "100%", marginTop: 10 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 12,
+                width: "100%",
+                marginTop: 10,
+              }}
+            >
               <TouchableOpacity
                 onPress={() => setIsJoinModalVisible(false)}
                 disabled={isProcessing}
@@ -1744,7 +2349,9 @@ export default function GroupDetailScreen() {
                   justifyContent: "center",
                 }}
               >
-                <Text style={{ color: "#64748B", fontWeight: "600" }}>Cancel</Text>
+                <Text style={{ color: "#64748B", fontWeight: "600" }}>
+                  Cancel
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleJoinSubmit}
@@ -1761,7 +2368,9 @@ export default function GroupDetailScreen() {
                 {isProcessing ? (
                   <ActivityIndicator color="white" size="small" />
                 ) : (
-                  <Text style={{ color: "white", fontWeight: "700" }}>Confirm Join</Text>
+                  <Text style={{ color: "white", fontWeight: "700" }}>
+                    Confirm Join
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1777,7 +2386,12 @@ export default function GroupDetailScreen() {
         onRequestClose={() => setShowJoinRequestSentModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView
+            experimentalBlurMethod="dimezisBlurView"
+            intensity={40}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
           <View style={styles.modalCard}>
             <View
               style={{
@@ -1815,8 +2429,11 @@ export default function GroupDetailScreen() {
               }}
             >
               Your request to join{" "}
-              <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>{groupName}</Text> has been
-              sent to the group admin. You will be notified once your membership is approved.
+              <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
+                {groupName}
+              </Text>{" "}
+              has been sent to the group admin. You will be notified once your
+              membership is approved.
             </Text>
 
             <TouchableOpacity
@@ -1830,7 +2447,9 @@ export default function GroupDetailScreen() {
                 justifyContent: "center",
               }}
             >
-              <Text style={{ color: "white", fontWeight: "700", fontSize: 15 }}>Understood</Text>
+              <Text style={{ color: "white", fontWeight: "700", fontSize: 15 }}>
+                Understood
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1842,7 +2461,12 @@ export default function GroupDetailScreen() {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.modalOverlay}
         >
-          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView
+            experimentalBlurMethod="dimezisBlurView"
+            intensity={40}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>
               {isGroupEnded ? "Withdraw to Wallet" : "Emergency Withdrawal"}
@@ -1864,14 +2488,22 @@ export default function GroupDetailScreen() {
 
             {/* Withdraw Amount Input with Real-time Savings Validation */}
             {(() => {
-              const numWithdraw = parseFloat(withdrawAmount.replace(/,/g, "")) || 0;
-              const isExceedingSavings = userContributedNaira > 0 && numWithdraw > userContributedNaira;
+              const numWithdraw =
+                parseFloat(withdrawAmount.replace(/,/g, "")) || 0;
+              const isExceedingSavings =
+                userContributedNaira > 0 && numWithdraw > userContributedNaira;
               const hasNoSavings = userContributedNaira <= 0;
-              const isInvalid = numWithdraw <= 0 || isExceedingSavings || hasNoSavings;
+              const isInvalid =
+                numWithdraw <= 0 || isExceedingSavings || hasNoSavings;
 
               return (
                 <>
-                  <View style={{ width: "100%", marginBottom: isExceedingSavings ? 10 : 14 }}>
+                  <View
+                    style={{
+                      width: "100%",
+                      marginBottom: isExceedingSavings ? 10 : 14,
+                    }}
+                  >
                     <View
                       style={{
                         flexDirection: "row",
@@ -1880,11 +2512,29 @@ export default function GroupDetailScreen() {
                         marginBottom: 8,
                       }}
                     >
-                      <Text style={{ fontSize: 13, fontWeight: "700", color: "#64748B" }}>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "700",
+                          color: "#64748B",
+                        }}
+                      >
                         Amount (₦)
                       </Text>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#64748B" }}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: "600",
+                            color: "#64748B",
+                          }}
+                        >
                           Savings:{" "}
                           <Text style={{ fontWeight: "800", color: THEME }}>
                             ₦{formatCurrency(userContributedNaira)}
@@ -1894,7 +2544,9 @@ export default function GroupDetailScreen() {
                           <TouchableOpacity
                             onPress={() => {
                               const rounded = Math.floor(userContributedNaira);
-                              setWithdrawAmount(rounded.toLocaleString("en-US"));
+                              setWithdrawAmount(
+                                rounded.toLocaleString("en-US"),
+                              );
                             }}
                             style={{
                               backgroundColor: "#E6F4F2",
@@ -1903,7 +2555,13 @@ export default function GroupDetailScreen() {
                               borderRadius: 6,
                             }}
                           >
-                            <Text style={{ fontSize: 11, fontWeight: "800", color: THEME }}>
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: "800",
+                                color: THEME,
+                              }}
+                            >
                               Max
                             </Text>
                           </TouchableOpacity>
@@ -1919,9 +2577,13 @@ export default function GroupDetailScreen() {
                           fontWeight: "700",
                           textAlign: "center",
                           height: 56,
-                          borderColor: isExceedingSavings ? "#EF4444" : "#E5E7EB",
+                          borderColor: isExceedingSavings
+                            ? "#EF4444"
+                            : "#E5E7EB",
                           borderWidth: isExceedingSavings ? 1.5 : 1,
-                          backgroundColor: isExceedingSavings ? "#FEF2F2" : "#F9FAFB",
+                          backgroundColor: isExceedingSavings
+                            ? "#FEF2F2"
+                            : "#F9FAFB",
                           color: isExceedingSavings ? "#DC2626" : "#1A1A1A",
                         },
                       ]}
@@ -1932,15 +2594,35 @@ export default function GroupDetailScreen() {
                       value={withdrawAmount ? `₦${withdrawAmount}` : ""}
                       onChangeText={(v) => {
                         const n = v.replace(/\D/g, "");
-                        setWithdrawAmount(n ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "");
+                        setWithdrawAmount(
+                          n ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "",
+                        );
                       }}
                     />
 
                     {isExceedingSavings && (
-                      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, gap: 4 }}>
-                        <Ionicons name="alert-circle" size={16} color="#DC2626" />
-                        <Text style={{ fontSize: 12, color: "#DC2626", fontWeight: "600" }}>
-                          Amount exceeds your total savings of ₦{formatCurrency(userContributedNaira)}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          marginTop: 6,
+                          gap: 4,
+                        }}
+                      >
+                        <Ionicons
+                          name="alert-circle"
+                          size={16}
+                          color="#DC2626"
+                        />
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            color: "#DC2626",
+                            fontWeight: "600",
+                          }}
+                        >
+                          Amount exceeds your total savings of ₦
+                          {formatCurrency(userContributedNaira)}
                         </Text>
                       </View>
                     )}
@@ -1965,11 +2647,11 @@ export default function GroupDetailScreen() {
                     >
                       {isGroupEnded
                         ? "Funds will be disbursed from your tribe balance directly into your Main Wallet upon PIN confirmation."
-                        : (group as any)?.penaltySetting === "IMMEDIATE_5"
-                        ? "⚠️ This is an Emergency Withdrawal before group maturity. A 5% penalty will be deducted from your savings. The remaining balance will be sent to your Main Wallet upon PIN confirmation."
-                        : (group as any)?.penaltySetting === "NONE"
-                        ? "⚠️ This is an Emergency Withdrawal before group maturity. No penalty applies — funds will be disbursed directly into your Main Wallet upon PIN confirmation."
-                        : "⚠️ This is an Emergency Withdrawal before group maturity. Funds will be disbursed directly into your Main Wallet upon PIN confirmation."}
+                        : (group as any)?.penaltySetting === "IMMEDIATE_5" || (group as any)?.penaltySetting?.includes("IMMEDIATE")
+                          ? `⚠️ This is an Emergency Withdrawal before group maturity. A ${groupPenaltyRate} penalty will be deducted from your savings. The remaining balance will be sent to your Main Wallet upon PIN confirmation.`
+                          : (group as any)?.penaltySetting === "NONE"
+                            ? "⚠️ This is an Emergency Withdrawal before group maturity. No penalty applies — funds will be disbursed directly into your Main Wallet upon PIN confirmation."
+                            : "⚠️ This is an Emergency Withdrawal before group maturity. Funds will be disbursed directly into your Main Wallet upon PIN confirmation."}
                     </Text>
                   </View>
 
@@ -1990,7 +2672,13 @@ export default function GroupDetailScreen() {
                       justifyContent: "center",
                     }}
                   >
-                    <Text style={{ color: "white", fontWeight: "800", fontSize: 16 }}>
+                    <Text
+                      style={{
+                        color: "white",
+                        fontWeight: "800",
+                        fontSize: 16,
+                      }}
+                    >
                       Continue
                     </Text>
                   </TouchableOpacity>
@@ -2005,7 +2693,11 @@ export default function GroupDetailScreen() {
               }}
               style={{ marginTop: 14 }}
             >
-              <Text style={{ color: "#64748B", fontWeight: "600", fontSize: 13 }}>Cancel</Text>
+              <Text
+                style={{ color: "#64748B", fontWeight: "600", fontSize: 13 }}
+              >
+                Cancel
+              </Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -2014,7 +2706,9 @@ export default function GroupDetailScreen() {
       {/* Withdraw Pre-PIN Confirmation Modal */}
       <ConfirmActionModal
         visible={showConfirmWithdrawModal}
-        title={isGroupEnded ? "Confirm Withdrawal" : "Confirm Emergency Withdrawal"}
+        title={
+          isGroupEnded ? "Confirm Withdrawal" : "Confirm Emergency Withdrawal"
+        }
         onCancel={() => {
           setShowConfirmWithdrawModal(false);
           setIsWithdrawModalVisible(true);
@@ -2038,7 +2732,9 @@ export default function GroupDetailScreen() {
         summaryRows={[
           {
             label: "Amount",
-            value: `₦${(parseFloat(withdrawAmount.replace(/,/g, "")) || 0).toLocaleString("en-NG", {
+            value: `₦${(
+              parseFloat(withdrawAmount.replace(/,/g, "")) || 0
+            ).toLocaleString("en-NG", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}`,
@@ -2047,7 +2743,6 @@ export default function GroupDetailScreen() {
           { label: "Destination", value: "Main Wallet" },
         ]}
       />
-
 
       {/* ─── JOIN REQUEST SENT MODAL ───────────────────────────────────── */}
       <Modal
@@ -2120,8 +2815,11 @@ export default function GroupDetailScreen() {
               }}
             >
               Your request to join{" "}
-              <Text style={{ fontWeight: "700", color: "#155D5F" }}>{groupName}</Text>{" "}
-              has been sent successfully.{"\n\n"}Please wait for the admin to review and accept your request.
+              <Text style={{ fontWeight: "700", color: "#155D5F" }}>
+                {groupName}
+              </Text>{" "}
+              has been sent successfully.{"\n\n"}Please wait for the admin to
+              review and accept your request.
             </Text>
 
             {/* Done button */}
@@ -2136,94 +2834,15 @@ export default function GroupDetailScreen() {
                 justifyContent: "center",
               }}
             >
-              <Text style={{ color: "white", fontWeight: "800", fontSize: 15 }}>Got it</Text>
+              <Text style={{ color: "white", fontWeight: "800", fontSize: 15 }}>
+                Got it
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* ─── REPORT GROUP MODAL ────────────────────────────────────────── */}
-      <Modal visible={isReportModalVisible} transparent animationType="slide">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.modalOverlay}
-        >
-          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Report Group</Text>
-            <Text
-              style={{
-                color: "#64748B",
-                fontSize: 13,
-                textAlign: "center",
-                marginTop: 6,
-                marginBottom: 16,
-                lineHeight: 18,
-              }}
-            >
-              Please describe the reason for reporting this group. Our moderation team will investigate.
-            </Text>
 
-            <TextInput
-              style={[
-                styles.textInput,
-                {
-                  height: 100,
-                  textAlignVertical: "top",
-                  paddingTop: 12,
-                  marginBottom: 20,
-                  fontSize: 14,
-                },
-              ]}
-              multiline
-              numberOfLines={4}
-              placeholder="Describe the issue or reason..."
-              placeholderTextColor="#9CA3AF"
-              value={reportReason}
-              onChangeText={setReportReason}
-            />
-
-            <View style={{ flexDirection: "row", gap: 12, width: "100%" }}>
-              <TouchableOpacity
-                onPress={() => {
-                  setIsReportModalVisible(false);
-                  setReportReason("");
-                }}
-                disabled={isReporting}
-                style={{
-                  flex: 1,
-                  height: 48,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: "#E5E5E5",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text style={{ color: "#64748B", fontWeight: "600" }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleSubmitReport}
-                disabled={isReporting}
-                style={{
-                  flex: 1,
-                  height: 48,
-                  borderRadius: 12,
-                  backgroundColor: "#EF4444",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {isReporting ? (
-                  <ActivityIndicator color="white" size="small" />
-                ) : (
-                  <Text style={{ color: "white", fontWeight: "700" }}>Submit Report</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
       {/* ─── EXIT TRIBE MODAL ─────────────────────────────────────────── */}
       <Modal visible={isExitModalVisible} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
@@ -2231,7 +2850,12 @@ export default function GroupDetailScreen() {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.modalOverlay}
           >
-            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView
+              experimentalBlurMethod="dimezisBlurView"
+              intensity={40}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+            />
             <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.modalCard}>
                 <Image
@@ -2268,30 +2892,47 @@ export default function GroupDetailScreen() {
                         {isExitLocked ? (
                           <>
                             The admin has configured voluntary withdrawals as{" "}
-                            <Text style={{ fontWeight: "700", color: "#DC2626" }}>
+                            <Text
+                              style={{ fontWeight: "700", color: "#DC2626" }}
+                            >
                               Locked (No Exit)
                             </Text>{" "}
                             for{" "}
-                            <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
+                            <Text
+                              style={{ fontWeight: "700", color: "#1A1A1A" }}
+                            >
                               {groupName}
                             </Text>
-                            . Members cannot exit early before the group matures.
+                            . Members cannot exit early before the group
+                            matures.
                           </>
-                        ) : (group as any)?.penaltySetting === "IMMEDIATE_5" ? (
+                        ) : (group as any)?.penaltySetting === "IMMEDIATE_5" || (group as any)?.penaltySetting?.includes("IMMEDIATE") ? (
                           <>
                             Are you sure you want to leave{" "}
-                            <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
+                            <Text
+                              style={{ fontWeight: "700", color: "#1A1A1A" }}
+                            >
                               {groupName}
                             </Text>
-                            ? A <Text style={{ fontWeight: "700", color: "#D97706" }}>5% penalty</Text> will be deducted from your accumulated savings before your refund is credited to your Main Wallet.
+                            ? A{" "}
+                            <Text
+                              style={{ fontWeight: "700", color: "#D97706" }}
+                            >
+                              {groupPenaltyRate} penalty
+                            </Text>{" "}
+                            will be deducted from your accumulated savings
+                            before your refund is credited to your Main Wallet.
                           </>
                         ) : (
                           <>
                             Are you sure you want to leave{" "}
-                            <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
+                            <Text
+                              style={{ fontWeight: "700", color: "#1A1A1A" }}
+                            >
                               {groupName}
                             </Text>
-                            ? Your accumulated savings will be refunded directly into your Main Wallet immediately.
+                            ? Your accumulated savings will be refunded directly
+                            into your Main Wallet immediately.
                           </>
                         )}
                       </Text>
@@ -2309,41 +2950,107 @@ export default function GroupDetailScreen() {
                             marginBottom: 16,
                           }}
                         >
-                          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              marginBottom: 6,
+                            }}
+                          >
                             <Ionicons
                               name="lock-closed"
                               size={18}
                               color="#DC2626"
                               style={{ marginRight: 6 }}
                             />
-                            <Text style={{ fontSize: 13, fontWeight: "800", color: "#991B1B" }}>
+                            <Text
+                              style={{
+                                fontSize: 13,
+                                fontWeight: "800",
+                                color: "#991B1B",
+                              }}
+                            >
                               Locked (No Exit Permitted)
                             </Text>
                           </View>
 
-                          <Text style={{ fontSize: 12, color: "#7F1D1D", marginBottom: 12, lineHeight: 16 }}>
-                            This tribe operates on a strict No Withdrawal policy. Your contributions remain securely locked and will be disbursed at the end of the group savings period.
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: "#7F1D1D",
+                              marginBottom: 12,
+                              lineHeight: 16,
+                            }}
+                          >
+                            This tribe operates on a strict No Withdrawal
+                            policy. Your contributions remain securely locked
+                            and will be disbursed at the end of the group
+                            savings period.
                           </Text>
 
-                          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
-                            <Text style={{ fontSize: 12, color: "#6B7280" }}>Your Total Savings</Text>
-                            <Text style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              justifyContent: "space-between",
+                              marginBottom: 6,
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, color: "#6B7280" }}>
+                              Your Total Savings
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: "700",
+                                color: "#1A1A1A",
+                              }}
+                            >
                               ₦{formatCurrency(userContributedNaira)}
                             </Text>
                           </View>
 
-                          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: group?.allowEmergencyWithdrawal ? 8 : 0 }}>
-                            <Text style={{ fontSize: 12, color: "#6B7280" }}>Group Maturity Date</Text>
-                            <Text style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              justifyContent: "space-between",
+                              marginBottom: group?.allowEmergencyWithdrawal
+                                ? 8
+                                : 0,
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, color: "#6B7280" }}>
+                              Group Maturity Date
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: "700",
+                                color: "#1A1A1A",
+                              }}
+                            >
                               {formatDateDisplay(group?.endDate)}
                             </Text>
                           </View>
 
                           {group?.allowEmergencyWithdrawal && (
                             <>
-                              <View style={{ height: 1, backgroundColor: "#FECACA", marginVertical: 8 }} />
-                              <Text style={{ fontSize: 11, color: "#991B1B", lineHeight: 15 }}>
-                                💡 Emergency Withdrawal is enabled for this tribe. If you have an urgent emergency, you may request an emergency withdrawal.
+                              <View
+                                style={{
+                                  height: 1,
+                                  backgroundColor: "#FECACA",
+                                  marginVertical: 8,
+                                }}
+                              />
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  color: "#991B1B",
+                                  lineHeight: 15,
+                                }}
+                              >
+                                💡 Emergency Withdrawal is enabled for this
+                                tribe. If you have an urgent emergency, you may
+                                request an emergency withdrawal.
                               </Text>
                             </>
                           )}
@@ -2352,18 +3059,27 @@ export default function GroupDetailScreen() {
                         (() => {
                           const hasSavings = userContributedNaira > 0;
 
-                          // Penalty is governed solely by penaltySetting — IMMEDIATE_5 = fixed 5%, anything else = 0%
-                          const hasPenalty = group?.penaltySetting === "IMMEDIATE_5";
-                          const penaltyRatio = hasPenalty ? 0.05 : 0;
-                          const penaltyPctStr = hasPenalty ? "5%" : "0%";
-                          const penaltyAmt = userContributedNaira * penaltyRatio;
-                          const estimatedRefund = Math.max(0, userContributedNaira - penaltyAmt);
+                          // Penalty ratio comes dynamically from systemConfig/rates/item via getDynamicPenaltyRate
+                          const hasPenalty =
+                            group?.penaltySetting === "IMMEDIATE_5" ||
+                            (group as any)?.penaltySetting?.includes("IMMEDIATE") ||
+                            (group?.penaltySetting !== "NONE" && group?.penaltySetting !== "GRACE_24");
+                          const penaltyRatio = hasPenalty ? groupPenaltyRatio : 0;
+                          const penaltyPctStr = hasPenalty ? groupPenaltyRate : "0%";
+                          const penaltyAmt =
+                            userContributedNaira * penaltyRatio;
+                          const estimatedRefund = Math.max(
+                            0,
+                            userContributedNaira - penaltyAmt,
+                          );
 
                           return hasSavings ? (
                             <View
                               style={{
                                 width: "100%",
-                                backgroundColor: hasPenalty ? "#FEF2F2" : "#F0FDF4",
+                                backgroundColor: hasPenalty
+                                  ? "#FEF2F2"
+                                  : "#F0FDF4",
                                 borderColor: hasPenalty ? "#FECACA" : "#BBF7D0",
                                 borderWidth: 1,
                                 borderRadius: 16,
@@ -2371,49 +3087,134 @@ export default function GroupDetailScreen() {
                                 marginBottom: 16,
                               }}
                             >
-                              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  marginBottom: 6,
+                                }}
+                              >
                                 <Ionicons
-                                  name={hasPenalty ? "alert-circle" : "checkmark-circle"}
+                                  name={
+                                    hasPenalty
+                                      ? "alert-circle"
+                                      : "checkmark-circle"
+                                  }
                                   size={18}
                                   color={hasPenalty ? "#DC2626" : "#15803D"}
                                   style={{ marginRight: 6 }}
                                 />
-                                <Text style={{ fontSize: 13, fontWeight: "800", color: hasPenalty ? "#991B1B" : "#166534" }}>
-                                  {hasPenalty ? "Early Exit Deduction" : "Full Refund (No Penalty)"}
+                                <Text
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: "800",
+                                    color: hasPenalty ? "#991B1B" : "#166534",
+                                  }}
+                                >
+                                  {hasPenalty
+                                    ? "Early Exit Deduction"
+                                    : "Full Refund (No Penalty)"}
                                 </Text>
                               </View>
 
-                              <Text style={{ fontSize: 12, color: hasPenalty ? "#7F1D1D" : "#15803D", marginBottom: 12, lineHeight: 16 }}>
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  color: hasPenalty ? "#7F1D1D" : "#15803D",
+                                  marginBottom: 12,
+                                  lineHeight: 16,
+                                }}
+                              >
                                 {hasPenalty
                                   ? `Leaving early incurs a ${penaltyPctStr} penalty, deducted from your accumulated savings.`
                                   : "This tribe has no early exit penalty. Your full accumulated contributions will be refunded directly into your Main Wallet."}
                               </Text>
 
-                              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
-                                <Text style={{ fontSize: 12, color: "#6B7280" }}>Your Total Savings</Text>
-                                <Text style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}>
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  justifyContent: "space-between",
+                                  marginBottom: 6,
+                                }}
+                              >
+                                <Text
+                                  style={{ fontSize: 12, color: "#6B7280" }}
+                                >
+                                  Your Total Savings
+                                </Text>
+                                <Text
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: "700",
+                                    color: "#1A1A1A",
+                                  }}
+                                >
                                   ₦{formatCurrency(userContributedNaira)}
                                 </Text>
                               </View>
 
                               {hasPenalty && (
-                                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
-                                  <Text style={{ fontSize: 12, color: "#DC2626", fontWeight: "700" }}>
+                                <View
+                                  style={{
+                                    flexDirection: "row",
+                                    justifyContent: "space-between",
+                                    marginBottom: 8,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 12,
+                                      color: "#DC2626",
+                                      fontWeight: "700",
+                                    }}
+                                  >
                                     Penalty Fee ({penaltyPctStr})
                                   </Text>
-                                  <Text style={{ fontSize: 12, fontWeight: "800", color: "#DC2626" }}>
+                                  <Text
+                                    style={{
+                                      fontSize: 12,
+                                      fontWeight: "800",
+                                      color: "#DC2626",
+                                    }}
+                                  >
                                     -₦{formatCurrency(penaltyAmt)}
                                   </Text>
                                 </View>
                               )}
 
-                              <View style={{ height: 1, backgroundColor: hasPenalty ? "#FECACA" : "#DCFCE7", marginBottom: 8 }} />
+                              <View
+                                style={{
+                                  height: 1,
+                                  backgroundColor: hasPenalty
+                                    ? "#FECACA"
+                                    : "#DCFCE7",
+                                  marginBottom: 8,
+                                }}
+                              />
 
-                              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                                <Text style={{ fontSize: 13, fontWeight: "800", color: "#155D5F" }}>
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: "800",
+                                    color: "#155D5F",
+                                  }}
+                                >
                                   Estimated Refund to Wallet
                                 </Text>
-                                <Text style={{ fontSize: 14, fontWeight: "900", color: "#155D5F" }}>
+                                <Text
+                                  style={{
+                                    fontSize: 14,
+                                    fontWeight: "900",
+                                    color: "#155D5F",
+                                  }}
+                                >
                                   ₦{formatCurrency(estimatedRefund)}
                                 </Text>
                               </View>
@@ -2433,7 +3234,11 @@ export default function GroupDetailScreen() {
                                 gap: 10,
                               }}
                             >
-                              <Ionicons name="checkmark-circle" size={20} color="#15803D" />
+                              <Ionicons
+                                name="checkmark-circle"
+                                size={20}
+                                color="#15803D"
+                              />
                               <Text
                                 style={{
                                   flex: 1,
@@ -2443,7 +3248,8 @@ export default function GroupDetailScreen() {
                                   lineHeight: 18,
                                 }}
                               >
-                                Your full accumulated savings will be refunded directly into your Main Wallet immediately.
+                                Your full accumulated savings will be refunded
+                                directly into your Main Wallet immediately.
                               </Text>
                             </View>
                           );
@@ -2463,12 +3269,24 @@ export default function GroupDetailScreen() {
                             justifyContent: "center",
                           }}
                         >
-                          <Text style={{ fontSize: 14, color: "white", fontWeight: "700" }}>
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              color: "white",
+                              fontWeight: "700",
+                            }}
+                          >
                             Understood
                           </Text>
                         </TouchableOpacity>
                       ) : (
-                        <View style={{ flexDirection: "row", gap: 12, width: "100%" }}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            gap: 12,
+                            width: "100%",
+                          }}
+                        >
                           <TouchableOpacity
                             onPress={() => setIsExitModalVisible(false)}
                             disabled={isExiting}
@@ -2482,7 +3300,15 @@ export default function GroupDetailScreen() {
                               justifyContent: "center",
                             }}
                           >
-                            <Text style={{ fontSize: 14, color: "#6B7280", fontWeight: "600" }}>Cancel</Text>
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                color: "#6B7280",
+                                fontWeight: "600",
+                              }}
+                            >
+                              Cancel
+                            </Text>
                           </TouchableOpacity>
 
                           <TouchableOpacity
@@ -2500,7 +3326,13 @@ export default function GroupDetailScreen() {
                             {isExiting ? (
                               <ActivityIndicator color="#EF4444" size="small" />
                             ) : (
-                              <Text style={{ fontSize: 14, color: "#E53935", fontWeight: "700" }}>
+                              <Text
+                                style={{
+                                  fontSize: 14,
+                                  color: "#E53935",
+                                  fontWeight: "700",
+                                }}
+                              >
                                 Exit Tribe
                               </Text>
                             )}
@@ -2523,7 +3355,12 @@ export default function GroupDetailScreen() {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.modalOverlay}
           >
-            <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView
+              experimentalBlurMethod="dimezisBlurView"
+              intensity={40}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+            />
             <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.modalCard}>
                 <Image
@@ -2552,8 +3389,12 @@ export default function GroupDetailScreen() {
                   }}
                 >
                   Are you sure you want to terminate{" "}
-                  <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>{groupName}</Text>?
-                  Dissolving this group will automatically refund 100% of all active members' saved contributions directly back into their respective Main Wallets immediately.
+                  <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
+                    {groupName}
+                  </Text>
+                  ? Dissolving this group will automatically refund 100% of all
+                  active members' saved contributions directly back into their
+                  respective Main Wallets immediately.
                 </Text>
 
                 <View
@@ -2580,7 +3421,8 @@ export default function GroupDetailScreen() {
                       lineHeight: 18,
                     }}
                   >
-                    All active contributions (₦{formatCurrency(currentNaira)}) will be refunded immediately. This action cannot be undone.
+                    All active contributions (₦{formatCurrency(currentNaira)})
+                    will be refunded immediately. This action cannot be undone.
                   </Text>
                 </View>
 
@@ -2598,7 +3440,15 @@ export default function GroupDetailScreen() {
                       justifyContent: "center",
                     }}
                   >
-                    <Text style={{ fontSize: 14, color: "#6B7280", fontWeight: "600" }}>Cancel</Text>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        color: "#6B7280",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Cancel
+                    </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -2616,7 +3466,13 @@ export default function GroupDetailScreen() {
                     {isTerminating ? (
                       <ActivityIndicator color="#EF4444" size="small" />
                     ) : (
-                      <Text style={{ fontSize: 14, color: "#E53935", fontWeight: "700" }}>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          color: "#E53935",
+                          fontWeight: "700",
+                        }}
+                      >
                         Terminate Group
                       </Text>
                     )}
@@ -2654,8 +3510,12 @@ function SpecRow({
         borderBottomColor: "#E0F2F1",
       }}
     >
-      <Text style={{ fontSize: 13, fontWeight: "500", color: "#64748B" }}>{label}</Text>
-      <Text style={{ fontSize: 13, fontWeight: "600", color: THEME }}>{value}</Text>
+      <Text style={{ fontSize: 13, fontWeight: "500", color: "#64748B" }}>
+        {label}
+      </Text>
+      <Text style={{ fontSize: 13, fontWeight: "600", color: THEME }}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -2681,7 +3541,9 @@ function MenuItem({
         borderBottomColor: "#F3F4F6",
       }}
     >
-      <Text style={{ fontSize: 13, fontWeight: "600", color: textColor }}>{title}</Text>
+      <Text style={{ fontSize: 13, fontWeight: "600", color: textColor }}>
+        {title}
+      </Text>
     </TouchableOpacity>
   );
 }

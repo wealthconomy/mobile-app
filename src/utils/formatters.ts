@@ -422,37 +422,110 @@ export const formatEarlyTerminationPenaltyRate = (
 };
 
 /**
+/**
+ * Safely formats any raw interest rate value (number or string) into a clean "X% P.A" string.
+ * Handles formats like: 8, "8", 8.5, "8%", "8% P.A", "8% p.a", 0.08, etc.
+ */
+export const formatInterestRateLabel = (rawRate: any): string | null => {
+  if (rawRate === undefined || rawRate === null || rawRate === "") return null;
+  const str = String(rawRate).trim();
+  if (!str) return null;
+
+  if (/p\.?a\.?/i.test(str)) {
+    return str;
+  }
+  if (str.endsWith("%")) {
+    return `${str} P.A`;
+  }
+  const num = parseFloat(str);
+  if (!isNaN(num) && num > 0) {
+    const pct = num < 0.5 && num > 0 ? num * 100 : num;
+    return `${pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(1)}% P.A`;
+  }
+  return `${str}% P.A`;
+};
+
+/**
  * Dynamically extracts and calculates early termination penalty rate & ratio
- * from backend system configs (/admin/system-config) and portfolio config rates (/portfolios/config).
+ * from individual item fields, backend system configs (/admin/system-config), and portfolio config rates (/portfolios/config).
  */
 export const getDynamicPenaltyRate = (
   portfolioType: string,
   systemConfigs?: { items?: Array<{ key: string; value: string }> } | any,
   portfolioConfigRates?: any,
-  fallback = "2.5%"
+  fallback = "2.5%",
+  item?: any
 ): { penaltyRate: string; penaltyRatio: number } => {
   const normType = (portfolioType || "")
     .toUpperCase()
     .replace(/^WEALTH_?/, "")
     .replace(/[-_]/g, ""); // e.g. "GOAL", "FAM", "FLOW", "FIX", "GROUP"
 
-  const rawItems: any[] =
-    systemConfigs?.items ||
-    systemConfigs?.data?.items ||
-    (Array.isArray(systemConfigs) ? systemConfigs : []);
+  // 1. Check individual item first
+  const itemRawRate =
+    item?.penaltyRate ??
+    item?.earlyWithdrawalPenaltyPercentage ??
+    item?.earlyLiquidationPenaltyRate ??
+    item?.metadata?.penaltyRate ??
+    item?.metadata?.earlyWithdrawalPenaltyPercentage ??
+    item?.metadata?.earlyLiquidationPenaltyRate;
 
-  const typeKey = `PENALTY_RATE_WEALTH_${normType}`;
-  const specificConfig = rawItems.find((i: any) => i?.key === typeKey);
-  const generalConfig = rawItems.find((i: any) => i?.key === "EARLY_TERMINATION_PENALTY_PCT");
+  // 2. Normalize systemConfigs into a key-value array
+  let rawItems: any[] = [];
+  if (Array.isArray(systemConfigs)) {
+    rawItems = systemConfigs;
+  } else if (Array.isArray(systemConfigs?.items)) {
+    rawItems = systemConfigs.items;
+  } else if (Array.isArray(systemConfigs?.data?.items)) {
+    rawItems = systemConfigs.data.items;
+  } else if (Array.isArray(systemConfigs?.data)) {
+    rawItems = systemConfigs.data;
+  } else if (systemConfigs && typeof systemConfigs === "object") {
+    const obj = systemConfigs.data || systemConfigs;
+    rawItems = Object.entries(obj).map(([key, value]) => ({ key, value }));
+  }
 
+  // 3. Match type-specific penalty rate key in systemConfig
+  const typeMatch = rawItems.find((i: any) => {
+    const k = String(i?.key || "").toUpperCase();
+    return (
+      k === `PENALTY_RATE_WEALTH_${normType}` ||
+      k === `PENALTY_RATE_${normType}` ||
+      k === `WEALTH_${normType}_PENALTY_RATE` ||
+      k === `${normType}_PENALTY_RATE` ||
+      k === `PENALTY_${normType}` ||
+      k === `WEALTH_${normType}_BREAKING_FEE`
+    );
+  });
+
+  // 4. Match general penalty rate key in systemConfig
+  const generalMatch = rawItems.find((i: any) => {
+    const k = String(i?.key || "").toUpperCase();
+    return (
+      k === "EARLY_TERMINATION_PENALTY_PCT" ||
+      k === "EARLY_TERMINATION_PENALTY_RATE" ||
+      k === "EARLY_EXIT_PENALTY_RATE" ||
+      k === "PENALTY_RATE" ||
+      k === "BREAKING_FEE_PCT"
+    );
+  });
+
+  // 5. Match portfolioConfigRates
   const lowerKey = `wealth${normType.toLowerCase()}`;
-  const rateObj = portfolioConfigRates?.[lowerKey];
+  const rateObj =
+    portfolioConfigRates?.[lowerKey] ||
+    portfolioConfigRates?.[normType.toLowerCase()] ||
+    portfolioConfigRates?.[portfolioType.toLowerCase()];
 
   const rawRate =
-    specificConfig?.value ??
+    itemRawRate ??
+    typeMatch?.value ??
     rateObj?.earlyLiquidationPenaltyRate ??
     rateObj?.earlyWithdrawalPenaltyPercentage ??
-    generalConfig?.value;
+    rateObj?.penaltyRate ??
+    rateObj?.penalty ??
+    rateObj?.earlyExitPenalty ??
+    generalMatch?.value;
 
   const penaltyRate = formatEarlyTerminationPenaltyRate(rawRate, fallback);
   const n = parseFloat(penaltyRate.replace("%", ""));
@@ -463,41 +536,97 @@ export const getDynamicPenaltyRate = (
 
 /**
  * Retrieves the annual interest rate label (e.g. "12% P.A", "10% P.A", "15% P.A") dynamically
- * from portfolio config or system config.
+ * from individual portfolio item fields, portfolio config, or system config.
  */
 export const getDynamicInterestRateLabel = (
   portfolioType: string,
   systemConfigs?: { items?: Array<{ key: string; value: string }> } | any,
   portfolioConfigRates?: any,
-  fallbackRate = 12
+  fallbackRate = 12,
+  item?: any
 ): string => {
+  // 1. Check individual item first
+  if (item) {
+    const itemRawRate =
+      item.interestRate ??
+      item.rate ??
+      item.annualInterestRate ??
+      item.annualPercentageYield ??
+      item.metadata?.interestRate ??
+      item.metadata?.rate ??
+      item.metadata?.annualInterestRate;
+
+    const formattedItemRate = formatInterestRateLabel(itemRawRate);
+    if (formattedItemRate) {
+      return formattedItemRate;
+    }
+  }
+
   const normType = (portfolioType || "")
     .toUpperCase()
     .replace(/^WEALTH_?/, "")
     .replace(/[-_]/g, "");
   const lowerKey = `wealth${normType.toLowerCase()}`;
 
-  // 1. Check portfolio config rates first
-  const configRateObj = portfolioConfigRates?.[lowerKey];
-  if (configRateObj?.label) {
-    return configRateObj.label;
-  }
-  if (configRateObj?.rate !== undefined && configRateObj.rate !== null) {
-    return `${configRateObj.rate}% P.A`;
-  }
-
-  // 2. Check system config items
-  const rawItems: any[] =
-    systemConfigs?.items ||
-    systemConfigs?.data?.items ||
-    (Array.isArray(systemConfigs) ? systemConfigs : []);
-  const specificConfig = rawItems.find(
-    (i: any) => i?.key === `INTEREST_RATE_WEALTH_${normType}`
-  );
-  if (specificConfig?.value && parseFloat(specificConfig.value) > 0) {
-    return `${specificConfig.value}% P.A`;
+  // 2. Check portfolio config rates
+  const configRateObj =
+    portfolioConfigRates?.[lowerKey] ||
+    portfolioConfigRates?.[normType.toLowerCase()] ||
+    portfolioConfigRates?.[portfolioType.toLowerCase()];
+  if (configRateObj) {
+    const formattedConfigLabel = formatInterestRateLabel(
+      configRateObj.label ??
+      configRateObj.annualInterestRate ??
+      configRateObj.rate ??
+      configRateObj.interestRate
+    );
+    if (formattedConfigLabel) {
+      return formattedConfigLabel;
+    }
   }
 
+  // 3. Normalize systemConfigs
+  let rawItems: any[] = [];
+  if (Array.isArray(systemConfigs)) {
+    rawItems = systemConfigs;
+  } else if (Array.isArray(systemConfigs?.items)) {
+    rawItems = systemConfigs.items;
+  } else if (Array.isArray(systemConfigs?.data?.items)) {
+    rawItems = systemConfigs.data.items;
+  } else if (Array.isArray(systemConfigs?.data)) {
+    rawItems = systemConfigs.data;
+  } else if (systemConfigs && typeof systemConfigs === "object") {
+    const obj = systemConfigs.data || systemConfigs;
+    rawItems = Object.entries(obj).map(([key, value]) => ({ key, value }));
+  }
+
+  const typeMatch = rawItems.find((i: any) => {
+    const k = String(i?.key || "").toUpperCase();
+    return (
+      k === `INTEREST_RATE_WEALTH_${normType}` ||
+      k === `INTEREST_RATE_${normType}` ||
+      k === `WEALTH_${normType}_INTEREST_RATE` ||
+      k === `${normType}_INTEREST_RATE` ||
+      k === `RATE_WEALTH_${normType}`
+    );
+  });
+
+  const generalMatch = rawItems.find((i: any) => {
+    const k = String(i?.key || "").toUpperCase();
+    return (
+      k === "ANNUAL_INTEREST_RATE" ||
+      k === "DEFAULT_INTEREST_RATE" ||
+      k === "INTEREST_RATE"
+    );
+  });
+
+  const rawSystemRate = typeMatch?.value ?? generalMatch?.value;
+  const formattedSystemLabel = formatInterestRateLabel(rawSystemRate);
+  if (formattedSystemLabel) {
+    return formattedSystemLabel;
+  }
+
+  // 4. Fallback
   return `${fallbackRate}% P.A`;
 };
 

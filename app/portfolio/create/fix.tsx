@@ -95,18 +95,27 @@ export default function CreateFixScreen() {
     }, [refetchWallet])
   );
 
+  const fixConfig = configData?.rates?.wealthfix || (configData as any)?.data?.rates?.wealthfix;
+  const minFixKobo = fixConfig?.minTargetAmount ?? fixConfig?.minimumAmount ?? 100000;
+  const minFixDuration = fixConfig?.minDurationDays ?? fixConfig?.minimumTenureDays ?? 30;
+  const maxFixDuration = fixConfig?.maxDurationDays ?? fixConfig?.maximumTenureDays ?? 730;
+  const minFixNaira = minFixKobo / 100;
+  const minFixNairaFormatted = minFixNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const walletBalanceNaira = (parseFloat(walletData?.currentBalance || "0") / 100);
   const enteredAmountNum = parseFloat(initialAmount.replace(/[^\d.]/g, "")) || 0;
   const isInsufficientBalance = enteredAmountNum > walletBalanceNaira && enteredAmountNum > 0;
+  const isBelowMinTarget = enteredAmountNum > 0 && enteredAmountNum < minFixNaira;
+
+  const durationNum = parseInt(duration, 10) || 0;
+  const isBelowMinDuration = duration.length > 0 && durationNum < minFixDuration;
+  const isAboveMaxDuration = duration.length > 0 && durationNum > maxFixDuration;
 
   // Date picker state
   const [endDate, setEndDate] = useState<Date>(() => {
     const d = new Date();
-    if (params.duration) {
-      d.setDate(d.getDate() + (parseInt(params.duration, 10) || 180));
-    } else {
-      d.setDate(d.getDate() + 180);
-    }
+    const initialDays = params.duration ? (parseInt(params.duration, 10) || minFixDuration) : minFixDuration;
+    d.setDate(d.getDate() + Math.max(initialDays, minFixDuration));
     return d;
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -179,7 +188,9 @@ export default function CreateFixScreen() {
     for (let day = 1; day <= daysInMonth; day++) {
       const cellDate = new Date(year, month, day);
       cellDate.setHours(0, 0, 0, 0);
-      const isPast = cellDate <= today;
+      const minAllowedDate = new Date(today);
+      minAllowedDate.setDate(minAllowedDate.getDate() + minFixDuration);
+      const isPast = cellDate < minAllowedDate;
       const isSelected =
         duration !== "" &&
         endDate.getDate() === day &&
@@ -533,6 +544,11 @@ export default function CreateFixScreen() {
             }}
           />
         </View>
+        {isBelowMinTarget && (
+          <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+            Minimum target amount is ₦{minFixNairaFormatted}
+          </Text>
+        )}
         {isInsufficientBalance && (
           <View
             style={{
@@ -608,6 +624,8 @@ export default function CreateFixScreen() {
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
+            borderWidth: (isBelowMinDuration || isAboveMaxDuration) ? 1 : 0,
+            borderColor: (isBelowMinDuration || isAboveMaxDuration) ? "#EF4444" : "transparent",
           }}
         >
           <Text
@@ -627,6 +645,16 @@ export default function CreateFixScreen() {
           </Text>
           <Ionicons name="calendar-outline" size={20} color={TEAL} />
         </TouchableOpacity>
+        {isBelowMinDuration && (
+          <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+            Minimum lock duration is {minFixDuration} days
+          </Text>
+        )}
+        {isAboveMaxDuration && (
+          <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+            Maximum lock duration is {maxFixDuration} days
+          </Text>
+        )}
       </View>
 
       {/* Funding Source (Read-only) */}
@@ -756,6 +784,9 @@ export default function CreateFixScreen() {
           title.trim().length > 0 &&
           enteredAmountNum > 0 &&
           !isInsufficientBalance &&
+          !isBelowMinTarget &&
+          !isBelowMinDuration &&
+          !isAboveMaxDuration &&
           Boolean(duration) &&
           isConsent;
         return (
