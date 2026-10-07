@@ -23,8 +23,7 @@ export default function AddBVNScreen() {
   const [showSuccess, setShowSuccess] = useState(false);
 
   const handleConfirm = () => {
-    // API logic would go here
-    setShowSuccess(true);
+    router.replace("/kyc/level2-intro");
   };
 
   return (

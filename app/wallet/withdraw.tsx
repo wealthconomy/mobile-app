@@ -8,7 +8,11 @@ import {
 } from "@/src/store/api/payoutAccountApi";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 import { useInitiateWithdrawalMutation } from "@/src/store/api/withdrawalApi";
+import { useVerifyPinMutation } from "@/src/store/api/userApi";
+import { useGetKycStatusQuery } from "@/src/store/api/kycApi";
 import { PayoutAccount, PayoutBank } from "@/src/types/wallet";
+import { useSelector } from "react-redux";
+import { RootState } from "@/src/store";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -76,6 +80,12 @@ export default function WithdrawScreen() {
         maximumFractionDigits: 2,
       })
     : "0.00";
+
+  // User & KYC Verification Status Gate
+  const user = useSelector((state: RootState) => state.auth.user);
+  const { data: kycData } = useGetKycStatusQuery();
+  const currentKycLevel = kycData?.data?.currentLevel ?? user?.kycLevel ?? 1;
+  const isKycVerified = currentKycLevel >= 2;
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
@@ -650,6 +660,38 @@ export default function WithdrawScreen() {
               }}
               className="w-full"
             />
+          </View>
+        </View>
+      </Modal>
+
+      {/* KYC Level 2 Verification Gate Modal */}
+      <Modal visible={!isKycVerified} transparent animationType="fade">
+        <View className="flex-1 bg-black/60 justify-center items-center px-6">
+          <View className="bg-white rounded-[28px] p-7 items-center w-full max-w-[340px]">
+            <View className="w-16 h-16 rounded-full bg-[#155D5F]/10 items-center justify-center mb-4">
+              <Ionicons name="shield-outline" size={34} color="#155D5F" />
+            </View>
+            <Text className="text-[#1A1A1A] font-extrabold text-[20px] text-center mb-2">
+              Identity Verification Required
+            </Text>
+            <Text className="text-[#64748B] text-[13.5px] text-center mb-6 leading-[20px]">
+              To enable withdrawals and protect your funds, Central Bank guidelines require you to complete KYC Level 2 identity verification.
+            </Text>
+            <ThemedButton
+              title="Verify Identity Now"
+              onPress={() => {
+                router.replace("/kyc/level2-intro");
+              }}
+              style={{ width: "100%", backgroundColor: "#155D5F", height: 50, borderRadius: 14 }}
+            />
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="mt-3.5 py-2"
+            >
+              <Text className="text-[#64748B] font-semibold text-[14px]">
+                Go Back
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

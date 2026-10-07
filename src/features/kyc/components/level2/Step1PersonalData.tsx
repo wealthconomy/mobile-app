@@ -70,7 +70,13 @@ export const Step1PersonalData: React.FC<Step1PersonalDataProps> = ({
   const [selectedYear, setSelectedYear] = useState(1995);
   const [showYearPicker, setShowYearPicker] = useState(false);
 
-  const [errors, setErrors] = useState<{ bvn?: string }>({});
+  const [errors, setErrors] = useState<{
+    bvn?: string;
+    dateOfBirth?: string;
+    nextOfKinName?: string;
+    nextOfKinRelationship?: string;
+    nextOfKinPhone?: string;
+  }>({});
 
   const getDaysInMonth = (month: number, year: number) => {
     return new Date(year, month + 1, 0).getDate();
@@ -112,15 +118,41 @@ export const Step1PersonalData: React.FC<Step1PersonalDataProps> = ({
       "dateOfBirth",
       `${formattedDay} / ${formattedMonth} / ${selectedYear}`,
     );
+    if (errors.dateOfBirth) {
+      setErrors((prev) => ({ ...prev, dateOfBirth: undefined }));
+    }
     setShowDatePicker(false);
   };
 
   const validateAndContinue = () => {
-    const newErrors: { bvn?: string } = {};
-    const cleanBvn = formData.bvn.replace(/\D/g, "");
+    const newErrors: {
+      bvn?: string;
+      dateOfBirth?: string;
+      nextOfKinName?: string;
+      nextOfKinRelationship?: string;
+      nextOfKinPhone?: string;
+    } = {};
 
+    if (!formData.dateOfBirth?.trim()) {
+      newErrors.dateOfBirth = "Please select your date of birth";
+    }
+
+    const cleanBvn = formData.bvn.replace(/\D/g, "");
     if (cleanBvn.length !== 11) {
       newErrors.bvn = "BVN must be exactly 11 numeric digits";
+    }
+
+    if (!formData.nextOfKinName?.trim()) {
+      newErrors.nextOfKinName = "Please enter next of kin full name";
+    }
+
+    if (!formData.nextOfKinRelationship?.trim()) {
+      newErrors.nextOfKinRelationship = "Please enter relationship with next of kin";
+    }
+
+    const cleanNokPhone = (formData.nextOfKinPhone || "").replace(/\D/g, "");
+    if (cleanNokPhone.length < 10) {
+      newErrors.nextOfKinPhone = "Please enter a valid next of kin phone number";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -132,7 +164,9 @@ export const Step1PersonalData: React.FC<Step1PersonalDataProps> = ({
     onContinue();
   };
 
-  const yearsList = Array.from({ length: 57 }, (_, i) => 2006 - i);
+  const currentYear = new Date().getFullYear();
+  const maxEligibleYear = currentYear - 18;
+  const yearsList = Array.from({ length: 70 }, (_, i) => maxEligibleYear - i);
 
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
@@ -187,13 +221,27 @@ export const Step1PersonalData: React.FC<Step1PersonalDataProps> = ({
             />
 
             {/* Date of Birth matching Image 2 */}
-            <KycSelectTrigger
-              label="Date of Birth"
-              value={formData.dateOfBirth}
-              onPress={() => setShowDatePicker(true)}
-              placeholder="DD / MM / YYYY"
-              bgVariant="gray"
-            />
+            <View>
+              <KycSelectTrigger
+                label="Date of Birth"
+                value={formData.dateOfBirth}
+                onPress={() => setShowDatePicker(true)}
+                placeholder="DD / MM / YYYY"
+                bgVariant="gray"
+              />
+              {errors.dateOfBirth && (
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#EF4444",
+                    marginTop: 4,
+                    fontWeight: "500",
+                  }}
+                >
+                  {errors.dateOfBirth}
+                </Text>
+              )}
+            </View>
 
             {/* BVN (Bank Verification Number) matching Image 2 */}
             <View>
@@ -253,30 +301,87 @@ export const Step1PersonalData: React.FC<Step1PersonalDataProps> = ({
                 Next of Kin Details
               </Text>
 
-              <KycFormInput
-                label="Next of Kin Full Name"
-                value={formData.nextOfKinName || ""}
-                onChangeText={(text) => onChange("nextOfKinName", text)}
-                placeholder="Enter next of kin full name"
-                bgVariant="gray"
-              />
+              <View>
+                <KycFormInput
+                  label="Next of Kin Full Name"
+                  value={formData.nextOfKinName || ""}
+                  onChangeText={(text) => {
+                    onChange("nextOfKinName", text);
+                    if (errors.nextOfKinName)
+                      setErrors((prev) => ({ ...prev, nextOfKinName: undefined }));
+                  }}
+                  placeholder="Enter next of kin full name"
+                  bgVariant="gray"
+                />
+                {errors.nextOfKinName && (
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#EF4444",
+                      marginTop: 4,
+                      fontWeight: "500",
+                    }}
+                  >
+                    {errors.nextOfKinName}
+                  </Text>
+                )}
+              </View>
 
-              <KycFormInput
-                label="Relationship"
-                value={formData.nextOfKinRelationship || ""}
-                onChangeText={(text) => onChange("nextOfKinRelationship", text)}
-                placeholder="e.g. Spouse, Sibling, Parent"
-                bgVariant="gray"
-              />
+              <View>
+                <KycFormInput
+                  label="Relationship"
+                  value={formData.nextOfKinRelationship || ""}
+                  onChangeText={(text) => {
+                    onChange("nextOfKinRelationship", text);
+                    if (errors.nextOfKinRelationship)
+                      setErrors((prev) => ({
+                        ...prev,
+                        nextOfKinRelationship: undefined,
+                      }));
+                  }}
+                  placeholder="e.g. Spouse, Sibling, Parent"
+                  bgVariant="gray"
+                />
+                {errors.nextOfKinRelationship && (
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#EF4444",
+                      marginTop: 4,
+                      fontWeight: "500",
+                    }}
+                  >
+                    {errors.nextOfKinRelationship}
+                  </Text>
+                )}
+              </View>
 
-              <KycFormInput
-                label="Next of Kin Phone Number"
-                value={formData.nextOfKinPhone || ""}
-                onChangeText={(text) => onChange("nextOfKinPhone", text)}
-                placeholder="Enter next of kin phone number"
-                keyboardType="phone-pad"
-                bgVariant="gray"
-              />
+              <View>
+                <KycFormInput
+                  label="Next of Kin Phone Number"
+                  value={formData.nextOfKinPhone || ""}
+                  onChangeText={(text) => {
+                    onChange("nextOfKinPhone", text);
+                    if (errors.nextOfKinPhone)
+                      setErrors((prev) => ({ ...prev, nextOfKinPhone: undefined }));
+                  }}
+                  placeholder="Enter next of kin phone number"
+                  keyboardType="phone-pad"
+                  bgVariant="gray"
+                />
+                {errors.nextOfKinPhone && (
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#EF4444",
+                      marginTop: 4,
+                      fontWeight: "500",
+                    }}
+                  >
+                    {errors.nextOfKinPhone}
+                  </Text>
+                )}
+              </View>
             </View>
 
             {/* API Error Display */}

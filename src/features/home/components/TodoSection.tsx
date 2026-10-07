@@ -79,7 +79,18 @@ export const TodoSection = () => {
   const onboardingTasks = [];
 
   // 1. KYC Sequential Logic
-  if (userState.kycLevel === 1) {
+  const isKycPending = user?.kycStatus === "PENDING" || user?.kycStatus === "pending";
+
+  if (isKycPending) {
+    onboardingTasks.push({
+      id: "kyc-pending",
+      title: "KYC Under Review",
+      description: "Your documents are currently being verified by compliance",
+      icon: <Ionicons name="time-outline" size={18} color="#D97706" />,
+      onPress: () => router.push(userState.kycLevel === 1 ? "/kyc/level2-intro" : "/kyc/level3-intro"),
+      isComplete: false,
+    });
+  } else if (userState.kycLevel === 1) {
     onboardingTasks.push({
       id: "kyc2",
       title: "Proceed to level 2",
@@ -88,28 +99,17 @@ export const TodoSection = () => {
       onPress: () => router.push("/kyc/level2-intro"),
       isComplete: false,
     });
-  } else {
+  } else if (userState.kycLevel === 2) {
     onboardingTasks.push({
-      id: "kyc2-test",
-      title: "Test / Retake KYC Level 2",
-      description: "Scan your ID document and complete face verification",
-      icon: <Ionicons name="id-card-outline" size={18} color="#155D5F" />,
-      onPress: () => router.push("/kyc/level2-intro"),
+      id: "kyc3",
+      title: "Proceed to level 3",
+      description: "Upgrade your account for higher limits and features",
+      icon: (
+        <Ionicons name="shield-checkmark-outline" size={18} color="#1A1A1A" />
+      ),
+      onPress: () => router.push("/kyc/level3-intro"),
       isComplete: false,
     });
-
-    if (userState.kycLevel === 2) {
-      onboardingTasks.push({
-        id: "kyc3",
-        title: "Proceed to level 3",
-        description: "Upgrade your account for higher limits and features",
-        icon: (
-          <Ionicons name="shield-checkmark-outline" size={18} color="#1A1A1A" />
-        ),
-        onPress: () => router.push("/kyc/level3-intro"),
-        isComplete: false,
-      });
-    }
   }
 
   // 2. Security

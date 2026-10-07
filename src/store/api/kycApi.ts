@@ -7,16 +7,12 @@ export interface KycStatusResponse {
   isEmailVerified?: boolean;
   isPhoneVerified?: boolean;
   nextRequirements?: string[];
+  kycRejectionReason?: string;
 }
 
 export interface SubmitLevel2InfoRequest {
   bvn: string;
   dateOfBirth: string;
-  firstName?: string;
-  lastName?: string;
-  nextOfKinName?: string;
-  nextOfKinRelationship?: string;
-  nextOfKinPhone?: string;
 }
 
 export interface ScanIdRequest {
@@ -39,16 +35,38 @@ export interface KycDocumentsResponse {
   id?: string;
   userId?: string;
   bvn?: number | string;
+  bvnProviderVerified?: boolean;
+  bvnExtracted?: { firstName?: string; [key: string]: any };
   idType?: string;
   idNumber?: string;
   idImageUrl?: string;
+  ninProviderVerified?: boolean;
+  ninExtracted?: { extractedName?: string; [key: string]: any };
   faceVerified?: boolean;
+  faceProviderVerified?: boolean;
+  faceConfidenceScore?: number;
+  faceStatus?: "Pending" | "Approved" | "Rejected" | string;
+  faceRejectionReason?: string;
+  faceImageUrl?: string;
   addressDocUrl?: string;
+  utilityStatus?: "Pending" | "Approved" | "Rejected" | string;
+  utilityRejectionReason?: string;
   passportUrl?: string;
+  passportStatus?: "Pending" | "Approved" | "Rejected" | string;
+  passportRejectionReason?: string;
+  ninStatus?: "Pending" | "Approved" | "Rejected" | string;
+  ninRejectionReason?: string;
   dateOfBirth?: string;
+  nextOfKinName?: string;
+  nextOfKinRelationship?: string;
+  nextOfKinPhone?: string;
+  kycStatus?: "PENDING" | "VERIFIED" | "REJECTED" | string;
+  kycLevel?: number;
+  kycRejectionReason?: string;
   createdAt?: string;
   updatedAt?: string;
 }
+
 
 export const kycApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({

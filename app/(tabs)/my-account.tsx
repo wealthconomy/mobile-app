@@ -15,7 +15,7 @@ import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 import { logout } from "@/src/store/slices/authSlice";
 import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
-import { RefreshControl, ScrollView, StatusBar } from "react-native";
+import { Alert, RefreshControl, ScrollView, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -116,9 +116,20 @@ export default function MyAccountScreen() {
     [router]
   );
 
+  const effectiveKycLevel = kycData?.data?.currentLevel ?? activeUser?.kycLevel ?? 1;
+
   const handleKycPress = useCallback(() => {
-    router.push("/profile/security" as any);
-  }, [router]);
+    if (effectiveKycLevel < 2) {
+      router.push("/kyc/level2-intro");
+    } else if (effectiveKycLevel === 2) {
+      router.push("/kyc/level3-intro");
+    } else {
+      Alert.alert(
+        "KYC Fully Verified ✅",
+        "Your account is verified at Level 3. You have full access to unlimited deposits, withdrawals, and wealth advisory."
+      );
+    }
+  }, [router, effectiveKycLevel]);
 
   const handleOpenLogoutModal = useCallback(() => {
     setShowLogoutModal(true);

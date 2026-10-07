@@ -16,6 +16,10 @@ export interface SupportMessage {
   sender?: string;
   role?: string;
   isAdmin?: boolean;
+  attachmentUrl?: string | null;
+  fileType?: "image" | "pdf" | "document" | string | null;
+  fileName?: string | null;
+  isFailed?: boolean;
 }
 
 export interface SupportChat {
@@ -37,12 +41,18 @@ export interface SupportChat {
 }
 
 export interface SendMessagePayload {
-  text: string;
+  text?: string;
+  attachmentUrl?: string;
+  fileType?: "image" | "pdf" | "document" | string;
+  fileName?: string;
 }
 
 export interface SocketSendMessagePayload {
   chatId: string;
-  text: string;
+  text?: string;
+  attachmentUrl?: string;
+  fileType?: "image" | "pdf" | "document" | string;
+  fileName?: string;
 }
 
 export interface SocketSendMessageAck {

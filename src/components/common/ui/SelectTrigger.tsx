@@ -12,6 +12,7 @@ export interface SelectTriggerProps extends TouchableOpacityProps {
   label: string;
   value: string;
   placeholder?: string;
+  error?: string;
   bgVariant?: "gray" | "white";
   containerStyle?: StyleProp<ViewStyle>;
   rightElement?: React.ReactNode;
@@ -23,6 +24,7 @@ export const SelectTrigger: React.FC<SelectTriggerProps> = ({
   label,
   value,
   placeholder = "Select...",
+  error,
   bgVariant = "gray",
   containerStyle,
   rightElement,
@@ -63,6 +65,7 @@ export const SelectTrigger: React.FC<SelectTriggerProps> = ({
             shadowRadius: 3,
             elevation: 1,
           },
+          error ? { borderWidth: 1, borderColor: "#EF4444" } : null,
           style,
         ]}
         {...props}
@@ -79,8 +82,21 @@ export const SelectTrigger: React.FC<SelectTriggerProps> = ({
         </Text>
         {rightElement}
       </TouchableOpacity>
+      {error ? (
+        <Text
+          style={{
+            fontSize: 12,
+            color: "#EF4444",
+            marginTop: 4,
+            fontWeight: "500",
+          }}
+        >
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 };
 
 export const KycSelectTrigger = SelectTrigger;
+
