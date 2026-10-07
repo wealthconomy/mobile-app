@@ -1,5 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { Alert } from "react-native";
 
 export interface ImageSelectionResult {
@@ -124,7 +124,9 @@ export const imageService = {
   formatFilePayload(uri: string, customName?: string, customType?: string) {
     const filename = customName || uri.split("/").pop() || "image.jpg";
     const match = /\.(\w+)$/.exec(filename);
-    const mimeType = customType || (match ? `image/${match[1]}` : "image/jpeg");
+    const ext = match ? match[1].toLowerCase() : "";
+    const detectedMime = ext === "pdf" ? "application/pdf" : ext ? `image/${ext}` : "image/jpeg";
+    const mimeType = customType || detectedMime;
     return {
       uri,
       name: filename,

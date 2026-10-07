@@ -12,6 +12,7 @@ import {
   useFaceVerifyMutation,
   useGetKycDocumentsQuery,
 } from "@/src/store/api/kycApi";
+import { useUpdateMyProfileMutation, useGetMyProfileQuery } from "@/src/store/api/userApi";
 import { useImageUpload } from "@/src/hooks/useImageUpload";
 
 import {
@@ -31,6 +32,7 @@ export default function KYCLevel2Screen() {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
 
+  const { data: userProfileResponse } = useGetMyProfileQuery();
   const { data: kycDocsResponse } = useGetKycDocumentsQuery();
   const [submitLevel2Info, { isLoading: isSubmittingInfo, error: submitInfoError }] =
     useSubmitLevel2InfoMutation();
@@ -39,6 +41,7 @@ export default function KYCLevel2Screen() {
   const [faceVerify, { isLoading: isVerifyingFace, error: faceVerifyError }] =
     useFaceVerifyMutation();
   const { uploadImage, isLoading: isUploadingImage } = useImageUpload();
+  const [updateMyProfile] = useUpdateMyProfileMutation();
 
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7>(1);
   const [capturedSelfie, setCapturedSelfie] = useState<string | undefined>(undefined);
@@ -84,19 +87,31 @@ export default function KYCLevel2Screen() {
     //   return;
     // }
 
-    const kycData = kycDocsResponse?.data;
-    if (user || kycData) {
+    const kycPayload: any = kycDocsResponse?.data;
+    const kycData = kycPayload?.data || kycPayload;
+
+    const profilePayload: any = userProfileResponse?.data;
+    const profileUser = profilePayload?.data || profilePayload || user;
+
+    if (user || kycData || profileUser) {
       setFormData((prev) => {
-        const newFirstName = user?.firstName !== undefined && user.firstName !== null ? user.firstName : prev.firstName;
-        const newLastName = user?.lastName !== undefined && user.lastName !== null ? user.lastName : prev.lastName;
+        const newFirstName =
+          profileUser?.firstName || user?.firstName || prev.firstName;
+        const newLastName =
+          profileUser?.lastName || user?.lastName || prev.lastName;
         const newBvn = kycData?.bvn ? String(kycData.bvn) : prev.bvn;
         const newDob = kycData?.dateOfBirth
           ? formatFromISO(kycData.dateOfBirth)
+          : profileUser?.dob
+          ? formatFromISO(profileUser.dob)
           : prev.dateOfBirth;
 
-        const newNokName = user?.nextOfKinName !== undefined && user.nextOfKinName !== null ? user.nextOfKinName : prev.nextOfKinName;
-        const newNokRel = user?.nextOfKinRelationship !== undefined && user.nextOfKinRelationship !== null ? user.nextOfKinRelationship : prev.nextOfKinRelationship;
-        const newNokPhone = user?.nextOfKinPhone !== undefined && user.nextOfKinPhone !== null ? user.nextOfKinPhone : prev.nextOfKinPhone;
+        const newNokName =
+          kycData?.nextOfKinName || profileUser?.nextOfKinName || user?.nextOfKinName || prev.nextOfKinName;
+        const newNokRel =
+          kycData?.nextOfKinRelationship || profileUser?.nextOfKinRelationship || user?.nextOfKinRelationship || prev.nextOfKinRelationship;
+        const newNokPhone =
+          kycData?.nextOfKinPhone || profileUser?.nextOfKinPhone || user?.nextOfKinPhone || prev.nextOfKinPhone;
 
         return {
           ...prev,
@@ -111,8 +126,8 @@ export default function KYCLevel2Screen() {
       });
 
       setScannedData((prev) => {
-        const newFirstName = `${user?.firstName || prev.firstName.split(" ")[0] || ""} ${
-          user?.lastName || prev.firstName.split(" ")[1] || ""
+        const newFirstName = `${profileUser?.firstName || user?.firstName || prev.firstName.split(" ")[0] || ""} ${
+          profileUser?.lastName || user?.lastName || prev.firstName.split(" ")[1] || ""
         }`.trim();
         const newDob = kycData?.dateOfBirth
           ? formatFromISO(kycData.dateOfBirth)
@@ -130,8 +145,11 @@ export default function KYCLevel2Screen() {
       if (kycData?.idImageUrl) {
         setCapturedIdPhoto((prev) => prev || kycData.idImageUrl);
       }
+      if (kycData?.faceImageUrl) {
+        setCapturedSelfie((prev) => prev || kycData.faceImageUrl);
+      }
     }
-  }, [user, kycDocsResponse]);
+  }, [user, userProfileResponse, kycDocsResponse]);
 
   // Scanned data for Step 3
   const [scannedData, setScannedData] = useState<ScannedData>({
@@ -194,30 +212,65 @@ export default function KYCLevel2Screen() {
     return "";
   };
 
+  const formatPhoneToE164 = (phoneInput?: string): string | undefined => {
+    if (!phoneInput) return undefined;
+    const cleaned = phoneInput.trim().replace(/[^\d+]/g, "");
+    if (!cleaned) return undefined;
+    if (cleaned.startsWith("+")) return cleaned;
+    if (cleaned.startsWith("234")) return `+${cleaned}`;
+    if (cleaned.startsWith("0")) return `+234${cleaned.slice(1)}`;
+    if (cleaned.length === 10) return `+234${cleaned}`;
+    return `+${cleaned}`;
+  };
+
   // Step 1 Submission
   const handleStep1Continue = async () => {
     try {
       const formattedDateOfBirth = formatToYYYYMMDD(formData.dateOfBirth);
-      const payload = {
-        bvn: formData.bvn,
+
+      // 1. Permanently persist Next of Kin details to user profile via PUT /user/me
+      if (formData.nextOfKinName || formData.nextOfKinPhone) {
+        const profilePayload = {
+          nextOfKinName: formData.nextOfKinName?.trim(),
+          nextOfKinRelationship: formData.nextOfKinRelationship?.trim(),
+          nextOfKinPhone: formatPhoneToE164(formData.nextOfKinPhone),
+        };
+
+        console.log("\n================ [STEP 1: NEXT OF KIN PROFILE SYNC REQUEST] ================");
+        console.log("Endpoint: PUT /user/me");
+        console.log("Payload:", JSON.stringify(profilePayload, null, 2));
+        console.log("============================================================================\n");
+
+        try {
+          const profileRes = await updateMyProfile(profilePayload).unwrap();
+          console.log("\n================ [STEP 1: NEXT OF KIN PROFILE SYNC RESPONSE] ================");
+          console.log("Status: SUCCESS");
+          console.log("Result from /user/me:", JSON.stringify(profileRes, null, 2));
+          console.log("=============================================================================\n");
+        } catch (profileErr: any) {
+          console.log("\n❌ [STEP 1: NEXT OF KIN PROFILE SYNC FAILED]:");
+          console.log("Error details:", JSON.stringify(profileErr, null, 2));
+          console.log("=============================================================================\n");
+        }
+      }
+
+      // 2. Submit strict BVN and Date of Birth payload to POST /kyc/level-2/submit-info
+      const kycPayload = {
+        bvn: formData.bvn.trim(),
         dateOfBirth: formattedDateOfBirth,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        nextOfKinName: formData.nextOfKinName || user?.nextOfKinName || "",
-        nextOfKinRelationship: formData.nextOfKinRelationship || user?.nextOfKinRelationship || "",
-        nextOfKinPhone: formData.nextOfKinPhone || user?.nextOfKinPhone || "",
       };
 
-      console.log("\n================ [KYC 2 - STEP 1: SUBMIT INFO REQUEST] ================");
+      console.log("\n================ [STEP 1: KYC BVN SUBMIT REQUEST] ================");
       console.log("Endpoint: POST /kyc/level-2/submit-info");
-      console.log("Payload:", JSON.stringify(payload, null, 2));
-      console.log("=======================================================================\n");
+      console.log("Payload:", JSON.stringify(kycPayload, null, 2));
+      console.log("===================================================================\n");
 
-      const response = await submitLevel2Info(payload).unwrap();
+      const response = await submitLevel2Info(kycPayload).unwrap();
 
-      console.log("\n================ [KYC 2 - STEP 1: SUBMIT INFO RESPONSE] ================");
-      console.log(JSON.stringify(response, null, 2));
-      console.log("========================================================================\n");
+      console.log("\n================ [STEP 1: KYC BVN SUBMIT RESPONSE] ================");
+      console.log("Status: SUCCESS");
+      console.log("Result from /kyc/level-2/submit-info:", JSON.stringify(response, null, 2));
+      console.log("====================================================================\n");
 
       setScannedData((prev) => ({
         ...prev,
@@ -226,8 +279,8 @@ export default function KYCLevel2Screen() {
       }));
       setStep(2);
     } catch (err: any) {
-      console.log("\n❌ [KYC 2 - STEP 1: SUBMIT INFO ERROR]:", err);
-      console.log("=======================================================================\n");
+      console.log("\n❌ [STEP 1: SUBMIT LEVEL 2 INFO ERROR]:", JSON.stringify(err, null, 2));
+      console.log("===================================================================\n");
     }
   };
 
@@ -325,7 +378,9 @@ export default function KYCLevel2Screen() {
   };
 
   const handleFinishAll = () => {
-    dispatch(updateKycLevel(2));
+    if (user?.kycStatus === "VERIFIED" || (user?.kycLevel && user.kycLevel >= 2)) {
+      dispatch(updateKycLevel(2));
+    }
     router.replace("/(tabs)");
   };
 
@@ -400,13 +455,17 @@ export default function KYCLevel2Screen() {
         <Step6FaceCompleted
           photoUri={capturedSelfie}
           onContinue={handleStep6Continue}
+          onRetake={() => setStep(5)}
           isLoading={isVerifyingFace}
           error={formatErrorMessage(faceVerifyError)}
         />
       )}
 
       {step === 7 && (
-        <Step7Congratulation onFinish={handleFinishAll} />
+        <Step7Congratulation
+          onFinish={handleFinishAll}
+          isPending={user?.kycStatus !== "VERIFIED" && (user?.kycLevel || 1) < 2}
+        />
       )}
     </SafeAreaView>
   );

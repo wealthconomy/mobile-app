@@ -7,11 +7,46 @@ import { CheckCircle2, Globe, TrendingUp, Trophy } from "lucide-react-native";
 import { ScrollView, Text, View } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSelector } from "react-redux";
+import { RootState } from "@/src/store";
+import { useGetKycDocumentsQuery, useGetKycStatusQuery } from "@/src/store/api/kycApi";
 
 const THEME_TEAL = "#155D5F";
 
 export default function KYCLevel3Intro() {
   const router = useRouter();
+  const user = useSelector((state: RootState) => state.auth.user);
+  const { data: kycData } = useGetKycStatusQuery();
+  const { data: kycDocsResponse } = useGetKycDocumentsQuery();
+
+  const kycDocsPayload: any = kycDocsResponse?.data;
+  const kycDocs: any = kycDocsPayload?.data || kycDocsPayload;
+
+  const currentLevel = kycData?.data?.currentLevel ?? user?.kycLevel ?? 1;
+  const kycStatus = kycData?.data?.status ?? user?.kycStatus;
+
+  // Level 2 is verified if currentLevel >= 2 OR if NIN & Face are approved/verified
+  const isLevel2Verified =
+    currentLevel >= 2 ||
+    (kycDocs?.ninStatus === "Approved" && kycDocs?.faceStatus === "Approved") ||
+    (kycDocs?.faceVerified && (kycDocs?.ninProviderVerified || Boolean(kycDocs?.idNumber)));
+
+  const isLevel2Pending = !isLevel2Verified && (kycStatus === "PENDING" || kycStatus === "pending");
+
+  const isLevel3Rejected =
+    isLevel2Verified &&
+    (kycDocs?.passportStatus === "Rejected" ||
+      kycDocs?.utilityStatus === "Rejected" ||
+      kycStatus === "REJECTED" ||
+      kycStatus === "rejected");
+
+  const rejectionReason =
+    (kycDocs?.passportStatus === "Rejected" && kycDocs?.passportRejectionReason) ||
+    (kycDocs?.utilityStatus === "Rejected" && kycDocs?.utilityRejectionReason) ||
+    kycData?.data?.kycRejectionReason ||
+    user?.kycRejectionReason ||
+    "";
+
 
   const benefits = [
     {
@@ -44,15 +79,25 @@ export default function KYCLevel3Intro() {
             entering={FadeInUp.duration(600).delay(100)}
             className="items-center mb-10"
           >
-            <View className="w-24 h-24 bg-[#F2FFFF] rounded-full items-center justify-center mb-6">
-              <Ionicons name="location" size={48} color={THEME_TEAL} />
+            <View
+              className="w-24 h-24 rounded-full items-center justify-center mb-6"
+              style={{ backgroundColor: isLevel2Verified ? "#F2FFFF" : "#F8FAFC" }}
+            >
+              <Ionicons
+                name={isLevel2Verified ? "location" : "lock-closed"}
+                size={48}
+                color={isLevel2Verified ? THEME_TEAL : "#94A3B8"}
+              />
             </View>
             <Text className="text-[28px] font-semibold text-[#1A1A1A] text-center mb-2">
-              Full Verification
+              {isLevel2Verified ? "Full Verification" : "Level 3 Address (Locked)"}
             </Text>
             <Text className="text-[#64748B] text-center text-[15px] leading-[22px] px-4 font-medium">
-              Achieve Level 3 status by verifying your residential address for
-              unrestricted wealth flow.
+              {isLevel2Verified
+                ? "Achieve Level 3 status by verifying your residential address for unrestricted wealth flow."
+                : isLevel2Pending
+                ? "Your Level 2 Identity Verification is currently under review. Address verification will be unlocked as soon as compliance approves Level 2."
+                : "Complete and get verified for Level 2 Identity Verification before unlocking Level 3 address verification."}
             </Text>
           </Animated.View>
 
@@ -108,9 +153,55 @@ export default function KYCLevel3Intro() {
             entering={FadeInDown.duration(600).delay(700)}
             className="mb-8"
           >
+            {isLevel3Rejected && (
+              <View className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-start">
+                <Ionicons name="alert-circle" size={24} color="#DC2626" style={{ marginTop: 2 }} />
+                <View className="flex-1 ml-3">
+                  <Text className="text-red-900 font-bold text-[14px]">
+                    Document Re-upload Required
+                  </Text>
+                  <Text className="text-red-800 text-[12px] mt-0.5 leading-[17px]">
+                    {rejectionReason
+                      ? `Reason: "${rejectionReason}". Please upload a clearer copy.`
+                      : "One or more of your address documents were rejected. Please review and re-upload to complete Level 3 verification."}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {!isLevel2Verified && (
+              <View className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 flex-row items-center">
+                <Ionicons name="alert-circle" size={24} color="#D97706" />
+                <View className="flex-1 ml-3">
+                  <Text className="text-amber-900 font-bold text-[14px]">
+                    {isLevel2Pending ? "Level 2 Verification Pending" : "Level 2 Verification Required"}
+                  </Text>
+                  <Text className="text-amber-800 text-[12px] mt-0.5 leading-[17px]">
+                    {isLevel2Pending
+                      ? "Your identity documents are currently under review. Address verification unlocks automatically once verified."
+                      : "You must complete BVN, ID card, and face verification before proceeding to Level 3."}
+                  </Text>
+                </View>
+              </View>
+            )}
+
             <ThemedButton
-              title="Continue to Address Form"
-              onPress={() => router.push("/kyc/level3")}
+              title={
+                isLevel3Rejected
+                  ? "Review & Re-upload Documents"
+                  : isLevel2Verified
+                  ? "Continue to Address Form"
+                  : isLevel2Pending
+                  ? "View Level 2 Status"
+                  : "Complete Level 2 First"
+              }
+              onPress={() => {
+                if (!isLevel2Verified) {
+                  router.replace("/kyc/level2-intro");
+                  return;
+                }
+                router.push("/kyc/level3");
+              }}
               style={{
                 backgroundColor: THEME_TEAL,
                 height: 60,
@@ -118,7 +209,9 @@ export default function KYCLevel3Intro() {
               }}
             />
             <Text className="text-[#64748B] text-[12px] text-center mt-5 font-medium">
-              Start building your global fortune today.
+              {isLevel2Verified
+                ? "Start building your global fortune today."
+                : "Higher KYC tiers grant unlimited transaction caps."}
             </Text>
           </Animated.View>
         </View>
@@ -126,3 +219,4 @@ export default function KYCLevel3Intro() {
     </SafeAreaView>
   );
 }
+

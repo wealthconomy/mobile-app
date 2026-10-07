@@ -12,12 +12,18 @@ import { FountainConfetti, KycButton } from "@/src/components/common";
 
 interface Step7CongratulationProps {
   onFinish: () => void;
+  title?: string;
+  subtitle?: string;
+  isPending?: boolean;
 }
 
 const THEME_TEAL = "#155D5F";
 
 export const Step7Congratulation: React.FC<Step7CongratulationProps> = ({
   onFinish,
+  title,
+  subtitle,
+  isPending = false,
 }) => {
   return (
     <View
@@ -122,7 +128,7 @@ export const Step7Congratulation: React.FC<Step7CongratulationProps> = ({
             textAlign: "center",
           }}
         >
-          Congratulation
+          {title || (isPending ? "Verification Submitted" : "Congratulation")}
         </Text>
         <Text
           style={{
@@ -134,7 +140,10 @@ export const Step7Congratulation: React.FC<Step7CongratulationProps> = ({
             fontWeight: "500",
           }}
         >
-          You've completed the 2nd KYC,{"\n"}you're now enable to withdraw funds
+          {subtitle ||
+            (isPending
+              ? "Your ID and biometric documents have been submitted for review. You will be notified once verified."
+              : "You've completed the 2nd KYC,\nyou're now enable to withdraw funds")}
         </Text>
       </Animated.View>
 

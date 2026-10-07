@@ -10,6 +10,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import * as ImagePicker from "expo-image-picker";
 import { FaceFramingBrackets, KycButton } from "@/src/components/common";
 
 interface Step2ScanIdProps {
@@ -81,6 +82,39 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
     }
     // Fallback if simulated or camera unavailable
     onStartScanning(ACTUAL_ID_FALLBACK_URI);
+  };
+
+  const handlePickFromGallery = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets[0]?.uri) {
+        const pickedUri = result.assets[0].uri;
+        try {
+          const manipulated = await manipulateAsync(
+            pickedUri,
+            [{ resize: { width: 1000 } }],
+            { compress: 0.7, format: SaveFormat.JPEG }
+          );
+          const finalUri = manipulated?.uri || pickedUri;
+          setCapturedUri(finalUri);
+          setTimeout(() => {
+            onStartScanning(finalUri);
+          }, 600);
+          return;
+        } catch {
+          setCapturedUri(pickedUri);
+          setTimeout(() => {
+            onStartScanning(pickedUri);
+          }, 600);
+        }
+      }
+    } catch (err) {
+      console.log("Error picking ID from gallery:", err);
+    }
   };
 
   return (
@@ -196,12 +230,31 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
         </View>
       </View>
 
-      {/* Start Scanning Button matching Image 4 exactly */}
+      {/* Start Scanning Button */}
       <KycButton
-        title={capturedUri ? "ID Captured!" : "Start scanning"}
+        title={capturedUri ? "ID Captured!" : "Take Photo of ID"}
         onPress={handleCapture}
-        style={{ marginBottom: 36 }}
+        style={{ marginBottom: 12 }}
       />
+
+      {/* Option to upload from Photo Gallery */}
+      <TouchableOpacity
+        onPress={handlePickFromGallery}
+        activeOpacity={0.7}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          paddingVertical: 12,
+          gap: 6,
+          marginBottom: 24,
+        }}
+      >
+        <Ionicons name="images-outline" size={18} color={THEME_TEAL} />
+        <Text style={{ fontSize: 14, fontWeight: "600", color: THEME_TEAL }}>
+          Upload ID from Gallery
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 };

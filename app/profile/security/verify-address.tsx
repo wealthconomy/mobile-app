@@ -22,7 +22,7 @@ export default function VerifyAddressScreen() {
   const [showSuccess, setShowSuccess] = useState(false);
 
   const handleConfirm = () => {
-    setShowSuccess(true);
+    router.replace("/kyc/level3-intro");
   };
 
   return (

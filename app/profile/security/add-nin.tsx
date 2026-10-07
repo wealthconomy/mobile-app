@@ -21,7 +21,7 @@ export default function AddNINScreen() {
   const [showSuccess, setShowSuccess] = useState(false);
 
   const handleConfirm = () => {
-    setShowSuccess(true);
+    router.replace("/kyc/level2-intro");
   };
 
   return (

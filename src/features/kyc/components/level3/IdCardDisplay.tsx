@@ -44,7 +44,7 @@ export const IdCardDisplay: React.FC<{ data: IdCardData }> = ({ data }) => {
          </View>
          <View className="w-[48%] mb-2 flex-row">
             <Text className="text-gray-400 text-[13px] w-12">Exp:</Text>
-            <Text className="text-gray-800 text-[13px] font-medium flex-1">{data.expires}</Text>
+            <Text className="text-gray-800 text-[13px] font-medium flex-1">{data.expires || "N/A"}</Text>
          </View>
       </View>
     </View>
