@@ -1,18 +1,40 @@
 import Header from "@/src/components/common/Header";
-import { RecentActivityList } from "@/src/features/home/components/RecentActivityList";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
+import { RecentTransactionList } from "@/src/features/home/components/RecentTransactionList";
 import { SubWealthCard } from "@/src/features/home/components/SubWealthCard";
 import { TransferToPortfolioSheet } from "@/src/features/home/components/TransferToPortfolioSheet";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useCallback, useState } from "react";
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 
 export default function WinUpScreen() {
   const [showTransferSheet, setShowTransferSheet] = useState(false);
-  const { data: walletData, isLoading } = useGetWalletSummaryQuery();
+  const [refreshing, setRefreshing] = useState(false);
+  const { data: walletData, isLoading, refetch } = useGetWalletSummaryQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch().unwrap();
+    } catch {
+      // ignore
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const formatAmount = (val?: string) => {
     if (!val) return "0.00";
@@ -25,10 +47,21 @@ export default function WinUpScreen() {
       <StatusBar style="dark" />
       <Header title="WinUp" />
 
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
+
       <ScrollView
-        className="flex-1 px-5"
+        className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: 10, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["#155D5F"]}
+            progressBackgroundColor="#FFFFFF"
+          />
+        }
       >
         {/* Total Savings Card */}
         <View className="mb-10">
@@ -96,7 +129,7 @@ export default function WinUpScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-          <RecentActivityList />
+          <RecentTransactionList />
         </View>
       </ScrollView>
 

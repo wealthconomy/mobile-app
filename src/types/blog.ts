@@ -41,5 +41,6 @@ export interface Blog {
   isLiked?: boolean;
   readingDuration?: string;
   description?: string;
+  slug?: string;
   comments?: BlogComment[];
 }

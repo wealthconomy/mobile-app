@@ -1,5 +1,6 @@
 export type GroupFrequency = "DAILY" | "WEEKLY" | "MONTHLY";
 export type GroupAccessType = "PUBLIC" | "PRIVATE";
+export type GroupType = "FLEX" | "FIXED" | "ROTATIONAL";
 export type GroupMemberFilter = "ALL" | "OVERDUE" | "PENDING" | "PAID" | "INACTIVE" | "PAST" | "BLACKLIST";
 
 export interface WealthGroupModel {
@@ -10,7 +11,13 @@ export interface WealthGroupModel {
   coverImage?: string;
   targetAmount: number | string;
   frequency: GroupFrequency;
+  groupType?: GroupType;
+  contributionAmount?: number | string;
+  currentCycle?: number;
+  totalCycles?: number;
+  isVetted?: boolean;
   memberInterest?: boolean;
+  positionsSet?: boolean;
   startDate: string;
   endDate: string;
   membersLimit: number;
@@ -38,6 +45,8 @@ export interface CreateGroupRequest {
   coverImage?: string;
   targetAmount: number;
   frequency: GroupFrequency;
+  groupType?: GroupType;
+  contributionAmount?: number;
   memberInterest: boolean;
   startDate: string;
   endDate: string;
@@ -46,6 +55,15 @@ export interface CreateGroupRequest {
   penaltySetting?: string;
   allowEarlyExit?: boolean;
   allowEmergencyWithdrawal?: boolean;
+}
+
+export interface GroupPosition {
+  memberId: string;
+  position: number;
+}
+
+export interface SetGroupPositionsRequest {
+  positions: GroupPosition[];
 }
 
 export interface UpdateGroupSettingsRequest {
@@ -87,6 +105,10 @@ export interface GroupMember {
     | string;
   joinedAt: string;
   totalContributed?: string | number;
+  /** Payout turn position set by the group admin (ROTATIONAL groups). */
+  position?: number;
+  /** Alias for position — returned as payoutPosition by GET /groups/{id}/members. */
+  payoutPosition?: number;
   user?: {
     id: string;
     firstName?: string;

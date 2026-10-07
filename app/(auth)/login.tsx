@@ -19,6 +19,8 @@ import { getApiErrorMessage } from "../../src/hooks/useAuthHooks";
 import { useLoginMutation } from "../../src/store/api/authApi";
 import { LoginFormData, loginSchema } from "../../src/validations/authSchemas";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 export default function LoginScreen() {
   const [generalError, setGeneralError] = useState("");
   const router = useRouter();
@@ -37,12 +39,61 @@ export default function LoginScreen() {
   const onSubmit = async (data: LoginFormData) => {
     setGeneralError("");
     try {
-      await loginMutation(data).unwrap();
-      router.replace("/(tabs)");
+      const res = await loginMutation(data).unwrap();
+      const user = res.data?.user;
+
+      if (user?.biometricsEnabled) {
+        router.replace("/(tabs)");
+      } else {
+        let count = 0;
+        try {
+          const stored = await AsyncStorage.getItem("@biometric_prompt_dismissed_count");
+          count = stored !== null ? parseInt(stored, 10) : 0;
+        } catch {
+          count = 0;
+        }
+
+        const newCount = count + 1;
+        if (newCount >= 5) {
+          await AsyncStorage.setItem("@biometric_prompt_dismissed_count", "0");
+          router.replace("/(auth)/biometric-setup" as any);
+        } else {
+          await AsyncStorage.setItem("@biometric_prompt_dismissed_count", String(newCount));
+          router.replace("/(tabs)");
+        }
+      }
     } catch (err: any) {
-      setGeneralError(
-        getApiErrorMessage(err, "Incorrect email or password. Please try again.")
-      );
+      // Inspect the raw error payload for lockout-level signals so we can show
+      // specific, actionable messages rather than a generic "wrong password" fallback.
+      const errorData = err?.data ?? err;
+      const errorMsg = (
+        errorData?.message ||
+        errorData?.error ||
+        errorData?.code ||
+        (typeof errorData === 'string' ? errorData : '')
+      ).toLowerCase();
+      const errorCode: string = (errorData?.code || '').toUpperCase();
+
+      if (errorMsg.includes('maintenance') || err?.status === 503) {
+        setGeneralError(
+          errorData?.message ||
+          'Wealthconomy is currently undergoing scheduled maintenance. Please try again shortly.'
+        );
+      } else if (errorMsg.includes('block') || errorCode === 'USER_BLOCKED') {
+        setGeneralError(
+          errorData?.message ||
+          'Your account has been blocked. Please contact support at support@wealthconomy.com.'
+        );
+      } else if (errorMsg.includes('suspend') || errorCode === 'USER_SUSPENDED') {
+        setGeneralError(
+          errorData?.message ||
+          'Your account has been suspended. Please contact support at support@wealthconomy.com.'
+        );
+      } else {
+        setGeneralError(
+          getApiErrorMessage(err, "Incorrect email or password. Please try again.")
+        );
+      }
     }
   };
 

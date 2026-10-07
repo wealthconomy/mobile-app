@@ -4,7 +4,7 @@ import { ScrollView, View } from "react-native";
 export const PortfolioCardSkeleton = () => (
   <View
     style={{
-      width: 179,
+      width: "100%",
       height: 119,
       backgroundColor: "#F9F9F9",
       borderTopLeftRadius: 50,

@@ -1,13 +1,15 @@
-import { MONTHS } from "../utils/notificationHelpers";
+﻿import { MONTHS } from "../utils/notificationHelpers";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
   Modal,
+  StyleSheet,
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { BlurView } from "expo-blur";
 
 interface DateFilterPickerProps {
   selectedDate: Date | null;
@@ -93,10 +95,12 @@ export const DateFilterPicker = ({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View className="flex-1 bg-black/50 justify-end">
-          <TouchableWithoutFeedback>
-            <View className="bg-white rounded-t-[36px] px-6 pb-10 pt-3">
+      <View style={{ flex: 1, justifyContent: "flex-end" }}>
+        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={StyleSheet.absoluteFill} />
+        </TouchableWithoutFeedback>
+        <View className="bg-white rounded-t-[36px] px-6 pb-10 pt-3">
               <View className="w-20 h-1.5 bg-[#bababa] rounded-full self-center mb-6" />
               <Text className="text-[22px] font-extrabold text-[#323232] mb-5 mt-2">
                 Filter by date
@@ -150,9 +154,7 @@ export const DateFilterPicker = ({
                 <Text className="text-white text-base font-bold">Close</Text>
               </TouchableOpacity>
             </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
+      </View>
     </Modal>
   );
 };

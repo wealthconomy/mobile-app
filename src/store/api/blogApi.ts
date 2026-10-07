@@ -30,6 +30,7 @@ export const blogApi = baseApi.injectEndpoints({
         url: `/client/blogs/${id}/like`,
         method: "POST",
       }),
+      invalidatesTags: (result, error, id) => [{ type: "Blog", id }, "Blog"],
     }),
 
     toggleBookmark: builder.mutation<ApiResponse<void>, string>({
@@ -37,6 +38,7 @@ export const blogApi = baseApi.injectEndpoints({
         url: `/client/blogs/${id}/bookmark`,
         method: "POST",
       }),
+      invalidatesTags: (result, error, id) => [{ type: "Blog", id }, "Blog"],
     }),
 
     addComment: builder.mutation<ApiResponse<void>, { id: string; content: string }>({

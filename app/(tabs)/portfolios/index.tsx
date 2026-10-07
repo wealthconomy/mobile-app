@@ -1,14 +1,16 @@
 import Header from "@/src/components/common/Header";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { PortfolioCard } from "@/src/features/home/components/PortfolioCard";
 import { SubWealthCard } from "@/src/features/home/components/SubWealthCard";
 import { TransferToPortfolioSheet } from "@/src/features/home/components/TransferToPortfolioSheet";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { FlatList, Text, View } from "react-native";
+import { FlatList, RefreshControl, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
+import { useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
 import { Skeleton } from "@/src/components/common/skeletons";
 import { PortfolioCardSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 
@@ -53,11 +55,39 @@ const PORTFOLIOS = [
 
 export default function WealthPortfolioScreen() {
   const [showTransferSheet, setShowTransferSheet] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const preferences = useSelector(
     (state: RootState) => state.portfolioPreference
   );
 
-  const { data: walletData, isLoading } = useGetWalletSummaryQuery();
+  const { data: walletData, isLoading, refetch: refetchWallet } = useGetWalletSummaryQuery();
+  const { data: configData, refetch: refetchConfig } = useGetPortfolioConfigQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.allSettled([
+        refetchWallet(),
+        refetchConfig(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const getRateLabel = (type: string) => {
+    const keyMap: Record<string, string> = {
+      flex: "wealthflex",
+      fix: "wealthfix",
+      goal: "wealthgoal",
+      fam: "wealthfam",
+      flow: "wealthflow",
+      group: "wealthgroup",
+    };
+    const rateKey = keyMap[type] || `wealth${type}`;
+    return rates?.[rateKey]?.label;
+  };
 
   const formatAmount = (val?: string) => {
     if (!val) return "0.00";
@@ -70,7 +100,7 @@ export default function WealthPortfolioScreen() {
   }: {
     item: (typeof PORTFOLIOS)[0] | number;
   }) => (
-    <View style={{ width: "48.5%", marginBottom: 16 }}>
+    <View style={{ width: "48%", marginBottom: 16 }}>
       {typeof item === "number" ? (
         <PortfolioCardSkeleton />
       ) : (
@@ -81,6 +111,7 @@ export default function WealthPortfolioScreen() {
           showEarnTag={false}
           hideInterest={preferences[item.type] === "Impact Wealth"}
           hasNotification={false}
+          interestRate={getRateLabel(item.type)}
         />
       )}
     </View>
@@ -90,6 +121,8 @@ export default function WealthPortfolioScreen() {
     <SafeAreaView edges={["top"]} style={{ flex: 1 }} className="bg-white">
       <StatusBar style="dark" />
       <Header title="Wealth Portfolio" />
+
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
 
       <FlatList
         data={isLoading ? ([1, 2, 3, 4, 5, 6] as any[]) : PORTFOLIOS}
@@ -104,6 +137,15 @@ export default function WealthPortfolioScreen() {
           paddingBottom: 40,
         }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["#155D5F"]}
+            progressBackgroundColor="#FFFFFF"
+          />
+        }
         ListHeaderComponent={
           <>
             {/* Total Savings Card */}

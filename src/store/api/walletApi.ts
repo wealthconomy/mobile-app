@@ -10,7 +10,7 @@ export const walletApi = baseApi.injectEndpoints({
     }),
     getWalletTransactions: builder.query<
       KeysetPagination<WalletTransaction>,
-      { limit?: number; after?: string; before?: string; q?: string; type?: string; reason?: string }
+      { limit?: number; after?: string; before?: string; q?: string; type?: string; reason?: string; from?: string; to?: string }
     >({
       query: (params) => ({
         url: "/wallet/txns",
@@ -20,18 +20,22 @@ export const walletApi = baseApi.injectEndpoints({
       transformResponse: (response: { data: KeysetPagination<WalletTransaction> }) => response.data,
       serializeQueryArgs: ({ endpointName, queryArgs }) => {
         // Only separate cache by filter parameters, not cursor
-        const { limit, q, type, reason } = queryArgs;
-        return `${endpointName}-${JSON.stringify({ limit, q, type, reason })}`;
+        const { limit, q, type, reason, from, to } = queryArgs;
+        return `${endpointName}-${JSON.stringify({ limit, q, type, reason, from, to })}`;
       },
       merge: (currentCache, newItems, { arg }) => {
         if (arg.after) {
           // appending forward
-          currentCache.items.push(...newItems.items);
+          const existingIds = new Set((currentCache.items || []).map((i) => i.id));
+          const fresh = (newItems.items || []).filter((i) => !existingIds.has(i.id));
+          currentCache.items.push(...fresh);
           currentCache.nextCursor = newItems.nextCursor;
           currentCache.hasNext = newItems.hasNext;
         } else if (arg.before) {
           // prepending backward
-          currentCache.items.unshift(...newItems.items);
+          const existingIds = new Set((currentCache.items || []).map((i) => i.id));
+          const fresh = (newItems.items || []).filter((i) => !existingIds.has(i.id));
+          currentCache.items.unshift(...fresh);
           currentCache.prevCursor = newItems.prevCursor;
           currentCache.hasPrev = newItems.hasPrev;
         } else {

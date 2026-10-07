@@ -1,12 +1,14 @@
-import { Ionicons } from "@expo/vector-icons";
+﻿import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import {
   Modal,
+  StyleSheet,
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { BlurView } from "expo-blur";
 
 interface LogoutModalProps {
   visible: boolean;
@@ -23,10 +25,12 @@ export const LogoutModal = React.memo(
         animationType="fade"
         onRequestClose={onClose}
       >
-        <TouchableWithoutFeedback onPress={onClose}>
-          <View className="flex-1 bg-black/50 items-center justify-center px-4">
-            <TouchableWithoutFeedback>
-              <View className="bg-white rounded-[32px] w-full p-8 items-center max-w-[340px]">
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 }}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          <TouchableWithoutFeedback onPress={onClose}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+          <View className="bg-white rounded-[32px] w-full p-8 items-center max-w-[340px]">
                 <View className="w-1.5 h-1.5 bg-[#BABABA] rounded-full mb-6" />
 
                 <View className="w-20 h-20 bg-[#FFF5F5] rounded-3xl items-center justify-center mb-6">
@@ -65,9 +69,7 @@ export const LogoutModal = React.memo(
                   </TouchableOpacity>
                 </View>
               </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+        </View>
       </Modal>
     );
   }

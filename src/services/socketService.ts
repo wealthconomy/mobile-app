@@ -68,13 +68,13 @@ class SocketService {
       this.notifyConnectionState(true);
     });
 
-    this.socket.on("disconnect", (reason) => {
+    this.socket.on("disconnect", (reason: any) => {
       this.isConnecting = false;
       console.log(`[SupportSocket] 🔴 DISCONNECTED. Reason: ${reason}`);
       this.notifyConnectionState(false);
     });
 
-    this.socket.on("connect_error", (error) => {
+    this.socket.on("connect_error", (error: any) => {
       this.isConnecting = false;
       console.warn(`[SupportSocket] ⚠️ Connection error: ${error.message}`);
       this.notifyConnectionState(false);

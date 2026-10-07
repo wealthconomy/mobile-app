@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch } from "react-redux";
+import { ArrowRight } from "lucide-react-native";
 import { completeOnboarding } from "../src/store/slices/authSlice";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
@@ -216,9 +217,10 @@ export default function OnboardingScreen() {
           paddingHorizontal: 21,
         }}
       >
-        <Text style={{ color: DARK, fontWeight: "700", fontSize: sx(16) }}>
-          Next →
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Text style={{ color: DARK, fontWeight: "700", fontSize: sx(16) }}>Next</Text>
+          <ArrowRight size={18} color={DARK} />
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -346,11 +348,22 @@ export default function OnboardingScreen() {
             paddingHorizontal: 21,
           }}
         >
-          <Text
-            style={{ color: "#FFFFFF", fontWeight: "700", fontSize: sx(16) }}
-          >
-            {isLast ? "Get Started" : "Next  →"}
-          </Text>
+          {isLast ? (
+            <Text
+              style={{ color: "#FFFFFF", fontWeight: "700", fontSize: sx(16) }}
+            >
+              Get Started
+            </Text>
+          ) : (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text
+                style={{ color: "#FFFFFF", fontWeight: "700", fontSize: sx(16) }}
+              >
+                Next
+              </Text>
+              <ArrowRight size={18} color="#FFFFFF" />
+            </View>
+          )}
         </TouchableOpacity>
       </View>
     );

@@ -1,14 +1,16 @@
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
 import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { useFocusEffect, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Eye, EyeOff } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { ArrowUp, Eye, EyeOff } from "lucide-react-native";
+import { useCallback, useEffect, useState } from "react";
 import {
   Dimensions,
   Image,
+  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -57,21 +59,46 @@ const TransferMoneyIcon = () => (
   </Svg>
 );
 
-import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
+import {
+  useGetPortfoliosQuery,
+  useGetPortfolioConfigQuery,
+} from "@/src/store/api/portfolioApi";
 import { useGetWalletSummaryQuery, useGetWalletTransactionsQuery } from "@/src/store/api/walletApi";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { WalletTransaction } from "@/src/types/wallet";
+import { getCleanTransactionTitle } from "@/src/utils/formatters";
 
 export default function WealthFlexScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [showTips, setShowTips] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   
-  const { data: walletData } = useGetWalletSummaryQuery();
-  const { data, isLoading: loading } = useGetPortfoliosQuery({ type: "wealthflex", limit: 1 });
+  const { data: walletData, refetch: refetchWallet } = useGetWalletSummaryQuery();
+  const { data, isLoading: loading, refetch: refetchFlex } = useGetPortfoliosQuery({ type: "wealthflex", limit: 1 });
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const flexRateLabel = rates?.wealthflex?.label || "5% P.A.";
   const flexPortfolio = data?.items?.[0];
 
-  const { data: txData } = useGetWalletTransactionsQuery({ limit: 3 });
+  const { data: txData, refetch: refetchTx } = useGetWalletTransactionsQuery({ limit: 3 });
   const transactions = txData?.items || [];
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.allSettled([refetchFlex(), refetchWallet(), refetchTx()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchFlex();
+      refetchWallet();
+      refetchTx();
+    }, [refetchFlex, refetchWallet, refetchTx])
+  );
 
   const formatAmount = (val?: string) => {
     if (!val) return "0.00";
@@ -117,16 +144,28 @@ export default function WealthFlexScreen() {
         rightElement={<PortfolioPreferenceMenu portfolioType="flex" />}
       />
 
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
+
       <ScrollView
-        className="flex-1 px-5"
+        className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: 10, paddingBottom: 100 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["#F44336"]}
+            progressBackgroundColor="#FFFFFF"
+          />
+        }
       >
         {/* Total Savings Card */}
         <View
           className="relative overflow-hidden self-center mb-8"
           style={{
-            width: 365,
+            width: "100%",
+            maxWidth: 365,
             height: 170,
             borderTopLeftRadius: 50,
             borderTopRightRadius: 20,
@@ -140,21 +179,26 @@ export default function WealthFlexScreen() {
             elevation: 4,
           }}
         >
-          {/* Wallet Image - User's latest tweaks */}
-          <Image
-            source={require("../../../assets/images/wallet.png")}
-            className="absolute"
+          {/* Wallet Image - Decorative Background Graphic */}
+          <View
+            pointerEvents="none"
             style={{
+              position: "absolute",
               width: 169.01,
               height: 169.01,
               top: -9,
-              left: 235,
+              right: -20,
               transform: [{ rotate: "320.33deg" }],
               opacity: 0.3,
               zIndex: 1,
             }}
-            resizeMode="contain"
-          />
+          >
+            <Image
+              source={require("../../../assets/images/wallet.png")}
+              style={{ width: "100%", height: "100%" }}
+              resizeMode="contain"
+            />
+          </View>
 
           {/* Text Container - Restored absolute positioning */}
           <View
@@ -162,14 +206,30 @@ export default function WealthFlexScreen() {
               position: "absolute",
               top: 28,
               left: 20,
-              width: 326, // 366 (card width) - 40 (20 left/right padding)
+              right: 20,
               zIndex: 10,
             }}
           >
             <View className="flex-row items-center justify-between mb-1">
-              <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-90">
-                Total Savings
-              </Text>
+              <View className="flex-row items-center gap-2">
+                <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-90">
+                  Total Savings
+                </Text>
+                {showInterest && (
+                  <View
+                    style={{
+                      backgroundColor: "#F44336",
+                      paddingHorizontal: 8,
+                      paddingVertical: 2.5,
+                      borderRadius: 20,
+                    }}
+                  >
+                    <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                      {flexRateLabel}
+                    </Text>
+                  </View>
+                )}
+              </View>
               <TouchableOpacity
                 onPress={() => setShowBalance(!showBalance)}
                 className="p-1"
@@ -189,7 +249,7 @@ export default function WealthFlexScreen() {
                 <BalanceText amount={amount} fontSize={32} color="#1A1A1A" />
               ) : (
                 <Text className="text-[#1A1A1A] text-[32px] font-extrabold tracking-tight">
-                  ••••••••
+                  ***
                 </Text>
               )}
               {showInterest && (
@@ -197,9 +257,7 @@ export default function WealthFlexScreen() {
                 <Text className="text-[#64748B] text-[13px] font-medium opacity-80">
                   Your wealth grew by ₦{dailyGrowthFormatted} today
                 </Text>
-                <Text className="text-[#4CAF50] text-[14px] font-bold ml-1">
-                  ↑
-                </Text>
+                <ArrowUp size={14} color="#4CAF50" style={{ marginLeft: 4 }} />
               </View>
               )}
             </View>
@@ -223,12 +281,12 @@ export default function WealthFlexScreen() {
 
             <Text
               className="font-extrabold text-[12px] mb-4"
-              style={{ width: 332, lineHeight: 12, color: "#F44336" }}
+              style={{ lineHeight: 12, color: "#F44336" }}
             >
-              What’s on WealthFlex?
+              What's on WealthFlex?
             </Text>
 
-            <View style={{ width: 332 }}>
+            <View>
               <View className="flex-row mb-3 items-start">
                 <Text className="mr-2 text-[10px]">👉</Text>
                 <Text
@@ -256,16 +314,15 @@ export default function WealthFlexScreen() {
         )}
 
         {/* Action Buttons */}
-        <View className="flex-row justify-between mb-8">
+        <View className="flex-row mb-8" style={{ gap: 12 }}>
           <TouchableOpacity
-            className="flex-row items-center"
+            className="flex-row items-center flex-1"
             style={{
-              width: 177,
               height: 75,
               borderRadius: 13,
               backgroundColor: "#F06358",
               paddingTop: 21,
-              paddingRight: 30,
+              paddingRight: 16,
               paddingBottom: 21,
               paddingLeft: 11,
               gap: 10,
@@ -281,27 +338,26 @@ export default function WealthFlexScreen() {
             <View className="items-center justify-center">
               <Ionicons name="add" size={20} color="white" />
             </View>
-            <View>
+            <View className="flex-1">
               <Text className="text-white font-bold text-[14px]">
-                Wealth Deposit{" "}
+                Wealth Deposit
               </Text>
               <Text className="text-white mt-2 text-[10px]">
-                {"Add to your WealthFles"}
+                {"Add to your WealthFlex"}
               </Text>
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity
-            className="flex-row items-center"
+            className="flex-row items-center flex-1"
             style={{
-              width: 177,
               height: 75,
               borderRadius: 13,
               backgroundColor: "#FFF2F1",
               borderWidth: 0.7,
               borderColor: "#F06358",
               paddingTop: 21,
-              paddingRight: 30,
+              paddingRight: 16,
               paddingBottom: 21,
               paddingLeft: 11,
               gap: 10,
@@ -321,7 +377,7 @@ export default function WealthFlexScreen() {
                 color="#F06358"
               />
             </View>
-            <View>
+            <View className="flex-1">
               <Text
                 className="font-bold text-[14px]"
                 style={{ color: "#F06358" }}
@@ -355,8 +411,7 @@ export default function WealthFlexScreen() {
           {/* Transactions List Preview Wrapper */}
           <View
             style={{
-              width: 383,
-              alignSelf: "center",
+              width: "100%",
               borderRadius: 20,
               padding: 10,
               backgroundColor: "#F6F6F6",
@@ -393,7 +448,10 @@ function TransactionItem({ item }: { item: WalletTransaction }) {
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
-    const amountNum = parseFloat(val) / 100;
+    const cleaned = String(val).replace(/[^0-9.-]/g, "");
+    const raw = parseFloat(cleaned);
+    if (isNaN(raw)) return "0.00";
+    const amountNum = Math.abs(raw) / 100;
     return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
@@ -404,19 +462,13 @@ function TransactionItem({ item }: { item: WalletTransaction }) {
   });
 
   const getTitle = () => {
-    if (item.description) return item.description;
-    switch (item.reason) {
-      case "WALLET_TOPUP": return "Wallet Topup";
-      case "WITHDRAWAL": return "Withdrawal";
-      case "REFERRAL_CREDIT": return "Referral Bonus";
-      default: return item.reason;
-    }
+    return getCleanTransactionTitle(item);
   };
 
   return (
     <TouchableOpacity
       style={{
-        width: 366,
+        alignSelf: "stretch",
         height: 66,
         backgroundColor: "#FFFFFF",
         borderRadius: 15,
@@ -443,7 +495,7 @@ function TransactionItem({ item }: { item: WalletTransaction }) {
       </View>
       <View className="items-end">
         <Text
-          className={`font-bold text-[13px] mb-1.5 ${isCredit ? "text-[#4CAF50]" : "text-[#1A1A1A]"}`}
+          className={`font-bold text-[13px] mb-1.5 ${isCredit ? "text-[#10B981]" : "text-[#DC2626]"}`}
         >
           {isCredit ? "+" : "-"}₦{formatAmount(item.amount)}
         </Text>

@@ -125,12 +125,13 @@ export default function SignupScreen() {
   });
 
   return (
-    <AuthLayout showBackButton scrollPaddingBottom={36}>
+    <AuthLayout scrollPaddingBottom={36}>
       <AuthHeader
         imageSource={require("../../assets/images/logo1.png")}
         title="Sign Up"
         subtitle="Join other purposeful wealth builders"
-        marginTop={24}
+        marginTop={8}
+        marginBottom={16}
       />
 
       <AuthErrorBanner error={generalError} />

@@ -15,22 +15,27 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
 import { useGetMyProfileQuery } from "@/src/store/api/userApi";
+import { useGetMyReferralSummaryQuery } from "@/src/store/api/referralApi";
+import { router } from "expo-router";
 
 export default function InviteScreen() {
   const { user: authUser } = useSelector((state: RootState) => state.auth);
   const { data: profileResponse } = useGetMyProfileQuery();
   const activeUser = profileResponse?.data || authUser;
 
+  const { data: summaryResp } = useGetMyReferralSummaryQuery(undefined, { refetchOnMountOrArgChange: true });
+  const summary = summaryResp?.data as any;
+
+  const referralCode =
+    activeUser?.referralCode ||
+    activeUser?.id?.slice(0, 8)?.toUpperCase() ||
+    "—";
+
   const onShare = async () => {
     try {
-      const referralCode =
-        activeUser?.referralCode ||
-        activeUser?.id?.slice(0, 8)?.toUpperCase() ||
-        "REF123";
       const referralLink = `https://wealthconomy.org/invite/${referralCode}`;
-
       await Share.share({
-        message: `Join me on Wealthconomy and get ₦5,000! Use my referral link: ${referralLink}`,
+        message: `Join me on Wealthconomy and get rewards! Use my referral link: ${referralLink}`,
       });
     } catch (error: any) {
       // ignore cancelled share
@@ -106,7 +111,7 @@ export default function InviteScreen() {
           </View>
 
           {/* Steps Row with Dashed Connectors */}
-          <View className="flex-row items-start justify-between mb-16 px-2 relative">
+          <View className="flex-row items-start justify-between mb-10 px-2 relative">
             {/* Dashed Line Background Overlay */}
             <View className="absolute top-7 left-14 right-14 border-t border-dashed border-[#2FB0B5] opacity-30" />
 
@@ -120,17 +125,109 @@ export default function InviteScreen() {
             />
             <StepIcon
               Icon={Wallet}
-              text="You'll get ₦5,000 credited to your wallets!"
+              text="You'll get rewards credited to your wallet!"
             />
           </View>
 
-          {/* Invite Button with Native Sharing */}
+          {/* Referral Code Pill */}
+          <View
+            style={{
+              backgroundColor: "#EEF7F8",
+              borderRadius: 14,
+              padding: 14,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 12,
+              borderWidth: 1,
+              borderColor: "#C8E6E8",
+            }}
+          >
+            <View>
+              <Text style={{ fontSize: 10, color: "#6B7280", fontWeight: "500", marginBottom: 2 }}>
+                Your Referral Code
+              </Text>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: "#155D5F", letterSpacing: 2 }}>
+                {referralCode}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={onShare}
+              style={{
+                backgroundColor: "#155D5F",
+                paddingHorizontal: 14,
+                paddingVertical: 8,
+                borderRadius: 10,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <Ionicons name="copy-outline" size={14} color="white" />
+              <Text style={{ color: "white", fontWeight: "700", fontSize: 12 }}>Copy & Share</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Live Summary Strip */}
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: "#F9FAFB",
+              borderRadius: 14,
+              padding: 14,
+              marginBottom: 16,
+              borderWidth: 1,
+              borderColor: "#F3F4F6",
+              gap: 0,
+            }}
+          >
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Text style={{ fontSize: 20, fontWeight: "800", color: "#155D5F" }}>
+                {summary?.totalReferrals ?? "—"}
+              </Text>
+              <Text style={{ fontSize: 10, color: "#9CA3AF", marginTop: 2 }}>Friends Invited</Text>
+            </View>
+            <View style={{ width: 1, backgroundColor: "#E5E7EB" }} />
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Text style={{ fontSize: 20, fontWeight: "800", color: "#D48E00" }}>
+                {summary?.totalEarnedKobo
+                  ? `₦${(parseFloat(summary.totalEarnedKobo) / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`
+                  : "₦0"}
+              </Text>
+              <Text style={{ fontSize: 10, color: "#9CA3AF", marginTop: 2 }}>Total Earned</Text>
+            </View>
+          </View>
+
+          {/* Invite Button */}
           <TouchableOpacity
             onPress={onShare}
             className="bg-[#155D5F] h-16 rounded-2xl flex-row items-center justify-center gap-x-3 active:opacity-90"
+            style={{ marginBottom: 12 }}
           >
             <Ionicons name="share-outline" size={24} color="white" />
-            <Text className="text-white text-lg font-bold">Invite friend</Text>
+            <Text className="text-white text-lg font-bold">Invite Friend</Text>
+          </TouchableOpacity>
+
+          {/* My Referrals Button */}
+          <TouchableOpacity
+            onPress={() => router.push("/profile/my-referrals" as any)}
+            style={{
+              height: 56,
+              borderRadius: 16,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              borderWidth: 1.5,
+              borderColor: "#155D5F",
+              backgroundColor: "transparent",
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="people-outline" size={20} color="#155D5F" />
+            <Text style={{ color: "#155D5F", fontWeight: "700", fontSize: 15 }}>
+              Check My Referrals
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

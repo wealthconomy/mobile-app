@@ -1,4 +1,5 @@
 import Header from "@/src/components/common/Header";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { LibraryItem } from "@/src/features/library/components/LibraryItem";
 import { useGetLibraryMaterialsQuery } from "@/src/store/api/libraryApi";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,6 +10,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Linking,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -21,10 +23,22 @@ export default function LibraryScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [refreshing, setRefreshing] = useState(false);
 
-  const { data: response, isLoading } = useGetLibraryMaterialsQuery({
+  const { data: response, isLoading, refetch } = useGetLibraryMaterialsQuery({
     publishToApp: true,
   });
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch().unwrap();
+    } catch {
+      // ignore
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const materials = response?.data?.items || [];
 
@@ -62,6 +76,8 @@ export default function LibraryScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="dark" />
       <Header title="Library Materials" />
+
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
 
       <View className="px-5 py-4">
         <Text className="text-[#6B7280] text-sm mb-4">
@@ -131,6 +147,15 @@ export default function LibraryScreen() {
         className="flex-1 px-5"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["#155D5F"]}
+            progressBackgroundColor="#FFFFFF"
+          />
+        }
       >
         {isLoading ? (
           <View className="flex-1 items-center justify-center py-20">

@@ -1,11 +1,12 @@
 import Header from "@/src/components/common/Header";
 import { useListGroupsQuery } from "@/src/store/api/groupApi";
+import { isGroupCompleted, isGroupDateEnded, isGroupTerminated } from "@/app/(tabs)/portfolios/wealth-group";
 import { WealthGroupModel } from "@/src/types/group";
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Search, Users } from "lucide-react-native";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -21,18 +22,78 @@ const THEME = "#155D5F";
 
 const CATEGORIES = ["All", "Business", "Real Estate", "Tech", "Savings", "Rotational"];
 
+const GroupCoverThumbnail = ({ uri, name }: { uri?: string; name?: string }) => {
+  const [hasError, setHasError] = useState(false);
+  const sanitized = uri?.startsWith("http://") ? uri.replace("http://", "https://") : uri;
+
+  if (!sanitized || hasError) {
+    return <Users size={28} color={THEME} />;
+  }
+
+  return (
+    <Image
+      source={{ uri: sanitized }}
+      onError={() => {
+        setHasError(true);
+      }}
+      style={{ width: "100%", height: "100%" }}
+      resizeMode="cover"
+    />
+  );
+};
+
 export default function GroupDiscoveryScreen() {
   const router = useRouter();
   const { type = "trending" } = useLocalSearchParams<{ type?: string }>();
   const isTrending = type === "trending";
 
-  const { data: groupsData, isLoading, refetch } = useListGroupsQuery();
+  const { data: groupsData, isLoading, refetch } = useListGroupsQuery(undefined, {
+    refetchOnFocus: true,
+    refetchOnMountOrArgChange: true,
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
 
-  const allGroups: WealthGroupModel[] = groupsData?.items || [];
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
-  const filteredGroups = allGroups.filter((g) => {
+
+
+  const rawGroups: WealthGroupModel[] = Array.isArray(groupsData?.items)
+    ? groupsData.items
+    : Array.isArray((groupsData as any)?.data?.items)
+    ? (groupsData as any).data.items
+    : Array.isArray((groupsData as any)?.data)
+    ? (groupsData as any).data
+    : Array.isArray(groupsData)
+    ? (groupsData as any)
+    : [];
+
+  const uniqueGroupsMap = new Map<string, WealthGroupModel>();
+  rawGroups.forEach((g: any) => {
+    if (!g) return;
+    const id = String(
+      g.id ||
+        g._id ||
+        g.groupId ||
+        g.group_id ||
+        (g.name ? `${g.name}_${g.createdAt || ""}` : "")
+    ).trim();
+    if (id) {
+      uniqueGroupsMap.set(id, { ...g, id: String(g.id || g._id || id) });
+    }
+  });
+  const allGroups = Array.from(uniqueGroupsMap.values());
+
+  // Filter out completed, terminated, AND date-ended groups — same logic as wealth-group.tsx
+  const activeGroups = allGroups.filter(
+    (g) => !isGroupCompleted(g) && !isGroupTerminated(g) && !isGroupDateEnded(g)
+  );
+
+  const filteredGroups = activeGroups.filter((g) => {
     const matchesSearch =
       g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (g.category && g.category.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -44,6 +105,10 @@ export default function GroupDiscoveryScreen() {
 
     return matchesSearch && matchesCategory;
   });
+
+  const displayGroups = isTrending
+    ? [...filteredGroups].sort((a, b) => Number(b.membersCount || 0) - Number(a.membersCount || 0))
+    : filteredGroups;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "white" }} edges={["top"]}>
@@ -122,8 +187,8 @@ export default function GroupDiscoveryScreen() {
           </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-            {filteredGroups.length > 0 ? (
-              filteredGroups.map((group) => {
+            {displayGroups.length > 0 ? (
+              displayGroups.map((group) => {
                 const targetFormatted = (parseFloat(group.targetAmount?.toString() || "0") / 100).toLocaleString();
                 const currentFormatted = ((typeof group.currentBalance === "string" ? parseFloat(group.currentBalance) : (group.currentBalance || 0)) / 100).toLocaleString();
 
@@ -164,15 +229,7 @@ export default function GroupDiscoveryScreen() {
                           justifyContent: "center",
                         }}
                       >
-                        {group.coverImage ? (
-                          <Image
-                            source={{ uri: group.coverImage }}
-                            style={{ width: "100%", height: "100%" }}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <Users size={28} color={THEME} />
-                        )}
+                        <GroupCoverThumbnail uri={group.coverImage} name={group.name} />
                       </View>
 
                       <View style={{ flex: 1 }}>
@@ -183,17 +240,49 @@ export default function GroupDiscoveryScreen() {
                           >
                             {group.name}
                           </Text>
-                          <View
-                            style={{
-                              backgroundColor: "#F0FDF4",
-                              paddingHorizontal: 8,
-                              paddingVertical: 3,
-                              borderRadius: 6,
-                            }}
-                          >
-                            <Text style={{ fontSize: 10, fontWeight: "700", color: THEME }}>
-                              {group.category || "Tribe"}
-                            </Text>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                            {Boolean(group.isVetted) && (
+                              <View
+                                style={{
+                                  backgroundColor: "#F0FDF4",
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 2,
+                                  borderRadius: 6,
+                                  borderWidth: 1,
+                                  borderColor: "#BBF7D0",
+                                }}
+                              >
+                                <Text style={{ fontSize: 9, fontWeight: "800", color: "#166534" }}>🛡️ Vetted</Text>
+                              </View>
+                            )}
+                            <View
+                              style={{
+                                backgroundColor: "#E6F7F7",
+                                paddingHorizontal: 6,
+                                paddingVertical: 2,
+                                borderRadius: 6,
+                              }}
+                            >
+                              <Text style={{ fontSize: 9, fontWeight: "800", color: THEME }}>
+                                {(group.groupType || (group as any).type || "FIXED").toString().includes("FLEX")
+                                  ? "Flex"
+                                  : (group.groupType || (group as any).type || "FIXED").toString().includes("ROTATIONAL")
+                                  ? "Rotational"
+                                  : "Fixed"}
+                              </Text>
+                            </View>
+                            <View
+                              style={{
+                                backgroundColor: "#F1F5F9",
+                                paddingHorizontal: 8,
+                                paddingVertical: 3,
+                                borderRadius: 6,
+                              }}
+                            >
+                              <Text style={{ fontSize: 10, fontWeight: "700", color: "#475569" }}>
+                                {group.category || "Tribe"}
+                              </Text>
+                            </View>
                           </View>
                         </View>
 

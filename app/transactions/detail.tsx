@@ -16,6 +16,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import ViewShot, { captureRef } from "react-native-view-shot";
 import { useGetWalletTransactionByIdQuery } from "@/src/store/api/walletApi";
+import {
+  formatCurrencyInText,
+  getCleanTransactionTitle,
+  getCleanTransactionNarrative,
+} from "@/src/utils/formatters";
 
 export default function TransactionDetailScreen() {
   const router = useRouter();
@@ -49,7 +54,7 @@ export default function TransactionDetailScreen() {
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
-    const amountNum = parseFloat(val) / 100;
+    const amountNum = Math.abs(parseFloat(val)) / 100;
     return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
@@ -64,21 +69,29 @@ export default function TransactionDetailScreen() {
     minute: "2-digit",
   });
 
-  const getTitle = () => {
-    if (transaction.description) return transaction.description;
-    switch (transaction.reason) {
-      case "WALLET_TOPUP": return "Wallet Topup";
-      case "WITHDRAWAL": return "Withdrawal";
-      case "REFERRAL_CREDIT": return "Referral Bonus";
-      default: return transaction.reason;
-    }
-  };
-
   const getStatusColor = () => {
     return "#10B981"; // success color by default
   };
 
+  const title = getCleanTransactionTitle(transaction);
+  const narrative = getCleanTransactionNarrative(transaction);
+  const formattedDescription = formatCurrencyInText(transaction.description);
   const amountFormatted = formatAmount(transaction.amount);
+
+  // Extract termination penalty if present in description
+  const penaltyMatch = transaction.description?.match(/Penalty:\s*(\d+(?:\.\d+)?)\s*(kobo|naira|₦)?/i);
+  let penaltyFormatted: string | null = null;
+  let descriptionWithoutPenalty = formattedDescription;
+
+  if (penaltyMatch) {
+    const rawVal = parseFloat(penaltyMatch[1]);
+    const unit = penaltyMatch[2]?.toLowerCase();
+    const penaltyNaira = unit === "naira" || unit === "₦" ? rawVal : rawVal / 100;
+    penaltyFormatted = `₦${penaltyNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    descriptionWithoutPenalty = formattedDescription
+      .replace(/\s*\([^\)]*penalty[^\)]*\)/i, "")
+      .trim();
+  }
 
   const handleShareImage = async () => {
     try {
@@ -106,13 +119,16 @@ export default function TransactionDetailScreen() {
               <p style="color: #64748B;">Wealthconomy Transaction Details</p>
             </div>
             <div style="background: #F8FAFC; padding: 20px; border-radius: 10px;">
-              <h2 style="color: ${getStatusColor()};">${getTitle()}</h2>
+              <h2 style="color: ${getStatusColor()};">${title}</h2>
               <p style="font-size: 24px;"><b>${isCredit ? "+" : "-"}₦${amountFormatted}</b></p>
               <p>Date: ${formattedDate} | ${formattedTime}</p>
               <hr style="border: 0.5px solid #E2E8F0; margin: 20px 0;">
               <p><b>Status:</b> Success</p>
               <p><b>Transaction ID:</b> ${transaction.id}</p>
               ${transaction.reference ? `<p><b>Reference:</b> ${transaction.reference}</p>` : ""}
+              ${penaltyFormatted ? `<p style="color: #DC2626;"><b>Termination Penalty:</b> -${penaltyFormatted}</p>` : ""}
+              <p><b>Narrative:</b> ${narrative}</p>
+              ${descriptionWithoutPenalty ? `<p><b>Details:</b> ${descriptionWithoutPenalty}</p>` : ""}
             </div>
             <div style="margin-top: 40px; text-align: center; color: #94A3B8;">
               <p>Thank you for using Wealthconomy</p>
@@ -145,10 +161,10 @@ export default function TransactionDetailScreen() {
             <View className="flex-row justify-between items-start">
               <View style={{ flex: 1, marginRight: 12 }}>
                 <Text className="text-[13px] font-bold mb-1" style={{ color: getStatusColor() }}>
-                  {getTitle()}
+                  {title}
                 </Text>
                 <Text className="text-[28px] font-bold text-[#323232]">
-                  {isCredit ? "+" : "-"}₦{amountFormatted.split('.')[0]}<Text className="text-[#9CA3AF]">.{amountFormatted.split('.')[1]}</Text>
+                  {isCredit ? "+" : "-"}₦{amountFormatted.split('.')[0]}<Text className="text-[#323232]">.{amountFormatted.split('.')[1]}</Text>
                 </Text>
                 <Text className="text-[#9CA3AF] text-[11px] mt-1">
                   {formattedDate} • {formattedTime}
@@ -184,20 +200,62 @@ export default function TransactionDetailScreen() {
             </View>
 
             <View className="p-5">
-              <View className="bg-[#F9FAFB] p-4 rounded-xl mb-6">
-                <Text className="text-[12px] font-bold text-[#4B5563] leading-[18px]">
-                  {transaction.description || getTitle()}
-                </Text>
-              </View>
+              {/* Description Box */}
+              {descriptionWithoutPenalty ? (
+                <View className="bg-[#F9FAFB] p-4 rounded-xl mb-4 border border-[#F3F4F6]">
+                  <Text className="text-[13px] font-bold text-[#374151] leading-[18px]">
+                    {descriptionWithoutPenalty}
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Termination Penalty Banner (High Visibility Bold Red) */}
+              {penaltyFormatted ? (
+                <View
+                  style={{
+                    backgroundColor: "#FEF2F2",
+                    borderColor: "#FECACA",
+                    borderWidth: 1,
+                    borderRadius: 14,
+                    padding: 14,
+                    marginBottom: 20,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 8 }}>
+                    <Ionicons name="alert-circle" size={22} color="#DC2626" style={{ marginRight: 8 }} />
+                    <View>
+                      <Text style={{ color: "#991B1B", fontWeight: "800", fontSize: 13 }}>
+                        Termination Penalty Deducted
+                      </Text>
+                      <Text style={{ color: "#DC2626", fontSize: 11, marginTop: 2, fontWeight: "500" }}>
+                        Early breaking fee deducted from fund
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ color: "#DC2626", fontWeight: "900", fontSize: 16 }}>
+                    -{penaltyFormatted}
+                  </Text>
+                </View>
+              ) : null}
 
               <View className="gap-y-5">
                 <DetailRow label="Status" value="Success" isSuccess />
+                {penaltyFormatted ? (
+                  <DetailRow
+                    label="Penalty Deducted"
+                    value={`-${penaltyFormatted}`}
+                    isDanger
+                  />
+                ) : null}
                 {transaction.reference && (
                   <DetailRow label="Reference" value={transaction.reference} />
                 )}
                 <DetailRow label="Transaction type" value={isCredit ? "Credit transaction" : "Debit transaction"} />
                 <DetailRow label="Transaction ID" value={transaction.id} />
-                <DetailRow label="Narrative" value={transaction.reason} />
+                <DetailRow label="Narrative" value={narrative} />
               </View>
             </View>
           </View>
@@ -235,24 +293,29 @@ const DetailRow = ({
   label,
   value,
   isSuccess,
+  isDanger,
 }: {
   label: string;
   value: string;
   isSuccess?: boolean;
+  isDanger?: boolean;
 }) => (
-  <View className="flex-row justify-between items-center">
-    <Text className="text-[14px] text-[#4B5563] font-bold flex-1 mr-2">{label}</Text>
+  <View className="flex-row justify-between items-start py-0.5">
+    <Text className="text-[14px] text-[#4B5563] font-medium mr-3 shrink-0">{label}</Text>
     <View className="flex-row items-center flex-1 justify-end">
       {isSuccess && (
         <Ionicons
           name="checkmark-circle"
           size={16}
           color="#10B981"
-          className="mr-1.5"
+          style={{ marginRight: 6 }}
         />
       )}
       <Text
-        className={`text-[13px] font-bold text-right ${isSuccess ? "text-[#10B981]" : "text-[#323232]"}`}
+        className={`text-[13px] font-bold text-right flex-shrink ${
+          isDanger ? "text-[#DC2626] font-extrabold" : isSuccess ? "text-[#10B981]" : "text-[#323232]"
+        }`}
+        selectable
       >
         {value}
       </Text>

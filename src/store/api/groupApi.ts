@@ -1,11 +1,12 @@
 import {
   ContributeGroupRequest,
   CreateGroupRequest,
-  GroupChatMessage,
   GroupJoinRequest,
   GroupMember,
   GroupMemberFilter,
   GroupMemberStats,
+  GroupType,
+  SetGroupPositionsRequest,
   UpdateGroupSettingsRequest,
   WealthGroupModel,
   WithdrawGroupRequest,
@@ -18,6 +19,8 @@ interface ListGroupsArgs {
   limit?: number;
   after?: string;
   before?: string;
+  groupType?: GroupType;
+  isVetted?: boolean;
   sortBy?: "createdAt" | "name" | string;
   sortDir?: "asc" | "desc";
   populate?: string[];
@@ -43,8 +46,44 @@ export const groupApi = baseApi.injectEndpoints({
         params: params || {},
       }),
       providesTags: ["WealthGroup"],
-      transformResponse: (response: { data: KeysetPagination<WealthGroupModel> }) =>
-        response.data || response,
+      transformResponse: (response: any) => {
+        const payload = response?.data || response;
+        let rawItems: any[] = [];
+        if (Array.isArray(payload)) {
+          rawItems = payload;
+        } else if (Array.isArray(payload?.items)) {
+          rawItems = payload.items;
+        } else if (Array.isArray(response?.items)) {
+          rawItems = response.items;
+        }
+
+        const map = new Map<string, WealthGroupModel>();
+        rawItems.forEach((g: any) => {
+          if (!g) return;
+          const id = String(
+            g.id ||
+              g._id ||
+              g.groupId ||
+              g.group_id ||
+              (g.name ? `${g.name}_${g.createdAt || ""}` : "")
+          ).trim();
+          if (id) {
+            map.set(id, { ...g, id: String(g.id || g._id || id) });
+          }
+        });
+
+        const items = Array.from(map.values());
+        return {
+          items,
+          nextCursor: payload?.nextCursor ?? payload?.nextAfter ?? null,
+          prevCursor: payload?.prevCursor ?? null,
+          pageSize: payload?.pageSize ?? items.length,
+          hasNext: payload?.hasNext ?? Boolean(payload?.nextAfter || payload?.nextCursor),
+          hasPrev: payload?.hasPrev ?? false,
+          total: payload?.total ?? items.length,
+          nextAfter: payload?.nextAfter,
+        } as unknown as KeysetPagination<WealthGroupModel>;
+      },
     }),
 
     // Get single group details
@@ -134,20 +173,6 @@ export const groupApi = baseApi.injectEndpoints({
       invalidatesTags: ["WealthGroup", "Wallet"],
     }),
 
-    // Get group messages
-    getGroupMessages: builder.query<
-      KeysetPagination<GroupChatMessage>,
-      { id: string; limit?: number; after?: string; before?: string; q?: string; populate?: string[] }
-    >({
-      query: ({ id, ...params }) => ({
-        url: `/groups/${id}/messages`,
-        params,
-      }),
-      providesTags: ["WealthGroup"],
-      transformResponse: (response: { data: KeysetPagination<GroupChatMessage> }) =>
-        response.data || response,
-    }),
-
     // Get group members
     getGroupMembers: builder.query<
       KeysetPagination<GroupMember>,
@@ -173,15 +198,6 @@ export const groupApi = baseApi.injectEndpoints({
         response.data || response,
     }),
 
-    // Clear chat
-    clearGroupChat: builder.mutation<{ message: string }, string>({
-      query: (id) => ({
-        url: `/groups/${id}/chat/clear`,
-        method: "POST",
-      }),
-      invalidatesTags: ["WealthGroup"],
-    }),
-
     // Emergency withdrawal from group
     withdrawFromGroup: builder.mutation<
       { message: string },
@@ -195,22 +211,13 @@ export const groupApi = baseApi.injectEndpoints({
       invalidatesTags: ["WealthGroup", "Wallet"],
     }),
 
-    // Exit group
+    // Exit group (voluntary exit - refunds savings to Main Wallet minus penalty)
     exitGroup: builder.mutation<{ message: string }, string>({
       query: (id) => ({
         url: `/groups/${id}/exit`,
         method: "POST",
       }),
-      invalidatesTags: ["WealthGroup"],
-    }),
-
-    // Terminate group
-    terminateGroup: builder.mutation<{ message: string }, string>({
-      query: (id) => ({
-        url: `/groups/${id}/terminate`,
-        method: "POST",
-      }),
-      invalidatesTags: ["WealthGroup"],
+      invalidatesTags: ["WealthGroup", "Wallet", "Payment"],
     }),
 
     // Toggle mute
@@ -250,13 +257,22 @@ export const groupApi = baseApi.injectEndpoints({
       invalidatesTags: ["WealthGroup"],
     }),
 
-    // Remove member (kick)
+    // Remove member (kick - refunds 100% savings directly to Main Wallet)
     removeGroupMember: builder.mutation<{ message: string }, { id: string; userId: string }>({
       query: ({ id, userId }) => ({
         url: `/groups/${id}/members/${userId}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["WealthGroup"],
+      invalidatesTags: ["WealthGroup", "Wallet", "Payment"],
+    }),
+
+    // Terminate group (Creator only - refunds 100% of all active members' savings to their Main Wallets)
+    terminateGroup: builder.mutation<{ message: string }, string>({
+      query: (id) => ({
+        url: `/groups/${id}/terminate`,
+        method: "POST",
+      }),
+      invalidatesTags: ["WealthGroup", "Wallet", "Payment"],
     }),
 
     // Add to blacklist
@@ -286,6 +302,26 @@ export const groupApi = baseApi.injectEndpoints({
         body: { userIds },
       }),
     }),
+
+    // Get system configurations (rates & penalties configured by admin)
+    getSystemConfigs: builder.query<{ items: Array<{ key: string; value: string }> }, void>({
+      query: () => "/admin/system-config",
+      providesTags: ["WealthGroup"],
+      transformResponse: (response: any) => response?.data || response,
+    }),
+
+    // Set rotational payout positions (Admin/Owner only)
+    setGroupPositions: builder.mutation<
+      { message: string },
+      { id: string; body: SetGroupPositionsRequest }
+    >({
+      query: ({ id, body }) => ({
+        url: `/groups/${id}/positions`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["WealthGroup"],
+    }),
   }),
   overrideExisting: true,
 });
@@ -300,19 +336,19 @@ export const {
   useApproveJoinRequestMutation,
   useRejectJoinRequestMutation,
   useContributeToGroupMutation,
-  useGetGroupMessagesQuery,
   useGetGroupMembersQuery,
   useGetMemberStatsQuery,
-  useClearGroupChatMutation,
   useWithdrawFromGroupMutation,
   useExitGroupMutation,
-  useTerminateGroupMutation,
   useToggleGroupMuteMutation,
   useReportGroupMutation,
   useAddGroupAdminMutation,
   useRemoveGroupAdminMutation,
   useRemoveGroupMemberMutation,
+  useTerminateGroupMutation,
   useAddToGroupBlacklistMutation,
   useRemoveFromGroupBlacklistMutation,
   useSendGroupRemindersMutation,
+  useGetSystemConfigsQuery,
+  useSetGroupPositionsMutation,
 } = groupApi;

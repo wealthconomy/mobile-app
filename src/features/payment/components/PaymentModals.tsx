@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   ActivityIndicator,
   Image,
@@ -10,7 +10,9 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  StyleSheet,
 } from "react-native";
+import { BlurView } from "expo-blur";
 
 interface ModalProps {
   visible: boolean;
@@ -53,10 +55,12 @@ export const RemoveConfirmationModal = ({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View className="flex-1 bg-black/50 items-center justify-center px-4">
-          <TouchableWithoutFeedback>
-            <View className="bg-white rounded-[32px] w-full p-8 items-center max-w-[340px]">
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 }}>
+        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={StyleSheet.absoluteFill} />
+        </TouchableWithoutFeedback>
+        <View className="bg-white rounded-[32px] w-full p-8 items-center max-w-[340px]">
               <View className="w-1.5 h-1.5 bg-[#BABABA] rounded-full mb-6" />
 
               <View className="mb-6">
@@ -95,9 +99,7 @@ export const RemoveConfirmationModal = ({
                 </TouchableOpacity>
               </View>
             </View>
-          </TouchableWithoutFeedback>
         </View>
-      </TouchableWithoutFeedback>
     </Modal>
   );
 };
@@ -113,7 +115,11 @@ export const CardAddedModal = ({
     animationType="fade"
     onRequestClose={onClose}
   >
-    <View className="flex-1 bg-black/50 items-center justify-center px-4">
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 }}>
+      <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={StyleSheet.absoluteFill} />
+      </TouchableWithoutFeedback>
       <View className="bg-white rounded-[32px] w-full p-8 items-center max-w-[340px]">
         <View className="w-1.5 h-1.5 bg-[#BABABA] rounded-full mb-6" />
 
@@ -195,10 +201,12 @@ export const InsertPinModal = ({
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <TouchableWithoutFeedback onPress={onClose}>
-          <View className="flex-1 bg-black/50 justify-end">
-            <TouchableWithoutFeedback>
-              <View className="bg-white rounded-t-[36px] px-6 pt-6 pb-8 items-center">
+        <View style={{ flex: 1, justifyContent: "flex-end" }}>
+          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          <TouchableWithoutFeedback onPress={onClose}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+          <View className="bg-white rounded-t-[36px] px-6 pt-6 pb-8 items-center">
                 <View className="w-16 h-1.5 bg-[#E2E8F0] rounded-full mb-4" />
 
                 <View className="w-16 h-16 bg-[#EFF7F8] rounded-2xl items-center justify-center mb-3">
@@ -272,9 +280,7 @@ export const InsertPinModal = ({
                   <Text className="text-[#64748B] font-semibold text-sm">Cancel</Text>
                 </TouchableOpacity>
               </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -284,15 +290,20 @@ export const TransferSuccessModal = ({
   visible,
   onClose,
   onConfirm,
+  title = "Funds Transferred Successfully ✅",
   description,
 }: SuccessModalProps) => (
   <Modal
     visible={visible}
     transparent
-    animationType="slide"
+    animationType="fade"
     onRequestClose={onClose}
   >
-    <View className="flex-1 bg-black/50 justify-end">
+    <View style={{ flex: 1, justifyContent: "flex-end" }}>
+      <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={StyleSheet.absoluteFill} />
+      </TouchableWithoutFeedback>
       <View className="bg-white rounded-t-[40px] p-8 items-center pb-12">
         <View className="w-20 h-1.5 bg-[#BABABA] rounded-full mb-8" />
 
@@ -314,8 +325,8 @@ export const TransferSuccessModal = ({
           />
         </View>
 
-        <Text className="text-[24px] font-extrabold text-[#111827] mb-2">
-          Funds Transferred Successfully ✅
+        <Text className="text-[24px] font-extrabold text-[#111827] mb-2 text-center">
+          {title}
         </Text>
 
         <Text className="text-[14px] text-[#6B7280] text-center leading-[22px] mb-8 px-4">

@@ -1,8 +1,22 @@
 import { useGetBlogsQuery } from "@/src/store/api/blogApi";
+import { Blog } from "@/src/types/blog";
 import { router } from "expo-router";
 import { Image, ScrollView, TouchableOpacity, View } from "react-native";
 import { Text } from "@/src/components/common/ui/Text";
 import { WiseUpSkeleton } from "./WiseUpSkeleton";
+
+/** Strip HTML tags and collapse whitespace — used when blog.content is the
+ *  only available preview text (blog.description is optional). Raw HTML like
+ *  "<h2>Introduction</h2><p>Some text…</p>" would otherwise render as the
+ *  literal heading "Introduction" on Android, consuming the first line and
+ *  leaving only "…" on the second. */
+const stripHtml = (html: string): string =>
+  html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+const getBlogSnippet = (blog: Blog): string => {
+  if (blog.description) return blog.description;
+  return stripHtml(blog.content);
+};
 
 interface WiseUpCardProps {
   id: string;
@@ -86,7 +100,7 @@ export const WiseUpSection = ({
               key={blog.id}
               id={blog.id}
               title={blog.title}
-              description={blog.description || blog.content}
+              description={getBlogSnippet(blog)}
               image={blog.image}
             />
           ))

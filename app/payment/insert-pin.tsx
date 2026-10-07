@@ -1,10 +1,14 @@
 import Header from "@/src/components/common/Header";
 import { TransferSuccessModal } from "@/src/features/payment/components/PaymentModals";
-import { useContributeToGroupMutation } from "@/src/store/api/groupApi";
+import {
+  useContributeToGroupMutation,
+  useWithdrawFromGroupMutation,
+} from "@/src/store/api/groupApi";
 import {
   useTerminatePortfolioMutation,
   useTopUpPortfolioMutation,
   useWithdrawToWalletMutation,
+  useTransferPortfolioFundsMutation,
 } from "@/src/store/api/portfolioApi";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +18,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Keyboard,
   ScrollView,
   StatusBar,
   Text,
@@ -21,6 +26,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useDispatch } from "react-redux";
+import { saveSingleCompletedPortfolio } from "@/src/store/slices/completedPortfolioSlice";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const TEAL = "#155D5F";
@@ -36,6 +43,8 @@ export default function InsertPinScreen() {
     action,
     targetId,
     targetName,
+    destinationId,
+    destinationName,
     returnUrl,
   } = useLocalSearchParams<{
     amount: string;
@@ -45,9 +54,12 @@ export default function InsertPinScreen() {
     action?: string;
     targetId?: string;
     targetName?: string;
+    destinationId?: string;
+    destinationName?: string;
     returnUrl?: string;
   }>();
 
+  const dispatch = useDispatch();
   const [pin, setPin] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -55,9 +67,11 @@ export default function InsertPinScreen() {
 
   const [verifyPin] = useVerifyPinMutation();
   const [contributeToGroup] = useContributeToGroupMutation();
+  const [withdrawFromGroup] = useWithdrawFromGroupMutation();
   const [topUpPortfolio] = useTopUpPortfolioMutation();
   const [withdrawToWallet] = useWithdrawToWalletMutation();
   const [terminatePortfolio] = useTerminatePortfolioMutation();
+  const [transferPortfolioFunds] = useTransferPortfolioFundsMutation();
 
   const numAmount = parseFloat(amount || "0");
   const formattedAmount = numAmount.toLocaleString("en-US", {
@@ -67,7 +81,9 @@ export default function InsertPinScreen() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      inputRef.current?.focus();
+      if (!isProcessing && !showSuccessModal) {
+        inputRef.current?.focus();
+      }
     }, 400);
     return () => clearTimeout(timer);
   }, []);
@@ -77,11 +93,15 @@ export default function InsertPinScreen() {
     const cleaned = text.replace(/[^0-9]/g, "").slice(0, 4);
     setPin(cleaned);
     if (cleaned.length === 4) {
+      Keyboard.dismiss();
+      inputRef.current?.blur();
       handleExecutePayment(cleaned);
     }
   };
 
   const handleExecutePayment = async (enteredPin: string) => {
+    Keyboard.dismiss();
+    inputRef.current?.blur();
     setIsProcessing(true);
     try {
       // 1. Verify 4-digit PIN
@@ -95,6 +115,11 @@ export default function InsertPinScreen() {
           id: targetId,
           body: { amount: amountKobo },
         }).unwrap();
+      } else if (action === "GROUP_WITHDRAW" && targetId) {
+        await withdrawFromGroup({
+          id: targetId,
+          body: { amount: amountKobo },
+        }).unwrap();
       } else if (
         (action === "FAM_TOPUP" ||
           action === "FLOW_TOPUP" ||
@@ -102,8 +127,18 @@ export default function InsertPinScreen() {
           action === "FIX_TOPUP") &&
         targetId
       ) {
+        const portfolioType =
+          action === "FAM_TOPUP"
+            ? "wealthfam"
+            : action === "FLOW_TOPUP"
+            ? "wealthflow"
+            : action === "FIX_TOPUP"
+            ? "wealthfix"
+            : "wealthgoal";
+
         await topUpPortfolio({
           id: targetId,
+          type: portfolioType,
           body: { amount: amountKobo, source: "WALLET" },
         }).unwrap();
       } else if (
@@ -112,25 +147,96 @@ export default function InsertPinScreen() {
           action === "WITHDRAW_TO_WALLET") &&
         targetId
       ) {
+        const portfolioType =
+          action?.includes("FAM")
+            ? "wealthfam"
+            : action?.includes("FLOW")
+            ? "wealthflow"
+            : action?.includes("FIX")
+            ? "wealthfix"
+            : action?.includes("GOAL")
+            ? "wealthgoal"
+            : undefined;
+
         await withdrawToWallet({
           id: targetId,
+          type: portfolioType,
           body: { amount: amountKobo, pin: enteredPin },
         }).unwrap();
       } else if (
         (action === "FAM_TERMINATE" ||
           action === "FLOW_TERMINATE" ||
           action === "FIX_TERMINATE" ||
+          action === "GOAL_TERMINATE" ||
           action?.endsWith("_TERMINATE") ||
           action === "PORTFOLIO_TERMINATE") &&
         targetId
       ) {
+        const portfolioType =
+          action === "FAM_TERMINATE"
+            ? "wealthfam"
+            : action === "FLOW_TERMINATE"
+            ? "wealthflow"
+            : action === "FIX_TERMINATE"
+            ? "wealthfix"
+            : action === "GOAL_TERMINATE"
+            ? "wealthgoal"
+            : undefined;
+
         await terminatePortfolio({
           id: targetId,
+          type: portfolioType,
           body: { pin: enteredPin },
+        }).unwrap();
+      } else if (action === "TRANSFER_PORTFOLIO" && targetId && destinationId) {
+        await transferPortfolioFunds({
+          id: targetId,
+          body: {
+            amount: amountKobo,
+            destinationType: "PORTFOLIO",
+            destinationId,
+            pin: enteredPin,
+          },
+        }).unwrap();
+      } else if (action === "TRANSFER_BANK" && targetId && destinationId) {
+        await transferPortfolioFunds({
+          id: targetId,
+          body: {
+            amount: amountKobo,
+            destinationType: "BANK",
+            destinationId,
+            pin: enteredPin,
+          },
         }).unwrap();
       }
 
-      // 3. Show success
+      // 3. Save completed/withdrawn/terminated plan to Redux & AsyncStorage (for individual portfolios only, NOT shared groups)
+      if (targetId && action !== "GROUP_WITHDRAW" && (action?.includes("WITHDRAW") || action?.includes("TERMINATE"))) {
+        dispatch(
+          saveSingleCompletedPortfolio({
+            id: targetId,
+            name: targetName || "Completed Plan",
+            balance: "0",
+            targetAmount: (numAmount * 100).toString(),
+            status: action?.includes("TERMINATE") ? "TERMINATED" : "COMPLETED",
+            maturityDate: new Date().toISOString(),
+            type: action?.includes("FAM")
+              ? "wealthfam"
+              : action?.includes("FLOW")
+              ? "wealthflow"
+              : action?.includes("FIX")
+              ? "wealthfix"
+              : "wealthgoal",
+            metadata: {
+              category: targetName || "Completed",
+            },
+          } as any)
+        );
+      }
+
+      // 4. Show success
+      Keyboard.dismiss();
+      inputRef.current?.blur();
       setShowSuccessModal(true);
     } catch (err: any) {
       console.error("❌ [Payment Error]:", err);
@@ -152,31 +258,67 @@ export default function InsertPinScreen() {
     Alert.alert(
       "Biometric Authentication",
       "Please enter your 4-digit transaction PIN to proceed securely.",
-      [{ text: "OK", onPress: () => inputRef.current?.focus() }]
+      [{
+        text: "OK",
+        onPress: () => {
+          if (!isProcessing && !showSuccessModal) {
+            inputRef.current?.focus();
+          }
+        },
+      }]
     );
   };
 
   const handleSuccessConfirm = () => {
+    Keyboard.dismiss();
+    inputRef.current?.blur();
     setShowSuccessModal(false);
-    if (action === "FAM_TERMINATE") {
-      router.replace("/(tabs)/portfolios/wealth-fam" as any);
-    } else if (action === "FLOW_TERMINATE") {
-      router.replace("/(tabs)/portfolios/wealth-flow" as any);
-    } else if (returnUrl) {
-      router.replace(returnUrl as any);
-    } else if (action === "GROUP_DEPOSIT" && targetId) {
-      router.replace(`/portfolio/detail/group/${targetId}` as any);
-    } else if (action?.includes("FAM") && targetId) {
-      router.replace(`/portfolio/detail/fam/${targetId}` as any);
-    } else if (action?.includes("FLOW") && targetId) {
-      router.replace(`/portfolio/detail/flow/${targetId}` as any);
-    } else if (action?.includes("GOAL") && targetId) {
-      router.replace(`/portfolio/detail/goal/${targetId}` as any);
-    } else if (action?.includes("FIX") && targetId) {
-      router.replace(`/portfolio/detail/fix/${targetId}` as any);
-    } else {
-      router.replace("/payment" as any);
-    }
+
+    // Wait for native modal to dismiss on iOS before triggering the navigation transition
+    setTimeout(() => {
+      // 1. If returnUrl is provided, return directly to the originating plan page
+      if (returnUrl) {
+        router.replace(returnUrl as any);
+        return;
+      }
+
+      // 2. If targetId exists, navigate directly to that plan's detail page
+      if (targetId) {
+        if (action?.includes("FAM")) {
+          router.replace(`/portfolio/detail/fam/${targetId}` as any);
+          return;
+        }
+        if (action?.includes("FLOW")) {
+          router.replace(`/portfolio/detail/flow/${targetId}` as any);
+          return;
+        }
+        if (action?.includes("GOAL")) {
+          router.replace(`/portfolio/detail/goal/${targetId}` as any);
+          return;
+        }
+        if (action?.includes("FIX")) {
+          router.replace(`/portfolio/detail/fix/${targetId}` as any);
+          return;
+        }
+        if (action?.includes("GROUP")) {
+          router.replace(`/portfolio/detail/group/${targetId}` as any);
+          return;
+        }
+      }
+
+      // 3. Category tab fallback
+      if (action?.includes("FLOW")) {
+        router.replace("/(tabs)/portfolios/wealth-flow" as any);
+      } else if (action?.includes("FIX")) {
+        router.replace("/(tabs)/portfolios/wealth-fix" as any);
+      } else if (action?.includes("GOAL")) {
+        router.replace("/(tabs)/portfolios/wealth-goal" as any);
+      } else if (action?.includes("GROUP")) {
+        router.replace("/(tabs)/portfolios/wealth-group" as any);
+      } else {
+        router.replace("/(tabs)/portfolios/wealth-fam" as any);
+      }
+    }, 250);
   };
 
   const getSubtitle = () => {
@@ -192,14 +334,30 @@ export default function InsertPinScreen() {
     if (action === "FAM_WITHDRAW" || action === "FLOW_WITHDRAW" || action?.endsWith("_WITHDRAW")) {
       return `Enter your transaction PIN to confirm withdrawal of ₦${formattedAmount} from ${targetName || "your plan"} to your wallet.`;
     }
-    if (action === "FAM_TERMINATE" || action === "FLOW_TERMINATE") {
+    if (
+      action === "FAM_TERMINATE" ||
+      action === "FLOW_TERMINATE" ||
+      action === "FIX_TERMINATE" ||
+      action === "GOAL_TERMINATE"
+    ) {
       return `Enter your transaction PIN to terminate ${targetName || "your plan"} and transfer accumulated funds to your wallet.`;
+    }
+    if (action === "TRANSFER_PORTFOLIO") {
+      return `Enter your transaction PIN to confirm transfer of ₦${formattedAmount} to ${destinationName || "target portfolio"}.`;
+    }
+    if (action === "TRANSFER_BANK") {
+      return `Enter your transaction PIN to confirm transfer of ₦${formattedAmount} to ${destinationName || "bank account"}.`;
     }
     return `Please insert your 4-digit transaction PIN to complete the transaction of ₦${formattedAmount}.`;
   };
 
   const getSuccessDescription = () => {
-    if (action === "FAM_TERMINATE" || action === "FLOW_TERMINATE") {
+    if (
+      action === "FAM_TERMINATE" ||
+      action === "FLOW_TERMINATE" ||
+      action === "FIX_TERMINATE" ||
+      action === "GOAL_TERMINATE"
+    ) {
       return `Your plan ${targetName ? `"${targetName}"` : ""} has been terminated successfully and the remaining funds have been transferred to your Main Wallet.`;
     }
     if (
@@ -220,6 +378,12 @@ export default function InsertPinScreen() {
     }
     if (action === "GOAL_TOPUP") {
       return `You have successfully topped up ₦${formattedAmount} from your wallet into your ${targetName || "WealthGoal"}.`;
+    }
+    if (action === "TRANSFER_PORTFOLIO") {
+      return `Successfully transferred ₦${formattedAmount} to ${destinationName || "target portfolio"}.`;
+    }
+    if (action === "TRANSFER_BANK") {
+      return `Successfully transferred ₦${formattedAmount} to ${destinationName || "bank account"}.`;
     }
     return `Congratulations, WealthBuilder! You have successfully transferred ₦${formattedAmount} from your Wealth Flex account to ${name || ""} ${bankName || ""} Bank Account(${accountNumber || ""}).`;
   };
@@ -275,7 +439,11 @@ export default function InsertPinScreen() {
         {/* 4-Box PIN Display */}
         <TouchableOpacity
           activeOpacity={1}
-          onPress={() => inputRef.current?.focus()}
+          onPress={() => {
+            if (!isProcessing && !showSuccessModal) {
+              inputRef.current?.focus();
+            }
+          }}
           style={{ flexDirection: "row", gap: 16, marginBottom: 32 }}
         >
           {[0, 1, 2, 3].map((i) => {
@@ -315,11 +483,10 @@ export default function InsertPinScreen() {
           onChangeText={handlePinChange}
           keyboardType="numeric"
           maxLength={4}
-          editable={!isProcessing}
+          editable={!isProcessing && !showSuccessModal}
           secureTextEntry
           style={{ position: "absolute", opacity: 0, height: 0, width: 0 }}
           caretHidden
-          autoFocus
         />
 
         {isProcessing && (
@@ -388,7 +555,7 @@ export default function InsertPinScreen() {
       {/* Success Modal */}
       <TransferSuccessModal
         visible={showSuccessModal}
-        onClose={() => setShowSuccessModal(false)}
+        onClose={handleSuccessConfirm}
         onConfirm={handleSuccessConfirm}
         title={
           action === "GROUP_DEPOSIT"

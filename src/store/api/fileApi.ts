@@ -84,19 +84,28 @@ export const fileApi = baseApi.injectEndpoints({
             formData = new FormData();
             const filename = arg.name || arg.uri.split("/").pop() || "file.jpg";
             const match = /\.(\w+)$/.exec(filename);
-            const mimeType = arg.type || (match ? `image/${match[1]}` : "image/jpeg");
+            const ext = match ? match[1].toLowerCase() : "jpg";
+            let mimeType = arg.type || (ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg");
+            if (mimeType.toLowerCase() === "image/jpg") {
+              mimeType = "image/jpeg";
+            }
             formData.append("file", { uri: arg.uri, name: filename, type: mimeType } as any);
           } else {
             return { error: { status: "CUSTOM_ERROR", error: "Invalid upload arguments provided: missing uri or FormData" } };
           }
 
           console.log("[FILE UPLOAD] Executing standard FormData fetch...");
+          if (Platform.OS === "android") {
+            console.log("[fileApi][ANDROID] Dispatching POST /file/upload. FormData parts:", (formData as any)?._parts || "FormData");
+          }
+
           const response = await fetch(uploadUrl, {
             method: "POST",
             headers,
             body: formData,
           });
           const data = await response.json();
+
           console.log("\n================ [FILE UPLOAD - FETCH RESULT] ================");
           console.log("HTTP Status:", response.status);
           console.log("Response Body:", JSON.stringify(data, null, 2));
@@ -106,6 +115,9 @@ export const fileApi = baseApi.injectEndpoints({
           }
           return { data };
         } catch (error: any) {
+          if (Platform.OS === "android") {
+            console.error("[fileApi][ANDROID] Network exception during upload:", error?.message || error);
+          }
           return { error: { status: "FETCH_ERROR", error: error?.message || String(error) } };
         }
       },
