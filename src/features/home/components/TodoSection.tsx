@@ -2,7 +2,7 @@ import { RootState } from "@/src/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useSelector } from "react-redux";
 import { useGetKycDocumentsQuery } from "@/src/store/api/kycApi";
 
@@ -87,7 +87,12 @@ export const TodoSection = () => {
       title: "KYC Under Review",
       description: "Your documents are currently being verified by compliance",
       icon: <Ionicons name="time-outline" size={18} color="#D97706" />,
-      onPress: () => router.push(userState.kycLevel === 1 ? "/kyc/level2-intro" : "/kyc/level3-intro"),
+      onPress: () => {
+        Alert.alert(
+          "KYC Under Review ⏳",
+          "Your documents are currently being reviewed by our compliance team. You will be notified once verified."
+        );
+      },
       isComplete: false,
     });
   } else if (userState.kycLevel === 1) {

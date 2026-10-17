@@ -1,7 +1,8 @@
-﻿import Header from "@/src/components/common/Header";
+import Header from "@/src/components/common/Header";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
+  Alert,
   Modal,
   ScrollView,
   StatusBar,
@@ -50,6 +51,12 @@ export default function SecurityScreen() {
       kycStatus === "REJECTED" ||
       kycStatus === "rejected");
 
+  const isLevel3Pending =
+    isLevel2Verified &&
+    !isLevel3Verified &&
+    !isLevel3Rejected &&
+    (Boolean(kycDocs?.addressDocUrl || kycDocs?.passportUrl) || kycStatus === "PENDING" || kycStatus === "pending");
+
   const handleDeleteAccount = () => {
     // Simulate deletion and navigate to login
     setShowDeleteModal(false);
@@ -87,13 +94,33 @@ export default function SecurityScreen() {
                   color="#155D5F"
                 />
               }
-              onPress={() => router.push("/kyc/level2-intro")}
+              onPress={() => {
+                if (isLevel2Verified) {
+                  Alert.alert(
+                    "Identity Verified ✅",
+                    "Your Level 2 Identity Verification has been approved. You can proceed to Level 3 Address Verification."
+                  );
+                  return;
+                }
+                if (isLevel2Pending) {
+                  Alert.alert(
+                    "Verification In Review ⏳",
+                    "Your Level 2 identity documents have been submitted and are currently being reviewed by compliance. You will be notified once complete."
+                  );
+                  return;
+                }
+                router.push("/kyc/level2-intro");
+              }}
             />
             <MenuItem
               title="Address Verification (Level 3)"
               subtitle={
                 isLevel3Rejected
                   ? "Document rejected - tap to review & re-upload"
+                  : isLevel3Verified
+                  ? "Residential address & passport verified"
+                  : isLevel3Pending
+                  ? "Documents submitted and currently under review"
                   : "Proof of residency & international passport"
               }
               badge={
@@ -101,21 +128,37 @@ export default function SecurityScreen() {
                   ? { text: "Verified", bg: "#DCFCE7", color: "#166534" }
                   : isLevel3Rejected
                   ? { text: "Action Required", bg: "#FEF2F2", color: "#DC2626" }
+                  : isLevel3Pending
+                  ? { text: "In Review", bg: "#FEF9C3", color: "#854D0E" }
                   : isLevel2Verified
                   ? { text: "Upgrade", bg: "#E0F2FE", color: "#0369A1" }
                   : { text: "Locked", bg: "#F1F5F9", color: "#64748B" }
               }
               icon={
                 <Ionicons
-                  name={isLevel2Verified ? "location-outline" : "lock-closed-outline"}
+                  name={isLevel3Verified || isLevel2Verified ? "location-outline" : "lock-closed-outline"}
                   size={24}
-                  color={isLevel3Rejected ? "#DC2626" : isLevel2Verified ? "#155D5F" : "#94A3B8"}
+                  color={isLevel3Rejected ? "#DC2626" : isLevel3Verified || isLevel2Verified ? "#155D5F" : "#94A3B8"}
                 />
               }
               isLocked={!isLevel2Verified}
               onPress={() => {
                 if (!isLevel2Verified) {
                   setShowLockedModal(true);
+                  return;
+                }
+                if (isLevel3Verified) {
+                  Alert.alert(
+                    "Address Verified ✅",
+                    "Your Level 3 Address Verification is complete. You have full access to unlimited platform privileges."
+                  );
+                  return;
+                }
+                if (isLevel3Pending) {
+                  Alert.alert(
+                    "Address In Review ⏳",
+                    "Your Level 3 address documents have been submitted and are currently being reviewed by compliance."
+                  );
                   return;
                 }
                 router.push("/kyc/level3-intro");

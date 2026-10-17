@@ -4,13 +4,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { CheckCircle2, ShieldCheck, Zap } from "lucide-react-native";
-import { ScrollView, Text, View } from "react-native";
+import { Alert, ScrollView, Text, View } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
-import { useGetKycDocumentsQuery } from "@/src/store/api/kycApi";
+import { useGetKycDocumentsQuery, useGetKycStatusQuery } from "@/src/store/api/kycApi";
 
 const THEME_TEAL = "#155D5F";
 
@@ -18,17 +17,32 @@ export default function KYCLevel2Intro() {
   const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
   const { data: kycDocsResponse } = useGetKycDocumentsQuery();
+  const { data: kycStatusResponse } = useGetKycStatusQuery();
 
-  useEffect(() => {
-    const isLevel2Complete =
-      (user?.kycLevel !== undefined && user.kycLevel >= 2) ||
-      kycDocsResponse?.data?.faceVerified === true;
+  const kycDocsPayload: any = kycDocsResponse?.data;
+  const kycDocs: any = kycDocsPayload?.data || kycDocsPayload;
 
-    // Note: Auto-redirect disabled so KYC Level 2 can be tested repeatedly
-    // if (isLevel2Complete) {
-    //   router.replace("/kyc/level3-intro");
-    // }
-  }, [user, kycDocsResponse]);
+  const currentLevel = kycStatusResponse?.data?.currentLevel ?? user?.kycLevel ?? 1;
+  const kycStatus = kycStatusResponse?.data?.status ?? user?.kycStatus;
+
+  const isLevel2Complete =
+    currentLevel >= 2 ||
+    (kycDocs?.ninStatus === "Approved" && kycDocs?.faceStatus === "Approved") ||
+    (kycDocs?.faceVerified && (kycDocs?.ninProviderVerified || Boolean(kycDocs?.idNumber)));
+
+  const isLevel2Rejected =
+    !isLevel2Complete &&
+    (kycDocs?.ninStatus === "Rejected" ||
+      kycDocs?.faceStatus === "Rejected" ||
+      kycStatus === "REJECTED" ||
+      kycStatus === "rejected");
+
+  const isLevel2Pending =
+    !isLevel2Complete &&
+    !isLevel2Rejected &&
+    (kycStatus === "PENDING" ||
+      kycStatus === "pending" ||
+      Boolean(kycDocs?.faceImageUrl || kycDocs?.idImageUrl));
 
   const benefits = [
     {
@@ -123,17 +137,80 @@ export default function KYCLevel2Intro() {
             entering={FadeInDown.duration(600).delay(700)}
             className="mb-8"
           >
+            {isLevel2Complete ? (
+              <View className="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex-row items-center">
+                <Ionicons name="checkmark-circle" size={24} color="#15803D" />
+                <View className="flex-1 ml-3">
+                  <Text className="text-emerald-900 font-bold text-[14px]">
+                    Level 2 Verified ✅
+                  </Text>
+                  <Text className="text-emerald-800 text-[12px] mt-0.5 leading-[17px]">
+                    Your identity has been verified. You can now proceed to Level 3 Address Verification.
+                  </Text>
+                </View>
+              </View>
+            ) : isLevel2Pending ? (
+              <View className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 flex-row items-center">
+                <Ionicons name="time" size={24} color="#D97706" />
+                <View className="flex-1 ml-3">
+                  <Text className="text-amber-900 font-bold text-[14px]">
+                    Verification In Review ⏳
+                  </Text>
+                  <Text className="text-amber-800 text-[12px] mt-0.5 leading-[17px]">
+                    Your documents have been submitted and are currently being reviewed by compliance. You will be notified once verified.
+                  </Text>
+                </View>
+              </View>
+            ) : isLevel2Rejected ? (
+              <View className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-center">
+                <Ionicons name="alert-circle" size={24} color="#DC2626" />
+                <View className="flex-1 ml-3">
+                  <Text className="text-red-900 font-bold text-[14px]">
+                    Action Required ⚠️
+                  </Text>
+                  <Text className="text-red-800 text-[12px] mt-0.5 leading-[17px]">
+                    One or more of your identity credentials were rejected. Please review and re-submit.
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
             <ThemedButton
-              title="Start Verification"
-              onPress={() => router.push("/kyc/level2")}
+              title={
+                isLevel2Complete
+                  ? "Proceed to Level 3 Address"
+                  : isLevel2Pending
+                  ? "Verification Under Review"
+                  : isLevel2Rejected
+                  ? "Re-submit Verification"
+                  : "Start Verification"
+              }
+              onPress={() => {
+                if (isLevel2Complete) {
+                  router.replace("/kyc/level3-intro");
+                  return;
+                }
+                if (isLevel2Pending) {
+                  Alert.alert(
+                    "Verification In Review ⏳",
+                    "Your identity documents are currently under review by compliance. You cannot re-submit while review is in progress."
+                  );
+                  return;
+                }
+                router.push("/kyc/level2");
+              }}
               style={{
-                backgroundColor: THEME_TEAL,
+                backgroundColor: isLevel2Pending ? "#94A3B8" : THEME_TEAL,
                 height: 60,
                 borderRadius: 20,
               }}
             />
             <Text className="text-[#64748B] text-[12px] text-center mt-5 font-medium">
-              Verification usually takes less than 24 hours.
+              {isLevel2Complete
+                ? "Identity verified. Upgrade to Level 3 for unlimited limits."
+                : isLevel2Pending
+                ? "Verification usually takes less than 24 hours."
+                : "Verification usually takes less than 24 hours."}
             </Text>
           </Animated.View>
         </View>

@@ -44,14 +44,44 @@ export default function KYCLevel3Screen() {
     (kycData?.ninStatus === "Approved" && kycData?.faceStatus === "Approved") ||
     (kycData?.faceVerified && (kycData?.ninProviderVerified || Boolean(kycData?.idNumber)));
 
+  const [step, setStep] = useState<1 | 2>(1);
+
   useEffect(() => {
     // Only redirect if both queries have responded AND Level 2 is genuinely unverified
     if (kycStatusResponse && kycDocsResponse && !isLevel2Verified) {
       router.replace("/kyc/level2-intro");
+      return;
     }
-  }, [kycStatusResponse, kycDocsResponse, isLevel2Verified, router]);
 
-  const [step, setStep] = useState<1 | 2>(1);
+    const isLevel3Verified =
+      currentLevel >= 3 ||
+      (kycData?.utilityStatus === "Approved" && kycData?.passportStatus === "Approved");
+
+    if (isLevel3Verified && step < 2) {
+      router.replace("/(tabs)/my-account");
+      return;
+    }
+
+    const isLevel3Rejected =
+      isLevel2Verified &&
+      (kycData?.passportStatus === "Rejected" ||
+        kycData?.utilityStatus === "Rejected" ||
+        user?.kycStatus === "REJECTED" ||
+        user?.kycStatus === "rejected");
+
+    const isLevel3Pending =
+      isLevel2Verified &&
+      !isLevel3Verified &&
+      !isLevel3Rejected &&
+      (Boolean(kycData?.addressDocUrl || kycData?.passportUrl) ||
+        user?.kycStatus === "PENDING" ||
+        user?.kycStatus === "pending");
+
+    if (isLevel3Pending && step < 2) {
+      router.replace("/kyc/level3-intro");
+      return;
+    }
+  }, [kycStatusResponse, kycDocsResponse, isLevel2Verified, currentLevel, kycData, user, step, router]);
   const [proofOfAddress, setProofOfAddress] = useState<string | null>(null);
   const [proofOfAddressName, setProofOfAddressName] = useState<string | null>(null);
   const [passport, setPassport] = useState<string | null>(null);
