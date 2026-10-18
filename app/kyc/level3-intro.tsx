@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { CheckCircle2, Globe, TrendingUp, Trophy } from "lucide-react-native";
-import { ScrollView, Text, View } from "react-native";
+import { Alert, ScrollView, Text, View } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
@@ -31,6 +31,10 @@ export default function KYCLevel3Intro() {
     (kycDocs?.ninStatus === "Approved" && kycDocs?.faceStatus === "Approved") ||
     (kycDocs?.faceVerified && (kycDocs?.ninProviderVerified || Boolean(kycDocs?.idNumber)));
 
+  const isLevel3Verified =
+    currentLevel >= 3 ||
+    (kycDocs?.utilityStatus === "Approved" && kycDocs?.passportStatus === "Approved");
+
   const isLevel2Pending = !isLevel2Verified && (kycStatus === "PENDING" || kycStatus === "pending");
 
   const isLevel3Rejected =
@@ -39,6 +43,12 @@ export default function KYCLevel3Intro() {
       kycDocs?.utilityStatus === "Rejected" ||
       kycStatus === "REJECTED" ||
       kycStatus === "rejected");
+
+  const isLevel3Pending =
+    isLevel2Verified &&
+    !isLevel3Verified &&
+    !isLevel3Rejected &&
+    (Boolean(kycDocs?.addressDocUrl || kycDocs?.passportUrl) || kycStatus === "PENDING" || kycStatus === "pending");
 
   const rejectionReason =
     (kycDocs?.passportStatus === "Rejected" && kycDocs?.passportRejectionReason) ||
@@ -153,7 +163,31 @@ export default function KYCLevel3Intro() {
             entering={FadeInDown.duration(600).delay(700)}
             className="mb-8"
           >
-            {isLevel3Rejected && (
+            {isLevel3Verified ? (
+              <View className="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex-row items-center">
+                <Ionicons name="checkmark-circle" size={24} color="#15803D" />
+                <View className="flex-1 ml-3">
+                  <Text className="text-emerald-900 font-bold text-[14px]">
+                    Level 3 Verified ✅
+                  </Text>
+                  <Text className="text-emerald-800 text-[12px] mt-0.5 leading-[17px]">
+                    Your residential address and passport have been verified. You have full access to unlimited platform privileges.
+                  </Text>
+                </View>
+              </View>
+            ) : isLevel3Pending ? (
+              <View className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 flex-row items-center">
+                <Ionicons name="time" size={24} color="#D97706" />
+                <View className="flex-1 ml-3">
+                  <Text className="text-amber-900 font-bold text-[14px]">
+                    Address Verification In Review ⏳
+                  </Text>
+                  <Text className="text-amber-800 text-[12px] mt-0.5 leading-[17px]">
+                    Your address documents have been submitted and are currently being reviewed by compliance. You will be notified once verified.
+                  </Text>
+                </View>
+              </View>
+            ) : isLevel3Rejected ? (
               <View className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-start">
                 <Ionicons name="alert-circle" size={24} color="#DC2626" style={{ marginTop: 2 }} />
                 <View className="flex-1 ml-3">
@@ -167,7 +201,7 @@ export default function KYCLevel3Intro() {
                   </Text>
                 </View>
               </View>
-            )}
+            ) : null}
 
             {!isLevel2Verified && (
               <View className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 flex-row items-center">
@@ -187,7 +221,11 @@ export default function KYCLevel3Intro() {
 
             <ThemedButton
               title={
-                isLevel3Rejected
+                isLevel3Verified
+                  ? "KYC Fully Verified"
+                  : isLevel3Pending
+                  ? "Verification Under Review"
+                  : isLevel3Rejected
                   ? "Review & Re-upload Documents"
                   : isLevel2Verified
                   ? "Continue to Address Form"
@@ -200,16 +238,29 @@ export default function KYCLevel3Intro() {
                   router.replace("/kyc/level2-intro");
                   return;
                 }
+                if (isLevel3Verified) {
+                  router.replace("/(tabs)/my-account");
+                  return;
+                }
+                if (isLevel3Pending) {
+                  Alert.alert(
+                    "Address In Review ⏳",
+                    "Your Level 3 address documents are currently being reviewed by compliance. You cannot re-submit while review is in progress."
+                  );
+                  return;
+                }
                 router.push("/kyc/level3");
               }}
               style={{
-                backgroundColor: THEME_TEAL,
+                backgroundColor: isLevel3Pending ? "#94A3B8" : THEME_TEAL,
                 height: 60,
                 borderRadius: 20,
               }}
             />
             <Text className="text-[#64748B] text-[12px] text-center mt-5 font-medium">
-              {isLevel2Verified
+              {isLevel3Verified
+                ? "Full verification completed."
+                : isLevel2Verified
                 ? "Start building your global fortune today."
                 : "Higher KYC tiers grant unlimited transaction caps."}
             </Text>

@@ -78,6 +78,9 @@ export default function KYCLevel2Screen() {
 
   // Pre-populate user profile data and existing KYC documents data if available
   useEffect(() => {
+    const kycPayload: any = kycDocsResponse?.data;
+    const kycData = kycPayload?.data || kycPayload;
+
     const isLevel2Complete =
       (user?.kycLevel !== undefined && user.kycLevel >= 2) ||
       kycDocsResponse?.data?.faceVerified === true;
@@ -85,10 +88,30 @@ export default function KYCLevel2Screen() {
     if (isLevel2Complete) {
       dispatch(updateKycLevel(2));
       AsyncStorage.setItem("@wealth_kyc_level_2_completed", "true").catch(() => {});
+      if (step < 7) {
+        router.replace("/kyc/level3-intro");
+        return;
+      }
     }
 
-    const kycPayload: any = kycDocsResponse?.data;
-    const kycData = kycPayload?.data || kycPayload;
+    const isLevel2Rejected =
+      !isLevel2Complete &&
+      (kycData?.ninStatus === "Rejected" ||
+        kycData?.faceStatus === "Rejected" ||
+        user?.kycStatus === "REJECTED" ||
+        user?.kycStatus === "rejected");
+
+    const isLevel2Pending =
+      !isLevel2Complete &&
+      !isLevel2Rejected &&
+      (user?.kycStatus === "PENDING" ||
+        user?.kycStatus === "pending" ||
+        Boolean(kycData?.faceImageUrl || kycData?.idImageUrl));
+
+    if (isLevel2Pending && step < 7) {
+      router.replace("/kyc/level2-intro");
+      return;
+    }
 
     const profilePayload: any = userProfileResponse?.data;
     const profileUser = profilePayload?.data || profilePayload || user;
