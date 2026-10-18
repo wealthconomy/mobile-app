@@ -2,6 +2,7 @@ import Header from "@/src/components/common/Header";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   ScrollView,
@@ -14,7 +15,6 @@ import {
 import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from "react";
-import { ActivityIndicator, Alert } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/src/store";
 import { useDeleteAccountMutation } from "@/src/store/api/userApi";
