@@ -28,6 +28,9 @@ export interface User {
   walletBalance?: string | number;
   totalSavings?: string | number;
   totalInterest?: string | number;
+  hasTransactionPin?: boolean;
+  hasAppPasscode?: boolean;
+  pinHash?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

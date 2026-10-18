@@ -81,7 +81,7 @@ export function useImageUpload() {
       }
 
       try {
-        const uploadRes: any = await uploadFileMutation(formData).unwrap();
+        const uploadRes: any = await uploadFileMutation(fileObject).unwrap();
 
         // Log immediately after upload resolves on Android
         if (Platform.OS === "android") {
@@ -128,7 +128,7 @@ export function useImageUpload() {
           console.log("[useImageUpload][android] Attempting native FileSystem.uploadAsync fallback...");
           try {
             const fsUploadRes = await FileSystem.uploadAsync(
-              `${process.env.EXPO_PUBLIC_API_URL}/file/upload`,
+              `${process.env.EXPO_PUBLIC_API_URL}/file/upload?multiSizes=false`,
               cleanUri,
               {
                 fieldName: "file",

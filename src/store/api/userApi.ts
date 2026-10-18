@@ -27,6 +27,30 @@ export interface UserProfile {
   totalSavings?: string;
   totalInterest?: string;
   kycLevel?: number;
+  kycStatus?: string;
+  hasTransactionPin?: boolean;
+  hasAppPasscode?: boolean;
+  pinHash?: string | null;
+}
+
+export interface SetupPasscodeRequest {
+  passcode: string;
+}
+
+export interface VerifyPasscodeRequest {
+  passcode: string;
+}
+
+export interface UpdatePasscodeRequest {
+  oldPasscode: string;
+  newPasscode: string;
+}
+
+export interface JoinWaitlistRequest {
+  feature: string;
+  email?: string;
+  fullName?: string;
+  intendedInvestment?: string;
 }
 
 export interface UpdateProfileRequest {
@@ -191,6 +215,36 @@ export const userApi = baseApi.injectEndpoints({
         method: "DELETE",
       }),
     }),
+    setupPasscode: builder.mutation<ApiResponse<any>, SetupPasscodeRequest>({
+      query: (body) => ({
+        url: "/user/passcode/setup",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["User"],
+    }),
+    verifyPasscode: builder.mutation<ApiResponse<{ valid: boolean }>, VerifyPasscodeRequest>({
+      query: (body) => ({
+        url: "/user/passcode/verify",
+        method: "POST",
+        body,
+      }),
+    }),
+    updatePasscode: builder.mutation<ApiResponse<any>, UpdatePasscodeRequest>({
+      query: (body) => ({
+        url: "/user/passcode/update",
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["User"],
+    }),
+    joinWaitlist: builder.mutation<ApiResponse<any>, JoinWaitlistRequest>({
+      query: (body) => ({
+        url: "/waitlist",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
   overrideExisting: true,
 });
@@ -207,4 +261,8 @@ export const {
   useUpdateNotificationSettingsMutation,
   useToggleBiometricsMutation,
   useDeleteAccountMutation,
+  useSetupPasscodeMutation,
+  useVerifyPasscodeMutation,
+  useUpdatePasscodeMutation,
+  useJoinWaitlistMutation,
 } = userApi;

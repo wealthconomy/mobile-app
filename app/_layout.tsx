@@ -12,9 +12,10 @@ import {
 } from "@expo-google-fonts/kumbh-sans";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { GlobalLockoutModal } from "../src/components/common/GlobalLockoutModal";
-import { ActivityIndicator, View } from "react-native";
+import { AppInactivityLockModal } from "../src/components/common/AppInactivityLockModal";
+import { ActivityIndicator, AppState, AppStateStatus, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider, useDispatch, useSelector } from "react-redux";
@@ -22,6 +23,7 @@ import "../global.css";
 import { AppDispatch, RootState, store } from "../src/store";
 import { loadAuthFromStorage } from "../src/store/slices/authSlice";
 import { loadGroupsFromStorage } from "../src/store/slices/wealthGroupSlice";
+import { lockAppForInactivity } from "../src/store/slices/appStatusSlice";
 
 const queryClient = new QueryClient();
 
@@ -68,7 +70,7 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
-  const { isAuthenticated, hasCompletedOnboarding, isLoading } = useSelector(
+  const { isAuthenticated, hasCompletedOnboarding, isLoading, user } = useSelector(
     (state: RootState) => state.auth,
   );
 
@@ -77,6 +79,28 @@ function RootLayoutNav() {
     dispatch(loadGroupsFromStorage());
   }, [dispatch]);
 
+  // Inactivity / Background Auto-lock (45-60 seconds)
+  const backgroundTimeRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === "background" || nextAppState === "inactive") {
+        backgroundTimeRef.current = Date.now();
+      } else if (nextAppState === "active") {
+        if (backgroundTimeRef.current && isAuthenticated) {
+          const elapsedSeconds = (Date.now() - backgroundTimeRef.current) / 1000;
+          // If app was left in background for 45 seconds or more, lock it
+          if (elapsedSeconds >= 45) {
+            dispatch(lockAppForInactivity());
+          }
+        }
+        backgroundTimeRef.current = null;
+      }
+    };
+
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription.remove();
+  }, [dispatch, isAuthenticated]);
 
   useEffect(() => {
     if (isLoading) {
@@ -85,6 +109,13 @@ function RootLayoutNav() {
 
     const inAuthGroup = segments[0] === "(auth)";
     const inOnboarding = segments[0] === "onboarding";
+    const inSetupPin = inAuthGroup && segments[1] === "setup-pin";
+
+    // Check if authenticated user needs to setup their transaction PIN or app passcode
+    const needsSecuritySetup =
+      isAuthenticated &&
+      user &&
+      (user.hasTransactionPin === false || user.hasAppPasscode === false);
 
     if (!hasCompletedOnboarding) {
       if (!inOnboarding) {
@@ -94,10 +125,16 @@ function RootLayoutNav() {
       if (!inAuthGroup) {
         router.replace("/(auth)/login" as any);
       }
+    } else if (needsSecuritySetup) {
+      if (!inSetupPin) {
+        router.replace("/(auth)/setup-pin" as any);
+      }
     } else if (inAuthGroup || inOnboarding) {
-      router.replace("/(tabs)" as any);
+      if (!inSetupPin) {
+        router.replace("/(tabs)" as any);
+      }
     }
-  }, [isAuthenticated, hasCompletedOnboarding, segments, isLoading]);
+  }, [isAuthenticated, hasCompletedOnboarding, segments, isLoading, user]);
 
   if (isLoading) {
     return (
@@ -271,9 +308,9 @@ function RootLayoutNav() {
           </Stack>
         </ThemeProvider>
       </QueryClientProvider>
-      {/* GlobalLockoutModal must sit outside QueryClientProvider but inside Provider/SafeAreaProvider
-          so it renders above all screens while still having Redux access */}
+      {/* Global modals: Lockout and Inactivity Session Shield */}
       <GlobalLockoutModal />
+      <AppInactivityLockModal />
     </SafeAreaProvider>
   );
 }

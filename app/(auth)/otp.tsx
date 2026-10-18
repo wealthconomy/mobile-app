@@ -80,7 +80,7 @@ export default function OtpScreen() {
       }).unwrap();
 
       if (context === "signup") {
-        router.replace("/(auth)/login" as any);
+        router.replace("/(auth)/setup-pin" as any);
       } else {
         router.push({
           pathname: "/(auth)/reset-password",

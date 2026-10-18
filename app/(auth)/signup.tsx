@@ -31,8 +31,21 @@ const MUTED = "#F7F7F7";
 const ERROR = "#DC2626";
 
 const WEALTH_PREFERENCES = [
-  "Impact Wealth (Power initiatives)",
-  "Mixed Wealth (Split/Donate)",
+  {
+    value: "INTEREST_WEALTH",
+    label: "Interest-Based Wealth",
+    subtitle: "Maximize personal growth and returns",
+  },
+  {
+    value: "IMPACT_WEALTH",
+    label: "Impact Wealth",
+    subtitle: "Channel growth into purposeful initiatives and causes",
+  },
+  {
+    value: "MIXED_WEALTH",
+    label: "Mixed Wealth",
+    subtitle: "Balanced approach between personal profit and impact",
+  },
 ];
 
 export default function SignupScreen() {
@@ -67,10 +80,10 @@ export default function SignupScreen() {
 
   const handleSignup = async () => {
     const newErrors: Record<string, string> = {};
-    if (!firstName) newErrors.firstName = "First name is required";
-    if (!lastName) newErrors.lastName = "Last name is required";
-    if (!phone) newErrors.phone = "Phone number is required";
-    if (!email) newErrors.email = "Email address is required";
+    if (!firstName.trim()) newErrors.firstName = "First name is required";
+    if (!lastName.trim()) newErrors.lastName = "Last name is required";
+    if (!phone.trim()) newErrors.phone = "Phone number is required";
+    if (!email.trim()) newErrors.email = "Email address is required";
     if (!wealthPreference)
       newErrors.wealthPreference = "Please select a wealth preference";
     if (!password) newErrors.password = "Password is required";
@@ -88,14 +101,27 @@ export default function SignupScreen() {
     }
     setErrors({});
 
+    // Clean and normalize phone to E.164 (+234...)
+    let cleanedDigits = phone.replace(/[^0-9]/g, "");
+    let formattedPhone = phone.trim();
+    if (formattedPhone.startsWith("+234")) {
+      // Already complete E.164
+    } else if (cleanedDigits.startsWith("234")) {
+      formattedPhone = "+" + cleanedDigits;
+    } else if (cleanedDigits.startsWith("0")) {
+      formattedPhone = "+234" + cleanedDigits.slice(1);
+    } else {
+      formattedPhone = "+234" + cleanedDigits;
+    }
+
     try {
       setIsSubmitting(true);
       await registerMutation({
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
-        firstName,
-        lastName,
-        phone,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        phone: formattedPhone,
         wealthPreference,
         referralCode: referralCode ? referralCode.trim() : undefined,
       }).unwrap();
@@ -104,19 +130,63 @@ export default function SignupScreen() {
         params: { email: email.trim(), context: "signup" },
       } as any);
     } catch (err: any) {
-      const msg = err?.data?.message || err?.message || "";
-      const msgStr = Array.isArray(msg) ? msg.join(", ") : String(msg);
-      if (
-        msgStr.toLowerCase().includes("email") ||
-        msgStr.toLowerCase().includes("exist")
-      ) {
-        setError(
-          "email",
-          "This email is already registered. Please log in instead.",
-        );
-      } else {
-        setError("general", msgStr || "Signup failed. Please try again.");
+      const rawMsg = err?.data?.message || err?.message || "";
+      const messages: string[] = Array.isArray(rawMsg)
+        ? rawMsg
+        : typeof rawMsg === "string"
+        ? [rawMsg]
+        : ["Signup failed. Please try again."];
+
+      const fieldErrors: Record<string, string> = {};
+      const unmapped: string[] = [];
+
+      for (const m of messages) {
+        const lower = m.toLowerCase();
+        if (
+          lower.includes("wealthpreference") ||
+          lower.includes("wealth preference")
+        ) {
+          fieldErrors.wealthPreference =
+            "Please select a valid wealth preference option.";
+        } else if (
+          lower.includes("phone") &&
+          (lower.includes("exist") ||
+            lower.includes("already") ||
+            lower.includes("taken") ||
+            lower.includes("registered") ||
+            lower.includes("in use"))
+        ) {
+          fieldErrors.phone =
+            "This phone number is already registered. Please log in or use another number.";
+        } else if (lower.includes("phone")) {
+          fieldErrors.phone = m || "Please enter a valid phone number (e.g. 801 234 5678).";
+        } else if (
+          lower.includes("email") &&
+          (lower.includes("exist") ||
+            lower.includes("already") ||
+            lower.includes("taken") ||
+            lower.includes("registered") ||
+            lower.includes("in use"))
+        ) {
+          fieldErrors.email =
+            "This email is already registered. Please log in instead.";
+        } else if (lower.includes("email")) {
+          fieldErrors.email = m || "Please enter a valid email address.";
+        } else if (lower.includes("password")) {
+          fieldErrors.password = m;
+        } else if (lower.includes("first name") || lower.includes("firstname")) {
+          fieldErrors.firstName = "First name is required.";
+        } else if (lower.includes("last name") || lower.includes("lastname")) {
+          fieldErrors.lastName = "Last name is required.";
+        } else {
+          unmapped.push(m);
+        }
       }
+
+      if (unmapped.length > 0) {
+        fieldErrors.general = unmapped.join(". ");
+      }
+      setErrors(fieldErrors);
     } finally {
       setIsSubmitting(false);
     }
@@ -252,15 +322,40 @@ export default function SignupScreen() {
 
           <Animated.View entering={FadeInDown.duration(600).delay(380)}>
           <F label="Phone Number" field="phone" errors={errors}>
-            <View style={inputWrap(!!errors.phone)}>
+            <View style={[inputWrap(!!errors.phone), { paddingLeft: 8 }]}>
+              {/* Dial Code Prefix Pill */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: "#E6F4F4",
+                  paddingHorizontal: 10,
+                  paddingVertical: 7,
+                  borderRadius: 8,
+                  marginRight: 10,
+                  gap: 4,
+                }}
+              >
+                <Text style={{ fontSize: 16 }}>🇳🇬</Text>
+                <Text
+                  style={{
+                    color: PRIMARY,
+                    fontWeight: "700",
+                    fontSize: 13.5,
+                  }}
+                >
+                  +234
+                </Text>
+              </View>
               <TextInput
-                placeholder="Mobile Number"
+                placeholder="801 234 5678"
                 placeholderTextColor="#9CA3AF"
                 style={{ flex: 1, fontSize: 15, color: DARK }}
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={(v) => {
-                  setPhone(v);
+                  const cleaned = v.replace(/[^0-9]/g, "");
+                  setPhone(cleaned);
                   clearError("phone");
                 }}
               />
@@ -317,9 +412,11 @@ export default function SignupScreen() {
                   color: wealthPreference ? DARK : "#9CA3AF",
                   fontSize: 15,
                   flex: 1,
+                  fontWeight: wealthPreference ? "600" : "400",
                 }}
               >
-                {wealthPreference || "Select Wealth Preference"}
+                {WEALTH_PREFERENCES.find((p) => p.value === wealthPreference)
+                  ?.label || "Select Wealth Preference"}
               </Text>
               {showDropdown ? (
                 <ChevronUp size={20} color="#9CA3AF" />
@@ -342,24 +439,40 @@ export default function SignupScreen() {
                   shadowRadius: 6,
                 }}
               >
-                {WEALTH_PREFERENCES.map((pref) => (
-                  <TouchableOpacity
-                    key={pref}
-                    onPress={() => {
-                      setWealthPreference(pref);
-                      setShowDropdown(false);
-                      clearError("wealthPreference");
-                    }}
-                    style={{
-                      paddingHorizontal: 16,
-                      paddingVertical: 14,
-                      borderBottomWidth: 1,
-                      borderBottomColor: "#F5F5F5",
-                    }}
-                  >
-                    <Text style={{ color: DARK, fontSize: 15 }}>{pref}</Text>
-                  </TouchableOpacity>
-                ))}
+                {WEALTH_PREFERENCES.map((pref) => {
+                  const isSelected = wealthPreference === pref.value;
+                  return (
+                    <TouchableOpacity
+                      key={pref.value}
+                      onPress={() => {
+                        setWealthPreference(pref.value);
+                        setShowDropdown(false);
+                        clearError("wealthPreference");
+                      }}
+                      style={{
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#F5F5F5",
+                        backgroundColor: isSelected ? "#F0F9F9" : "#FFFFFF",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: isSelected ? PRIMARY : DARK,
+                          fontSize: 14.5,
+                          fontWeight: isSelected ? "700" : "600",
+                          marginBottom: 2,
+                        }}
+                      >
+                        {pref.label}
+                      </Text>
+                      <Text style={{ color: "#6B7280", fontSize: 12 }}>
+                        {pref.subtitle}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
             {errors.wealthPreference ? (

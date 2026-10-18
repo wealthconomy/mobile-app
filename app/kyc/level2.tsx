@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { updateKycLevel } from "@/src/store/slices/authSlice";
 import { RootState } from "@/src/store";
 import {
@@ -81,11 +82,10 @@ export default function KYCLevel2Screen() {
       (user?.kycLevel !== undefined && user.kycLevel >= 2) ||
       kycDocsResponse?.data?.faceVerified === true;
 
-    // Note: Auto-redirect disabled so KYC Level 2 can be tested repeatedly
-    // if (isLevel2Complete && step < 7) {
-    //   router.replace("/kyc/level3-intro");
-    //   return;
-    // }
+    if (isLevel2Complete) {
+      dispatch(updateKycLevel(2));
+      AsyncStorage.setItem("@wealth_kyc_level_2_completed", "true").catch(() => {});
+    }
 
     const kycPayload: any = kycDocsResponse?.data;
     const kycData = kycPayload?.data || kycPayload;
@@ -370,6 +370,8 @@ export default function KYCLevel2Screen() {
       console.log("Response from server:", JSON.stringify(response, null, 2));
       console.log("========================================================================\n");
 
+      dispatch(updateKycLevel(2));
+      AsyncStorage.setItem("@wealth_kyc_level_2_completed", "true").catch(() => {});
       setStep(7);
     } catch (err: any) {
       console.log("\n❌ [KYC 2 - STEP 6: FACE VERIFY ERROR]:", err);
@@ -378,9 +380,8 @@ export default function KYCLevel2Screen() {
   };
 
   const handleFinishAll = () => {
-    if (user?.kycStatus === "VERIFIED" || (user?.kycLevel && user.kycLevel >= 2)) {
-      dispatch(updateKycLevel(2));
-    }
+    dispatch(updateKycLevel(2));
+    AsyncStorage.setItem("@wealth_kyc_level_2_completed", "true").catch(() => {});
     router.replace("/(tabs)");
   };
 
@@ -464,7 +465,7 @@ export default function KYCLevel2Screen() {
       {step === 7 && (
         <Step7Congratulation
           onFinish={handleFinishAll}
-          isPending={user?.kycStatus !== "VERIFIED" && (user?.kycLevel || 1) < 2}
+          isPending={false}
         />
       )}
     </SafeAreaView>

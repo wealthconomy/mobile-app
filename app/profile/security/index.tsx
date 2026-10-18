@@ -147,13 +147,27 @@ export default function SecurityScreen() {
             />
             <MenuItem
               title="Transaction PIN"
+              subtitle="4-digit PIN for withdrawals and transactions"
               icon={
                 <Ionicons name="keypad-outline" size={24} color="#155D5F" />
               }
               onPress={() => router.push("/profile/security/change-pin")}
             />
             <MenuItem
-              title="Enable Face ID"
+              title="App Lock Passcode"
+              subtitle="6-digit passcode for inactivity lock"
+              icon={
+                <MaterialCommunityIcons
+                  name="shield-key-outline"
+                  size={24}
+                  color="#155D5F"
+                />
+              }
+              onPress={() => router.push("/profile/security/change-passcode")}
+            />
+            <MenuItem
+              title="Face ID & Biometrics"
+              subtitle="Fast unlock with fingerprint or Face ID"
               icon={
                 <MaterialCommunityIcons
                   name="face-recognition"

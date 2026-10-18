@@ -162,6 +162,23 @@ export const kycApi = baseApi.injectEndpoints({
     getKycDocuments: builder.query<ApiResponse<KycDocumentsResponse>, void>({
       query: () => "/kyc/documents",
       providesTags: ["Kyc"],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          const kycDocsPayload: any = data?.data;
+          const kycDocs: any = kycDocsPayload?.data || kycDocsPayload;
+          const isL2 =
+            (kycDocs?.ninStatus === "Approved" && kycDocs?.faceStatus === "Approved") ||
+            (kycDocs?.faceVerified && (kycDocs?.ninProviderVerified || Boolean(kycDocs?.idNumber) || Boolean(kycDocs?.bvn))) ||
+            kycDocs?.faceVerified === true ||
+            kycDocs?.faceStatus === "Approved";
+          if (isL2) {
+            dispatch(updateKycLevel(2));
+          }
+        } catch {
+          // fetch failed
+        }
+      },
     }),
   }),
   overrideExisting: true,

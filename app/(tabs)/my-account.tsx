@@ -181,7 +181,7 @@ export default function MyAccountScreen() {
         {/* Profile Header Card */}
         <AccountHeader
           user={activeUser}
-          kycLevel={kycData?.data?.currentLevel}
+          kycLevel={effectiveKycLevel}
           kycStatus={kycData?.data?.status}
           loading={isLoading}
           onPressKyc={handleKycPress}

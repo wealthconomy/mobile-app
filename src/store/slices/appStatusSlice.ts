@@ -7,6 +7,7 @@ interface AppStatusState {
   lockoutType: LockoutType;
   title: string;
   message: string;
+  isInactivityLocked: boolean;
 }
 
 const initialState: AppStatusState = {
@@ -14,6 +15,7 @@ const initialState: AppStatusState = {
   lockoutType: null,
   title: '',
   message: '',
+  isInactivityLocked: false,
 };
 
 const appStatusSlice = createSlice({
@@ -52,8 +54,19 @@ const appStatusSlice = createSlice({
       state.title = '';
       state.message = '';
     },
+    lockAppForInactivity: (state) => {
+      state.isInactivityLocked = true;
+    },
+    unlockAppFromInactivity: (state) => {
+      state.isInactivityLocked = false;
+    },
   },
 });
 
-export const { setLockout, clearLockout } = appStatusSlice.actions;
+export const {
+  setLockout,
+  clearLockout,
+  lockAppForInactivity,
+  unlockAppFromInactivity,
+} = appStatusSlice.actions;
 export default appStatusSlice.reducer;

@@ -30,7 +30,7 @@ export const fileApi = baseApi.injectEndpoints({
             headers.Authorization = `Bearer ${token}`;
           }
 
-          const uploadUrl = `${process.env.EXPO_PUBLIC_API_URL}/file/upload`;
+          const uploadUrl = `${process.env.EXPO_PUBLIC_API_URL}/file/upload?multiSizes=false`;
           console.log("\n================ [FILE UPLOAD - INITIATING REQUEST] ================");
           console.log("Upload URL:", uploadUrl);
           console.log("Platform:", Platform.OS);
@@ -46,6 +46,7 @@ export const fileApi = baseApi.injectEndpoints({
                   httpMethod: "POST",
                   uploadType: FileSystem.FileSystemUploadType.MULTIPART,
                   fieldName: "file",
+                  mimeType: arg.type || "image/jpeg",
                   headers,
                 });
 

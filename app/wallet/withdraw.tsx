@@ -9,14 +9,16 @@ import {
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 import { useInitiateWithdrawalMutation } from "@/src/store/api/withdrawalApi";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
-import { useGetKycStatusQuery } from "@/src/store/api/kycApi";
+import { useGetKycStatusQuery, useGetKycDocumentsQuery } from "@/src/store/api/kycApi";
+import { updateKycLevel } from "@/src/store/slices/authSlice";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { PayoutAccount, PayoutBank } from "@/src/types/wallet";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/src/store";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -70,6 +72,13 @@ export default function WithdrawScreen() {
     useAddPayoutAccountMutation();
   const [initiateWithdrawal, { isLoading: isSubmittingWithdrawal }] =
     useInitiateWithdrawalMutation();
+  const [verifyPinApi, { isLoading: isVerifyingPin }] = useVerifyPinMutation();
+
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [showKycModal, setShowKycModal] = useState(false);
+  const [pinValue, setPinValue] = useState("");
+  const [pinError, setPinError] = useState("");
+  const pinInputRef = useRef<TextInput>(null);
 
   const savedPayouts = savedPayoutsData?.items || [];
   const banks = banksData?.items || [];
@@ -82,10 +91,52 @@ export default function WithdrawScreen() {
     : "0.00";
 
   // User & KYC Verification Status Gate
+  const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
-  const { data: kycData } = useGetKycStatusQuery();
+  const { data: kycData, isLoading: isLoadingKycStatus } = useGetKycStatusQuery();
+  const { data: kycDocsResponse, isLoading: isLoadingKycDocs } = useGetKycDocumentsQuery();
+
+  const [localKyc2Completed, setLocalKyc2Completed] = useState(false);
+  const [isCheckingStorage, setIsCheckingStorage] = useState(true);
+
+  useEffect(() => {
+    AsyncStorage.getItem("@wealth_kyc_level_2_completed")
+      .then((val) => {
+        if (val === "true") {
+          setLocalKyc2Completed(true);
+        }
+      })
+      .finally(() => {
+        setIsCheckingStorage(false);
+      });
+  }, []);
+
+  const kycDocsPayload: any = kycDocsResponse?.data;
+  const kycDocs: any = kycDocsPayload?.data || kycDocsPayload;
+
   const currentKycLevel = kycData?.data?.currentLevel ?? user?.kycLevel ?? 1;
-  const isKycVerified = currentKycLevel >= 2;
+  const kycStatus = String(kycData?.data?.status || user?.kycStatus || "").toUpperCase();
+
+  const hasDocsVerified =
+    (kycDocs?.ninStatus === "Approved" && kycDocs?.faceStatus === "Approved") ||
+    (kycDocs?.faceVerified && (kycDocs?.ninProviderVerified || Boolean(kycDocs?.idNumber) || Boolean(kycDocs?.bvn))) ||
+    kycDocs?.faceVerified === true ||
+    kycDocs?.faceStatus === "Approved";
+
+  const isKycVerified =
+    currentKycLevel >= 2 ||
+    localKyc2Completed ||
+    Boolean(user?.isVerified) ||
+    kycStatus === "VERIFIED" ||
+    kycStatus === "APPROVED" ||
+    hasDocsVerified;
+
+  useEffect(() => {
+    if (isKycVerified && (user?.kycLevel || 1) < 2) {
+      dispatch(updateKycLevel(2));
+      AsyncStorage.setItem("@wealth_kyc_level_2_completed", "true").catch(() => {});
+    }
+  }, [isKycVerified, user?.kycLevel, dispatch]);
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
@@ -400,7 +451,13 @@ export default function WithdrawScreen() {
 
             <ThemedButton
               title="Proceed to Preview"
-              onPress={() => setStep("preview")}
+              onPress={() => {
+                if (!isKycVerified) {
+                  setShowKycModal(true);
+                  return;
+                }
+                setStep("preview");
+              }}
               disabled={!isFormValid}
               textStyle={{
                 color: !isFormValid ? "#1A1A1A" : "#FFFFFF",
@@ -489,7 +546,32 @@ export default function WithdrawScreen() {
     </View>
   );
 
-  const handleConfirmWithdrawal = async () => {
+  const handleOpenPinPrompt = () => {
+    if (!isKycVerified) {
+      setShowKycModal(true);
+      return;
+    }
+    setPinValue("");
+    setPinError("");
+    setShowPinModal(true);
+    setTimeout(() => pinInputRef.current?.focus(), 300);
+  };
+
+  const handleVerifyAndSubmitWithdrawal = async (enteredPin: string) => {
+    if (enteredPin.length !== 4) return;
+    setPinError("");
+    try {
+      await verifyPinApi({ pin: enteredPin }).unwrap();
+      setShowPinModal(false);
+      await executeWithdrawal();
+    } catch (err: any) {
+      const msg = err?.data?.message || err?.message || "Incorrect transaction PIN. Please try again.";
+      setPinError(msg);
+      setPinValue("");
+    }
+  };
+
+  const executeWithdrawal = async () => {
     const numericAmount = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
     if (numericAmount <= 0) {
       Alert.alert("Invalid Amount", "Please enter a valid amount.");
@@ -617,7 +699,7 @@ export default function WithdrawScreen() {
 
       <ThemedButton
         title="Confirm Withdrawal"
-        onPress={handleConfirmWithdrawal}
+        onPress={handleOpenPinPrompt}
         loading={isAddingPayout || isSubmittingWithdrawal}
         className="mt-14"
       />
@@ -665,7 +747,7 @@ export default function WithdrawScreen() {
       </Modal>
 
       {/* KYC Level 2 Verification Gate Modal */}
-      <Modal visible={!isKycVerified} transparent animationType="fade">
+      <Modal visible={!isKycVerified && !isCheckingStorage && !isLoadingKycStatus && !isLoadingKycDocs} transparent animationType="fade">
         <View className="flex-1 bg-black/60 justify-center items-center px-6">
           <View className="bg-white rounded-[28px] p-7 items-center w-full max-w-[340px]">
             <View className="w-16 h-16 rounded-full bg-[#155D5F]/10 items-center justify-center mb-4">
@@ -691,6 +773,99 @@ export default function WithdrawScreen() {
               <Text className="text-[#64748B] font-semibold text-[14px]">
                 Go Back
               </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 4-Digit Transaction PIN Authorization Modal */}
+      <Modal visible={showPinModal} transparent animationType="fade">
+        <View className="flex-1 bg-black/60 justify-center items-center px-6">
+          <View className="bg-white rounded-[28px] p-6 items-center w-full max-w-[340px]">
+            <View className="w-14 h-14 rounded-full bg-[#E6F4F4] items-center justify-center mb-3">
+              <Ionicons name="keypad-outline" size={28} color="#155D5F" />
+            </View>
+            <Text className="text-[#1A1A1A] font-extrabold text-[19px] text-center mb-1">
+              Enter Transaction PIN
+            </Text>
+            <Text className="text-[#6B7280] text-[12px] text-center mb-6">
+              Authorize withdrawal of ₦{formatAmount(amount)} to {userName || "recipient"}
+            </Text>
+
+            {/* Masked PIN Dots */}
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => pinInputRef.current?.focus()}
+              className="flex-row justify-center gap-3 mb-4"
+            >
+              {Array.from({ length: 4 }).map((_, index) => {
+                const isFilled = index < pinValue.length;
+                return (
+                  <View
+                    key={index}
+                    style={{
+                      width: 52,
+                      height: 56,
+                      borderRadius: 14,
+                      borderWidth: 2,
+                      borderColor: isFilled ? "#155D5F" : "#E5E7EB",
+                      backgroundColor: isFilled ? "#EEF7F8" : "#F9FAFB",
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    {isFilled && (
+                      <View
+                        style={{
+                          width: 14,
+                          height: 14,
+                          borderRadius: 7,
+                          backgroundColor: "#155D5F",
+                        }}
+                      />
+                    )}
+                  </View>
+                );
+              })}
+            </TouchableOpacity>
+
+            <TextInput
+              ref={pinInputRef}
+              value={pinValue}
+              onChangeText={(val) => {
+                const cleaned = val.replace(/[^0-9]/g, "").slice(0, 4);
+                setPinValue(cleaned);
+                setPinError("");
+                if (cleaned.length === 4) {
+                  handleVerifyAndSubmitWithdrawal(cleaned);
+                }
+              }}
+              keyboardType="numeric"
+              maxLength={4}
+              style={{ position: "absolute", opacity: 0, width: 1, height: 1 }}
+              autoFocus
+            />
+
+            {!!pinError && (
+              <Text className="text-[#DC2626] font-semibold text-[12px] text-center mb-3">
+                {pinError}
+              </Text>
+            )}
+
+            {isVerifyingPin || isSubmittingWithdrawal ? (
+              <View className="py-3 items-center">
+                <ActivityIndicator size="small" color="#155D5F" />
+                <Text className="text-[#6B7280] text-[11px] mt-1.5">
+                  Verifying PIN & initiating transfer...
+                </Text>
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              onPress={() => setShowPinModal(false)}
+              className="mt-4 py-2"
+            >
+              <Text className="text-[#6B7280] font-semibold text-[13px]">Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
