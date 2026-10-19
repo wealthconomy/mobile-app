@@ -1,5 +1,5 @@
 import { View } from "react-native";
-import Skeleton from "../../../components/common/Skeleton";
+import { Skeleton } from "@/src/components/common/skeletons";
 
 export const BlogSkeleton = () => {
   return (

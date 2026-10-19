@@ -1,0 +1,10 @@
+export const AUTH_COLORS = {
+  PRIMARY: "#155D5F",
+  DARK: "#323232",
+  SECONDARY: "#6B7280",
+  BORDER: "#E5E5E5",
+  MUTED: "#F7F7F7",
+  ERROR: "#DC2626",
+  SUCCESS: "#16A34A",
+};
+

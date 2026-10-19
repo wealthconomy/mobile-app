@@ -1,8 +1,10 @@
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useMemo } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../store";
+import { useListNotificationsQuery } from "../../../store/api/notificationApi";
 
 export const NotificationIcon = () => (
   <Svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -25,7 +27,46 @@ export const CustomerSupportIcon = () => (
 export const HomeHeader = () => {
   const router = useRouter();
   const { user } = useSelector((state: RootState) => state.auth);
-  const notificationCount = 3;
+
+  const {
+    data: notificationsData,
+    refetch: refetchNotifications,
+  } = useListNotificationsQuery(
+    { limit: 50 },
+    {
+      pollingInterval: 10000,
+      refetchOnFocus: true,
+      refetchOnMountOrArgChange: true,
+    }
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchNotifications();
+    }, [refetchNotifications])
+  );
+
+  const notificationCount = useMemo(() => {
+    const items =
+      notificationsData?.data?.items ||
+      (notificationsData as any)?.items ||
+      [];
+    return items.filter((item: any) => {
+      if (item.isRead === true || item.read === true) return false;
+      if (item.readAt) return false;
+      if (item.status && item.status.toUpperCase() === "READ") return false;
+      return true;
+    }).length;
+  }, [notificationsData]);
+
+  const displayName =
+    user?.firstName
+      ? `${user.firstName} ${user.lastName || ""}`.trim()
+      : user?.name
+      ? user.name
+      : user?.email
+      ? user.email.split("@")[0]
+      : "Wealth Builder";
 
   return (
     <View className="flex-row justify-between items-center mb-5 ml-[10px]">
@@ -35,7 +76,7 @@ export const HomeHeader = () => {
           Hello, WealthBuilder!
         </Text>
         <Text className="text-[#323232] text-[20px] font-extrabold tracking-[-0.5px]">
-          {user?.name || "Simon"}
+          {displayName}
         </Text>
       </View>
 
@@ -48,9 +89,24 @@ export const HomeHeader = () => {
         >
           <NotificationIcon />
           {notificationCount > 0 && (
-            <View className="absolute -top-[7px] -right-[6px] w-4 h-4 rounded-full bg-[#F44336] border-[1.5px] border-white items-center justify-center">
-              <Text className="text-white text-[8px] font-bold">
-                {notificationCount}
+            <View
+              style={{
+                position: "absolute",
+                top: -5,
+                right: -4,
+                minWidth: 18,
+                height: 18,
+                paddingHorizontal: 4,
+                borderRadius: 9,
+                backgroundColor: "#EF4444",
+                borderWidth: 1.5,
+                borderColor: "white",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ color: "white", fontSize: 9, fontWeight: "800" }}>
+                {notificationCount > 99 ? "99+" : notificationCount}
               </Text>
             </View>
           )}

@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, Eye, EyeOff, Lock } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -14,7 +15,8 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { authApi } from "../../api/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useResetPasswordMutation } from "../../src/store/api/authApi";
 
 const PRIMARY = "#155D5F";
 const DARK = "#323232";
@@ -39,8 +41,17 @@ const STRENGTH_RULES: StrengthRule[] = [
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ email: string }>();
+  const params = useLocalSearchParams<{ email: string; resetToken?: string }>();
   const email = params.email ?? "";
+  const [resetToken, setResetToken] = useState(params.resetToken ?? "");
+
+  useEffect(() => {
+    if (!resetToken) {
+      AsyncStorage.getItem("@wealth_reset_token").then((saved) => {
+        if (saved) setResetToken(saved);
+      });
+    }
+  }, [resetToken]);
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -49,6 +60,8 @@ export default function ResetPasswordScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newPasswordError, setNewPasswordError] = useState("");
   const [confirmPasswordError, setConfirmPasswordError] = useState("");
+
+  const [resetPasswordMutation] = useResetPasswordMutation();
 
   const allRulesPassed = STRENGTH_RULES.every((r) => r.test(newPassword));
 
@@ -77,12 +90,40 @@ export default function ResetPasswordScreen() {
     }
     if (!valid) return;
 
+    const activeToken =
+      resetToken || (await AsyncStorage.getItem("@wealth_reset_token")) || "";
+
+    if (!activeToken) {
+      Alert.alert(
+        "Verification Required",
+        "Your password reset session is missing or expired. Please re-enter your OTP code to proceed.",
+        [
+          {
+            text: "Enter OTP",
+            onPress: () =>
+              router.replace({
+                pathname: "/(auth)/otp",
+                params: { email, context: "forgot-password" },
+              } as any),
+          },
+        ]
+      );
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      await authApi.resetPassword(email, newPassword, "");
+      await resetPasswordMutation({
+        destination: email,
+        resetToken: activeToken,
+        newPassword,
+        confirmPassword,
+      }).unwrap();
+      await AsyncStorage.removeItem("@wealth_reset_token").catch(() => {});
       router.replace("/(auth)/success" as any);
-    } catch {
-      setNewPasswordError("Could not reset password. Please try again.");
+    } catch (err: any) {
+      const msg = err?.data?.message || err?.message || "Could not reset password. Please try again.";
+      setNewPasswordError(Array.isArray(msg) ? msg.join(", ") : String(msg));
     } finally {
       setIsSubmitting(false);
     }

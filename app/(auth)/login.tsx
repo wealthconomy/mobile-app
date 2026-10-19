@@ -1,5 +1,5 @@
 import { Link, useRouter } from "expo-router";
-import { Eye, EyeOff, Lock, Mail } from "lucide-react-native";
+import { AlertCircle, Eye, EyeOff, Lock, Mail } from "lucide-react-native";
 import { useState } from "react";
 import {
   Image,
@@ -14,10 +14,9 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { SvgXml } from "react-native-svg";
 import { useDispatch } from "react-redux";
-import { authApi } from "../../api/auth";
-import { setCredentials, setLoading } from "../../src/store/slices/authSlice";
+import { setCredentials } from "../../src/store/slices/authSlice";
+import { useLoginMutation } from "../../src/store/api/authApi";
 
 const PRIMARY = "#155D5F";
 const DARK = "#323232";
@@ -25,17 +24,6 @@ const SECONDARY = "#6B7280";
 const BORDER = "#E5E5E5";
 const MUTED = "#F7F7F7";
 const ERROR = "#DC2626";
-
-const googleSvg = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path opacity="0.987" fill-rule="evenodd" clip-rule="evenodd" d="M8.11015 1.19334C8.92578 1.10222 9.4084 1.10222 10.2848 1.19334C11.8361 1.42295 13.2741 2.14001 14.391 3.24084C13.6363 3.95425 12.8915 4.67807 12.1568 5.41209C10.7498 4.21959 9.17928 3.94434 7.44528 4.58634C6.17328 5.17134 5.28753 6.11934 4.78803 7.43034C3.97177 6.82265 3.16615 6.20081 2.37153 5.56509C2.31631 5.53603 2.25323 5.52538 2.19153 5.53472C3.45378 3.10097 5.42628 1.65347 8.10903 1.19222" fill="#F44336"/>
-<path opacity="0.997" fill-rule="evenodd" clip-rule="evenodd" d="M2.18929 5.53484C2.25304 5.52509 2.31341 5.53521 2.37041 5.56521C3.16504 6.20093 3.97066 6.82277 4.78691 7.43046C4.65847 7.94128 4.5775 8.46287 4.54504 8.98859C4.57279 9.49709 4.65341 9.99621 4.78691 10.486L2.25004 12.5053C1.14529 10.1968 1.12504 7.87334 2.18929 5.53484Z" fill="#FFC107"/>
-<path opacity="0.999" fill-rule="evenodd" clip-rule="evenodd" d="M14.2707 14.9535C13.4808 14.2569 12.6538 13.6034 11.7935 12.996C12.656 12.387 13.1795 11.5515 13.364 10.4895H9.13733V7.5544C11.5748 7.53415 14.0112 7.55477 16.4465 7.61627C16.9085 10.125 16.3748 12.387 14.8456 14.4023C14.6637 14.5956 14.4711 14.7796 14.2707 14.9535Z" fill="#448AFF"/>
-<path opacity="0.993" fill-rule="evenodd" clip-rule="evenodd" d="M4.78688 10.4844C5.70938 12.7771 7.40063 13.8474 9.86063 13.6951C10.5512 13.6152 11.2133 13.3739 11.7934 12.9909C12.6544 13.5999 13.4801 14.2524 14.2706 14.9484C13.0181 16.0739 11.4211 16.7417 9.74025 16.8429C9.35836 16.8734 8.97464 16.8734 8.59275 16.8429C5.72925 16.5054 3.615 15.0586 2.25 12.5026L4.78688 10.4844Z" fill="#43A047"/>
-</svg>`;
-
-const appleSvg = `<svg width="16" height="18" viewBox="0 0 16 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M12.6371 17.28C11.6571 18.23 10.5871 18.08 9.55708 17.63C8.46708 17.17 7.46708 17.15 6.31708 17.63C4.87708 18.25 4.11708 18.07 3.25708 17.28C-1.62292 12.25 -0.902922 4.59 4.63708 4.31C5.98708 4.38 6.92708 5.05 7.71708 5.11C8.89708 4.87 10.0271 4.18 11.2871 4.27C12.7971 4.39 13.9371 4.99 14.6871 6.07C11.5671 7.94 12.3071 12.05 15.1671 13.2C14.5971 14.7 13.8571 16.19 12.6271 17.29L12.6371 17.28ZM7.61708 4.25C7.46708 2.02 9.27708 0.18 11.3571 0C11.6471 2.58 9.01708 4.5 7.61708 4.25Z" fill="black"/>
-</svg>`;
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -48,6 +36,7 @@ export default function LoginScreen() {
 
   const router = useRouter();
   const dispatch = useDispatch();
+  const [loginMutation] = useLoginMutation();
 
   const clearErrors = () => {
     setEmailError("");
@@ -70,26 +59,51 @@ export default function LoginScreen() {
 
     try {
       setIsSubmitting(true);
-      dispatch(setLoading(true));
-      const response = await authApi.login(email, password);
-      dispatch(setCredentials(response));
-      router.replace("/(tabs)");
-    } catch (err: any) {
-      // API will return specific errors; mock shows generic fallback
-      const msg = err?.message ?? "";
-      if (msg.toLowerCase().includes("password")) {
-        setPasswordError("Incorrect password. Please try again.");
-      } else if (
-        msg.toLowerCase().includes("email") ||
-        msg.toLowerCase().includes("user")
-      ) {
-        setEmailError("No account found with this email.");
+      const res = await loginMutation({ email: email.trim(), password }).unwrap();
+      const tokens = res.data;
+      if (tokens?.accessToken) {
+        dispatch(
+          setCredentials({
+            user: tokens.user,
+            token: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+          })
+        );
+        router.replace("/(tabs)");
       } else {
-        setGeneralError("Incorrect email or password. Please try again.");
+        setGeneralError("Login failed. Please check your credentials.");
+      }
+    } catch (err: any) {
+      const msg = err?.data?.message || err?.message || "";
+      const msgStr = Array.isArray(msg) ? msg.join(", ") : String(msg);
+      const lower = msgStr.toLowerCase();
+
+      if (
+        lower.includes("invalid credential") ||
+        lower.includes("unauthorized") ||
+        lower.includes("incorrect") ||
+        lower.includes("not match")
+      ) {
+        setGeneralError(
+          "Incorrect email or password. Please double-check your credentials, or tap 'Forgot Password?' below to reset your password."
+        );
+      } else if (
+        lower.includes("not found") ||
+        lower.includes("user does not exist") ||
+        lower.includes("no account") ||
+        lower.includes("no user")
+      ) {
+        setEmailError("No account found with this email. Please check your email or sign up.");
+      } else if (lower.includes("password")) {
+        setPasswordError("Incorrect password. Please verify your password or tap 'Forgot Password?'.");
+      } else {
+        setGeneralError(
+          msgStr ||
+            "Incorrect email or password. Please confirm your login details or tap 'Forgot Password?' to reset."
+        );
       }
     } finally {
       setIsSubmitting(false);
-      dispatch(setLoading(false));
     }
   };
 
@@ -161,13 +175,27 @@ export default function LoginScreen() {
                 backgroundColor: "#FEF2F2",
                 borderWidth: 1,
                 borderColor: "#FECACA",
-                borderRadius: 10,
+                borderRadius: 12,
                 paddingHorizontal: 14,
-                paddingVertical: 10,
+                paddingVertical: 12,
                 marginBottom: 16,
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: 10,
               }}
             >
-              <Text style={{ color: ERROR, fontSize: 13 }}>{generalError}</Text>
+              <AlertCircle size={18} color="#DC2626" style={{ marginTop: 2 }} />
+              <Text
+                style={{
+                  color: "#B91C1C",
+                  fontSize: 13,
+                  lineHeight: 19,
+                  fontWeight: "500",
+                  flex: 1,
+                }}
+              >
+                {generalError}
+              </Text>
             </Animated.View>
           ) : null}
 
@@ -321,46 +349,6 @@ export default function LoginScreen() {
               </Text>
             </TouchableOpacity>
           </Link>
-
-          {/* Apple Sign In */}
-          <TouchableOpacity
-            style={{
-              borderWidth: 1,
-              borderColor: BORDER,
-              borderRadius: 12,
-              paddingVertical: 14,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              marginBottom: 12,
-            }}
-          >
-            <SvgXml xml={appleSvg} width={16} height={18} />
-            <Text style={{ color: DARK, fontWeight: "500", fontSize: 15 }}>
-              Sign In with Apple
-            </Text>
-          </TouchableOpacity>
-
-          {/* Google Sign In */}
-          <TouchableOpacity
-            style={{
-              borderWidth: 1,
-              borderColor: BORDER,
-              borderRadius: 12,
-              paddingVertical: 14,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              marginBottom: 12,
-            }}
-          >
-            <SvgXml xml={googleSvg} width={18} height={18} />
-            <Text style={{ color: DARK, fontWeight: "500", fontSize: 15 }}>
-              Sign In with Google
-            </Text>
-          </TouchableOpacity>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>

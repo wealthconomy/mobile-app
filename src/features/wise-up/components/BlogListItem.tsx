@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { BookmarkIcon } from "../../../components/icons/BookmarkIcon";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 import { Blog, Category } from "../../../types/blog";
 
@@ -34,9 +35,24 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
   showSeparator = false,
 }) => {
   const styles = getPlanStyles(blog.category);
+  
+  const [localIsBookmarked, setLocalIsBookmarked] = useState(blog.isBookmarked || false);
+  const [localBookmarks, setLocalBookmarks] = useState(blog.bookmarks || 0);
+
+  useEffect(() => {
+    setLocalIsBookmarked(blog.isBookmarked || false);
+    setLocalBookmarks(blog.bookmarks || 0);
+  }, [blog]);
+
+  const handleBookmark = () => {
+    const newIsBookmarked = !localIsBookmarked;
+    setLocalIsBookmarked(newIsBookmarked);
+    setLocalBookmarks(prev => newIsBookmarked ? prev + 1 : Math.max(0, prev - 1));
+    onBookmark();
+  };
 
   return (
-    <View style={{ width: 372 }}>
+    <View style={{ width: "100%" }}>
       <TouchableOpacity
         onPress={onPress}
         className="flex-row items-center"
@@ -44,7 +60,11 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
         activeOpacity={0.7}
       >
         <Image
-          source={{ uri: blog.image }}
+          source={{
+            uri:
+              blog.image ||
+              "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=800",
+          }}
           className="rounded-[6px] bg-gray-100"
           style={{ width: 104, height: 66 }}
           resizeMode="cover"
@@ -54,7 +74,7 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
           <View className="mb-1.5">
             <View
               className="px-2 items-center justify-center rounded-[4px] self-start mb-1"
-              style={{ width: 57, height: 15, backgroundColor: styles.bg }}
+              style={{ height: 15, backgroundColor: styles.bg }}
             >
               <Text
                 className="text-[8px] font-bold"
@@ -72,17 +92,16 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
               </Text>
               <View className="flex-row items-center">
                 <TouchableOpacity
-                  onPress={onBookmark}
+                  onPress={handleBookmark}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Ionicons
-                    name={blog.isBookmarked ? "bookmark" : "bookmark-outline"}
+                  <BookmarkIcon
                     size={18}
-                    color={blog.isBookmarked ? "#155D5F" : "#6B7280"}
+                    color={localIsBookmarked ? "#155D5F" : "#6B7280"}
                   />
                 </TouchableOpacity>
                 <Text className="text-[#6B7280] text-[10px] font-bold ml-1">
-                  {blog.bookmarkCount}
+                  {localBookmarks}
                 </Text>
               </View>
             </View>
@@ -90,15 +109,23 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
 
           <View className="flex-row items-center">
             <Image
-              source={{ uri: blog.author.image }}
+              source={{
+                uri:
+                  blog.authorAvatar ||
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                    typeof blog.author === "string"
+                      ? blog.author
+                      : blog.author?.name || "Wealthconomy"
+                  )}&background=155D5F&color=fff`,
+              }}
               className="w-4 h-4 rounded-full bg-gray-200 mr-2"
             />
             <View>
               <Text className="text-[#6B7280] text-[9px] font-bold leading-tight">
-                {blog.author.name}
+                {typeof blog.author === 'string' ? blog.author : blog.author?.name}
               </Text>
               <Text className="text-[#9CA3AF] text-[8px] font-medium leading-tight">
-                {blog.timePosted} • {blog.readingDuration}
+                {blog.timeAgo}{blog.readingDuration ? ` • ${blog.readingDuration}` : ""}
               </Text>
             </View>
           </View>

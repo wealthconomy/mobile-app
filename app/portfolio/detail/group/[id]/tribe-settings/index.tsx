@@ -1,3 +1,4 @@
+import { useGetGroupDetailsQuery } from "@/src/store/api/groupApi";
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -40,6 +41,11 @@ const SETTING_ITEMS = [
 
 export default function TribeSettingsHubScreen() {
   const { id } = useLocalSearchParams();
+  const { data: group } = useGetGroupDetailsQuery(id as string, {
+    skip: !id,
+  });
+
+  const isRotational = group?.groupType === "ROTATIONAL";
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-[#F8FAFC]" edges={["top"]}>
@@ -79,20 +85,22 @@ export default function TribeSettingsHubScreen() {
           </View>
         </ScrollView>
 
-        <View className="px-5 pb-10">
-          <TouchableOpacity
-            onPress={() =>
-              router.push(
-                `/portfolio/detail/group/${id}/tribe-settings/exit` as any,
-              )
-            }
-            className="w-full h-16 bg-white border border-[#E2E8F0] rounded-3xl items-center justify-center"
-          >
-            <Text className="text-[#EF4444] font-bold text-base">
-              Exit Group
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {!isRotational && (
+          <View className="px-5 pb-10">
+            <TouchableOpacity
+              onPress={() =>
+                router.push(
+                  `/portfolio/detail/group/${id}/tribe-settings/exit` as any,
+                )
+              }
+              className="w-full h-16 bg-white border border-[#E2E8F0] rounded-3xl items-center justify-center"
+            >
+              <Text className="text-[#EF4444] font-bold text-base">
+                Exit Group
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );

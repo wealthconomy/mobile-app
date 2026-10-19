@@ -3,6 +3,9 @@ import { Image, StatusBar, Text, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useSelector } from "react-redux";
+import { RootState } from "../../src/store";
+
 const PRIMARY = "#155D5F";
 const DARK = "#323232";
 const SECONDARY = "#6B7280";
@@ -10,10 +13,15 @@ const CHECK_LIGHT = "#59AFAF";
 
 export default function SuccessScreen() {
   const router = useRouter();
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
 
   const handleLetsGo = () => {
-    // Replace entire stack so user can't go back to reset flow
-    router.replace("/(auth)/login" as any);
+    // Replace stack so user can't go back to reset flow
+    if (isAuthenticated) {
+      router.replace("/(tabs)" as any);
+    } else {
+      router.replace("/(auth)/login" as any);
+    }
   };
 
   return (

@@ -13,7 +13,9 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { authApi } from "../../api/auth";
+import { useSelector } from "react-redux";
+import { RootState } from "../../src/store";
+import { useForgotPasswordMutation } from "../../src/store/api/authApi";
 
 const PRIMARY = "#155D5F";
 const DARK = "#323232";
@@ -24,9 +26,11 @@ const ERROR = "#DC2626";
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const user = useSelector((state: RootState) => state.auth.user);
+  const [email, setEmail] = useState(user?.email || "");
   const [emailError, setEmailError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [forgotPasswordMutation] = useForgotPasswordMutation();
 
   const handleContinue = async () => {
     setEmailError("");
@@ -41,20 +45,21 @@ export default function ForgotPasswordScreen() {
     }
     try {
       setIsSubmitting(true);
-      await authApi.forgotPassword(email);
+      await forgotPasswordMutation({ destination: email.trim() }).unwrap();
       router.push({
         pathname: "/(auth)/otp",
-        params: { email, context: "forgot-password" },
+        params: { email: email.trim(), context: "forgot-password" },
       } as any);
     } catch (err: any) {
-      const msg = err?.message ?? "";
+      const msg = err?.data?.message || err?.message || "";
+      const msgStr = Array.isArray(msg) ? msg.join(", ") : String(msg);
       if (
-        msg.toLowerCase().includes("not found") ||
-        msg.toLowerCase().includes("user")
+        msgStr.toLowerCase().includes("not found") ||
+        msgStr.toLowerCase().includes("user")
       ) {
         setEmailError("No account found with this email address.");
       } else {
-        setEmailError("Something went wrong. Please try again.");
+        setEmailError(msgStr || "Something went wrong. Please try again.");
       }
     } finally {
       setIsSubmitting(false);

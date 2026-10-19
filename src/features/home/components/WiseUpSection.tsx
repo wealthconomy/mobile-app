@@ -1,8 +1,22 @@
-import { blogService } from "@/src/api/blogService";
-import { useQuery } from "@tanstack/react-query";
+import { useGetBlogsQuery } from "@/src/store/api/blogApi";
+import { Blog } from "@/src/types/blog";
 import { router } from "expo-router";
-import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Image, ScrollView, TouchableOpacity, View } from "react-native";
+import { Text } from "@/src/components/common/ui/Text";
 import { WiseUpSkeleton } from "./WiseUpSkeleton";
+
+/** Strip HTML tags and collapse whitespace — used when blog.content is the
+ *  only available preview text (blog.description is optional). Raw HTML like
+ *  "<h2>Introduction</h2><p>Some text…</p>" would otherwise render as the
+ *  literal heading "Introduction" on Android, consuming the first line and
+ *  leaving only "…" on the second. */
+const stripHtml = (html: string): string =>
+  html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+const getBlogSnippet = (blog: Blog): string => {
+  if (blog.description) return blog.description;
+  return stripHtml(blog.content);
+};
 
 interface WiseUpCardProps {
   id: string;
@@ -19,7 +33,7 @@ export const WiseUpCard = ({
 }: WiseUpCardProps) => (
   <TouchableOpacity
     className="mr-4"
-    style={{ width: 170, height: 162 }}
+    style={{ width: 170 }}
     activeOpacity={0.8}
     onPress={() => router.push(`/blog/${id}` as any)}
   >
@@ -31,13 +45,15 @@ export const WiseUpCard = ({
       />
     </View>
     <Text
-      className="text-[#1A1A1A] font-bold text-[15px] leading-tight mb-1"
+      variant="caption"
+      className="font-kumbh-bold text-[#1A1A1A] leading-tight mb-1"
       numberOfLines={1}
     >
       {title}
     </Text>
     <Text
-      className="text-[#9CA3AF] text-[12px] font-medium leading-[16px]"
+      variant="small"
+      className="text-[#9CA3AF] leading-[16px]"
       numberOfLines={2}
     >
       {description}
@@ -45,26 +61,37 @@ export const WiseUpCard = ({
   </TouchableOpacity>
 );
 
-export const WiseUpSection = () => {
-  const { data: blogs, isLoading } = useQuery({
-    queryKey: ["home-blogs"],
-    queryFn: () => blogService.getBlogs(),
-  });
+interface WiseUpSectionProps {
+  hideViewAll?: boolean;
+  containerClassName?: string;
+  scrollClassName?: string;
+}
+
+export const WiseUpSection = ({
+  hideViewAll = false,
+  containerClassName = "",
+  scrollClassName = "-mx-5",
+}: WiseUpSectionProps = {}) => {
+  const { data: response, isLoading } = useGetBlogsQuery({ publishToApp: true });
+  const blogs = response?.data?.items || [];
 
   return (
-    <View>
+    <View className={containerClassName}>
       <View className="flex-row justify-between items-center mb-4">
-        <Text className="text-[#1A1A1A] font-bold text-lg">WiseUp</Text>
-        <TouchableOpacity
-          onPress={() => router.push("/education/wise-up" as any)}
-        >
-          <Text className="text-[#155D5F] text-sm font-medium">View all</Text>
-        </TouchableOpacity>
+        <Text variant="h3" className="text-[#1A1A1A] font-kumbh-extrabold">Wise Up</Text>
+        {!hideViewAll && (
+          <TouchableOpacity
+            onPress={() => router.push("/education/wise-up" as any)}
+          >
+            <Text variant="caption" className="text-[#155D5F] font-kumbh-medium">View all</Text>
+          </TouchableOpacity>
+        )}
       </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        className="-mx-5 px-5"
+        className={scrollClassName}
+        contentContainerStyle={{ paddingHorizontal: 20 }}
       >
         {isLoading ? (
           <WiseUpSkeleton />
@@ -74,7 +101,7 @@ export const WiseUpSection = () => {
               key={blog.id}
               id={blog.id}
               title={blog.title}
-              description={blog.description}
+              description={getBlogSnippet(blog)}
               image={blog.image}
             />
           ))

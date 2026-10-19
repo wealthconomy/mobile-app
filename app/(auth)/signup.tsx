@@ -21,8 +21,7 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { SvgXml } from "react-native-svg";
-import { authApi } from "../../api/auth";
+import { useRegisterMutation } from "../../src/store/api/authApi";
 
 const PRIMARY = "#155D5F";
 const DARK = "#323232";
@@ -32,21 +31,22 @@ const MUTED = "#F7F7F7";
 const ERROR = "#DC2626";
 
 const WEALTH_PREFERENCES = [
-  "Impact Wealth (Impact/Halal Savings)",
-  "Interest Wealth (Conventional Savings)",
-  "Mixed Wealth (Split/Donate)",
+  {
+    value: "INTEREST_WEALTH",
+    label: "Interest-Based Wealth",
+    subtitle: "Maximize personal growth and returns",
+  },
+  {
+    value: "IMPACT_WEALTH",
+    label: "Impact Wealth",
+    subtitle: "Channel growth into purposeful initiatives and causes",
+  },
+  {
+    value: "MIXED_WEALTH",
+    label: "Mixed Wealth",
+    subtitle: "Balanced approach between personal profit and impact",
+  },
 ];
-
-const googleSvg = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path opacity="0.987" fill-rule="evenodd" clip-rule="evenodd" d="M8.11015 1.19334C8.92578 1.10222 9.4084 1.10222 10.2848 1.19334C11.8361 1.42295 13.2741 2.14001 14.391 3.24084C13.6363 3.95425 12.8915 4.67807 12.1568 5.41209C10.7498 4.21959 9.17928 3.94434 7.44528 4.58634C6.17328 5.17134 5.28753 6.11934 4.78803 7.43034C3.97177 6.82265 3.16615 6.20081 2.37153 5.56509C2.31631 5.53603 2.25323 5.52538 2.19153 5.53472C3.45378 3.10097 5.42628 1.65347 8.10903 1.19222" fill="#F44336"/>
-<path opacity="0.997" fill-rule="evenodd" clip-rule="evenodd" d="M2.18929 5.53484C2.25304 5.52509 2.31341 5.53521 2.37041 5.56521C3.16504 6.20093 3.97066 6.82277 4.78691 7.43046C4.65847 7.94128 4.5775 8.46287 4.54504 8.98859C4.57279 9.49709 4.65341 9.99621 4.78691 10.486L2.25004 12.5053C1.14529 10.1968 1.12504 7.87334 2.18929 5.53484Z" fill="#FFC107"/>
-<path opacity="0.999" fill-rule="evenodd" clip-rule="evenodd" d="M14.2707 14.9535C13.4808 14.2569 12.6538 13.6034 11.7935 12.996C12.656 12.387 13.1795 11.5515 13.364 10.4895H9.13733V7.5544C11.5748 7.53415 14.0112 7.55477 16.4465 7.61627C16.9085 10.125 16.3748 12.387 14.8456 14.4023C14.6637 14.5956 14.4711 14.7796 14.2707 14.9535Z" fill="#448AFF"/>
-<path opacity="0.993" fill-rule="evenodd" clip-rule="evenodd" d="M4.78688 10.4844C5.70938 12.7771 7.40063 13.8474 9.86063 13.6951C10.5512 13.6152 11.2133 13.3739 11.7934 12.9909C12.6544 13.5999 13.4801 14.2524 14.2706 14.9484C13.0181 16.0739 11.4211 16.7417 9.74025 16.8429C9.35836 16.8734 8.97464 16.8734 8.59275 16.8429C5.72925 16.5054 3.615 15.0586 2.25 12.5026L4.78688 10.4844Z" fill="#43A047"/>
-</svg>`;
-
-const appleSvg = `<svg width="16" height="18" viewBox="0 0 16 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M12.6371 17.28C11.6571 18.23 10.5871 18.08 9.55708 17.63C8.46708 17.17 7.46708 17.15 6.31708 17.63C4.87708 18.25 4.11708 18.07 3.25708 17.28C-1.62292 12.25 -0.902922 4.59 4.63708 4.31C5.98708 4.38 6.92708 5.05 7.71708 5.11C8.89708 4.87 10.0271 4.18 11.2871 4.27C12.7971 4.39 13.9371 4.99 14.6871 6.07C11.5671 7.94 12.3071 12.05 15.1671 13.2C14.5971 14.7 13.8571 16.19 12.6271 17.29L12.6371 17.28ZM7.61708 4.25C7.46708 2.02 9.27708 0.18 11.3571 0C11.6471 2.58 9.01708 4.5 7.61708 4.25Z" fill="black"/>
-</svg>`;
 
 export default function SignupScreen() {
   const [firstName, setFirstName] = useState("");
@@ -67,6 +67,7 @@ export default function SignupScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const router = useRouter();
+  const [registerMutation] = useRegisterMutation();
 
   const setError = (field: string, msg: string) =>
     setErrors((prev) => ({ ...prev, [field]: msg }));
@@ -79,10 +80,10 @@ export default function SignupScreen() {
 
   const handleSignup = async () => {
     const newErrors: Record<string, string> = {};
-    if (!firstName) newErrors.firstName = "First name is required";
-    if (!lastName) newErrors.lastName = "Last name is required";
-    if (!phone) newErrors.phone = "Phone number is required";
-    if (!email) newErrors.email = "Email address is required";
+    if (!firstName.trim()) newErrors.firstName = "First name is required";
+    if (!lastName.trim()) newErrors.lastName = "Last name is required";
+    if (!phone.trim()) newErrors.phone = "Phone number is required";
+    if (!email.trim()) newErrors.email = "Email address is required";
     if (!wealthPreference)
       newErrors.wealthPreference = "Please select a wealth preference";
     if (!password) newErrors.password = "Password is required";
@@ -100,33 +101,92 @@ export default function SignupScreen() {
     }
     setErrors({});
 
+    // Clean and normalize phone to E.164 (+234...)
+    let cleanedDigits = phone.replace(/[^0-9]/g, "");
+    let formattedPhone = phone.trim();
+    if (formattedPhone.startsWith("+234")) {
+      // Already complete E.164
+    } else if (cleanedDigits.startsWith("234")) {
+      formattedPhone = "+" + cleanedDigits;
+    } else if (cleanedDigits.startsWith("0")) {
+      formattedPhone = "+234" + cleanedDigits.slice(1);
+    } else {
+      formattedPhone = "+234" + cleanedDigits;
+    }
+
     try {
       setIsSubmitting(true);
-      await authApi.signup(
-        email,
+      await registerMutation({
+        email: email.trim().toLowerCase(),
         password,
-        `${firstName} ${lastName}`,
-        phone,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        phone: formattedPhone,
         wealthPreference,
-        referralCode,
-      );
+        referralCode: referralCode ? referralCode.trim() : undefined,
+      }).unwrap();
       router.push({
         pathname: "/(auth)/otp",
-        params: { email, context: "signup" },
+        params: { email: email.trim(), context: "signup" },
       } as any);
     } catch (err: any) {
-      const msg = err?.message ?? "";
-      if (
-        msg.toLowerCase().includes("email") ||
-        msg.toLowerCase().includes("exist")
-      ) {
-        setError(
-          "email",
-          "This email is already registered. Please log in instead.",
-        );
-      } else {
-        setError("general", "Signup failed. Please try again.");
+      const rawMsg = err?.data?.message || err?.message || "";
+      const messages: string[] = Array.isArray(rawMsg)
+        ? rawMsg
+        : typeof rawMsg === "string"
+        ? [rawMsg]
+        : ["Signup failed. Please try again."];
+
+      const fieldErrors: Record<string, string> = {};
+      const unmapped: string[] = [];
+
+      for (const m of messages) {
+        const lower = m.toLowerCase();
+        if (
+          lower.includes("wealthpreference") ||
+          lower.includes("wealth preference")
+        ) {
+          fieldErrors.wealthPreference =
+            "Please select a valid wealth preference option.";
+        } else if (
+          lower.includes("phone") &&
+          (lower.includes("exist") ||
+            lower.includes("already") ||
+            lower.includes("taken") ||
+            lower.includes("registered") ||
+            lower.includes("in use"))
+        ) {
+          fieldErrors.phone =
+            "This phone number is already registered. Please log in or use another number.";
+        } else if (lower.includes("phone")) {
+          fieldErrors.phone = m || "Please enter a valid phone number (e.g. 801 234 5678).";
+        } else if (
+          lower.includes("email") &&
+          (lower.includes("exist") ||
+            lower.includes("already") ||
+            lower.includes("taken") ||
+            lower.includes("registered") ||
+            lower.includes("in use"))
+        ) {
+          fieldErrors.email =
+            "This email is already registered. Please log in instead.";
+        } else if (lower.includes("email")) {
+          fieldErrors.email = m || "Please enter a valid email address.";
+        } else if (lower.includes("password")) {
+          fieldErrors.password = m;
+        } else if (lower.includes("first name") || lower.includes("firstname")) {
+          fieldErrors.firstName = "First name is required.";
+        } else if (lower.includes("last name") || lower.includes("lastname")) {
+          fieldErrors.lastName = "Last name is required.";
+        } else {
+          unmapped.push(m);
+        }
       }
+
+      if (unmapped.length > 0) {
+        fieldErrors.general = unmapped.join(". ");
+      }
+      setErrors(fieldErrors);
     } finally {
       setIsSubmitting(false);
     }
@@ -262,15 +322,40 @@ export default function SignupScreen() {
 
           <Animated.View entering={FadeInDown.duration(600).delay(380)}>
           <F label="Phone Number" field="phone" errors={errors}>
-            <View style={inputWrap(!!errors.phone)}>
+            <View style={[inputWrap(!!errors.phone), { paddingLeft: 8 }]}>
+              {/* Dial Code Prefix Pill */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: "#E6F4F4",
+                  paddingHorizontal: 10,
+                  paddingVertical: 7,
+                  borderRadius: 8,
+                  marginRight: 10,
+                  gap: 4,
+                }}
+              >
+                <Text style={{ fontSize: 16 }}>🇳🇬</Text>
+                <Text
+                  style={{
+                    color: PRIMARY,
+                    fontWeight: "700",
+                    fontSize: 13.5,
+                  }}
+                >
+                  +234
+                </Text>
+              </View>
               <TextInput
-                placeholder="Mobile Number"
+                placeholder="801 234 5678"
                 placeholderTextColor="#9CA3AF"
                 style={{ flex: 1, fontSize: 15, color: DARK }}
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={(v) => {
-                  setPhone(v);
+                  const cleaned = v.replace(/[^0-9]/g, "");
+                  setPhone(cleaned);
                   clearError("phone");
                 }}
               />
@@ -327,9 +412,11 @@ export default function SignupScreen() {
                   color: wealthPreference ? DARK : "#9CA3AF",
                   fontSize: 15,
                   flex: 1,
+                  fontWeight: wealthPreference ? "600" : "400",
                 }}
               >
-                {wealthPreference || "Select Wealth Preference"}
+                {WEALTH_PREFERENCES.find((p) => p.value === wealthPreference)
+                  ?.label || "Select Wealth Preference"}
               </Text>
               {showDropdown ? (
                 <ChevronUp size={20} color="#9CA3AF" />
@@ -352,24 +439,40 @@ export default function SignupScreen() {
                   shadowRadius: 6,
                 }}
               >
-                {WEALTH_PREFERENCES.map((pref) => (
-                  <TouchableOpacity
-                    key={pref}
-                    onPress={() => {
-                      setWealthPreference(pref);
-                      setShowDropdown(false);
-                      clearError("wealthPreference");
-                    }}
-                    style={{
-                      paddingHorizontal: 16,
-                      paddingVertical: 14,
-                      borderBottomWidth: 1,
-                      borderBottomColor: "#F5F5F5",
-                    }}
-                  >
-                    <Text style={{ color: DARK, fontSize: 15 }}>{pref}</Text>
-                  </TouchableOpacity>
-                ))}
+                {WEALTH_PREFERENCES.map((pref) => {
+                  const isSelected = wealthPreference === pref.value;
+                  return (
+                    <TouchableOpacity
+                      key={pref.value}
+                      onPress={() => {
+                        setWealthPreference(pref.value);
+                        setShowDropdown(false);
+                        clearError("wealthPreference");
+                      }}
+                      style={{
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#F5F5F5",
+                        backgroundColor: isSelected ? "#F0F9F9" : "#FFFFFF",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: isSelected ? PRIMARY : DARK,
+                          fontSize: 14.5,
+                          fontWeight: isSelected ? "700" : "600",
+                          marginBottom: 2,
+                        }}
+                      >
+                        {pref.label}
+                      </Text>
+                      <Text style={{ color: "#6B7280", fontSize: 12 }}>
+                        {pref.subtitle}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
             {errors.wealthPreference ? (
@@ -578,46 +681,6 @@ export default function SignupScreen() {
               </Text>
             </TouchableOpacity>
           </Link>
-
-          {/* Apple */}
-          <TouchableOpacity
-            style={{
-              borderWidth: 1,
-              borderColor: BORDER,
-              borderRadius: 12,
-              paddingVertical: 14,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              marginBottom: 12,
-            }}
-          >
-            <SvgXml xml={appleSvg} width={16} height={18} />
-            <Text style={{ color: DARK, fontWeight: "500", fontSize: 15 }}>
-              Sign In with Apple
-            </Text>
-          </TouchableOpacity>
-
-          {/* Google */}
-          <TouchableOpacity
-            style={{
-              borderWidth: 1,
-              borderColor: BORDER,
-              borderRadius: 12,
-              paddingVertical: 14,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              marginBottom: 12,
-            }}
-          >
-            <SvgXml xml={googleSvg} width={18} height={18} />
-            <Text style={{ color: DARK, fontWeight: "500", fontSize: 15 }}>
-              Sign In with Google
-            </Text>
-          </TouchableOpacity>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>

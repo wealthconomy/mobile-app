@@ -1,48 +1,18 @@
 import Header from "@/src/components/common/Header";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { PortfolioCard } from "@/src/features/home/components/PortfolioCard";
 import { SubWealthCard } from "@/src/features/home/components/SubWealthCard";
 import { TransferToPortfolioSheet } from "@/src/features/home/components/TransferToPortfolioSheet";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
-import { FlatList, Text, View } from "react-native";
+import { useState } from "react";
+import { FlatList, RefreshControl, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
-
-// ─── Mock portfolio activity data (replace with API when ready) ───────────────
-// This simulates what would come from the backend based on user saving plans
-const PORTFOLIO_ACTIVITY = {
-  flex: {
-    hasNotification: false,
-    badgeType: undefined as any,
-    badgeValue: undefined as any,
-  },
-  fix: {
-    hasNotification: false,
-    badgeType: "daysLeft" as const,
-    badgeValue: "4 days left", // driven by nearest-maturing WealthFix saving plan
-  },
-  goal: {
-    hasNotification: false,
-    badgeType: "topup" as const,
-    badgeValue: "Top Up", // driven by goal that hasn't been funded in a while
-  },
-  fam: {
-    hasNotification: true, // a family member has updated their contribution
-    badgeType: "topup" as const,
-    badgeValue: "Top Up",
-  },
-  flow: {
-    hasNotification: false,
-    badgeType: undefined as any,
-    badgeValue: undefined as any,
-  },
-  group: {
-    hasNotification: true, // new group activity notification
-    badgeType: undefined as any,
-    badgeValue: undefined as any,
-  },
-};
+import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
+import { useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
+import { Skeleton } from "@/src/components/common/skeletons";
+import { PortfolioCardSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 
 const PORTFOLIOS = [
   {
@@ -53,21 +23,21 @@ const PORTFOLIOS = [
   },
   {
     id: "2",
-    type: "fix" as const,
-    title: "WealthFix",
-    description: "Lock it in, block temptation, and watch your money grow.",
-  },
-  {
-    id: "3",
     type: "goal" as const,
     title: "WealthGoal",
     description: "Save with discipline and smash every goals.",
   },
   {
-    id: "4",
+    id: "3",
     type: "fam" as const,
     title: "WealthFam",
     description: "Build a wealthy family; save for kids, spouse, and loved ones.",
+  },
+  {
+    id: "4",
+    type: "fix" as const,
+    title: "WealthFix",
+    description: "Lock it in, block temptation, and watch your money grow.",
   },
   {
     id: "5",
@@ -83,27 +53,54 @@ const PORTFOLIOS = [
   },
 ];
 
-import Skeleton from "@/src/components/common/Skeleton";
-import { PortfolioCardSkeleton } from "@/src/features/home/components/DashboardSkeletons";
-
 export default function WealthPortfolioScreen() {
-  const [loading, setLoading] = useState(true);
   const [showTransferSheet, setShowTransferSheet] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const preferences = useSelector(
     (state: RootState) => state.portfolioPreference
   );
 
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 1500);
-    return () => clearTimeout(timer);
-  }, []);
+  const { data: walletData, isLoading, refetch: refetchWallet } = useGetWalletSummaryQuery();
+  const { data: configData, refetch: refetchConfig } = useGetPortfolioConfigQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.allSettled([
+        refetchWallet(),
+        refetchConfig(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const getRateLabel = (type: string) => {
+    const keyMap: Record<string, string> = {
+      flex: "wealthflex",
+      fix: "wealthfix",
+      goal: "wealthgoal",
+      fam: "wealthfam",
+      flow: "wealthflow",
+      group: "wealthgroup",
+    };
+    const rateKey = keyMap[type] || `wealth${type}`;
+    return rates?.[rateKey]?.label;
+  };
+
+  const formatAmount = (val?: string) => {
+    if (!val) return "0.00";
+    const amount = parseFloat(val) / 100;
+    return amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
 
   const renderPortfolioItem = ({
     item,
   }: {
     item: (typeof PORTFOLIOS)[0] | number;
   }) => (
-    <View style={{ width: "48.5%", marginBottom: 16 }}>
+    <View style={{ width: "48%", marginBottom: 16 }}>
       {typeof item === "number" ? (
         <PortfolioCardSkeleton />
       ) : (
@@ -113,9 +110,8 @@ export default function WealthPortfolioScreen() {
           description={item.description}
           showEarnTag={false}
           hideInterest={preferences[item.type] === "Impact Wealth"}
-          hasNotification={PORTFOLIO_ACTIVITY[item.type].hasNotification}
-          badgeType={PORTFOLIO_ACTIVITY[item.type].badgeType}
-          badgeValue={PORTFOLIO_ACTIVITY[item.type].badgeValue}
+          hasNotification={false}
+          interestRate={getRateLabel(item.type)}
         />
       )}
     </View>
@@ -126,8 +122,10 @@ export default function WealthPortfolioScreen() {
       <StatusBar style="dark" />
       <Header title="Wealth Portfolio" />
 
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
+
       <FlatList
-        data={(loading ? [1, 2, 3, 4, 5, 6] : PORTFOLIOS) as any[]}
+        data={isLoading ? ([1, 2, 3, 4, 5, 6] as any[]) : PORTFOLIOS}
         keyExtractor={(item, index) =>
           typeof item === "number" ? index.toString() : item.id
         }
@@ -139,11 +137,20 @@ export default function WealthPortfolioScreen() {
           paddingBottom: 40,
         }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["#155D5F"]}
+            progressBackgroundColor="#FFFFFF"
+          />
+        }
         ListHeaderComponent={
           <>
             {/* Total Savings Card */}
             <View className="mb-6">
-              {loading ? (
+              {isLoading ? (
                 <Skeleton
                   width="100%"
                   height={170}
@@ -157,7 +164,7 @@ export default function WealthPortfolioScreen() {
                 />
               ) : (
                 <SubWealthCard
-                  amount="₦350,000.00"
+                  amount={`₦${formatAmount(walletData?.currentBalance)}`}
                   description="Discipline Today, Wealth Tomorrow"
                   onTransferPress={() => setShowTransferSheet(true)}
                 />

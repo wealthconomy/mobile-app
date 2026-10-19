@@ -1,15 +1,16 @@
-import { libraryService } from "@/src/api/libraryService";
 import Header from "@/src/components/common/Header";
-import { LibraryItem } from "@/src/features/wise-up/components/LibraryItem";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
+import { LibraryItem } from "@/src/features/library/components/LibraryItem";
+import { useGetLibraryMaterialsQuery } from "@/src/store/api/libraryApi";
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import { StatusBar } from "expo-status-bar";
-import React, { useState } from "react";
+import * as WebBrowser from "expo-web-browser";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Linking,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -22,11 +23,24 @@ export default function LibraryScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [refreshing, setRefreshing] = useState(false);
 
-  const { data: materials, isLoading } = useQuery({
-    queryKey: ["library-materials"],
-    queryFn: () => libraryService.getMaterials(),
+  const { data: response, isLoading, refetch } = useGetLibraryMaterialsQuery({
+    publishToApp: true,
   });
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch().unwrap();
+    } catch {
+      // ignore
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const materials = response?.data?.items || [];
 
   const filteredMaterials =
     materials?.filter((material) =>
@@ -63,6 +77,8 @@ export default function LibraryScreen() {
       <StatusBar style="dark" />
       <Header title="Library Materials" />
 
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
+
       <View className="px-5 py-4">
         <Text className="text-[#6B7280] text-sm mb-4">
           Browse and download learning materials
@@ -84,7 +100,17 @@ export default function LibraryScreen() {
             <TouchableOpacity
               onPress={() => setViewMode("list")}
               className="p-1.5 rounded-md"
-              style={viewMode === "list" ? { backgroundColor: "#fff", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 } : undefined}
+              style={
+                viewMode === "list"
+                  ? {
+                      backgroundColor: "#fff",
+                      shadowColor: "#000",
+                      shadowOpacity: 0.1,
+                      shadowRadius: 2,
+                      elevation: 2,
+                    }
+                  : undefined
+              }
             >
               <Ionicons
                 name="list"
@@ -95,7 +121,17 @@ export default function LibraryScreen() {
             <TouchableOpacity
               onPress={() => setViewMode("grid")}
               className="p-1.5 rounded-md"
-              style={viewMode === "grid" ? { backgroundColor: "#fff", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 } : undefined}
+              style={
+                viewMode === "grid"
+                  ? {
+                      backgroundColor: "#fff",
+                      shadowColor: "#000",
+                      shadowOpacity: 0.1,
+                      shadowRadius: 2,
+                      elevation: 2,
+                    }
+                  : undefined
+              }
             >
               <Ionicons
                 name="grid"
@@ -111,6 +147,15 @@ export default function LibraryScreen() {
         className="flex-1 px-5"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["#155D5F"]}
+            progressBackgroundColor="#FFFFFF"
+          />
+        }
       >
         {isLoading ? (
           <View className="flex-1 items-center justify-center py-20">
@@ -118,14 +163,24 @@ export default function LibraryScreen() {
           </View>
         ) : filteredMaterials.length > 0 ? (
           <View
-            style={viewMode === "grid" ? { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" } : undefined}
+            style={
+              viewMode === "grid"
+                ? {
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    justifyContent: "space-between",
+                  }
+                : undefined
+            }
           >
             {filteredMaterials.map((material) => (
               <LibraryItem
                 key={material.id}
                 material={material}
                 viewMode={viewMode}
-                onPress={() => router.push(`/education/library/${material.id}` as any)}
+                onPress={() =>
+                  router.push(`/education/library/${material.id}` as any)
+                }
                 onReadInApp={() => handleReadInApp(material.documentUrl ?? "")}
                 onDownload={() => handleDownload(material.documentUrl ?? "")}
                 onWatchOnYouTube={() => {

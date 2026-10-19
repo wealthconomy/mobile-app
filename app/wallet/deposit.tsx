@@ -1,15 +1,31 @@
-import { paymentService } from "@/src/api/paymentService";
 import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
+import { RootState } from "@/src/store";
+import {
+  useChargeMandateMutation,
+  useCreateVirtualAccountMutation,
+  useCreateWalletTopupIntentMutation,
+  useLazyVerifyPaymentQuery,
+  useListMyMandatesQuery,
+} from "@/src/store/api/paymentApi";
+import { useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
+import { useGetWalletSummaryQuery, walletApi } from "@/src/store/api/walletApi";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+import * as Clipboard from "expo-clipboard";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import * as WebBrowser from "expo-web-browser";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -17,17 +33,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
+import { useDispatch, useSelector } from "react-redux";
 
 type Step = "select-method" | "use-card" | "preview";
-
-interface SavedCard {
-  id: string;
-  last4: string;
-  brand: "Mastercard" | "Visa";
-  expiryDate: string;
-  nameOnCard: string;
-  usageCount: number;
-}
 
 export default function DepositScreen() {
   const { plan } = useLocalSearchParams<{ plan: string }>();
@@ -37,40 +45,112 @@ export default function DepositScreen() {
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState("");
   const [wealthPlan] = useState(plan || "WealthFlex");
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
-  const [cvv, setCvv] = useState("");
-  const [nameOnCard, setNameOnCard] = useState("");
-  const [pin, setPin] = useState("");
 
-  const [savedCards, setSavedCards] = useState<SavedCard[]>([
+  const [selectedMandateId, setSelectedMandateId] = useState<string | null>(
+    null,
+  );
+  const [depositMethod, setDepositMethod] = useState<"card" | "bank_transfer">(
+    "card",
+  );
+  const [vaLoading, setVaLoading] = useState(false);
+  const [vaError, setVaError] = useState<string | null>(null);
+  const timeoutRef = useRef<any>(null);
+
+  const dispatch = useDispatch();
+  const user = useSelector((state: RootState) => state.auth.user);
+  const { data: wallet, refetch: refetchWallet } = useGetWalletSummaryQuery(
+    undefined,
     {
-      id: "1",
-      last4: "4252",
-      brand: "Mastercard",
-      expiryDate: "12/25",
-      nameOnCard: "SIMON PETER",
-      usageCount: 10,
+      refetchOnMountOrArgChange: true,
     },
-    {
-      id: "2",
-      last4: "8372",
-      brand: "Visa",
-      expiryDate: "09/24",
-      nameOnCard: "SIMON PETER",
-      usageCount: 5,
-    },
+  );
+
+  useEffect(() => {
+    if (wallet) {
+      console.log("=== WALLET SUMMARY RESPONSE ===");
+      console.log(JSON.stringify(wallet, null, 2));
+    }
+  }, [wallet]);
+
+  // Queries & Mutations
+  const { data: mandatesResponse, isLoading: loadingMandates } =
+    useListMyMandatesQuery();
+  const savedCards = mandatesResponse?.data?.items || [];
+
+  const [createTopupIntent] = useCreateWalletTopupIntentMutation();
+  const [chargeMandate] = useChargeMandateMutation();
+  const [createVirtualAccount] = useCreateVirtualAccountMutation();
+  const [verifyPayment] = useLazyVerifyPaymentQuery();
+  const [verifying, setVerifying] = useState(false);
+
+  // Auto-generate virtual account if modal is opened and accountNumber is missing
+  const generateVirtualAccount = useCallback(async () => {
+    if (!user || wallet?.accountNumber) return;
+
+    setVaLoading(true);
+    setVaError(null);
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // 15-second timeout
+    timeoutRef.current = setTimeout(() => {
+      if (!wallet?.accountNumber) {
+        setVaLoading(false);
+        setVaError("Unable to generate account details. Please try again.");
+      }
+    }, 15000);
+
+    try {
+      await createVirtualAccount({
+        userId: user.id,
+        email: user.email || "",
+        name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || "User",
+      }).unwrap();
+
+      const updated = await refetchWallet();
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      setVaLoading(false);
+
+      if (!updated.data?.accountNumber && !wallet?.accountNumber) {
+        setVaError("Unable to generate account details. Please try again.");
+      } else {
+        setVaError(null);
+      }
+    } catch (error: any) {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      setVaLoading(false);
+      const errMsg =
+        error?.data?.message ||
+        error?.message ||
+        "Unable to generate account details. Please try again.";
+      setVaError(errMsg);
+      console.error("Failed to generate virtual account:", error);
+      Alert.alert("Account Generation Failed", errMsg);
+    }
+  }, [user, wallet?.accountNumber, createVirtualAccount, refetchWallet]);
+
+  useEffect(() => {
+    if (showBankModal && !wallet?.accountNumber && !vaError && !vaLoading) {
+      generateVirtualAccount();
+    }
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [
+    showBankModal,
+    wallet?.accountNumber,
+    vaError,
+    vaLoading,
+    generateVirtualAccount,
   ]);
-
-  const defaultCardId = [...savedCards].sort(
-    (a, b) => b.usageCount - a.usageCount,
-  )[0]?.id;
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
     const cleaned = val.replace(/[^\d.]/g, "");
-    const amount = parseFloat(cleaned) || 0;
-    return amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+    const amountNum = parseFloat(cleaned) || 0;
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
   const getTitle = () => {
@@ -86,36 +166,129 @@ export default function DepositScreen() {
     else router.back();
   };
 
-  const handleCardSelect = (card: SavedCard) => {
-    setCardNumber(`**** **** **** ${card.last4}`);
-    setExpiryDate(card.expiryDate);
-    setNameOnCard(card.nameOnCard);
-    setCvv("");
-    setPin("");
+  const handleCardSelect = (card: any) => {
+    setDepositMethod("card");
+    setSelectedMandateId(card.id);
     setStep("use-card");
   };
 
-  const handleConfirmPayment = () => {
-    // Logic to save/update card
-    const last4 = cardNumber.slice(-4);
-    const existingCard = savedCards.find((c) => c.last4 === last4);
+  const handleConfirmDeposit = async () => {
+    const numAmount = parseFloat(amount.replace(/,/g, "")) || 0;
+    if (!numAmount || numAmount <= 0) {
+      Alert.alert("Error", "Please enter a valid amount.");
+      return;
+    }
 
-    if (existingCard) {
-      setSavedCards((prev) =>
-        prev.map((c) =>
-          c.id === existingCard.id ? { ...c, usageCount: c.usageCount + 1 } : c,
-        ),
+    setLoading(true);
+    const amountKobo = String(Math.round(numAmount * 100));
+    const idempotencyKey = `dep_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+
+    try {
+      if (selectedMandateId) {
+        // Direct charge using saved mandate token
+        await chargeMandate({
+          userId: user?.id || "",
+          paymentMethodId: selectedMandateId,
+          amountKobo,
+          channel: "WEB",
+          walletId: wallet?.id,
+          idempotencyKey,
+        }).unwrap();
+
+        dispatch(walletApi.util.invalidateTags(["Wallet"]));
+        await refetchWallet();
+        setShowSuccess(true);
+      } else {
+        // Create dynamic web top-up checkout
+        const response = await createTopupIntent({
+          userId: user?.id || "",
+          amountKobo,
+          provider: "PAYSTACK",
+          channel: "WEB",
+          redirectUrl: `${process.env.EXPO_PUBLIC_API_URL}/wallet/me`,
+          email: user?.email || "",
+          idempotencyKey,
+        }).unwrap();
+
+        const checkoutUrl = response?.data?.checkoutUrl;
+        const paymentRef = response?.data?.providerRef || response?.data?.id;
+        if (checkoutUrl) {
+          await WebBrowser.openBrowserAsync(checkoutUrl);
+
+          // On Android, openBrowserAsync returns immediately (does not block).
+          // Wait 5 seconds to give the user time to complete payment before polling.
+          if (Platform.OS === "android") {
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
+
+          // Verify payment status after returning from browser
+          if (paymentRef) {
+            setVerifying(true);
+            let verified = false;
+            for (let i = 0; i < 5; i++) {
+              try {
+                const verifyRes = await verifyPayment(paymentRef).unwrap();
+                console.log(
+                  `=== VERIFY PAYMENT (attempt ${i + 1}) ===`,
+                  JSON.stringify(verifyRes, null, 2),
+                );
+                const status = verifyRes?.data?.status;
+                if (status === "SUCCESSFUL" || status === "SUCCEEDED") {
+                  verified = true;
+                  break;
+                }
+                if (i >= 1 && status === "FAILED") {
+                  break;
+                }
+              } catch (e) {
+                console.warn(`Verify attempt ${i + 1} failed:`, e);
+              }
+              // Wait 3 seconds before retrying
+              await new Promise((resolve) => setTimeout(resolve, 3000));
+            }
+            setVerifying(false);
+
+            const safeRefetch = () => {
+              try {
+                dispatch(walletApi.util.invalidateTags(["Wallet"]));
+                refetchWallet();
+              } catch (e) {
+                console.warn("Refetch wallet query ignored:", e);
+              }
+            };
+
+            if (verified) {
+              dispatch(walletApi.util.invalidateTags(["Wallet"]));
+              safeRefetch();
+              setShowSuccess(true);
+            } else {
+              dispatch(walletApi.util.invalidateTags(["Wallet"]));
+              safeRefetch();
+              Alert.alert(
+                "Payment Processing",
+                "Your payment is being processed. Your wallet balance will update shortly.",
+              );
+            }
+          } else {
+            // Fallback if no paymentRef returned
+            dispatch(walletApi.util.invalidateTags(["Wallet"]));
+            try {
+              refetchWallet();
+            } catch (e) {}
+            setShowSuccess(true);
+          }
+        } else {
+          throw new Error("Checkout URL not found in API response.");
+        }
+      }
+    } catch (err: any) {
+      console.error("Deposit error:", err);
+      Alert.alert(
+        "Error",
+        err?.data?.message || err?.message || "Deposit transaction failed.",
       );
-    } else {
-      const newCard: SavedCard = {
-        id: Date.now().toString(),
-        last4,
-        brand: cardNumber.startsWith("4") ? "Visa" : "Mastercard",
-        expiryDate,
-        nameOnCard,
-        usageCount: 1,
-      };
-      setSavedCards((prev) => [...prev, newCard]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -123,34 +296,32 @@ export default function DepositScreen() {
     label,
     value,
     icon,
-    showCopy = false,
+    showCopy,
   }: {
     label: string;
     value: string;
     icon: React.ReactNode;
     showCopy?: boolean;
   }) => (
-    <View className="flex-row items-center mb-6">
-      <View className="w-12 h-12 bg-[#E6F4F4] rounded-full items-center justify-center mr-4">
-        {icon}
-      </View>
-      <View className="flex-1">
-        <Text className="text-[#4B5563] text-[14px] font-extrabold mb-0.5">
-          {label}
-        </Text>
-        <Text className="text-[#1A1A1A] font-bold text-[16px]">{value}</Text>
+    <View className="flex-row justify-between items-center py-4 border-b border-gray-100">
+      <View className="flex-row items-center flex-1">
+        <View className="mr-3">{icon}</View>
+        <View className="flex-1">
+          <Text className="text-[#9CA3AF] text-[12px] font-semibold mb-1">
+            {label}
+          </Text>
+          <Text className="text-[#1A1A1A] text-[14px] font-bold">{value}</Text>
+        </View>
       </View>
       {showCopy && (
         <TouchableOpacity
-          onPress={() => Alert.alert("Copied", `${value} copied to clipboard`)}
-          activeOpacity={0.7}
-          className="p-2"
+          onPress={async () => {
+            await Clipboard.setStringAsync(value);
+            Alert.alert("Copied", `${value} copied to clipboard!`);
+          }}
+          className="bg-[#EFF7F8] px-3 py-1.5 rounded-lg"
         >
-          <MaterialCommunityIcons
-            name="content-copy"
-            size={20}
-            color="#6B7280"
-          />
+          <Text className="text-[#155D5F] text-[11px] font-bold">Copy</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -165,11 +336,8 @@ export default function DepositScreen() {
       <View className="mt-8 border-t border-b border-gray-100">
         <TouchableOpacity
           onPress={() => {
-            setCardNumber("");
-            setExpiryDate("");
-            setNameOnCard("");
-            setCvv("");
-            setPin("");
+            setDepositMethod("card");
+            setSelectedMandateId(null);
             setStep("use-card");
           }}
           className="flex-row items-center py-6 px-1 border-b border-gray-50"
@@ -190,7 +358,11 @@ export default function DepositScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => setShowBankModal(true)}
+          onPress={() => {
+            setDepositMethod("bank_transfer");
+            setVaError(null);
+            setShowBankModal(true);
+          }}
           className="flex-row items-center py-6 px-1"
           activeOpacity={0.7}
         >
@@ -213,20 +385,21 @@ export default function DepositScreen() {
         </TouchableOpacity>
       </View>
 
-      <View className="px-1 mt-8">
-        <Text className="text-[#374151] text-[15px] font-extrabold mb-6">
-          Saved cards
-        </Text>
+      {loadingMandates ? (
+        <ActivityIndicator size="small" color="#155D5F" className="mt-8" />
+      ) : savedCards.length > 0 ? (
+        <View className="px-1 mt-8">
+          <Text className="text-[#374151] text-[15px] font-extrabold mb-6">
+            Saved cards / Linked banks
+          </Text>
 
-        {savedCards
-          .sort((a, b) => b.usageCount - a.usageCount)
-          .map((card) => (
+          {savedCards.map((card: any) => (
             <TouchableOpacity
               key={card.id}
               onPress={() => handleCardSelect(card)}
               className="flex-row items-center mb-6"
             >
-              {card.brand === "Mastercard" ? (
+              {card.brand?.toLowerCase() === "mastercard" ? (
                 <Image
                   source={{
                     uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/1280px-Mastercard-logo.svg.png",
@@ -252,34 +425,48 @@ export default function DepositScreen() {
               )}
               <View>
                 <Text className="text-[#1A1A1A] font-bold text-sm">
-                  **** {card.last4}
+                  **** {card.lastFour || "xxxx"}
                 </Text>
                 <Text className="text-[#4B5563] text-[13px] font-bold">
-                  {card.id === defaultCardId ? "Default card" : "Saved card"}
+                  {card.isDefault ? "Default mandate" : "Saved mandate"}
                 </Text>
               </View>
             </TouchableOpacity>
           ))}
-      </View>
+        </View>
+      ) : null}
 
       <TouchableOpacity
         onPress={() => {
-          setCardNumber("");
-          setExpiryDate("");
-          setNameOnCard("");
-          setCvv("");
-          setPin("");
+          setDepositMethod("card");
+          setSelectedMandateId(null);
           setStep("use-card");
         }}
         className="bg-[#155D5F] rounded-2xl p-4 flex-row items-center justify-center mt-10"
         activeOpacity={0.8}
       >
         <Ionicons name="add" size={20} color="white" className="mr-2" />
-        <Text className="text-white font-bold ml-2">Add card</Text>
+        <Text className="text-white font-bold ml-2">Add card / Link bank</Text>
       </TouchableOpacity>
 
-      <Modal visible={showBankModal} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 justify-end">
+      <Modal
+        visible={showBankModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBankModal(false)}
+      >
+        <View className="flex-1 justify-end">
+          <BlurView
+            experimentalBlurMethod="dimezisBlurView"
+            intensity={40}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowBankModal(false)}
+          />
           <View className="bg-white rounded-t-[40px] px-8 py-10 pb-12 w-full">
             <View className="w-12 h-1.5 bg-[#E5E7EB] rounded-full self-center mb-8" />
             <Text className="text-[#1A1A1A] font-extrabold text-[24px] mb-2 leading-tight">
@@ -291,31 +478,68 @@ export default function DepositScreen() {
 
             <View className="h-[1px] bg-gray-100 mb-8" />
 
-            <InfoRow
-              label="Bank Acct Number"
-              value="Paystack7374w88q8w"
-              icon={
-                <MaterialCommunityIcons
-                  name="pound"
-                  size={20}
-                  color="#155D5F"
+            {vaError ? (
+              <View className="py-6 px-4 bg-red-50 rounded-2xl border border-red-200 items-center mb-6">
+                <Ionicons name="alert-circle" size={36} color="#DC2626" />
+                <Text className="text-[#1A1A1A] font-bold text-[15px] mt-2 text-center">
+                  Unable to Generate Account
+                </Text>
+                <Text className="text-[#6B7280] text-[12px] text-center mt-1 leading-5">
+                  {vaError}
+                </Text>
+                <TouchableOpacity
+                  onPress={generateVirtualAccount}
+                  className="mt-4 bg-[#155D5F] px-6 py-2.5 rounded-xl flex-row items-center"
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="refresh" size={16} color="white" />
+                  <Text className="text-white font-bold text-xs ml-1.5">
+                    Retry
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <InfoRow
+                  label="Bank Acct Number"
+                  value={
+                    wallet?.accountNumber ||
+                    (vaLoading ? "Generating..." : "Not Available")
+                  }
+                  icon={
+                    <MaterialCommunityIcons
+                      name="pound"
+                      size={20}
+                      color="#155D5F"
+                    />
+                  }
+                  showCopy={!!wallet?.accountNumber}
                 />
-              }
-              showCopy
-            />
-            <InfoRow
-              label="Bank"
-              value="Palmpay"
-              icon={
-                <MaterialCommunityIcons name="bank" size={20} color="#155D5F" />
-              }
-            />
-            <InfoRow
-              label="Account Name"
-              value="SIMON PETER"
-              icon={<Ionicons name="person" size={20} color="#155D5F" />}
-              showCopy
-            />
+                <InfoRow
+                  label="Bank"
+                  value={
+                    wallet?.bankName ||
+                    (vaLoading ? "Generating..." : "Not Available")
+                  }
+                  icon={
+                    <MaterialCommunityIcons
+                      name="bank"
+                      size={20}
+                      color="#155D5F"
+                    />
+                  }
+                />
+                <InfoRow
+                  label="Account Name"
+                  value={
+                    wallet?.accountName ||
+                    (vaLoading ? "Generating..." : "Not Available")
+                  }
+                  icon={<Ionicons name="person" size={20} color="#155D5F" />}
+                  showCopy={!!wallet?.accountName}
+                />
+              </>
+            )}
 
             <ThemedButton
               title="Confirm"
@@ -328,10 +552,23 @@ export default function DepositScreen() {
     </View>
   );
 
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const flexConfig = rates?.wealthflex || rates?.flex;
+  const minDepositKobo = flexConfig?.minDeposit ?? flexConfig?.minimumAmount ?? 10000;
+  const minDepositNaira = minDepositKobo / 100;
+  const minDepositNairaFormatted = minDepositNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const numAmount = parseFloat(amount.replace(/,/g, "")) || 0;
+  const isBelowMinDeposit = numAmount > 0 && numAmount < minDepositNaira;
+  const isDepositValid = numAmount >= minDepositNaira;
+
   const renderUseCard = () => (
     <View className="px-5">
       <Text className="text-[#6B7280] text-[13px] mb-8 mt-4">
-        Input your card details
+        {selectedMandateId
+          ? "Confirm deposit amount from your saved card"
+          : "Input the amount you wish to deposit"}
       </Text>
 
       <View className="space-y-6 gap-5">
@@ -339,233 +576,219 @@ export default function DepositScreen() {
           <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
             Amount(₦)
           </Text>
-          <TextInput
-            placeholder="₦0.00"
-            placeholderTextColor="#9CA3AF"
-            className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
-            keyboardType="numeric"
-            value={amount}
-            onChangeText={setAmount}
-          />
-        </View>
-
-        <View>
-          <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
-            Card number
-          </Text>
-          <TextInput
-            placeholder="0000 0000 0000 0000"
-            placeholderTextColor="#9CA3AF"
-            className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
-            keyboardType="numeric"
-            value={cardNumber}
-            onChangeText={setCardNumber}
-          />
-        </View>
-
-        <View className="flex-row gap-4">
-          <View className="flex-1">
-            <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
-              Expiry Date
-            </Text>
+          <View style={{ position: "relative", justifyContent: "center" }}>
             <TextInput
-              placeholder="MM / YY"
+              placeholder="₦0.00"
               placeholderTextColor="#9CA3AF"
-              className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
-              value={expiryDate}
-              onChangeText={setExpiryDate}
-            />
-          </View>
-          <View className="flex-1">
-            <Text className="text-[#1A1A1A] font-bold text-xs mb-2">CVV</Text>
-            <TextInput
-              placeholder="123"
-              placeholderTextColor="#9CA3AF"
-              className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
+              className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] text-xl font-bold pr-12"
               keyboardType="numeric"
-              secureTextEntry
-              value={cvv}
-              onChangeText={setCvv}
-            />
-          </View>
-        </View>
-
-        <View>
-          <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
-            Name on card
-          </Text>
-          <TextInput
-            placeholder="John Doe"
-            placeholderTextColor="#9CA3AF"
-            className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
-            value={nameOnCard}
-            onChangeText={setNameOnCard}
-          />
-        </View>
-
-        <View>
-          <Text className="text-[#1A1A1A] font-bold text-xs mb-2">Pin</Text>
-          <TextInput
-            placeholder="****"
-            placeholderTextColor="#9CA3AF"
-            className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
-            keyboardType="numeric"
-            secureTextEntry
-            value={pin}
-            onChangeText={setPin}
-          />
-        </View>
-      </View>
-
-      {(() => {
-        const isFormValid =
-          amount && cardNumber && expiryDate && cvv && nameOnCard && pin;
-        return (
-          <ThemedButton
-            title="Confirm"
-            onPress={async () => {
-              setLoading(true);
-              await paymentService.depositViaCard({
-                amount,
-                cardNumber,
-                expiryDate,
-                cvv,
-                nameOnCard,
-                pin,
-              });
-              handleConfirmPayment();
-              setLoading(false);
-              setStep("preview");
-            }}
-            loading={loading}
-            disabled={!isFormValid || loading}
-            style={{ opacity: !isFormValid || loading ? 0.5 : 1 }}
-            className="mt-10"
-          />
-        );
-      })()}
-    </View>
-  );
-
-  const renderPreview = () => (
-    <View className="px-5">
-      <Text className="text-[#374151] text-[14px] font-extrabold mb-8 mt-4">
-        Please, recheck and confirm before making the transaction.
-      </Text>
-
-      <View
-        className="bg-[#F6F6F6] p-6 rounded-t-[24px] relative self-center"
-        style={{
-          width: 365,
-          height: 250,
-          borderWidth: 0.8,
-          borderColor: "#00000040",
-          borderBottomWidth: 0,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 10,
-          elevation: 2,
-        }}
-      >
-        {/* Wealthconomy Logo */}
-        {/* <Image
-          source={require("../../assets/images/wealth.png")}
-          style={{
-            width: 80,
-            height: 20,
-            position: "absolute",
-            right: 10,
-          }}
-          resizeMode="contain"
-        /> */}
-
-        <View className="flex-row justify-between mb-8 mt-2 items-start">
-          <View>
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
-              Amount To Deposit
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              ₦{formatAmount(amount)}
-            </Text>
-          </View>
-          <View className="items-end">
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
-              Account No.
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              8736123335
-            </Text>
-          </View>
-        </View>
-
-        <View className="flex-row justify-between mb-8">
-          <View>
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
-              Account Name
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">
-              Simon Peter
-            </Text>
-          </View>
-          <View className="items-end">
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
-              Bank Name
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">Opay</Text>
-          </View>
-        </View>
-
-        <View className="flex-row justify-between">
-          <View>
-            <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
-              Transfer Method{" "}
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[16px]">Card</Text>
-          </View>
-        </View>
-
-        {/* Jagged Edge Components */}
-        <View
-          className="flex-row absolute -bottom-[10px] left-0 right-0 overflow-hidden"
-          style={{ width: 365.1 }}
-        >
-          {Array.from({ length: 40 }).map((_, i) => (
-            <View
-              key={i}
+              value={amount ? `₦${amount}` : ""}
+              onChangeText={(text) => {
+                const cleaned = text.replace(/\D/g, "");
+                if (!cleaned) {
+                  setAmount("");
+                  return;
+                }
+                setAmount(cleaned.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+              }}
               style={{
-                width: 14,
-                height: 14,
-                backgroundColor: "white",
-                transform: [{ rotate: "45deg" }],
-                marginTop: 4,
+                borderWidth: isBelowMinDeposit ? 1 : 0,
+                borderColor: isBelowMinDeposit ? "#EF4444" : "transparent",
               }}
             />
-          ))}
+            {amount ? (
+              <TouchableOpacity
+                onPress={() => setAmount("")}
+                style={{ position: "absolute", right: 14, padding: 4 }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          {isBelowMinDeposit && (
+            <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+              Minimum deposit amount is ₦{minDepositNairaFormatted}
+            </Text>
+          )}
         </View>
       </View>
 
       <ThemedButton
-        title="Confirm"
-        onPress={() => setShowSuccess(true)}
-        className="mt-14"
+        title="Continue"
+        onPress={() => {
+          if (!isDepositValid) return;
+          setStep("preview");
+        }}
+        disabled={!isDepositValid}
+        style={{ opacity: !isDepositValid ? 0.5 : 1 }}
+        className="mt-10"
       />
     </View>
   );
+
+  const renderPreview = () => {
+    const isCardFlow = depositMethod === "card" || !!selectedMandateId;
+    const selectedCard = savedCards.find(
+      (c: any) => c.id === selectedMandateId,
+    );
+
+    return (
+      <View className="px-5">
+        <Text className="text-[#374151] text-[14px] font-extrabold mb-8 mt-4">
+          Please, recheck and confirm before making the transaction.
+        </Text>
+
+        <View
+          className="bg-[#F6F6F6] p-6 rounded-t-[24px] relative self-center"
+          style={{
+            width: 365,
+            minHeight: isCardFlow
+              ? selectedMandateId && selectedCard
+                ? 180
+                : 150
+              : 250,
+            borderWidth: 0.8,
+            borderColor: "#00000040",
+            borderBottomWidth: 0,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 10,
+            elevation: 2,
+          }}
+        >
+          <View className="flex-row justify-between mb-8 mt-2 items-start">
+            <View>
+              <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
+                Amount To Deposit
+              </Text>
+              <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                ₦{formatAmount(amount)}
+              </Text>
+            </View>
+            <View className="items-end">
+              <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
+                Transfer Method
+              </Text>
+              <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                {selectedMandateId
+                  ? "Saved Card"
+                  : isCardFlow
+                    ? "Card Checkout"
+                    : "Bank Transfer"}
+              </Text>
+            </View>
+          </View>
+
+          {selectedMandateId && selectedCard && (
+            <View className="flex-row justify-between items-center mb-6">
+              <View>
+                <Text className="text-[#4B5563] text-[12px] font-semibold">
+                  Card Details
+                </Text>
+                <Text className="text-[#1A1A1A] font-bold text-[14px]">
+                  {selectedCard.brand ? `${selectedCard.brand} ` : ""}••••{" "}
+                  {selectedCard.lastFour || "xxxx"}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {!isCardFlow && (
+            <>
+              <View className="flex-row justify-between mb-8">
+                <View>
+                  <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
+                    Account Name
+                  </Text>
+                  <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                    {wallet?.accountName || "N/A"}
+                  </Text>
+                </View>
+                <View className="items-end">
+                  <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
+                    Bank Name
+                  </Text>
+                  <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                    {wallet?.bankName || "N/A"}
+                  </Text>
+                </View>
+              </View>
+
+              <View className="flex-row justify-between mb-6">
+                <View>
+                  <Text className="text-[#4B5563] text-[13px] mb-1.5 font-extrabold">
+                    Account No.
+                  </Text>
+                  <Text className="text-[#1A1A1A] font-bold text-[16px]">
+                    {wallet?.accountNumber || "N/A"}
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
+
+          {/* Jagged Edge Components */}
+          <View
+            className="flex-row absolute -bottom-[10px] left-0 right-0 overflow-hidden"
+            style={{ width: 365.1 }}
+          >
+            {Array.from({ length: 40 }).map((_, i) => (
+              <View
+                key={i}
+                style={{
+                  width: 14,
+                  height: 14,
+                  backgroundColor: "white",
+                  transform: [{ rotate: "45deg" }],
+                  marginTop: 4,
+                }}
+              />
+            ))}
+          </View>
+        </View>
+
+        <ThemedButton
+          title={verifying ? "Verifying payment..." : "Confirm"}
+          onPress={handleConfirmDeposit}
+          loading={loading || verifying}
+          disabled={loading || verifying}
+          className="mt-14"
+        />
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
       <StatusBar style="dark" />
       <Header title={getTitle()} onBack={handleBack} />
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {step === "select-method" && renderSelectMethod()}
-        {step === "use-card" && renderUseCard()}
-        {step === "preview" && renderPreview()}
-      </ScrollView>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          className="flex-1"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 40 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {step === "select-method" && renderSelectMethod()}
+          {step === "use-card" && renderUseCard()}
+          {step === "preview" && renderPreview()}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <Modal visible={showSuccess} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 justify-center items-center px-10">
+        <View className="flex-1 justify-center items-center px-10">
+          <BlurView
+            experimentalBlurMethod="dimezisBlurView"
+            intensity={40}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
           <View className="bg-white rounded-[32px] p-8 items-center w-full">
             <Image
               source={require("@/assets/images/funds.png")}
@@ -580,8 +803,9 @@ export default function DepositScreen() {
               {formatAmount(amount)} into your WinUp account.
             </Text>
             <ThemedButton
-              title="Confirm"
+              title="Done"
               onPress={() => {
+                dispatch(walletApi.util.invalidateTags(["Wallet"]));
                 setShowSuccess(false);
                 router.replace("/education/win-up");
               }}

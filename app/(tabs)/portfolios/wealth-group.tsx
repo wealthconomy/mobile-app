@@ -5,12 +5,13 @@ import { PortfolioDetailSkeleton } from "@/src/features/home/components/Dashboar
 import { RootState } from "@/src/store";
 import { WealthGroup } from "@/src/store/slices/wealthGroupSlice";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { useFocusEffect, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Eye, EyeOff, Search, Users } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { ArrowUp, Eye, EyeOff, Search, Users } from "lucide-react-native";
+import { useCallback, useEffect, useState } from "react";
 import {
   Image,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -19,6 +20,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
+import { getDynamicInterestRateLabel } from "@/src/utils/formatters";
+import { useListGroupsQuery, useGetGroupMembersQuery, useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
+import { useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
+import { WealthGroupModel } from "@/src/types/group";
 
 const THEME = "#155D5F"; // Deep teal
 const THEME_BG = "#F2FFFF"; // Request color for info cards
@@ -26,168 +32,533 @@ const CREATE_CARD_BG = "#D2FEFF4D";
 const BORDER_COLOR = "#D9D9D9";
 const DISCOVERY_BORDER = "#E8E8E8";
 
+const sanitizeImageUrl = (url?: string | null) => {
+  if (!url) return undefined;
+  if (url.startsWith("http://")) return url.replace("http://", "https://");
+  return url;
+};
+
+export function GroupCoverImage({
+  uri,
+  name,
+  size = 58,
+}: {
+  uri?: string | null;
+  name?: string;
+  size?: number;
+}) {
+  const [hasError, setHasError] = useState(false);
+  const sanitized = sanitizeImageUrl(uri);
+
+  if (!sanitized || hasError) {
+    return (
+      <View className="w-full h-full bg-[#F2FFFF] items-center justify-center">
+        <Users size={size * 0.45} color={THEME} />
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri: sanitized }}
+      onError={() => {
+        setHasError(true);
+      }}
+      style={{ width: "100%", height: "100%" }}
+      resizeMode="cover"
+    />
+  );
+}
+
 interface DiscoveryGroup {
   id: string;
   title: string;
   members: number;
-  dailyAmount: string;
+  groupTypeLabel: string;
+  targetAmountText: string;
+  contributionText: string;
   endDate: string;
   growth: string;
   image: any;
   category: string;
 }
 
-const DUMMY_TRENDING: DiscoveryGroup[] = [
-  {
-    id: "t1",
-    title: "Wealthy People Savings",
-    category: "Fixed Contribution Groups",
-    dailyAmount: "₦2,000 Daily",
-    endDate: "2/12/2023",
-    growth: "₦3M/day",
-    members: 283,
-    image: require("../../../assets/images/group_trending_1.png"),
-  },
-  {
-    id: "t2",
-    title: "Road to ₦300M",
-    category: "Flex Contribution Group",
-    dailyAmount: "₦2,000 Daily",
-    endDate: "2/12/2023",
-    growth: "₦3M/day",
-    members: 283,
-    image: require("../../../assets/images/advert.jpg"),
-  },
-  {
-    id: "t3",
-    title: "Future Achievers",
-    category: "Fixed Contribution",
-    dailyAmount: "₦5,000 Weekly",
-    endDate: "12/12/2024",
-    growth: "₦500k/day",
-    members: 45,
-    image: require("../../../assets/images/group_trending_1.png"),
-  },
-  {
-    id: "t4",
-    title: "Techies Fund",
-    category: "Flex Contribution",
-    dailyAmount: "₦10,000 Mo",
-    endDate: "1/1/2025",
-    growth: "₦1M/day",
-    members: 120,
-    image: require("../../../assets/images/group_recommended_1.png"),
-  },
-];
-
-const DUMMY_RECOMMENDED: DiscoveryGroup[] = [
-  {
-    id: "r1",
-    title: "Supportive Hands",
-    category: "Flex Contribution Group",
-    dailyAmount: "₦2,000 Daily",
-    endDate: "2/12/2023",
-    growth: "₦3M/day",
-    members: 283,
-    image: require("../../../assets/images/group_recommended_1.png"),
-  },
-  {
-    id: "r2",
-    title: "Future Finance Cooperative",
-    category: "Rotational Savings (Ajo/Esusu model)",
-    dailyAmount: "₦2,000 Daily",
-    endDate: "2/12/2023",
-    growth: "₦3M/day",
-    members: 283,
-    image: require("../../../assets/images/group_trending_1.png"),
-  },
-  {
-    id: "r3",
-    title: "Homeowners 2025",
-    category: "Fixed Contribution",
-    dailyAmount: "₦50k/Monthly",
-    endDate: "2/12/2025",
-    growth: "₦10M/day",
-    members: 500,
-    image: require("../../../assets/images/group_recommended_1.png"),
-  },
-  {
-    id: "r4",
-    title: "Travelers Hub",
-    category: "Rotational",
-    dailyAmount: "₦5,000 Daily",
-    endDate: "1/5/2024",
-    growth: "₦1.2M/day",
-    members: 156,
-    image: require("../../../assets/images/advert.jpg"),
-  },
-];
-
 const CREATE_CATEGORIES = [
   {
     id: "fixed",
     title: "Fixed\nContribution\nGroups",
     icon: "people-outline",
+    groupType: "FIXED",
   },
   {
     id: "flex",
     title: "Flex\nContribution\nGroups",
     icon: "cash-outline",
+    groupType: "FLEX",
   },
   {
     id: "rotational",
     title: "Rotational\nSavings (Ajo/\nEsusu model)",
     icon: "people-circle-outline",
+    groupType: "ROTATIONAL",
   },
 ];
 
+export const isGroupTerminated = (g: WealthGroupModel) => {
+  const s = (g.status || (g as any).state || "").toString().trim().toUpperCase();
+  return (
+    s === "TERMINATED" ||
+    s === "DISSOLVED" ||
+    s === "CANCELLED" ||
+    s === "CLOSED" ||
+    s === "INACTIVE" ||
+    s === "ENDED" ||
+    s === "DISBANDED" ||
+    Boolean((g as any).isTerminated) ||
+    Boolean((g as any).is_terminated)
+  );
+};
+
+// A group is "completed" when:
+//  1. The backend explicitly says COMPLETED AND the end date has passed, OR
+//  2. The end date has passed (regardless of backend status).
+// Reaching the target amount alone does NOT complete a group — it runs until end date.
+export const isGroupCompleted = (g: WealthGroupModel) => {
+  const s = (g.status || (g as any).state || "").toString().trim().toUpperCase();
+  const dateEnded = isGroupDateEnded(g);
+  // Only trust the COMPLETED backend status if the date has also elapsed.
+  // This prevents a group that hit its target early from being wrongly flagged.
+  return (s === "COMPLETED" && dateEnded) || isGroupTerminated(g);
+};
+
+// Client-side date check: true when the group's endDate has passed,
+// treating endDate as inclusive of the whole end day (ends at 23:59:59 UTC).
+export const isGroupDateEnded = (g: WealthGroupModel) => {
+  if (!g.endDate) return false;
+  const trimmed = g.endDate.toString().trim();
+  // Handle DD/MM/YYYY format
+  if (trimmed.includes("/") && !trimmed.includes("T")) {
+    const parts = trimmed.split("/").map((p) => parseInt(p.trim(), 10));
+    if (parts.length === 3) {
+      const [day, month, year] = parts;
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+        // End of that day in UTC
+        return new Date(Date.UTC(year, month - 1, day, 23, 59, 59)).getTime() < Date.now();
+      }
+    }
+  }
+  const d = new Date(trimmed);
+  if (isNaN(d.getTime())) return false;
+  // If the stored date is already end-of-day (23:59:59) use as-is.
+  // If it's midnight (00:00:00) treat the whole day as still active.
+  const isStartOfDay = d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+  if (isStartOfDay) {
+    // The group is active through the end of that UTC day
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59)).getTime() < Date.now();
+  }
+  return d.getTime() < Date.now();
+};
+
+// Extract the display active savings in kobo for a group.
+// For ROTATIONAL: active vault balance is ONLY currentCycleSavings during active cycles.
+//   Once closed, completed, date-ended, or cycles finished, active balance is strictly 0
+//   because payouts were already distributed to members. Never fall back to cumulative totalSavings.
+// For FIXED/FLEX: use totalSavings.
+export const getGroupTotalSavingsKobo = (g: WealthGroupModel): number => {
+  const isRotational = (g.groupType ?? (g as any).type) === "ROTATIONAL";
+  if (isRotational) {
+    if (isGroupCompleted(g) || isGroupTerminated(g) || isGroupDateEnded(g)) {
+      return 0;
+    }
+    const rawCycle = (g as any).currentCycleSavings;
+    if (rawCycle !== undefined && rawCycle !== null) {
+      const n = typeof rawCycle === "string" ? parseFloat(rawCycle) : Number(rawCycle);
+      return isNaN(n) ? 0 : n;
+    }
+    if (g.currentCycle && g.totalCycles && g.currentCycle >= g.totalCycles) {
+      return 0;
+    }
+    return 0;
+  }
+  const rawVal = g.totalSavings ?? g.currentBalance ?? 0;
+  return typeof rawVal === "string" ? parseFloat(rawVal) : Number(rawVal);
+};
+
+// Check if a user has already fully withdrawn their funds from a completed group
+export const isUserFullySettledInGroup = (g: WealthGroupModel, uid?: string): boolean => {
+  if (!uid) return false;
+  if (isGroupTerminated(g)) return true;
+  if ((g.groupType ?? (g as any).type) === "ROTATIONAL") return true;
+
+  const membersList =
+    (g as any).members ||
+    (g as any).groupMembers ||
+    (g as any).membersList;
+  if (Array.isArray(membersList) && membersList.length > 0) {
+    const myMember = membersList.find((m: any) => {
+      const mUid =
+        m?.userId ||
+        m?.id ||
+        m?.user?.id ||
+        (m as any)?.user?._id ||
+        (typeof m?.userId === "object" ? (m?.userId?.id || (m?.userId as any)?._id) : null);
+      return mUid === uid;
+    });
+    // If the member record exists and their totalContributed is 0 or less, they've withdrawn their money
+    if (myMember && parseFloat(myMember.totalContributed?.toString() || "0") <= 0) {
+      return true;
+    }
+  }
+  return false;
+};
+
+// Background watcher component that checks member withdrawal status for completed groups
+function CompletedGroupWatcher({
+  groupId,
+  currentUserId,
+  onUpdate,
+}: {
+  groupId: string;
+  currentUserId?: string;
+  onUpdate: (
+    groupId: string,
+    data: { myContributedKobo: number; hasWithdrawn: boolean; groupTotalKobo: number }
+  ) => void;
+}) {
+  const { data: membersData } = useGetGroupMembersQuery(
+    { id: groupId },
+    { skip: !groupId }
+  );
+
+  useEffect(() => {
+    if (!membersData?.items || !currentUserId) return;
+    const myMember = membersData.items.find((m: any) => {
+      const mUid =
+        m?.userId ||
+        m?.id ||
+        m?.user?.id ||
+        (m as any)?.user?._id ||
+        (typeof m?.userId === "object" ? (m?.userId?.id || (m?.userId as any)?._id) : null);
+      return mUid === currentUserId;
+    });
+
+    const contributedKobo = parseFloat(myMember?.totalContributed?.toString() || "0") || 0;
+    const groupTotal = membersData.items.reduce(
+      (sum: number, m: any) => sum + (parseFloat(m.totalContributed?.toString() || "0") || 0),
+      0
+    );
+    // hasWithdrawn is true ONLY if member record exists and their contribution has been reduced to 0
+    const hasWithdrawn = myMember !== null && myMember !== undefined && contributedKobo <= 0;
+
+    onUpdate(groupId, {
+      myContributedKobo: contributedKobo,
+      hasWithdrawn,
+      groupTotalKobo: groupTotal,
+    });
+  }, [membersData, currentUserId, groupId, onUpdate]);
+
+  return null;
+}
+
 export default function WealthGroupScreen() {
-  const [loading, setLoading] = useState(true);
-  const groupsFromRedux = useSelector(
-    (state: RootState) => state.wealthGroup.groups,
+  const {
+    data: groupsData,
+    isLoading: loading,
+    refetch,
+  } = useListGroupsQuery(
+    { populate: ["members", "creator"] },
+    {
+      pollingInterval: 10000,
+      refetchOnFocus: true,
+      refetchOnMountOrArgChange: true,
+    }
   );
   const portfolioPreference = useSelector(
     (state: RootState) => state.portfolioPreference.group
   );
   const showInterest = portfolioPreference !== "Impact Wealth";
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const groupRateLabel = getDynamicInterestRateLabel("group", systemConfigData, rates, 15);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(timer);
-  }, []);
+  const groupConfig = rates?.wealthgroup || (rates as any)?.group;
+  const groupMinMembers = groupConfig?.membersLimitRange?.[0] ?? 2;
+  const groupMaxMembers = groupConfig?.membersLimitRange?.[1] ?? 50;
 
+  const handleBack = () => {
+    router.replace("/(tabs)/portfolios" as any);
+  };
+
+  const [refreshing, setRefreshing] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
   const [showTips, setShowTips] = useState(true);
-  const [activeTab, setActiveTab] = useState<"ongoing" | "completed">(
-    "ongoing",
-  );
+  const [activeTab, setActiveTab] = useState<"ongoing" | "completed">("ongoing");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Map Redux groups to DiscoveryGroup interface
-  const mappedGroups = groupsFromRedux.map((g: WealthGroup) => ({
-    id: g.id,
-    title: g.name,
-    category: g.category,
-    dailyAmount: `₦${g.amount} ${g.frequency}`,
-    endDate: g.endDate,
-    growth: `₦${g.growthToday}/day`,
-    members: g.membersCount,
-    image: g.coverImage
-      ? { uri: g.coverImage }
-      : require("../../../assets/images/group_trending_1.png"),
-  }));
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
-  const trendingGroups = [...mappedGroups, ...DUMMY_TRENDING].filter(
+  const currentUser = useSelector((state: RootState) => state.auth.user);
+
+  const isUserMemberOfGroup = (g: WealthGroupModel) => {
+    if (!currentUser?.id) return false;
+    const uid = currentUser.id;
+
+    // 1. Creator checks
+    if (g.creatorId === uid || (g as any).creator?.id === uid) return true;
+
+    // 2. Status checks on group user membership
+    const userStatus = (
+      (g as any).userStatus ||
+      (g as any).membershipStatus ||
+      (g as any).memberStatus ||
+      ""
+    ).toString().toUpperCase();
+
+    if (
+      userStatus === "REMOVED" ||
+      userStatus === "EXITED" ||
+      userStatus === "PAST" ||
+      userStatus === "PAST MEMBER" ||
+      userStatus === "BANNED" ||
+      userStatus === "BLACKLISTED"
+    ) {
+      return false;
+    }
+
+    // 3. Explicit admin flag
+    if (g.isAdmin) return true;
+
+    if (
+      userStatus === "ACTIVE" ||
+      userStatus === "PAID" ||
+      userStatus === "UNPAID" ||
+      userStatus === "APPROVED"
+    ) {
+      return true;
+    }
+
+    // 4. Check populated members array
+    const membersList =
+      (g as any).members ||
+      (g as any).groupMembers ||
+      (g as any).membersList;
+    if (Array.isArray(membersList) && membersList.length > 0) {
+      const found = membersList.some((m: any) => {
+        if (!m) return false;
+        if (typeof m === "string") return m === uid;
+        const memberUid =
+          m.userId ||
+          m.id ||
+          m.user?.id ||
+          (typeof m.userId === "object" ? m.userId?.id : null);
+        const memberStatus = m.status;
+        const memberRole = m.role;
+        return (
+          memberUid === uid &&
+          (memberRole === "OWNER" ||
+            memberRole === "ADMIN" ||
+            memberStatus === "ACTIVE" ||
+            memberStatus === "PAID" ||
+            memberStatus === "UNPAID" ||
+            memberStatus === "APPROVED")
+        );
+      });
+      if (found) return true;
+    }
+
+    // 5. Check if user is in userMembership object with ACTIVE status
+    if (
+      (g as any).userMembership &&
+      ((g as any).userMembership.status === "ACTIVE" ||
+        (g as any).userMembership.status === "APPROVED")
+    ) {
+      return true;
+    }
+
+    // 6. Explicit boolean only if not pending
+    if (g.isMember && userStatus !== "PENDING") return true;
+
+    return false;
+  };
+
+  const rawGroups: WealthGroupModel[] = Array.isArray(groupsData?.items)
+    ? groupsData.items
+    : Array.isArray((groupsData as any)?.data?.items)
+    ? (groupsData as any).data.items
+    : Array.isArray((groupsData as any)?.data)
+    ? (groupsData as any).data
+    : Array.isArray(groupsData)
+    ? (groupsData as any)
+    : [];
+
+  // Deduplicate groups by unique ID (id or _id) to strictly prevent duplicate entries
+  const uniqueGroupsMap = new Map<string, WealthGroupModel>();
+  rawGroups.forEach((g: any) => {
+    if (!g) return;
+    const id = String(
+      g.id ||
+        g._id ||
+        g.groupId ||
+        g.group_id ||
+        (g.name ? `${g.name}_${g.createdAt || ""}` : "")
+    ).trim();
+    if (id) {
+      uniqueGroupsMap.set(id, { ...g, id: String(g.id || g._id || id) });
+    }
+  });
+  const allGroups = Array.from(uniqueGroupsMap.values());
+
+  // Filter out completed, terminated, AND date-ended groups from discovery (trending/recommended)
+  const activeDiscoveryGroups = allGroups.filter(
+    (g) => !isGroupCompleted(g) && !isGroupTerminated(g) && !isGroupDateEnded(g)
+  );
+
+  // Map API groups to DiscoveryGroup interface
+  const mappedGroups: DiscoveryGroup[] = activeDiscoveryGroups.map((g) => {
+    const memberCount =
+      (g as any).membersCount ??
+      (g as any).memberCount ??
+      (g as any)._count?.members ??
+      (g as any).members?.length ??
+      1;
+
+    const rawFreq = (g.frequency || "MONTHLY").toString().toUpperCase();
+    const freqSuffix = rawFreq.includes("DAILY") ? "Daily" : rawFreq.includes("WEEKLY") ? "Weekly" : "Monthly";
+    const frequencyLabel = rawFreq.charAt(0) + rawFreq.slice(1).toLowerCase();
+
+    const rawType = (g.groupType || (g as any).type || "FIXED").toString().toUpperCase();
+    let groupTypeLabel = "Fixed Group";
+    if (rawType.includes("FLEX")) {
+      groupTypeLabel = "Flex Group";
+    } else if (rawType.includes("ROTATIONAL")) {
+      groupTypeLabel = "Rotational";
+    }
+
+    const rawTarget = parseFloat(g.targetAmount?.toString() || "0");
+    const targetNaira = rawTarget > 0 ? (rawTarget / 100).toLocaleString() : "0";
+
+    const rawContrib = parseFloat(g.contributionAmount?.toString() || "0");
+    const contribNaira = rawContrib > 0 ? (rawContrib / 100).toLocaleString() : null;
+
+    const formattedEnd = g.endDate
+      ? (() => {
+          const d = new Date(g.endDate);
+          if (isNaN(d.getTime())) return "Flexible";
+          return `${d.getUTCMonth() + 1}/${d.getUTCDate()}/${String(d.getUTCFullYear()).slice(-2)}`;
+        })()
+      : "Flexible";
+
+    return {
+      id: String(g.id),
+      title: g.name,
+      category: g.category || "General",
+      groupTypeLabel,
+      targetAmountText: `Target: ₦${targetNaira}`,
+      contributionText: contribNaira ? `₦${contribNaira} / ${freqSuffix}` : `${freqSuffix} contribution`,
+      dailyAmount: `Target: ₦${targetNaira}`,
+      endDate: formattedEnd,
+      growth: "₦0/day",
+      members: memberCount,
+      image: g.coverImage
+        ? { uri: sanitizeImageUrl(g.coverImage) }
+        : require("../../../assets/images/group_trending_1.png"),
+    };
+  });
+
+  const filteredGroups = mappedGroups.filter(
     (g) =>
       g.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       g.category.toLowerCase().includes(searchQuery.toLowerCase()),
   );
-  const recommendedGroups = [...mappedGroups, ...DUMMY_RECOMMENDED].filter(
-    (g) =>
-      g.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      g.category.toLowerCase().includes(searchQuery.toLowerCase()),
+
+  // Sort discovery groups by member count for Trending
+  const sortedDiscoveryGroups = [...filteredGroups].sort((a, b) => b.members - a.members);
+
+  const trendingGroups = sortedDiscoveryGroups.slice(0, 5);
+  const recommendedGroups = [...filteredGroups].slice(0, 5);
+
+  const ongoingGroups = allGroups.filter(
+    (g) => isUserMemberOfGroup(g) && !isGroupCompleted(g) && !isGroupTerminated(g) && !isGroupDateEnded(g)
   );
-  const ongoingGroups = groupsFromRedux.filter((g: WealthGroup) => g.isMember);
+  // A group enters "completed" only once its end date has elapsed (date is the source of truth).
+  const completedGroups = allGroups.filter(
+    (g) => isUserMemberOfGroup(g) && !isGroupTerminated(g) && isGroupDateEnded(g)
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
+  const currentUserId = currentUser?.id || (currentUser as any)?._id;
+
+  // Clear completed status cache whenever the logged-in user changes
+  useEffect(() => {
+    setCompletedStatusMap({});
+  }, [currentUserId]);
+
+  const [completedStatusMap, setCompletedStatusMap] = useState<
+    Record<string, { myContributedKobo: number; hasWithdrawn: boolean; groupTotalKobo: number }>
+  >({});
+
+  const handleWatcherUpdate = useCallback(
+    (
+      groupId: string,
+      data: { myContributedKobo: number; hasWithdrawn: boolean; groupTotalKobo: number }
+    ) => {
+      setCompletedStatusMap((prev) => {
+        const existing = prev[groupId];
+        if (
+          existing &&
+          existing.hasWithdrawn === data.hasWithdrawn &&
+          existing.myContributedKobo === data.myContributedKobo &&
+          existing.groupTotalKobo === data.groupTotalKobo
+        ) {
+          return prev;
+        }
+        return { ...prev, [groupId]: data };
+      });
+    },
+    []
+  );
+
+  // 1. Ongoing active groups savings
+  const ongoingSavingsKobo = ongoingGroups.reduce((acc, g) => {
+    return acc + getGroupTotalSavingsKobo(g);
+  }, 0);
+
+  // 2. Completed groups savings: include ONLY if NOT terminated and current user has NOT withdrawn
+  const unwithdrawnCompletedSavingsKobo = completedGroups.reduce((acc, g) => {
+    if (isGroupTerminated(g)) return acc;
+    if ((g.groupType ?? (g as any).type) === "ROTATIONAL") return acc;
+
+    const status = completedStatusMap[g.id];
+    if (status) {
+      if (status.hasWithdrawn) {
+        return acc; // Current user fully withdrew their contribution, strictly exclude from subwealthcard!
+      }
+      const amountKobo = status.groupTotalKobo > 0 ? status.groupTotalKobo : status.myContributedKobo;
+      return acc + (amountKobo > 0 ? amountKobo : getGroupTotalSavingsKobo(g));
+    }
+
+    // Fallback while watcher is loading
+    if (isUserFullySettledInGroup(g, currentUserId)) {
+      return acc;
+    }
+
+    return acc + getGroupTotalSavingsKobo(g);
+  }, 0);
+
+  const totalSavingsKobo = ongoingSavingsKobo + unwithdrawnCompletedSavingsKobo;
 
   if (loading) {
     return (
@@ -195,7 +566,7 @@ export default function WealthGroupScreen() {
         <StatusBar style="dark" />
       <Header
         title="WealthGroup"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="group" />}
       />
         <PortfolioDetailSkeleton />
@@ -208,17 +579,40 @@ export default function WealthGroupScreen() {
       <StatusBar style="dark" />
       <Header
         title="WealthGroup"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="group" />}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+      {/* Headless background watchers to check completed groups' member withdrawal status */}
+      {completedGroups.map((g) => (
+        <CompletedGroupWatcher
+          key={g.id}
+          groupId={g.id}
+          currentUserId={currentUser?.id}
+          onUpdate={handleWatcherUpdate}
+        />
+      ))}
+
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        className="flex-1"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["transparent"]}
+          />
+        }
+      >
         <View className="px-5 py-2">
           {/* ── Hero Card ────────────────────────────────────────── */}
           <View
             className="relative overflow-hidden mb-8 self-center"
             style={{
-              width: 365,
+              width: "100%",
+              maxWidth: 365,
               height: 160,
               borderTopLeftRadius: 50,
               borderTopRightRadius: 20,
@@ -234,25 +628,48 @@ export default function WealthGroupScreen() {
               borderColor: "#D9D9D9",
             }}
           >
-            <Image
-              source={require("../../../assets/images/group.png")}
-              className="absolute"
+            {/* Decorative Background Graphic */}
+            <View
+              pointerEvents="none"
               style={{
+                position: "absolute",
                 width: 240,
                 height: 240,
                 right: -60,
                 top: 50,
                 opacity: 0.3,
                 transform: [{ rotate: "-378.33deg" }],
+                zIndex: 1,
               }}
-              resizeMode="contain"
-            />
+            >
+              <Image
+                source={require("../../../assets/images/group.png")}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="contain"
+              />
+            </View>
 
-            <View style={{ padding: 24 }}>
+            <View style={{ padding: 24, zIndex: 10 }}>
               <View className="flex-row items-center justify-between mb-1">
-                <Text className="text-[#4B5563] text-[14px] font-extrabold">
-                  Total Savings
-                </Text>
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-[#4B5563] text-[14px] font-extrabold">
+                    Total Savings
+                  </Text>
+                  {showInterest && groupRateLabel && (
+                    <View
+                      style={{
+                        backgroundColor: "#4B5563",
+                        paddingHorizontal: 8,
+                        paddingVertical: 2.5,
+                        borderRadius: 20,
+                      }}
+                    >
+                      <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                        {groupRateLabel}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <TouchableOpacity
                   onPress={() => setShowBalance(!showBalance)}
                   className="p-1"
@@ -265,26 +682,33 @@ export default function WealthGroupScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View className="flex-row items-baseline mb-2">
+              <TouchableOpacity
+                onPress={() => router.push("/education/win-up" as any)}
+                activeOpacity={0.8}
+                className="flex-row items-baseline mb-2"
+              >
                 {showBalance ? (
                   <BalanceText
-                    amount="₦300,735.42"
-                    fontSize={34}
+                    amount={`₦${(totalSavingsKobo / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    fontSize={31}
                     color="#1A1A1A"
                   />
                 ) : (
-                  <Text className="text-[#1A1A1A] text-[34px] font-black tracking-tight">
-                    ••••••••
+                  <Text className="text-[#1A1A1A] text-[31px] font-black tracking-tight">
+                    ***
                   </Text>
                 )}
-              </View>
+                <Text className="text-[#1A1A1A] text-[34px] font-light ml-4 mb-1">
+                  ›
+                </Text>
+              </TouchableOpacity>
 
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
                   <Text className="text-[#4B5563] text-[13px] font-extrabold">
-                    Your wealth grew by N230.00 today
+                    Your wealth grew by ₦{(ongoingGroups.reduce((acc, g) => acc + (parseFloat(g.dailyWealthGrowth?.toString() || "0")), 0) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} today
                   </Text>
-                  <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
+                  <ArrowUp size={14} color="#4CAF50" />
                 </View>
               )}
             </View>
@@ -303,12 +727,13 @@ export default function WealthGroupScreen() {
               Create a group
             </Text>
             <View className="flex-row justify-between">
-              {CREATE_CATEGORIES.map((cat) => (
+              {CREATE_CATEGORIES.map((cat, index) => (
                 <TouchableOpacity
                   key={cat.id}
                   activeOpacity={0.8}
                   style={{
-                    width: 114,
+                    flex: 1,
+                    marginRight: index < CREATE_CATEGORIES.length - 1 ? 8 : 0,
                     height: 89,
                     borderRadius: 13,
                     borderWidth: 1,
@@ -316,9 +741,14 @@ export default function WealthGroupScreen() {
                     backgroundColor: CREATE_CARD_BG,
                     alignItems: "center",
                     justifyContent: "center",
-                    paddingHorizontal: 10,
+                    paddingHorizontal: 6,
                   }}
-                  onPress={() => router.push("/portfolio/create/group")}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/portfolio/create/group",
+                      params: { groupType: cat.groupType },
+                    })
+                  }
                 >
                   <View className="mb-2">
                     <Ionicons name={cat.icon as any} size={24} color={THEME} />
@@ -334,37 +764,34 @@ export default function WealthGroupScreen() {
           {/* ── Tips Card ─────────────────────────────────────────── */}
           {showTips && (
             <View
-              className="relative p-6 mb-10"
+              className="relative p-5 mb-8"
               style={{
                 width: "100%",
-                minHeight: 226,
                 backgroundColor: THEME_BG,
-                borderRadius: 15,
+                borderRadius: 16,
                 borderWidth: 1,
                 borderColor: BORDER_COLOR,
               }}
             >
               <TouchableOpacity
-                className="absolute right-4 top-4 z-10"
+                className="absolute right-3 top-3 z-10 p-1"
                 onPress={() => setShowTips(false)}
               >
                 <Ionicons name="close" size={20} color={THEME} />
               </TouchableOpacity>
               <Text
-                className="font-extrabold text-[14px] mb-4"
+                className="font-extrabold text-[14px] mb-2 pr-8"
                 style={{ color: "#155D5F" }}
               >
                 What's on Wealth Group?
               </Text>
               <Text
-                className="text-[11px] leading-[16px] mb-4 font-medium"
-                style={{ color: "#155D5F", opacity: 0.8 }}
+                className="text-[12px] leading-[18px] mb-4 font-medium pr-6"
+                style={{ color: "#155D5F", opacity: 0.9 }}
               >
-                A community-powered savings feature that enables users to create
-                or join structured group savings models for collective financial
-                goals.
+                A community-powered savings feature ({groupRateLabel}) for collective financial goals. Groups support between <Text className="font-bold">{groupMinMembers} to {groupMaxMembers} members</Text>.
               </Text>
-              <View className="space-y-3">
+              <View style={{ gap: 10 }}>
                 <TipRow
                   label="Fixed Contribution Groups"
                   text="All members save the same amount at the same frequency (e.g., ₦20,000 monthly for 12 months)."
@@ -409,14 +836,24 @@ export default function WealthGroupScreen() {
           <DiscoverySection
             title="Trending Groups"
             data={trendingGroups}
-            onViewAll={() => {}}
+            onViewAll={() =>
+              router.push({
+                pathname: "/portfolio/group/discovery",
+                params: { type: "trending" },
+              })
+            }
           />
 
           {/* ── Recommended Groups ────────────────────────────────── */}
           <DiscoverySection
             title="Recommended Groups"
             data={recommendedGroups}
-            onViewAll={() => {}}
+            onViewAll={() =>
+              router.push({
+                pathname: "/portfolio/group/discovery",
+                params: { type: "recommended" },
+              })
+            }
           />
 
           {/* ── Tabs ─────────────────────────────────────────────── */}
@@ -486,14 +923,26 @@ export default function WealthGroupScreen() {
           {activeTab === "ongoing" ? (
             ongoingGroups.length > 0 ? (
               <View className="space-y-6 mb-10">
-                {ongoingGroups.map((g: WealthGroup) => {
-                  const target = parseFloat(g.amount.replace(/,/g, "")) || 1;
-                  const current =
-                    parseFloat(g.currentSavings.replace(/,/g, "")) || 0;
-                  const progress = Math.min(
-                    Math.max((current / target) * 100, 5),
-                    100,
-                  );
+                {ongoingGroups.map((g: WealthGroupModel) => {
+                  const targetNum = (parseFloat(g.targetAmount?.toString() || "10000000")) / 100;
+
+                  // For ROTATIONAL: show active cycle savings via getGroupTotalSavingsKobo(g).
+                  // For FIXED/FLEX: show totalSavings.
+                  const displayKobo = getGroupTotalSavingsKobo(g);
+
+                  const currentNum = displayKobo / 100;
+
+                  // Progress bar: always against targetAmount (lifetime for all types)
+                  const progressRatio = targetNum > 0 ? (currentNum / targetNum) * 100 : 0;
+                  const formattedPct = progressRatio >= 100 ? "100%" : `${progressRatio.toFixed(1)}%`;
+                  const barWidth = Math.min(Math.max(progressRatio, 2), 100);
+
+                  const memberCount =
+                    (g as any).membersCount ??
+                    (g as any).memberCount ??
+                    (g as any)._count?.members ??
+                    (g as any).members?.length ??
+                    1;
 
                   return (
                     <TouchableOpacity
@@ -501,10 +950,10 @@ export default function WealthGroupScreen() {
                       onPress={() =>
                         router.push({
                           pathname: "/portfolio/detail/group/[id]",
-                          params: { id: g.id, member: "true" },
+                          params: { id: g.id },
                         })
                       }
-                      className="flex-row items-center p-4 bg-white rounded-2xl"
+                      className="flex-row items-center p-4 bg-white rounded-2xl mb-4"
                       style={{
                         shadowColor: "#000",
                         shadowOffset: { width: 0, height: 1 },
@@ -516,38 +965,31 @@ export default function WealthGroupScreen() {
                       }}
                     >
                       <View className="w-16 h-16 rounded-xl overflow-hidden mr-4">
-                        {g.coverImage ? (
-                          <Image
-                            source={{ uri: g.coverImage }}
-                            className="w-full h-full"
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <View className="w-full h-full bg-[#F2FFFF] items-center justify-center">
-                            <Users size={28} color={THEME} />
-                          </View>
-                        )}
+                        <GroupCoverImage uri={g.coverImage} name={g.name} size={64} />
                       </View>
                       <View className="flex-1">
                         <Text className="text-[16px] font-bold text-[#1A1A1A] mb-1">
                           {g.name}
                         </Text>
-                        <View className="flex-row items-center justify-between mb-2">
-                          <Text className="text-[14px] font-bold text-[#4B5563]">
+                        <View className="flex-row items-center justify-between mb-1.5">
+                          <Text className="text-[13px] font-bold text-[#4B5563]">
                             Progress:{" "}
                             <Text className="text-[#155D5F] font-black">
-                              ₦{g.currentSavings}
+                              ₦{currentNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Text>
+                            <Text className="text-[11px] text-[#6B7280] font-medium">
+                              {" "}({formattedPct})
                             </Text>
                           </Text>
-                          <Text className="text-[13px] font-bold text-[#4B5563]">
-                            {g.membersCount} members
+                          <Text className="text-[12px] font-bold text-[#4B5563]">
+                            {memberCount} {memberCount === 1 ? "member" : "members"}
                           </Text>
                         </View>
                         {/* Progress Bar */}
-                        <View className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <View className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                           <View
                             className="h-full bg-[#155D5F] rounded-full"
-                            style={{ width: `${progress}%` }}
+                            style={{ width: `${barWidth}%` }}
                           />
                         </View>
                       </View>
@@ -581,6 +1023,16 @@ export default function WealthGroupScreen() {
                 </Text>
               </View>
             )
+          ) : completedGroups.length > 0 ? (
+            <View className="space-y-6 mb-10">
+              {completedGroups.map((g: WealthGroupModel) => (
+                <CompletedGroupCard
+                  key={g.id}
+                  group={g}
+                  currentUser={currentUser}
+                />
+              ))}
+            </View>
           ) : (
             <View className="items-center justify-center py-10 mb-10">
               <Text className="text-gray-400">No completed groups yet</Text>
@@ -594,18 +1046,16 @@ export default function WealthGroupScreen() {
 
 function TipRow({ label, text }: { label: string; text: string }) {
   return (
-    <View className="flex-row items-start space-x-2">
+    <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
       <Text
-        style={{ color: "#155D5F" }}
-        className="text-[11px] font-black mt-0.5"
+        style={{ color: "#155D5F", marginRight: 6, fontSize: 12, fontWeight: "900", lineHeight: 17 }}
       >
         •
       </Text>
       <Text
-        className="flex-1 text-[10.5px] leading-[15px]"
-        style={{ color: "#155D5F" }}
+        style={{ color: "#155D5F", flex: 1, flexShrink: 1, fontSize: 11.5, lineHeight: 17 }}
       >
-        <Text className="font-extrabold">{label}:</Text> {text}
+        <Text style={{ fontWeight: "800" }}>{label}:</Text> {text}
       </Text>
     </View>
   );
@@ -650,9 +1100,9 @@ function DiscoverySection({
         </ScrollView>
       ) : (
         <View className="w-full h-32 items-center justify-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-          <Ionicons name="search-outline" size={32} color="#94A3B8" />
-          <Text className="text-[#374151] text-[14px] font-extrabold mt-2">
-            No tribes found matching your search
+          <Ionicons name="people-outline" size={32} color="#94A3B8" />
+          <Text className="text-[#374151] text-[13px] font-bold mt-2 text-center px-4">
+            No groups found yet. Create a tribe or search by name.
           </Text>
         </View>
       )}
@@ -661,76 +1111,285 @@ function DiscoverySection({
 }
 
 function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
+  const [imgError, setImgError] = useState(false);
+  const fallbackImg = require("../../../assets/images/group_trending_1.png");
+
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      className="bg-white rounded-[10px] border border-[#E8E8E8] overflow-hidden p-[10px]"
+      onPress={() =>
+        router.push({
+          pathname: "/portfolio/detail/group/[id]",
+          params: { id: item.id },
+        })
+      }
+      className="bg-white rounded-[12px] border border-[#E8E8E8] overflow-hidden"
       style={{
         width: 170,
-        height: 194,
+        height: 196,
         marginRight: 10,
+        padding: 8,
+        paddingBottom: 8,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         borderColor: "#dbdcdcff",
         shadowOpacity: 0.05,
         shadowRadius: 4,
         elevation: 2,
+        justifyContent: "space-between",
       }}
     >
-      <Image
-        source={item.image}
-        style={{ width: 152, height: 72, borderRadius: 7 }}
-      />
-      <View className="mt-2 flex-1">
-        <Text
-          numberOfLines={1}
-          className="text-[11px] font-black text-[#1A1A1A] mb-1 font-bold"
-        >
-          {item.title}
-        </Text>
-        <Text
-          numberOfLines={1}
-          className="text-[10px] text-[#4B5563] font-extrabold mb-1"
-        >
-          {item.category}
-        </Text>
-
-        <View className="flex-row justify-between items-center mb-1">
-          <Text className="text-[10px] text-[#1A1A1A] font-black font-bold">
-            {item.dailyAmount}
-          </Text>
-          <Text className="text-[11px] text-[#4B5563] font-bold">
-            Ends: {item.endDate}
-          </Text>
-        </View>
-
-        <View className="flex-row justify-between items-center mb-3">
-          <View className="flex-row items-baseline space-x-0.5">
-            <Text className="text-[8px] text-[#4CAF50] font-bold">
-              Wealth Growth
-            </Text>
-            <Text className="text-[10px] text-[#4CAF50] font-black font-bold">
-              {item.growth}
+      <View>
+        <View style={{ position: "relative" }}>
+          <Image
+            source={imgError ? fallbackImg : item.image}
+            onError={(e) => {
+              console.warn(`❌ [DiscoveryCard Image Error] [${item.title}]:`, e.nativeEvent?.error, `| URI: "${item.image?.uri}"`);
+              setImgError(true);
+            }}
+            style={{ width: 154, height: 60, borderRadius: 6 }}
+            resizeMode="cover"
+          />
+          {/* Group Type Pill Badge on Top Left of Image */}
+          <View
+            style={{
+              position: "absolute",
+              top: 4,
+              left: 4,
+              backgroundColor: "rgba(21, 93, 95, 0.9)",
+              paddingHorizontal: 5,
+              paddingVertical: 1.5,
+              borderRadius: 4,
+            }}
+          >
+            <Text style={{ fontSize: 8, fontWeight: "800", color: "#FFFFFF" }}>
+              {item.groupTypeLabel}
             </Text>
           </View>
-          <Text className="text-[10px] text-[#155D5F] font-black">
-            {item.members} Members
-          </Text>
         </View>
 
-        <TouchableOpacity
-          className="w-full h-[34px] rounded-[8px] items-center justify-center p-2"
-          style={{ backgroundColor: THEME }}
-          onPress={() =>
-            router.push({
-              pathname: "/portfolio/detail/group/[id]",
-              params: { id: item.id },
-            })
-          }
-        >
-          <Text className="text-white text-[10px] font-black ">View Group</Text>
-        </TouchableOpacity>
+        <View className="mt-1">
+          <Text
+            numberOfLines={1}
+            className="text-[11px] font-black text-[#1A1A1A] mb-0.5 font-bold"
+          >
+            {item.title}
+          </Text>
+          <Text
+            numberOfLines={1}
+            className="text-[9px] text-[#64748B] font-extrabold mb-0.5"
+          >
+            {item.category}
+          </Text>
+
+          {/* Explicit Target Amount */}
+          <View className="mb-0.5">
+            <Text
+              numberOfLines={1}
+              className="text-[10px] text-[#155D5F] font-black font-bold"
+            >
+              {item.targetAmountText}
+            </Text>
+          </View>
+
+          {/* Frequency & Contribution */}
+          <View className="flex-row justify-between items-center mb-0.5">
+            <Text
+              numberOfLines={1}
+              className="text-[9px] text-[#4B5563] font-semibold flex-1 mr-1"
+            >
+              {item.contributionText}
+            </Text>
+            <Text className="text-[9px] text-[#64748B] font-bold">
+              Ends: {item.endDate}
+            </Text>
+          </View>
+
+          <View className="flex-row justify-between items-center">
+            <View className="flex-row items-baseline space-x-0.5">
+              <Text className="text-[8px] text-[#4CAF50] font-bold">
+                Wealth Growth
+              </Text>
+              <Text className="text-[9px] text-[#4CAF50] font-black font-bold">
+                {item.growth}
+              </Text>
+            </View>
+            <Text className="text-[9px] text-[#155D5F] font-black">
+              {item.members} {item.members === 1 ? "Member" : "Members"}
+            </Text>
+          </View>
+        </View>
       </View>
+
+      <TouchableOpacity
+        className="w-full h-[28px] rounded-[7px] items-center justify-center p-1 mt-1"
+        style={{ backgroundColor: THEME }}
+        onPress={() =>
+          router.push({
+            pathname: "/portfolio/detail/group/[id]",
+            params: { id: item.id },
+          })
+        }
+      >
+        <Text className="text-white text-[10px] font-black">View Group</Text>
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 }
+
+function CompletedGroupCard({
+  group,
+  currentUser,
+}: {
+  group: WealthGroupModel;
+  currentUser: any;
+}) {
+  const isTerm = isGroupTerminated(group);
+  const { data: membersData } = useGetGroupMembersQuery(
+    { id: group.id },
+    { skip: !group.id }
+  );
+
+  const membersList =
+    membersData?.items ||
+    (group as any).members ||
+    (group as any).groupMembers ||
+    (group as any).membersList ||
+    [];
+
+  const myMember = Array.isArray(membersList)
+    ? membersList.find((m: any) => {
+        const uid = currentUser?.id || (currentUser as any)?._id;
+        if (!uid) return false;
+        const memberUid =
+          m?.userId ||
+          m?.id ||
+          m?.user?.id ||
+          (m as any)?.user?._id ||
+          (typeof m?.userId === "object" ? (m?.userId?.id || (m?.userId as any)?._id) : null);
+        return memberUid === uid;
+      })
+    : null;
+
+  const myContributedKobo = parseFloat(
+    myMember?.totalContributed?.toString() || "0"
+  );
+
+  // For completed (non-terminated) groups: use the group's total savings for the display amount
+  const rawSavings = parseFloat(
+    (group.totalSavings ?? group.currentBalance ?? "0").toString()
+  ) || 0;
+  const totalContributedKobo = Array.isArray(membersList)
+    ? membersList.reduce(
+        (sum: number, m: any) =>
+          sum + (parseFloat(m?.totalContributed?.toString() || "0") || 0),
+        0
+      )
+    : 0;
+  const groupTotalNaira = (
+    totalContributedKobo > 0 ? totalContributedKobo : rawSavings
+  ) / 100;
+
+  // User has fully settled when they are a member and their own contribution is 0 on a completed (non-terminated) group
+  // (backend zeros out totalContributed after withdrawal)
+  const hasFullySettled = !isTerm && myMember !== null && myMember !== undefined && myContributedKobo <= 0;
+
+  // Badge config
+  const badgeColor = isTerm ? "#EF4444" : hasFullySettled ? "#16A34A" : "#10B981";
+  const badgeBg = isTerm ? "#FEF2F2" : hasFullySettled ? "#F0FDF4" : "#ECFDF5";
+  const badgeLabel = isTerm ? "Terminated" : hasFullySettled ? "Fully Settled" : "Completed";
+  const badgeIcon: any = isTerm ? "close-circle" : "checkmark-circle";
+
+  // Secondary info line
+  const infoText = isTerm
+    ? "All savings refunded to member wallets"
+    : hasFullySettled
+    ? "Your savings have been withdrawn to your wallet"
+    : `Group total: ₦${groupTotalNaira.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const infoColor = isTerm ? "#B91C1C" : hasFullySettled ? "#166534" : "#4B5563";
+
+  return (
+    <TouchableOpacity
+      key={group.id}
+      onPress={() =>
+        router.push({
+          pathname: "/portfolio/detail/group/[id]",
+          params: { id: group.id },
+        })
+      }
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        padding: 14,
+        backgroundColor: "white",
+        borderRadius: 18,
+        marginBottom: 12,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 1,
+        borderWidth: 1,
+        borderColor: isTerm ? "#FECACA" : hasFullySettled ? "#BBF7D0" : "#F1F5F9",
+      }}
+    >
+      {/* Thumbnail */}
+      <View
+        style={{
+          width: 58,
+          height: 58,
+          borderRadius: 14,
+          overflow: "hidden",
+          marginRight: 14,
+          flexShrink: 0,
+        }}
+      >
+        <GroupCoverImage uri={group.coverImage} name={group.name} size={58} />
+      </View>
+
+      {/* Content */}
+      <View style={{ flex: 1 }}>
+        {/* Group name */}
+        <Text
+          numberOfLines={1}
+          style={{ fontSize: 15, fontWeight: "800", color: "#1A1A1A", marginBottom: 6 }}
+        >
+          {group.name}
+        </Text>
+
+        {/* Status pill badge */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            alignSelf: "flex-start",
+            backgroundColor: badgeBg,
+            borderRadius: 20,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            marginBottom: 5,
+          }}
+        >
+          <Ionicons name={badgeIcon} size={12} color={badgeColor} style={{ marginRight: 4 }} />
+          <Text style={{ fontSize: 11, fontWeight: "800", color: badgeColor }}>
+            {badgeLabel}
+          </Text>
+        </View>
+
+        {/* Secondary info line */}
+        <Text
+          numberOfLines={1}
+          style={{ fontSize: 11, fontWeight: "600", color: infoColor, opacity: 0.9 }}
+        >
+          {infoText}
+        </Text>
+      </View>
+
+      {/* Chevron */}
+      <Ionicons name="chevron-forward" size={16} color="#CBD5E1" style={{ marginLeft: 8 }} />
+    </TouchableOpacity>
+  );
+}
+
+

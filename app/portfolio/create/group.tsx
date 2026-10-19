@@ -1,12 +1,22 @@
+import { AppCalendarModal, AppDatePickerField } from "@/src/components/common";
 import Header from "@/src/components/common/Header";
-import { addGroup } from "@/src/store/slices/wealthGroupSlice";
+import { useImageUpload } from "@/src/hooks/useImageUpload";
+import {
+  useCreateGroupMutation,
+  useGetSystemConfigsQuery,
+} from "@/src/store/api/groupApi";
+import { useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
+import { CreateGroupRequest, GroupFrequency } from "@/src/types/group";
+import { formatEarlyTerminationPenaltyRate, getDynamicPenaltyRate } from "@/src/utils/formatters";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Check, Share2, Upload, X } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -18,7 +28,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useDispatch } from "react-redux";
 
 const THEME = "#155D5F";
 const THEME_BG = "#F2FFFF";
@@ -28,6 +37,8 @@ const THEME_BG = "#F2FFFF";
 type GroupData = {
   name: string;
   category: string;
+  groupType: "FLEX" | "FIXED" | "ROTATIONAL";
+  contributionAmount: string;
   coverImage: string | null;
   description: string;
   amount: string;
@@ -49,13 +60,49 @@ type GroupData = {
 
 export default function CreateGroupScreen() {
   const router = useRouter();
-  const dispatch = useDispatch();
+  const params = useLocalSearchParams<{ groupType?: string }>();
+
+  const paramGroupType = useMemo(() => {
+    if (!params.groupType) return null;
+    const upper = params.groupType.toUpperCase();
+    if (upper === "FIXED" || upper === "FLEX" || upper === "ROTATIONAL") {
+      return upper as "FIXED" | "FLEX" | "ROTATIONAL";
+    }
+    return null;
+  }, [params.groupType]);
+
   const [step, setStep] = useState(1);
   const [isInfoVisible, setIsInfoVisible] = useState(true);
   const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createGroup, { isLoading: isCreating }] = useCreateGroupMutation();
+  const { uploadImage } = useImageUpload();
+
+  const { data: systemConfigData, refetch: refetchSystemConfig } =
+    useGetSystemConfigsQuery(undefined, {
+      refetchOnMountOrArgChange: true,
+    });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchSystemConfig();
+    }, [refetchSystemConfig]),
+  );
+
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const { penaltyRate: groupPenaltyRate } = getDynamicPenaltyRate(
+    "group",
+    systemConfigData,
+    configData?.rates || (configData as any)?.data?.rates,
+    "2.5%"
+  );
+
   const [formData, setFormData] = useState<GroupData>({
     name: "",
     category: "",
+    groupType: paramGroupType || "FLEX",
+    contributionAmount: "",
     coverImage: null,
     description: "",
     amount: "",
@@ -73,54 +120,241 @@ export default function CreateGroupScreen() {
     wealthPreference: "Interest Based",
   });
 
+  useEffect(() => {
+    if (paramGroupType) {
+      setFormData((prev) => ({ ...prev, groupType: paramGroupType }));
+    }
+  }, [paramGroupType]);
+
   const updateFormData = (field: string, value: any) => {
-    // Defensive check to prevent event objects from being saved as values
     if (value && typeof value === "object" && value.nativeEvent) {
       return;
     }
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const nextStep = () => {
-    if (step === 5) {
-      const newId = Math.random().toString(36).substring(7);
-      dispatch(
-        addGroup({
-          ...formData,
-          id: newId,
-          membersCount: 1,
-          currentSavings: "0.00",
-          growthToday: "0.00",
-          isAdmin: true,
-          isMember: true,
-        }),
-      );
-      setCreatedGroupId(newId);
+  // Start date: 00:00:00 UTC of the chosen day (group opens at the start of that day)
+  const parseDateToIsoStart = (dStr: string) => {
+    const parts = dStr.split("/").map((p) => p.trim());
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      if (
+        !isNaN(day) &&
+        !isNaN(month) &&
+        !isNaN(year) &&
+        year >= 2020 &&
+        day >= 1 &&
+        day <= 31 &&
+        month >= 0 &&
+        month <= 11
+      ) {
+        return new Date(Date.UTC(year, month, day, 0, 0, 0)).toISOString();
+      }
     }
-    setStep((s) => s + 1);
+    return new Date(Date.now()).toISOString();
   };
+
+  // End date: 23:59:59 UTC of the chosen day (group is active through the whole end day)
+  const parseDateToIsoEnd = (dStr: string) => {
+    const parts = dStr.split("/").map((p) => p.trim());
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      if (
+        !isNaN(day) &&
+        !isNaN(month) &&
+        !isNaN(year) &&
+        year >= 2020 &&
+        day >= 1 &&
+        day <= 31 &&
+        month >= 0 &&
+        month <= 11
+      ) {
+        return new Date(Date.UTC(year, month, day, 23, 59, 59)).toISOString();
+      }
+    }
+    return new Date(Date.now() + 365 * 86400000).toISOString();
+  };
+
+  const isRotational = formData.groupType === "ROTATIONAL";
+
+  const nextStep = async () => {
+    if (step === 5) {
+      setIsSubmitting(true);
+      try {
+        const amountKobo = Math.round(
+          (parseFloat(formData.amount.replace(/,/g, "")) || 0) * 100,
+        );
+        const contribKobo =
+          formData.groupType === "FIXED" || formData.groupType === "ROTATIONAL"
+            ? Math.round(
+                (parseFloat(formData.contributionAmount.replace(/,/g, "")) ||
+                  0) * 100,
+              )
+            : undefined;
+
+        let mappedPenalty = "NONE";
+        if (
+          formData.penalty.toLowerCase().includes("immediate") ||
+          formData.penalty.toLowerCase().includes("5%")
+        ) {
+          mappedPenalty = "IMMEDIATE_5";
+        } else if (
+          formData.penalty.toLowerCase().includes("grace") ||
+          formData.penalty.toLowerCase().includes("24")
+        ) {
+          mappedPenalty = "GRACE_24";
+        } else if (
+          formData.penalty === "IMMEDIATE_5" ||
+          formData.penalty === "GRACE_24"
+        ) {
+          mappedPenalty = formData.penalty;
+        }
+
+        let uploadedCoverUrl: string | undefined = undefined;
+        if (formData.coverImage) {
+          if (
+            formData.coverImage.startsWith("http://") ||
+            formData.coverImage.startsWith("https://")
+          ) {
+            uploadedCoverUrl = formData.coverImage;
+          } else if (
+            formData.coverImage.startsWith("file://") ||
+            formData.coverImage.startsWith("content://")
+          ) {
+            try {
+              uploadedCoverUrl = await uploadImage(formData.coverImage, {
+                allowFallback: false,
+              });
+            } catch (e) {
+              console.warn(
+                "Cover image upload failed, skipping cloud coverImage in payload:",
+                e,
+              );
+              uploadedCoverUrl = undefined;
+            }
+          }
+        }
+
+        // Strictly verify that coverImage is a remote URL, never a local file:// path
+        if (
+          uploadedCoverUrl &&
+          (uploadedCoverUrl.startsWith("file://") ||
+            uploadedCoverUrl.startsWith("content://"))
+        ) {
+          uploadedCoverUrl = undefined;
+        }
+
+        const payload: CreateGroupRequest = {
+          name: formData.name.trim(),
+          category: formData.category.trim() || "General",
+          description: formData.description.trim(),
+          groupType: formData.groupType,
+          contributionAmount: contribKobo,
+          coverImage: uploadedCoverUrl,
+          targetAmount: amountKobo,
+          frequency: (formData.frequency
+            ? formData.frequency.toUpperCase()
+            : "MONTHLY") as GroupFrequency,
+          memberInterest: formData.hasInterest,
+          startDate: parseDateToIsoStart(formData.startDate),
+          endDate: parseDateToIsoEnd(formData.endDate),
+          membersLimit: parseInt(formData.memberLimit) || 10,
+          accessType: formData.accessType.toUpperCase().includes("PRIVATE")
+            ? "PRIVATE"
+            : "PUBLIC",
+          penaltySetting: mappedPenalty,
+          allowEarlyExit: formData.earlyExit
+            ? formData.earlyExit.toLowerCase().includes("allow")
+            : false,
+          allowEmergencyWithdrawal: formData.emergencyWithdrawal,
+        };
+
+        console.log(
+          "👥 [WealthGroup Create Request] POST /api/v1/groups with payload:\n",
+          JSON.stringify(payload, null, 2),
+        );
+        const res: any = await createGroup(payload).unwrap();
+        console.log(
+          "✅ [WealthGroup Create Success] Response:\n",
+          JSON.stringify(res, null, 2),
+        );
+
+        const newId =
+          res?.id || res?.data?.id || (typeof res === "string" ? res : "new");
+        setCreatedGroupId(newId);
+        setStep(6);
+      } catch (err: any) {
+        console.error(
+          "❌ [WealthGroup Create Error]:\n",
+          JSON.stringify(err, null, 2),
+        );
+        const msg =
+          err?.data?.message ||
+          err?.message ||
+          "Failed to create Wealth Group. Please try again.";
+        Alert.alert("Creation Failed", msg);
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      setIsNavigating(true);
+      setTimeout(() => {
+        setStep((s) => s + 1);
+        setIsNavigating(false);
+      }, 150);
+    }
+  };
+
   const prevStep = () => setStep((s) => s - 1);
 
   const isStepValid = useMemo(() => {
     switch (step) {
       case 1:
-        return !!(formData.name && formData.category && formData.description);
+        return !!(
+          formData.name &&
+          formData.category &&
+          formData.description &&
+          formData.groupType
+        );
       case 2:
+        const isFixedOrRotational =
+          formData.groupType === "FIXED" || formData.groupType === "ROTATIONAL";
+        const validFixedAmount =
+          !isFixedOrRotational ||
+          (formData.contributionAmount &&
+            parseFloat(formData.contributionAmount.replace(/,/g, "")) > 0);
+        const groupRatesConfig = configData?.rates?.wealthgroup || (configData as any)?.data?.rates?.wealthgroup;
+        const minGroupKobo = groupRatesConfig?.minTargetAmount ?? 100000;
+        const minGroupNaira = minGroupKobo / 100;
+        const targetAmtVal = parseFloat(formData.amount.replace(/,/g, "")) || 0;
+        const isTargetAmountValid = targetAmtVal >= minGroupNaira;
         return !!(
           formData.amount &&
+          isTargetAmountValid &&
           formData.frequency &&
           formData.startDate.length >= 10 &&
-          formData.endDate.length >= 10
+          formData.endDate.length >= 10 &&
+          validFixedAmount
         );
       case 3:
         const limit = parseInt(formData.memberLimit);
+        const groupRates = configData?.rates?.wealthgroup || (configData as any)?.data?.rates?.wealthgroup;
+        const minM = groupRates?.membersLimitRange?.[0] ?? 2;
+        const maxM = groupRates?.membersLimitRange?.[1] ?? 50;
         return !!(
           formData.memberLimit &&
-          limit > 0 &&
-          limit <= 200 &&
+          !isNaN(limit) &&
+          limit >= minM &&
+          limit <= maxM &&
           formData.accessType
         );
       case 4:
+        // ROTATIONAL: only penalty required (no early exit / emergency withdrawal)
+        if (isRotational) return !!formData.penalty;
         return !!(formData.penalty && formData.earlyExit);
       case 5:
         return !!formData.agreed;
@@ -132,7 +366,7 @@ export default function CreateGroupScreen() {
   if (step === 6) {
     return (
       <SuccessScreen
-        onDone={() => router.replace("/portfolios/wealth-group")}
+        onDone={() => router.replace("/(tabs)/portfolios/wealth-group")}
         onView={() =>
           router.replace({
             pathname: "/portfolio/detail/group/[id]",
@@ -170,8 +404,7 @@ export default function CreateGroupScreen() {
               <View
                 className="rounded-[15px] p-5 mb-8 relative"
                 style={{
-                  width: 366,
-                  height: 132,
+                  width: "100%",
                   backgroundColor: THEME_BG,
                   alignSelf: "center",
                 }}
@@ -186,16 +419,21 @@ export default function CreateGroupScreen() {
                   Important things to know
                 </Text>
                 <Text className="text-[#155D5F] text-[12px] leading-[18px]">
-                  To keep the experience simple and intuitive for the
-                  "WealthBuilder," the form for creating a Fixed Contribution
-                  Group should be broken down into logical steps. This prevents
-                  the user from feeling overwhelmed by too many fields at once.
+                  {formData.groupType === "ROTATIONAL"
+                    ? "In a Rotational Savings group (Ajo/Esusu), every member contributes a fixed amount each cycle. The pooled funds are paid out as a lump sum to one member at a time, rotating through the payout order set by the admin. Payouts are automatic — no withdrawal requests needed."
+                    : formData.groupType === "FIXED"
+                      ? "In a Fixed Contribution group, all members contribute the exact same amount every cycle. The goal is a shared target. Members can only access funds through approved early exit or emergency withdrawal rules you set up."
+                      : "In a Flex Contribution group, each member contributes what they can each cycle — amounts can differ. The group works toward a collective wealth target and members have more flexible rules for accessing funds."}
                 </Text>
               </View>
             )}
 
             {step === 1 && (
-              <Step1Identity data={formData} update={updateFormData} />
+              <Step1Identity
+                data={formData}
+                update={updateFormData}
+                hideGroupTypeSelector={!!paramGroupType}
+              />
             )}
             {step === 2 && (
               <Step2Financial data={formData} update={updateFormData} />
@@ -203,25 +441,45 @@ export default function CreateGroupScreen() {
             {step === 3 && (
               <Step3Membership data={formData} update={updateFormData} />
             )}
-            {step === 4 && (
-              <Step4Risk data={formData} update={updateFormData} />
+            {step === 4 && !isRotational && (
+              <Step4Risk
+                data={formData}
+                update={updateFormData}
+                groupPenaltyRate={groupPenaltyRate}
+              />
+            )}
+            {step === 4 && isRotational && (
+              // For ROTATIONAL: only penalty setting needed — no early exit or emergency withdrawal
+              <Step4RiskRotational
+                data={formData}
+                update={updateFormData}
+                groupPenaltyRate={groupPenaltyRate}
+              />
             )}
             {step === 5 && (
               <Step5Review data={formData} update={updateFormData} />
             )}
 
-            {/* ── Action Button (Inside ScrollView) ────────────────── */}
+            {/* ── Action Button ────────────────────────────────────────── */}
             <View className="mt-10">
               <TouchableOpacity
-                disabled={!isStepValid}
+                disabled={
+                  !isStepValid || isCreating || isNavigating || isSubmitting
+                }
                 onPress={nextStep}
                 className={`h-14 rounded-2xl items-center justify-center ${
-                  isStepValid ? "bg-[#155D5F]" : "bg-gray-200"
+                  isStepValid && !isCreating && !isNavigating && !isSubmitting
+                    ? "bg-[#155D5F]"
+                    : "bg-gray-200"
                 }`}
               >
-                <Text className="text-white font-bold text-base">
-                  {step === 5 ? "Launch your Wealth Tribe" : "Proceed"}
-                </Text>
+                {isCreating || isNavigating || isSubmitting ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text className="text-white font-bold text-base">
+                    {step === 5 ? "Launch your Wealth Tribe" : "Proceed"}
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -233,7 +491,243 @@ export default function CreateGroupScreen() {
 
 // ── Step Components ─────────────────────────────────────────────────────────
 
-function Step1Identity({ data, update }: any) {
+// Rich info card shown in Step 1 when user arrives from a specific group type
+function GroupTypeInfoCard({
+  groupType,
+}: {
+  groupType: "FLEX" | "FIXED" | "ROTATIONAL";
+}) {
+  const configs = {
+    FLEX: {
+      icon: "cash-outline" as const,
+      title: "Flex Contribution Group",
+      badge: "Flexible Savings",
+      badgeColor: "#D1FAE5",
+      badgeBg: "#1fd4d4ff",
+      borderColor: "#1fd4d4ff",
+      bg: "#F2FFFF",
+      textColor: "#064E3B",
+      rows: [
+        {
+          label: "How it works",
+          value:
+            "Members contribute any amount they choose each cycle. There's no fixed minimum, everyone saves at their own pace toward a shared group target.",
+        },
+        {
+          label: "Who controls the amount?",
+          value:
+            "Each member decides their own contribution every cycle. The admin sets the overall group goal and timeline.",
+        },
+        {
+          label: "How do members access funds?",
+          value:
+            "Members can request early exit or emergency withdrawals based on the rules the admin sets when creating the group.",
+        },
+        {
+          label: "Interest & returns",
+          value:
+            "If the group is interest-based, members earn returns proportional to the amount they contribute toward the target.",
+        },
+        {
+          label: "Best for",
+          value:
+            "People with irregular income or who want to save together without a strict commitment amount per cycle.",
+        },
+      ],
+    },
+    FIXED: {
+      icon: "people-outline" as const,
+      title: "Fixed Contribution Group",
+      badge: "Disciplined Savings",
+      badgeColor: "#D1FAE5",
+      badgeBg: "#1fd4d4ff",
+      borderColor: "#1fd4d4ff",
+      bg: "#F2FFFF",
+      textColor: "#064E3B",
+      rows: [
+        {
+          label: "How it works",
+          value:
+            "Every member commits to paying the same fixed amount each cycle. The group marches together toward a collective savings target.",
+        },
+        {
+          label: "Who controls the amount?",
+          value:
+            "The admin sets one mandatory contribution amount when creating the group. All members must pay exactly that amount every cycle.",
+        },
+        {
+          label: "How do members access funds?",
+          value:
+            "Access depends on the exit rules the admin sets, members may be allowed to exit early with or without a penalty, or emergency withdrawals may be permitted.",
+        },
+        {
+          label: "Interest & returns",
+          value:
+            "All members earn equal proportional returns since contributions are identical. Interest is applied if the group is interest-based.",
+        },
+        {
+          label: "Best for",
+          value:
+            "Groups that want strict discipline and equal commitment — e.g., house rent goals, joint business capital, or community savings.",
+        },
+      ],
+    },
+    ROTATIONAL: {
+      icon: "people-circle-outline" as const,
+      title: "Rotational Savings (Ajo / Esusu)",
+      badge: "Automatic Payouts",
+      badgeColor: "#D1FAE5",
+      badgeBg: "#1fd4d4ff",
+      borderColor: "#1fd4d4ff",
+      bg: "#F2FFFF",
+      textColor: "#064E3B",
+      rows: [
+        {
+          label: "How it works",
+          value:
+            "All members contribute a fixed amount each cycle. The pooled total is paid out as a lump sum to one member at a time, rotating through the payout order set by the admin.",
+        },
+        {
+          label: "Who gets paid first?",
+          value:
+            "The admin assigns each member a payout position when the group starts. Members receive the full pool on their turn, no exceptions.",
+        },
+        {
+          label: "Are payouts automatic?",
+          value:
+            "Yes — payouts happen automatically on each cycle based on the rotation order. No withdrawal requests or manual approvals are needed.",
+        },
+        {
+          label: "Early exit or emergency withdrawal?",
+          value:
+            "Not applicable. Because payouts are structured and automatic, early exit and emergency withdrawal features do not apply to rotational groups.",
+        },
+        {
+          label: "Best for",
+          value:
+            "Communities, friends, or colleagues running a traditional Ajo or Esusu — where trust, rotation, and discipline are the foundation.",
+        },
+      ],
+    },
+  };
+
+  const c = configs[groupType] || configs.FLEX;
+
+  return (
+    <View
+      style={{
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: c.borderColor,
+        backgroundColor: c.bg,
+        marginBottom: 16,
+        overflow: "hidden",
+      }}
+    >
+      {/* Header */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          padding: 14,
+          borderBottomWidth: 1,
+          borderBottomColor: c.borderColor + "40",
+        }}
+      >
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: c.borderColor,
+            alignItems: "center",
+            justifyContent: "center",
+            marginRight: 12,
+          }}
+        >
+          <Ionicons name={c.icon} size={20} color="white" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: "700",
+              color: c.textColor,
+              opacity: 0.7,
+              textTransform: "uppercase",
+              letterSpacing: 0.5,
+            }}
+          >
+            Selected Group Type
+          </Text>
+          <Text
+            style={{
+              fontSize: 14,
+              fontWeight: "800",
+              color: c.textColor,
+              marginTop: 1,
+            }}
+          >
+            {c.title}
+          </Text>
+        </View>
+        <View
+          style={{
+            backgroundColor: c.badgeBg,
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 20,
+          }}
+        >
+          <Text
+            style={{ color: c.badgeColor, fontSize: 10, fontWeight: "700" }}
+          >
+            {c.badge}
+          </Text>
+        </View>
+      </View>
+
+      {/* Info rows */}
+      <View style={{ padding: 14, gap: 12 }}>
+        {c.rows.map((row, i) => (
+          <View key={i}>
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "700",
+                color: c.textColor,
+                marginBottom: 2,
+              }}
+            >
+              {row.label}
+            </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: c.textColor,
+                opacity: 0.85,
+                lineHeight: 18,
+              }}
+            >
+              {row.value}
+            </Text>
+            {i < c.rows.length - 1 && (
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: c.borderColor + "20",
+                  marginTop: 10,
+                }}
+              />
+            )}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function Step1Identity({ data, update, hideGroupTypeSelector }: any) {
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
@@ -246,8 +740,118 @@ function Step1Identity({ data, update }: any) {
     }
   };
 
+  const groupTypes = [
+    {
+      id: "FLEX",
+      title: "Flex Contribution Groups",
+      subtitle: "Flexible individual contribution amounts per cycle.",
+      icon: "cash-outline",
+    },
+    {
+      id: "FIXED",
+      title: "Fixed Contribution Groups",
+      subtitle: "All members contribute the exact same fixed amount per cycle.",
+      icon: "people-outline",
+    },
+    {
+      id: "ROTATIONAL",
+      title: "Rotational Savings (Ajo/Esusu Model)",
+      subtitle:
+        "Contributions rotate as lump-sum payouts to members in turn order.",
+      icon: "people-circle-outline",
+    },
+  ];
+
   return (
     <View className="space-y-6">
+      {hideGroupTypeSelector ? (
+        // Rich info card — shown when user arrives from a specific group type button
+        <GroupTypeInfoCard groupType={data.groupType} />
+      ) : (
+        <View style={{ marginBottom: 12 }}>
+          <Text
+            style={{
+              color: "#64748B",
+              fontWeight: "700",
+              fontSize: 13,
+              marginBottom: 10,
+            }}
+          >
+            Group Type
+          </Text>
+          <View style={{ gap: 10 }}>
+            {groupTypes.map((item) => {
+              const isSelected = data.groupType === item.id;
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  activeOpacity={0.8}
+                  onPress={() => update("groupType", item.id)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    padding: 14,
+                    borderRadius: 14,
+                    backgroundColor: isSelected ? "#F2FFFF" : "#F9FAFB",
+                    borderWidth: isSelected ? 2 : 1,
+                    borderColor: isSelected ? THEME : "#E5E7EB",
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      backgroundColor: isSelected ? THEME : "#E2E8F0",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginRight: 12,
+                    }}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color={isSelected ? "white" : "#64748B"}
+                    />
+                  </View>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: "700",
+                        color: "#1A1A1A",
+                      }}
+                    >
+                      {item.title}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: "#64748B",
+                        marginTop: 2,
+                        lineHeight: 15,
+                      }}
+                    >
+                      {item.subtitle}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      borderWidth: isSelected ? 6 : 2,
+                      borderColor: isSelected ? THEME : "#9CA3AF",
+                      backgroundColor: "white",
+                    }}
+                  />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
       <FormField
         label="Group Name"
         placeholder='e.g., "The 2026 Homeowners Circle"'
@@ -319,6 +923,8 @@ function Step1Identity({ data, update }: any) {
 
 function Step2Financial({ data, update }: any) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
   const options = ["Daily", "Weekly", "Monthly"];
 
   const formatAmount = (val: string) => {
@@ -327,23 +933,91 @@ function Step2Financial({ data, update }: any) {
     return n ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "";
   };
 
-  const formatDate = (val: string) => {
-    if (typeof val !== "string") return "";
-    const n = val.replace(/\D/g, "");
-    if (n.length <= 2) return n;
-    if (n.length <= 4) return `${n.slice(0, 2)} / ${n.slice(2)}`;
-    return `${n.slice(0, 2)} / ${n.slice(2, 4)} / ${n.slice(4, 8)}`;
+  const parseDateString = (str: string): Date | null => {
+    if (!str) return null;
+    const parts = str.split("/").map((p) => p.trim());
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year) && year >= 2020) {
+        return new Date(year, month, day);
+      }
+    }
+    return null;
   };
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const formatDateToDisplay = (d: Date) =>
+    `${pad(d.getDate())} / ${pad(d.getMonth() + 1)} / ${d.getFullYear()}`;
+
+  const startDateObj = parseDateString(data.startDate);
+  const endDateObj = parseDateString(data.endDate);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Min start date is today
+  const minStartDate = today;
+
+  // Min end date: must be at least 1 day after start date, or tomorrow
+  const minEndDate = startDateObj
+    ? new Date(startDateObj.getTime() + 86400000)
+    : new Date(today.getTime() + 86400000);
+
+  const handleSelectStartDate = (picked: Date) => {
+    update("startDate", formatDateToDisplay(picked));
+    if (endDateObj && endDateObj <= picked) {
+      const autoEnd = new Date(picked);
+      autoEnd.setFullYear(autoEnd.getFullYear() + 1);
+      update("endDate", formatDateToDisplay(autoEnd));
+    }
+  };
+
+  const handleSelectEndDate = (picked: Date) => {
+    update("endDate", formatDateToDisplay(picked));
+  };
+
+  const isFixedOrRotational =
+    data.groupType === "FIXED" || data.groupType === "ROTATIONAL";
+
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const groupRatesConfig = configData?.rates?.wealthgroup || (configData as any)?.data?.rates?.wealthgroup;
+  const minGroupKobo = groupRatesConfig?.minTargetAmount ?? 100000;
+  const minGroupNaira = minGroupKobo / 100;
+  const minGroupNairaFormatted = minGroupNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const targetAmtVal = parseFloat(data.amount.replace(/,/g, "")) || 0;
+  const isBelowMinTarget = targetAmtVal > 0 && targetAmtVal < minGroupNaira;
 
   return (
     <View className="space-y-6">
-      <FormField
-        label="Wealth Amount(₦)"
-        placeholder="e.g, ₦3,500,000.00"
-        value={data.amount}
-        onChange={(t: string) => update("amount", formatAmount(t))}
-        keyboardType="numeric"
-      />
+      <View style={{ marginBottom: 12 }}>
+        <FormField
+          label="Wealth Target Amount (₦)"
+          placeholder="e.g, ₦3,500,000.00"
+          value={data.amount}
+          onChange={(t: string) => update("amount", formatAmount(t))}
+          keyboardType="numeric"
+        />
+        {isBelowMinTarget && (
+          <Text className="text-red-500 text-[11px] mt-1 font-medium">
+            Minimum target amount is ₦{minGroupNairaFormatted}
+          </Text>
+        )}
+      </View>
+
+      {isFixedOrRotational && (
+        <FormField
+          label="Fixed Contribution Amount per Cycle (₦)"
+          placeholder="e.g, ₦50,000.00"
+          value={data.contributionAmount}
+          onChange={(t: string) =>
+            update("contributionAmount", formatAmount(t))
+          }
+          keyboardType="numeric"
+          helperText="Mandatory contribution amount required from each member per cycle."
+        />
+      )}
 
       <View className="mb-4">
         <Text className="text-[#64748B] text-[13px] font-bold mb-2">
@@ -383,40 +1057,127 @@ function Step2Financial({ data, update }: any) {
       </View>
 
       <View style={{ marginBottom: 18 }}>
-        <Text style={{ color: "#64748B", fontWeight: "700", fontSize: 13, marginBottom: 8 }}>
+        <Text
+          style={{
+            color: "#64748B",
+            fontWeight: "700",
+            fontSize: 13,
+            marginBottom: 8,
+          }}
+        >
           Wealth Preference
         </Text>
-        <View style={{ flexDirection: "row", backgroundColor: "#F3F4F6", borderRadius: 12, padding: 4 }}>
-          <TouchableOpacity 
+        <View
+          style={{
+            flexDirection: "row",
+            backgroundColor: "#F3F4F6",
+            borderRadius: 12,
+            padding: 4,
+          }}
+        >
+          <TouchableOpacity
             onPress={() => update("wealthPreference", "Interest Based")}
-            style={{ flex: 1, backgroundColor: data.wealthPreference === "Interest Based" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: data.wealthPreference === "Interest Based" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: data.wealthPreference === "Interest Based" ? 2 : 0 }}
+            style={{
+              flex: 1,
+              backgroundColor:
+                data.wealthPreference === "Interest Based"
+                  ? "#FFFFFF"
+                  : "transparent",
+              paddingVertical: 12,
+              borderRadius: 8,
+              alignItems: "center",
+              shadowColor:
+                data.wealthPreference === "Interest Based"
+                  ? "#000"
+                  : "transparent",
+              shadowOpacity: 0.1,
+              shadowRadius: 2,
+              elevation: data.wealthPreference === "Interest Based" ? 2 : 0,
+            }}
           >
-            <Text style={{ color: data.wealthPreference === "Interest Based" ? "#1A1A1A" : "#6B7280", fontWeight: data.wealthPreference === "Interest Based" ? "700" : "500", fontSize: 13 }}>Interest Based</Text>
+            <Text
+              style={{
+                color:
+                  data.wealthPreference === "Interest Based"
+                    ? "#1A1A1A"
+                    : "#6B7280",
+                fontWeight:
+                  data.wealthPreference === "Interest Based" ? "700" : "500",
+                fontSize: 13,
+              }}
+            >
+              Interest Based
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => update("wealthPreference", "Impact Wealth")}
-            style={{ flex: 1, backgroundColor: data.wealthPreference === "Impact Wealth" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: data.wealthPreference === "Impact Wealth" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: data.wealthPreference === "Impact Wealth" ? 2 : 0 }}
+            style={{
+              flex: 1,
+              backgroundColor:
+                data.wealthPreference === "Impact Wealth"
+                  ? "#FFFFFF"
+                  : "transparent",
+              paddingVertical: 12,
+              borderRadius: 8,
+              alignItems: "center",
+              shadowColor:
+                data.wealthPreference === "Impact Wealth"
+                  ? "#000"
+                  : "transparent",
+              shadowOpacity: 0.1,
+              shadowRadius: 2,
+              elevation: data.wealthPreference === "Impact Wealth" ? 2 : 0,
+            }}
           >
-            <Text style={{ color: data.wealthPreference === "Impact Wealth" ? "#1A1A1A" : "#6B7280", fontWeight: data.wealthPreference === "Impact Wealth" ? "700" : "500", fontSize: 13 }}>Impact Wealth</Text>
+            <Text
+              style={{
+                color:
+                  data.wealthPreference === "Impact Wealth"
+                    ? "#1A1A1A"
+                    : "#6B7280",
+                fontWeight:
+                  data.wealthPreference === "Impact Wealth" ? "700" : "500",
+                fontSize: 13,
+              }}
+            >
+              Impact Wealth
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <FormField
+      <AppDatePickerField
         label="Start Date"
-        placeholder="DD / MM / YYYY"
+        placeholder="Select Start Date"
         value={data.startDate}
-        onChange={(t: string) => update("startDate", formatDate(t))}
-        keyboardType="numeric"
-        maxLength={14}
+        onPress={() => setShowStartPicker(true)}
+        helperText="Date contributions begin (cannot be in the past)"
       />
-      <FormField
+
+      <AppDatePickerField
         label="End Date"
-        placeholder="DD / MM / YYYY"
+        placeholder="Select End Date"
         value={data.endDate}
-        onChange={(t: string) => update("endDate", formatDate(t))}
-        keyboardType="numeric"
-        maxLength={14}
+        onPress={() => setShowEndPicker(true)}
+        helperText="Group maturity date (must be after start date)"
+      />
+
+      <AppCalendarModal
+        visible={showStartPicker}
+        onClose={() => setShowStartPicker(false)}
+        title="Select Start Date"
+        selectedDate={startDateObj}
+        minDate={minStartDate}
+        onSelectDate={handleSelectStartDate}
+      />
+
+      <AppCalendarModal
+        visible={showEndPicker}
+        onClose={() => setShowEndPicker(false)}
+        title="Select End Date"
+        selectedDate={endDateObj}
+        minDate={minEndDate}
+        onSelectDate={handleSelectEndDate}
       />
 
       {data.wealthPreference === "Interest Based" && (
@@ -432,7 +1193,14 @@ function Step2Financial({ data, update }: any) {
 function Step3Membership({ data, update }: any) {
   const [isOpen, setIsOpen] = useState(false);
   const options = ["Public/Open", "Private/Invite-Only"];
-  const isOverLimit = parseInt(data.memberLimit) > 200;
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const groupRates = rates?.wealthgroup || rates?.group;
+  const minM = groupRates?.membersLimitRange?.[0] ?? 2;
+  const maxM = groupRates?.membersLimitRange?.[1] ?? 50;
+
+  const limitVal = parseInt(data.memberLimit);
+  const isInvalidLimit = !isNaN(limitVal) && (limitVal < minM || limitVal > maxM);
 
   return (
     <View className="space-y-6">
@@ -441,20 +1209,18 @@ function Step3Membership({ data, update }: any) {
           <Text className="text-[#64748B] text-[13px] font-bold">
             Members Limit
           </Text>
-          <Text className="text-gray-400 text-[11px]">200 maximum</Text>
+          <Text className="text-gray-400 text-[11px]">{minM} min - {maxM} max</Text>
         </View>
         <TextInput
-          placeholder="e.g., 10 members"
+          placeholder={`e.g., ${minM} to ${maxM} members`}
           value={data.memberLimit}
           onChangeText={(t) => update("memberLimit", t)}
           keyboardType="numeric"
-          className={`h-14 bg-gray-50 rounded-xl px-4 text-[#1A1A1A] border ${
-            isOverLimit ? "border-red-500" : "border-gray-100"
-          }`}
+          className="h-14 bg-gray-50 rounded-xl px-4 text-[#1A1A1A] border border-gray-100"
         />
-        {isOverLimit && (
-          <Text className="text-red-500 text-[10px] mt-1">
-            Limit cannot exceed 200 members
+        {isInvalidLimit && (
+          <Text className="text-red-500 text-[11px] mt-1 font-medium">
+            Limit must be between {minM} and {maxM} members
           </Text>
         )}
       </View>
@@ -469,9 +1235,11 @@ function Step3Membership({ data, update }: any) {
           className="h-14 bg-gray-50 rounded-xl px-4 flex-row items-center justify-between border border-gray-100"
         >
           <Text
-            className={data.accessType ? "text-[#1A1A1A]" : "text-gray-400"}
+            className={
+              data.accessType ? "text-[#1A1A1A] font-semibold" : "text-gray-400"
+            }
           >
-            {data.accessType || "Choose an access type"}
+            {data.accessType || "Public/Open, Private/Invite-Only"}
           </Text>
           <Ionicons
             name={isOpen ? "chevron-up" : "chevron-down"}
@@ -481,19 +1249,46 @@ function Step3Membership({ data, update }: any) {
         </TouchableOpacity>
         {isOpen && (
           <View className="bg-white rounded-xl mt-2 border border-gray-100 overflow-hidden shadow-sm">
-            {options.map((opt) => (
-              <TouchableOpacity
-                key={opt}
-                onPress={() => {
-                  update("accessType", opt);
-                  setIsOpen(false);
-                }}
-                className="px-4 py-4 border-b border-gray-50 flex-row items-center justify-between"
-              >
-                <Text className="text-[#1A1A1A] font-medium">{opt}</Text>
-                {data.accessType === opt && <Check size={16} color={THEME} />}
-              </TouchableOpacity>
-            ))}
+            {options.map((opt) => {
+              const isPublic = opt.toLowerCase().includes("public");
+              return (
+                <TouchableOpacity
+                  key={opt}
+                  onPress={() => {
+                    update("accessType", opt);
+                    setIsOpen(false);
+                  }}
+                  className="px-4 py-4 border-b border-gray-50 flex-row items-center justify-between"
+                >
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text className="text-[#1A1A1A] font-bold text-[14px]">
+                      {opt}
+                    </Text>
+                    <Text className="text-[#64748B] text-[11px] mt-0.5 leading-[16px]">
+                      {isPublic
+                        ? "Open group: Members can join immediately without waiting for admin approval."
+                        : "Private group: Members send a join request. Admin can accept or reject each request."}
+                    </Text>
+                  </View>
+                  {data.accessType === opt && <Check size={18} color={THEME} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+        {data.accessType && (
+          <View className="bg-[#EEF7F8] p-3 rounded-xl mt-3 border border-[#D5EAE9]">
+            <Text className="text-[#155D5F] text-[12px] font-bold mb-0.5">
+              ℹ️{" "}
+              {data.accessType.toLowerCase().includes("public")
+                ? "Public Group Policy"
+                : "Private Group Policy"}
+            </Text>
+            <Text className="text-[#155D5F] text-[11px] leading-[16px]">
+              {data.accessType.toLowerCase().includes("public")
+                ? "People can join this group directly without you approving them."
+                : "People must request to join this group. You will have full control in settings to accept or reject them."}
+            </Text>
           </View>
         )}
       </View>
@@ -501,44 +1296,46 @@ function Step3Membership({ data, update }: any) {
   );
 }
 
-function Step4Risk({ data, update }: any) {
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+function Step4Risk({ data, update, groupPenaltyRate = "10%" }: any) {
+  const [isPenaltyOpen, setIsPenaltyOpen] = useState(false);
+  const [isExitOpen, setIsExitOpen] = useState(false);
 
-  const penaltyOptions = [
-    "Immediate (5% of contribution)",
-    "Grace period (24hours)",
+  const penaltyOptions = ["Immediate (5%)", "Grace period (24h)", "No Penalty"];
+
+  const exitOptions = [
+    "No Withdrawal",
+    `Allow with Fixed Penalty (${groupPenaltyRate})`,
+    "Allow without Penalty",
   ];
-  const exitOptions = ["Fixed Penalty (10%)", "No Withdrawal", "Custom Rule"];
 
   return (
     <View className="space-y-6">
       <View className="mb-4">
-        <Text className="text-[#64748B] text-[13px] font-bold mb-1">
-          Penalty Settings
+        <Text className="text-[#64748B] text-[13px] font-bold mb-2">
+          Late Payment Penalty
         </Text>
         <TouchableOpacity
-          onPress={() =>
-            setOpenDropdown(openDropdown === "penalty" ? null : "penalty")
-          }
+          activeOpacity={1}
+          onPress={() => setIsPenaltyOpen(!isPenaltyOpen)}
           className="h-14 bg-gray-50 rounded-xl px-4 flex-row items-center justify-between border border-gray-100"
         >
           <Text className={data.penalty ? "text-[#1A1A1A]" : "text-gray-400"}>
-            {data.penalty || "Set a Penalty"}
+            {data.penalty || "Select Penalty..."}
           </Text>
           <Ionicons
-            name={openDropdown === "penalty" ? "chevron-up" : "chevron-down"}
+            name={isPenaltyOpen ? "chevron-up" : "chevron-down"}
             size={20}
             color="#64748B"
           />
         </TouchableOpacity>
-        {openDropdown === "penalty" && (
+        {isPenaltyOpen && (
           <View className="bg-white rounded-xl mt-2 border border-gray-100 overflow-hidden shadow-sm">
             {penaltyOptions.map((opt) => (
               <TouchableOpacity
                 key={opt}
                 onPress={() => {
                   update("penalty", opt);
-                  setOpenDropdown(null);
+                  setIsPenaltyOpen(false);
                 }}
                 className="px-4 py-4 border-b border-gray-50 flex-row items-center justify-between"
               >
@@ -548,38 +1345,38 @@ function Step4Risk({ data, update }: any) {
             ))}
           </View>
         )}
-        <Text className="text-gray-400 text-[10px] mt-1">
-          Note: This is for late contribution
-        </Text>
       </View>
 
       <View className="mb-4">
-        <Text className="text-[#64748B] text-[13px] font-bold mb-1">
-          Early Exit
+        <Text className="text-[#64748B] text-[13px] font-bold mb-2">
+          Early Exit / Default Rule
         </Text>
         <TouchableOpacity
-          onPress={() =>
-            setOpenDropdown(openDropdown === "exit" ? null : "exit")
-          }
+          activeOpacity={1}
+          onPress={() => setIsExitOpen(!isExitOpen)}
           className="h-14 bg-gray-50 rounded-xl px-4 flex-row items-center justify-between border border-gray-100"
         >
           <Text className={data.earlyExit ? "text-[#1A1A1A]" : "text-gray-400"}>
-            {data.earlyExit || "Set a Penalty"}
+            {data.earlyExit || "Select Exit Rule..."}
           </Text>
           <Ionicons
-            name={openDropdown === "exit" ? "chevron-up" : "chevron-down"}
+            name={isExitOpen ? "chevron-up" : "chevron-down"}
             size={20}
             color="#64748B"
           />
         </TouchableOpacity>
-        {openDropdown === "exit" && (
+        <Text className="text-[#64748B] text-[11px] mt-1.5 px-1 leading-4">
+          Choose whether members can exit early before maturity and whether the
+          platform exit penalty ({groupPenaltyRate}) applies.
+        </Text>
+        {isExitOpen && (
           <View className="bg-white rounded-xl mt-2 border border-gray-100 overflow-hidden shadow-sm">
             {exitOptions.map((opt) => (
               <TouchableOpacity
                 key={opt}
                 onPress={() => {
                   update("earlyExit", opt);
-                  setOpenDropdown(null);
+                  setIsExitOpen(false);
                 }}
                 className="px-4 py-4 border-b border-gray-50 flex-row items-center justify-between"
               >
@@ -591,29 +1388,13 @@ function Step4Risk({ data, update }: any) {
         )}
       </View>
 
-      <View className="flex-row items-center justify-between mb-4">
-        <View className="flex-1 pr-4">
-          <Text className="text-[#64748B] text-[13px] font-bold">
-            Exit Rule
-          </Text>
-          <Text className="text-gray-400 text-[10px]">
-            Users must agree to the "Lock-in Period" (Funds cannot be withdrawn
-            until the end of the cycle)
-          </Text>
-        </View>
-        <CustomSwitch
-          value={data.exitRule}
-          onValueChange={(v: boolean) => update("exitRule", v)}
-        />
-      </View>
-
-      <View className="flex-row items-center justify-between mb-4">
-        <View className="flex-1 pr-4">
-          <Text className="text-[#64748B] text-[13px] font-bold">
+      <View className="flex-row items-center justify-between p-4 bg-gray-50 rounded-xl">
+        <View className="flex-1 mr-4">
+          <Text className="text-[#1A1A1A] font-bold text-[14px]">
             Emergency Withdrawal
           </Text>
-          <Text className="text-gray-400 text-[10px]">
-            For members to request funds before the goal date
+          <Text className="text-gray-400 text-[11px] mt-0.5">
+            Allow members to withdraw funds during emergencies
           </Text>
         </View>
         <CustomSwitch
@@ -625,68 +1406,176 @@ function Step4Risk({ data, update }: any) {
   );
 }
 
-function Step5Review({ data, update }: any) {
+// Rotational groups only need the late-payment penalty setting.
+// Early exit and emergency withdrawal don't apply — payouts are automatic.
+function Step4RiskRotational({ data, update, groupPenaltyRate = "10%" }: any) {
+  const [isPenaltyOpen, setIsPenaltyOpen] = useState(false);
+
+  const penaltyOptions = ["Immediate (5%)", "Grace period (24h)", "No Penalty"];
+
   return (
     <View className="space-y-6">
-      <Text className="text-[#155D5F] font-black text-[15px] mb-2 underline">
-        Terms of Service
-      </Text>
+      <View className="mb-4">
+        <Text className="text-[#64748B] text-[13px] font-bold mb-2">
+          Late Payment Penalty
+        </Text>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setIsPenaltyOpen(!isPenaltyOpen)}
+          className="h-14 bg-gray-50 rounded-xl px-4 flex-row items-center justify-between border border-gray-100"
+        >
+          <Text className={data.penalty ? "text-[#1A1A1A]" : "text-gray-400"}>
+            {data.penalty || "Select Penalty..."}
+          </Text>
+          <Ionicons
+            name={isPenaltyOpen ? "chevron-up" : "chevron-down"}
+            size={20}
+            color="#64748B"
+          />
+        </TouchableOpacity>
+        {isPenaltyOpen && (
+          <View className="bg-white rounded-xl mt-2 border border-gray-100 overflow-hidden shadow-sm">
+            {penaltyOptions.map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                onPress={() => {
+                  update("penalty", opt);
+                  setIsPenaltyOpen(false);
+                }}
+                className="px-4 py-4 border-b border-gray-50 flex-row items-center justify-between"
+              >
+                <Text className="text-[#1A1A1A] font-medium">{opt}</Text>
+                {data.penalty === opt && <Check size={16} color={THEME} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* Info banner */}
+      <View
+        style={{
+          backgroundColor: "#F2FFFF",
+          borderColor: "#1fd4d4ff",
+          borderWidth: 1,
+          borderRadius: 14,
+          padding: 14,
+          marginBottom: 4,
+        }}
+      >
+        <Text
+          style={{
+            color: "#166534",
+            fontWeight: "700",
+            fontSize: 13,
+            marginBottom: 4,
+          }}
+        >
+          ℹ️ Rotational Group — Automatic Payouts
+        </Text>
+        <Text style={{ color: "#166534", fontSize: 12, lineHeight: 18 }}>
+          In an Ajo/Esusu group, funds are automatically paid out to each member
+          in the rotation order set by the admin. There is no need for early
+          exit or emergency withdrawal rules. You only need to set the late
+          contribution penalty below.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function Step5Review({ data, update }: any) {
+  const groupTypeLabel =
+    data.groupType === "ROTATIONAL"
+      ? "Rotational Savings (Ajo/Esusu)"
+      : data.groupType === "FIXED"
+        ? "Fixed Contribution"
+        : "Flex Contribution";
+
+  return (
+    <View className="space-y-6">
+      <View className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+        <Text className="text-[#155D5F] font-bold text-[16px] mb-4">
+          Group Summary
+        </Text>
+
+        <ReviewRow label="Name" value={data.name} />
+        <ReviewRow label="Category" value={data.category} />
+        <ReviewRow label="Group Type" value={groupTypeLabel} />
+        {(data.groupType === "FIXED" || data.groupType === "ROTATIONAL") && (
+          <ReviewRow
+            label="Fixed Contribution"
+            value={`₦${data.contributionAmount}`}
+          />
+        )}
+        <ReviewRow label="Target Amount" value={`₦${data.amount}`} />
+        <ReviewRow label="Frequency" value={data.frequency} />
+        <ReviewRow
+          label="Dates"
+          value={`${data.startDate} - ${data.endDate}`}
+        />
+        <ReviewRow label="Access" value={data.accessType} />
+        <ReviewRow label="Member Limit" value={`${data.memberLimit} members`} />
+        <ReviewRow label="Penalty" value={data.penalty} />
+        <ReviewRow label="Exit Rule" value={data.earlyExit || "None"} />
+      </View>
+
       <TouchableOpacity
+        activeOpacity={0.8}
         onPress={() => update("agreed", !data.agreed)}
-        className="flex-row items-start"
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
+          paddingVertical: 8,
+          paddingHorizontal: 4,
+        }}
       >
         <View
-          className={`w-5 h-5 rounded border items-center justify-center mr-3 mt-1 ${
+          className={`w-6 h-6 rounded-lg items-center justify-center border ${
             data.agreed
               ? "bg-[#155D5F] border-[#155D5F]"
-              : "bg-white border-gray-300"
+              : "border-gray-300 bg-white"
           }`}
+          style={{ marginRight: 4 }}
         >
           {data.agreed && <Check size={14} color="white" />}
         </View>
-        <Text className="text-[#64748B] text-[14px] leading-[20px] flex-1">
-          I agree with the{" "}
-          <Text className="font-bold underline text-[#1A1A1A]">
-            Group Savings Agreement and Accountability Rules.
-          </Text>
+        <Text className="text-[#64748B] text-[13px] flex-1 leading-[19px]">
+          I agree to the WealthGroup Terms of Service and understand the
+          financial responsibilities as group administrator.
         </Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-function SuccessScreen({
-  onDone,
-  onView,
-  groupName,
-}: {
-  onDone: () => void;
-  onView: () => void;
-  groupName: string;
-}) {
+function ReviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View className="flex-row justify-between py-2 border-b border-gray-100/50">
+      <Text className="text-[#64748B] text-[13px]">{label}</Text>
+      <Text className="text-[#1A1A1A] font-bold text-[13px]">{value}</Text>
+    </View>
+  );
+}
+
+function SuccessScreen({ onDone, onView, groupName }: any) {
   const onShare = async () => {
     try {
       await Share.share({
-        message: `Join my Wealth Tribe "${groupName}" on Wealthconomy!`,
+        message: `Join my Wealth Tribe "${groupName}" on Wealthconomy! 🚀\n\nJoin here: wealthconomy://group/join/${encodeURIComponent(
+          groupName,
+        )}`,
       });
-    } catch (error) {
-      console.log(error);
+    } catch (error: any) {
+      console.error(error.message);
     }
   };
 
   return (
-    <SafeAreaView
-      style={{ flex: 1 }}
-      className="bg-white"
-      edges={["top", "bottom"]}
-    >
+    <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
+      <StatusBar style="dark" />
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-        <View className="px-5 py-4">
-          <TouchableOpacity onPress={onDone}>
-            <Ionicons name="chevron-back" size={24} color="#1A1A1A" />
-          </TouchableOpacity>
-        </View>
-
         <View className="items-center px-5 pt-4">
           <View className="w-full h-64 items-center justify-center relative">
             <Image

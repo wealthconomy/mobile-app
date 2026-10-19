@@ -1,15 +1,16 @@
-import { blogService } from "@/src/api/blogService";
-import Header from "@/src/components/common/Header";
+import { useGetBlogsQuery } from "@/src/store/api/blogApi";
+import { useBookmarks } from "@/src/hooks/useBookmarks";
 import { BlogListItem } from "@/src/features/wise-up/components/BlogListItem";
 import { BlogSkeleton } from "@/src/features/wise-up/components/BlogSkeleton";
 import { CategoryChips } from "@/src/features/wise-up/components/CategoryChips";
 import { Category } from "@/src/types/blog";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -22,62 +23,72 @@ const TABS = ["For you", "Popular", "Trending", "Categories"];
 
 export default function WiseUpScreen() {
   const router = useRouter();
-  const queryClient = useQueryClient();
+  const { isBookmarked, toggleBookmark } = useBookmarks();
+
   const [activeTab, setActiveTab] = useState("For you");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null,
   );
+  const [refreshing, setRefreshing] = useState(false);
 
-  const { data: blogs, isLoading } = useQuery({
-    queryKey: ["blogs", activeTab, selectedCategory],
-    queryFn: () =>
-      blogService.getBlogs(
-        activeTab === "Categories" ? undefined : activeTab,
-        activeTab === "Categories" ? selectedCategory || undefined : undefined,
-      ),
-  });
+  const { data: response, isLoading, refetch } = useGetBlogsQuery({ publishToApp: true });
 
-  const toggleBookmarkMutation = useMutation({
-    mutationFn: (id: string) => blogService.toggleBookmark(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["blogs"] });
-      queryClient.invalidateQueries({ queryKey: ["bookmarked-blogs"] });
-      queryClient.invalidateQueries({ queryKey: ["blog"] });
-    },
-  });
-
-  const filteredBlogs =
-    blogs?.filter((blog) =>
-      blog.title.toLowerCase().includes(searchQuery.toLowerCase()),
-    ) || [];
-
-  const handleBookmark = (id: string) => {
-    toggleBookmarkMutation.mutate(id);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch().unwrap();
+    } catch {
+      // ignore
+    } finally {
+      setRefreshing(false);
+    }
   };
+
+  const allBlogs = response?.data?.items || [];
+
+  let filteredBlogs = [...allBlogs];
+
+  if (activeTab === "Popular") {
+    filteredBlogs.sort((a, b) => b.views - a.views);
+  } else if (activeTab === "Trending") {
+    filteredBlogs = filteredBlogs.slice().reverse();
+  }
+
+  if (activeTab === "Categories" && selectedCategory) {
+    filteredBlogs = filteredBlogs.filter((b) => b.category === selectedCategory);
+  }
+
+  filteredBlogs = filteredBlogs.filter((blog) =>
+    blog.title.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
       <StatusBar style="dark" />
-      <Header
-        title="WiseUp Blog"
-        rightElement={
+      <AppRefreshIndicator refreshing={refreshing} topOffset={15} />
+      <View className="px-5 pt-2 pb-4">
+        <View className="flex-row justify-between items-center mb-6">
           <TouchableOpacity
-            onPress={() => router.push("/support/reading-list")}
+            onPress={() => router.back()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="chevron-back" size={28} color="#1A1A1A" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push("/support/reading-list" as any)}
           >
             <Ionicons name="bookmark" size={24} color="#155D5F" />
           </TouchableOpacity>
-        }
-      />
-
-      <View className="px-5 pb-4">
+        </View>
+        
         <View className="flex-row justify-between items-center mb-6">
-          <View>
-            <Text className="text-[#1A1A1A] font-extrabold text-[24px]">
-              Hi Good Day!
+          <View className="flex-1 pr-4">
+            <Text className="text-[#1A1A1A] font-extrabold text-[28px]">
+              Hi WiseUp!
             </Text>
-            <Text className="text-[#6B7280] text-sm">
-              Welcome to WiseUp Blog
+            <Text className="text-[#6B7280] text-sm mt-1">
+              Get smart about money and build wealth
             </Text>
           </View>
           <TouchableOpacity
@@ -134,18 +145,34 @@ export default function WiseUpScreen() {
         className="flex-1 px-5"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["#155D5F"]}
+            progressBackgroundColor="#FFFFFF"
+          />
+        }
       >
         {isLoading ? (
           <BlogSkeleton />
         ) : filteredBlogs.length > 0 ? (
-          filteredBlogs.map((blog) => (
-            <BlogListItem
-              key={blog.id}
-              blog={blog}
-              onPress={() => router.push(`/blog/${blog.id}` as any)}
-              onBookmark={() => handleBookmark(blog.id)}
-            />
-          ))
+          filteredBlogs.map((blog) => {
+            const isItemBookmarked = isBookmarked(blog.id) || !!blog.isBookmarked;
+            const blogWithBookmark = {
+              ...blog,
+              isBookmarked: isItemBookmarked,
+            };
+            return (
+              <BlogListItem
+                key={blog.id}
+                blog={blogWithBookmark}
+                onPress={() => router.push(`/blog/${blog.id}` as any)}
+                onBookmark={() => toggleBookmark(blogWithBookmark)}
+              />
+            );
+          })
         ) : (
           <View className="items-center justify-center py-20">
             <Ionicons name="document-text-outline" size={48} color="#D1D5DB" />

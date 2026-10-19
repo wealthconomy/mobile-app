@@ -3,8 +3,11 @@ export interface LibraryComment {
   userId: string;
   userName: string;
   userImage?: string;
-  text: string;
-  timePosted: string;
+  content?: string;
+  text?: string;
+  timePosted?: string;
+  timeAgo?: string;
+  createdAt?: string;
 }
 
 export interface LibraryMaterial {
@@ -13,12 +16,12 @@ export interface LibraryMaterial {
   title: string;
   description: string;
   image: string;
-  author: {
-    name: string;
-    image: string;
-  };
-  timePosted: string;
-  readingDuration: string; // For videos this will be the video duration e.g. "12 min watch"
+  author: string;
+  authorAvatar?: string;
+  timePosted?: string;
+  timeAgo?: string;
+  createdAt?: string;
+  readingDuration?: string; // For videos this will be the video duration e.g. "12 min watch"
   // Document-specific fields (optional for video type)
   documentUrl?: string;
   fileType?: "PDF" | "DOC" | "XLS" | "EPUB";
@@ -27,6 +30,8 @@ export interface LibraryMaterial {
   // Video-specific fields (optional for document type)
   youtubeUrl?: string;
   likesCount: number;
+  isLiked?: boolean;
+  isBookmarked?: boolean;
   downloadsCount?: number;
   commentsCount: number;
   comments?: LibraryComment[];

@@ -2,8 +2,9 @@ import { RootState } from "@/src/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useSelector } from "react-redux";
+import { useGetKycDocumentsQuery } from "@/src/store/api/kycApi";
 
 interface TodoCardProps {
   title: string;
@@ -58,9 +59,16 @@ const TodoCard = ({
 
 export const TodoSection = () => {
   const user = useSelector((state: RootState) => state.auth.user);
+  const { data: kycDocsResponse } = useGetKycDocumentsQuery();
+
+  const isLevel2Complete =
+    (user?.kycLevel !== undefined && user.kycLevel >= 2) ||
+    kycDocsResponse?.data?.faceVerified === true;
+
+  const currentKycLevel = Math.max(user?.kycLevel || 1, isLevel2Complete ? 2 : 1);
 
   const userState = {
-    kycLevel: user?.kycLevel || 1,
+    kycLevel: currentKycLevel,
     isEmailVerified: true,
     hasFirstGoal: false,
     hasJoinedTribe: false,
@@ -71,7 +79,23 @@ export const TodoSection = () => {
   const onboardingTasks = [];
 
   // 1. KYC Sequential Logic
-  if (userState.kycLevel === 1) {
+  const isKycPending = user?.kycStatus === "PENDING" || user?.kycStatus === "pending";
+
+  if (isKycPending) {
+    onboardingTasks.push({
+      id: "kyc-pending",
+      title: "KYC Under Review",
+      description: "Your documents are currently being verified by compliance",
+      icon: <Ionicons name="time-outline" size={18} color="#D97706" />,
+      onPress: () => {
+        Alert.alert(
+          "KYC Under Review ⏳",
+          "Your documents are currently being reviewed by our compliance team. You will be notified once verified."
+        );
+      },
+      isComplete: false,
+    });
+  } else if (userState.kycLevel === 1) {
     onboardingTasks.push({
       id: "kyc2",
       title: "Proceed to level 2",
@@ -151,8 +175,8 @@ export const TodoSection = () => {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        className="-mx-5 px-5"
-        contentContainerStyle={{ paddingRight: 20 }}
+        className="-mx-5"
+        contentContainerStyle={{ paddingHorizontal: 20 }}
       >
         {onboardingTasks.map((task) => (
           <TodoCard

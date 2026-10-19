@@ -1,14 +1,19 @@
 import Header from "@/src/components/common/Header";
-import { ThemedButton } from "@/src/components/ThemedButton";
-import { RootState } from "@/src/store";
-import { WealthGroup } from "@/src/store/slices/wealthGroupSlice";
+import ThemedButton from "@/src/components/ThemedButton";
+import { AppToast, ToastState } from "@/src/components/common/AppToast";
+import {
+  useGetGroupDetailsQuery,
+  useUpdateGroupSettingsMutation,
+} from "@/src/store/api/groupApi";
+import { useImageUpload } from "@/src/hooks/useImageUpload";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Check } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   ScrollView,
   Text,
@@ -17,7 +22,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSelector } from "react-redux";
 
 const VISIBILITY_OPTIONS = [
   "Public/Open: Visible on the discovery page",
@@ -25,35 +29,103 @@ const VISIBILITY_OPTIONS = [
 ];
 
 export default function GeneralSettingsScreen() {
-  const { id } = useLocalSearchParams();
-  const groups = useSelector((state: RootState) => state.wealthGroup.groups);
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { data: group, isLoading } = useGetGroupDetailsQuery(id as string, {
+    skip: !id,
+  });
+  const [updateSettings, { isLoading: isSaving }] = useUpdateGroupSettingsMutation();
+  const { uploadImage } = useImageUpload();
 
-  const group = useMemo(() => {
-    return groups.find((g: WealthGroup) => g.id === id) || ({} as WealthGroup);
-  }, [id, groups]);
-
-  const [name, setName] = useState(group.name || "Wealthy People Savings");
-  const [description, setDescription] = useState(group.description || "");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Business");
   const [visibility, setVisibility] = useState(VISIBILITY_OPTIONS[0]);
-  const [coverImage, setCoverImage] = useState(
-    "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?q=80&w=1000&auto=format&fit=crop",
-  );
-
+  const [coverImage, setCoverImage] = useState("");
   const [isVisibilityOpen, setIsVisibilityOpen] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
+
+  useEffect(() => {
+    if (group) {
+      setName(group.name || "");
+      setDescription(group.description || "");
+      setCategory(group.category || "Business");
+      setVisibility(
+        group.accessType === "PRIVATE" ? VISIBILITY_OPTIONS[1] : VISIBILITY_OPTIONS[0]
+      );
+      setCoverImage(group.coverImage || "");
+    }
+  }, [group]);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [16, 9],
-      quality: 1,
+      quality: 0.8,
     });
 
     if (!result.canceled) {
       setCoverImage(result.assets[0].uri);
     }
   };
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      setToast({ type: "warning", title: "Required", message: "Group name cannot be empty." });
+      return;
+    }
+
+    try {
+      let uploadedCoverUrl: string | undefined = undefined;
+      if (coverImage) {
+        if (coverImage.startsWith("http://") || coverImage.startsWith("https://")) {
+          uploadedCoverUrl = coverImage;
+        } else if (coverImage.startsWith("file://") || coverImage.startsWith("content://")) {
+          try {
+            uploadedCoverUrl = await uploadImage(coverImage, { allowFallback: false });
+          } catch (e) {
+            console.warn("Image upload failed in settings:", e);
+            uploadedCoverUrl = undefined;
+          }
+        }
+      }
+
+      if (uploadedCoverUrl && (uploadedCoverUrl.startsWith("file://") || uploadedCoverUrl.startsWith("content://"))) {
+        uploadedCoverUrl = undefined;
+      }
+
+      const accessType = visibility.includes("Private") ? "PRIVATE" : "PUBLIC";
+      await updateSettings({
+        id: id as string,
+        body: {
+          name: name.trim(),
+          description: description.trim(),
+          category: category.trim(),
+          accessType,
+          coverImage: uploadedCoverUrl,
+        },
+      }).unwrap();
+
+      setToast({ type: "success", title: "Settings Saved", message: "Group details updated successfully." });
+      router.back();
+    } catch (err: any) {
+      const msg = err?.data?.message || err?.message || "Failed to update group settings.";
+      setToast({ type: "error", title: "Update Failed", message: msg });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={["top"]}>
+        <StatusBar style="dark" />
+        <Stack.Screen options={{ headerShown: false }} />
+        <Header title="General" onBack={() => router.back()} />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color="#155D5F" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-[#F8FAFC]" edges={["top"]}>
@@ -91,20 +163,22 @@ export default function GeneralSettingsScreen() {
               <Text className="text-[14px] font-medium text-[#155D5F] mb-3">
                 Group Cover Image (Optional)
               </Text>
-              <View className="w-full h-48 rounded-2xl overflow-hidden mb-3">
-                <Image
-                  source={{ uri: coverImage }}
-                  className="w-full h-full"
-                  resizeMode="cover"
-                />
-              </View>
+              {coverImage ? (
+                <View className="w-full h-48 rounded-2xl overflow-hidden mb-3">
+                  <Image
+                    source={{ uri: coverImage }}
+                    className="w-full h-full"
+                    resizeMode="cover"
+                  />
+                </View>
+              ) : null}
               <TouchableOpacity
                 onPress={pickImage}
                 className="w-full h-14 bg-white border border-[#E2E8F0] rounded-2xl flex-row items-center justify-center"
               >
                 <Ionicons name="create-outline" size={20} color="#64748B" />
                 <Text className="ml-2 text-[#64748B] font-medium text-base">
-                  Change picture
+                  {coverImage ? "Change picture" : "Upload picture"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -171,12 +245,14 @@ export default function GeneralSettingsScreen() {
 
         <View className="px-5 pb-10">
           <ThemedButton
-            title="Save"
-            onPress={() => router.back()}
-            style={{ backgroundColor: "#155D5F", borderRadius: 16, height: 64 }}
+            title={isSaving ? "Saving..." : "Save"}
+            onPress={handleSave}
+            disabled={isSaving}
+            style={{ backgroundColor: "#155D5F", borderRadius: 16, height: 60 }}
           />
         </View>
       </View>
+      <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </SafeAreaView>
   );
 }

@@ -2,16 +2,28 @@ import { useColorScheme } from "@/components/useColorScheme";
 import { DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
+import {
+  KumbhSans_300Light,
+  KumbhSans_400Regular,
+  KumbhSans_500Medium,
+  KumbhSans_600SemiBold,
+  KumbhSans_700Bold,
+  KumbhSans_800ExtraBold,
+} from "@expo-google-fonts/kumbh-sans";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { useEffect, useRef } from "react";
+import { GlobalLockoutModal } from "../src/components/common/GlobalLockoutModal";
+import { AppInactivityLockModal } from "../src/components/common/AppInactivityLockModal";
+import { ActivityIndicator, AppState, AppStateStatus, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider, useDispatch, useSelector } from "react-redux";
 import "../global.css";
 import { AppDispatch, RootState, store } from "../src/store";
+import { loadAuthFromStorage } from "../src/store/slices/authSlice";
 import { loadGroupsFromStorage } from "../src/store/slices/wealthGroupSlice";
+import { lockAppForInactivity } from "../src/store/slices/appStatusSlice";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +38,12 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
+    KumbhSans_300Light,
+    KumbhSans_400Regular,
+    KumbhSans_500Medium,
+    KumbhSans_600SemiBold,
+    KumbhSans_700Bold,
+    KumbhSans_800ExtraBold,
   });
 
   useEffect(() => {
@@ -33,7 +51,9 @@ export default function RootLayout() {
   }, [error]);
 
   useEffect(() => {
-    if (loaded) SplashScreen.hideAsync();
+    if (loaded) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
   }, [loaded]);
 
   if (!loaded) return null;
@@ -50,29 +70,77 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
-  const { isAuthenticated, hasCompletedOnboarding, isLoading } = useSelector(
+  const { isAuthenticated, hasCompletedOnboarding, isLoading, user } = useSelector(
     (state: RootState) => state.auth,
   );
 
   useEffect(() => {
+    dispatch(loadAuthFromStorage());
     dispatch(loadGroupsFromStorage());
   }, [dispatch]);
 
+  // Inactivity / Background Auto-lock (45-60 seconds)
+  const backgroundTimeRef = useRef<number | null>(null);
+
   useEffect(() => {
-    if (isLoading) return;
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === "background" || nextAppState === "inactive") {
+        backgroundTimeRef.current = Date.now();
+      } else if (nextAppState === "active") {
+        if (backgroundTimeRef.current && isAuthenticated) {
+          const elapsedSeconds = (Date.now() - backgroundTimeRef.current) / 1000;
+          // If app was left in background for 45 seconds or more, lock it
+          if (elapsedSeconds >= 45) {
+            dispatch(lockAppForInactivity());
+          }
+        }
+        backgroundTimeRef.current = null;
+      }
+    };
+
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription.remove();
+  }, [dispatch, isAuthenticated]);
+
+  useEffect(() => {
+    if (isLoading) {
+      return;
+    }
 
     const inAuthGroup = segments[0] === "(auth)";
     const inOnboarding = segments[0] === "onboarding";
-    const inTabs = segments[0] === "(tabs)";
+    const inSetupPin = inAuthGroup && segments[1] === "setup-pin";
+    const inPasswordResetFlow =
+      inAuthGroup &&
+      (segments[1] === "forgot-password" ||
+        segments[1] === "otp" ||
+        segments[1] === "reset-password" ||
+        segments[1] === "success");
+
+    // Check if authenticated user needs to setup their transaction PIN or app passcode
+    const needsSecuritySetup =
+      isAuthenticated &&
+      user &&
+      (user.hasTransactionPin === false || user.hasAppPasscode === false);
 
     if (!hasCompletedOnboarding) {
-      if (!inOnboarding) router.replace("/onboarding" as any);
+      if (!inOnboarding) {
+        router.replace("/onboarding" as any);
+      }
     } else if (!isAuthenticated) {
-      if (!inAuthGroup) router.replace("/(auth)/login" as any);
+      if (!inAuthGroup) {
+        router.replace("/(auth)/login" as any);
+      }
+    } else if (needsSecuritySetup) {
+      if (!inSetupPin && !inPasswordResetFlow) {
+        router.replace("/(auth)/setup-pin" as any);
+      }
     } else if (inAuthGroup || inOnboarding) {
-      router.replace("/(tabs)" as any);
+      if (!inSetupPin && !inPasswordResetFlow) {
+        router.replace("/(tabs)" as any);
+      }
     }
-  }, [isAuthenticated, hasCompletedOnboarding, segments, isLoading]);
+  }, [isAuthenticated, hasCompletedOnboarding, segments, isLoading, user]);
 
   if (isLoading) {
     return (
@@ -99,7 +167,11 @@ function RootLayoutNav() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="transactions/activities"
+              name="transactions/activities/index"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="transactions/activities/[id]"
               options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -182,6 +254,10 @@ function RootLayoutNav() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
+              name="profile/my-referrals"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
               name="transactions/detail"
               options={{ headerShown: false }}
             />
@@ -195,6 +271,18 @@ function RootLayoutNav() {
             />
             <Stack.Screen
               name="profile/security"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="profile/about"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="profile/terms"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="profile/privacy"
               options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -226,6 +314,9 @@ function RootLayoutNav() {
           </Stack>
         </ThemeProvider>
       </QueryClientProvider>
+      {/* Global modals: Lockout and Inactivity Session Shield */}
+      <GlobalLockoutModal />
+      <AppInactivityLockModal />
     </SafeAreaProvider>
   );
 }

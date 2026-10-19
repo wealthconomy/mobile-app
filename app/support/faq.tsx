@@ -1,4 +1,4 @@
-import Skeleton from "@/src/components/common/Skeleton";
+import { Skeleton } from "@/src/components/common/skeletons";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { SUPPORT_FAQS } from "./index";
+import { SUPPORT_FAQS } from "@/src/features/support/constants";
 
 export default function FAQDetailScreen() {
   const router = useRouter();

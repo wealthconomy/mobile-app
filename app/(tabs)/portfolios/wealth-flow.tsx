@@ -1,18 +1,29 @@
-import { WealthGoal } from "@/src/api/goalService";
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
 import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
-import { router } from "expo-router";
+import { useFocusEffect, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Eye, EyeOff } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
-import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ArrowUp, Eye, EyeOff } from "lucide-react-native";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Image, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/src/store";
+import {
+  useGetPortfoliosQuery,
+  useGetPortfolioConfigQuery,
+} from "@/src/store/api/portfolioApi";
+import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
+import { Portfolio } from "@/src/types/portfolio";
+import {
+  saveCompletedPortfolios,
+  hydrateCompletedPortfolios,
+  removeCompletedPortfolio,
+} from "@/src/store/slices/completedPortfolioSlice";
+import { isPortfolioCompleted, getDynamicInterestRateLabel } from "@/src/utils/formatters";
 
 const THEME = "#005F61"; // Dark teal for text/buttons
 const THEME_BG = "#D5EDFF"; // Theme light blue
@@ -76,149 +87,109 @@ const CATEGORIES: Category[] = [
 
 export default function WealthFlowScreen() {
   const [showBalance, setShowBalance] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [showTips, setShowTips] = useState(true);
+  const [activeTab, setActiveTab] = useState<"ongoing" | "completed">(
+    "ongoing",
+  );
+  const [refreshing, setRefreshing] = useState(false);
+
   const portfolioPreference = useSelector(
     (state: RootState) => state.portfolioPreference.flow
   );
   const showInterest = portfolioPreference !== "Impact Wealth";
 
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const [showTips, setShowTips] = useState(true);
-  const [activeTab, setActiveTab] = useState<"ongoing" | "completed">(
-    "ongoing",
+  const dispatch = useDispatch();
+  const completedMap = useSelector(
+    (state: RootState) => state.completedPortfolio.completedMap
   );
-  const [ongoingPlans, setOngoingPlans] = useState<WealthGoal[]>([]);
-  const [completedPlans, setCompletedPlans] = useState<WealthGoal[]>([]);
+
+  const { data, isLoading: loading, refetch: refetchFlow } = useGetPortfoliosQuery({ type: "wealthflow" });
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const flowRateLabel = getDynamicInterestRateLabel("flow", systemConfigData, rates, 10);
+
+  const flowConfig = rates?.wealthflow || (rates as any)?.flow;
+  const minFlowKobo = flowConfig?.minTargetAmount ?? flowConfig?.minimumAmount ?? 50000;
+  const minFlowDuration = flowConfig?.minDurationDays ?? flowConfig?.minimumTenureDays ?? 30;
+  const maxFlowDuration = flowConfig?.maxDurationDays ?? flowConfig?.maximumTenureDays ?? 365;
+  const flowPenaltyRate = flowConfig?.earlyLiquidationPenaltyRate ?? flowConfig?.earlyWithdrawalPenaltyPercentage ?? 2;
+  const minFlowNairaFormatted = (minFlowKobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const handleBack = () => {
+    router.replace("/(tabs)/portfolios" as any);
+  };
+
+  const allGoals = data?.items || [];
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetchFlow();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
-      // Mock data based on screenshots
-      const mockOngoing: WealthGoal[] = [
-        {
-          id: "auto-1",
-          title: "Investment",
-          subtitle: "Daily(₦5,000)",
-          amount: "50,373.28",
-          saved: "20,149.31",
-          progress: 0.4,
-          daysLeft: 70, // 10 weeks
-          endDate: "24th Dec 2026",
-          automationFrequency: "Daily",
-          source: "WinUp",
-        },
-        {
-          id: "auto-2",
-          title: "Investment",
-          subtitle: "Daily(₦5,000)",
-          amount: "50,373.28",
-          saved: "46,343.42",
-          progress: 0.92,
-          daysLeft: 7, // 1 week
-          endDate: "24th Dec 2026",
-          automationFrequency: "Daily",
-          source: "WinUp",
-        },
-        {
-          id: "auto-3",
-          title: "Savings Plan",
-          subtitle: "Weekly(₦10,000)",
-          amount: "100,000.00",
-          saved: "15,000.00",
-          progress: 0.15,
-          daysLeft: 9, // 9 weeks
-          endDate: "12th June 2026",
-          automationFrequency: "Weekly",
-          source: "WealthFlex",
-        },
-        {
-          id: "auto-4",
-          title: "Emergency Fund",
-          subtitle: "Monthly(₦50,000)",
-          amount: "500,000.00",
-          saved: "300,000.00",
-          progress: 0.6,
-          daysLeft: 4, // 4 months
-          endDate: "30th Sept 2026",
-          automationFrequency: "Monthly",
-          source: "WinUp",
-        },
-        {
-          id: "auto-5",
-          title: "Investment Pro",
-          subtitle: "Daily(₦2,000)",
-          amount: "25,000.00",
-          saved: "20,000.00",
-          progress: 0.8,
-          daysLeft: 3, // 3 weeks
-          endDate: "20th May 2026",
-          automationFrequency: "Daily",
-          source: "WealthFlex",
-        },
-      ];
-
-      const mockCompleted: WealthGoal[] = [
-        {
-          id: "auto-c1",
-          title: "Investment",
-          subtitle: "Daily(₦5,000)",
-          amount: "143,736.00",
-          saved: "143,736.00",
-          progress: 1.0,
-          daysLeft: 0,
-          endDate: "24th Dec 2024",
-          automationFrequency: "Daily",
-          source: "WinUp",
-          isCompleted: true,
-        },
-        {
-          id: "auto-c2",
-          title: "Summer Trip",
-          subtitle: "Weekly(₦20,000)",
-          amount: "200,000.00",
-          saved: "200,000.00",
-          progress: 1.0,
-          daysLeft: 0,
-          endDate: "15th Aug 2024",
-          automationFrequency: "Weekly",
-          source: "WealthFlex",
-          isCompleted: true,
-        },
-        {
-          id: "auto-c3",
-          title: "Holiday Fund",
-          subtitle: "Monthly(₦100,000)",
-          amount: "1,200,000.00",
-          saved: "1,200,000.00",
-          progress: 1.0,
-          daysLeft: 0,
-          endDate: "1st Jan 2025",
-          automationFrequency: "Monthly",
-          source: "WinUp",
-          isCompleted: true,
-        },
-        {
-          id: "auto-c4",
-          title: "Gadget Savings",
-          subtitle: "Daily(₦1,000)",
-          amount: "30,000.00",
-          saved: "30,000.00",
-          progress: 1.0,
-          daysLeft: 0,
-          endDate: "10th Nov 2024",
-          automationFrequency: "Daily",
-          source: "WealthFlex",
-          isCompleted: true,
-        },
-      ];
-
-      setOngoingPlans(mockOngoing);
-      setCompletedPlans(mockCompleted);
-    }, []),
+      refetchFlow();
+      (dispatch as any)(hydrateCompletedPortfolios());
+    }, [refetchFlow, dispatch])
   );
+
+  useEffect(() => {
+    (dispatch as any)(hydrateCompletedPortfolios());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (allGoals.length > 0) {
+      const completed = allGoals.filter(isPortfolioCompleted);
+      if (completed.length > 0) {
+        dispatch(
+          saveCompletedPortfolios(
+            completed.map((p) => ({ ...p, type: p.type || "wealthflow" }))
+          )
+        );
+      }
+      // Evict any active plan that was mistakenly stored in completedMap
+      allGoals.forEach((p) => {
+        if (!isPortfolioCompleted(p) && completedMap[p.id]) {
+          dispatch(removeCompletedPortfolio(p.id));
+        }
+      });
+    }
+  }, [allGoals, completedMap, dispatch]);
+
+  const ongoingPlans = allGoals.filter((g) => !isPortfolioCompleted(g));
+  const completedPlans = useMemo(() => {
+    const fromApi = allGoals.filter(isPortfolioCompleted);
+    const fromCache = Object.values(completedMap)
+      .filter(isPortfolioCompleted)
+      .filter((g) => {
+        const normType = (g.type || "").toLowerCase().replace(/[-_]/g, "");
+        if (normType === "wealthflow" || normType === "flow") return true;
+        if (g.metadata?.autoSaveFrequency || g.metadata?.category?.includes("Flow") || g.metadata?.category?.includes("Auto")) return true;
+        return false;
+      });
+    const combined = new Map<string, Portfolio>();
+    fromCache.forEach((item) => combined.set(item.id, item));
+    fromApi.forEach((item) =>
+      combined.set(item.id, {
+        ...item,
+        type: item.type || "wealthflow",
+      })
+    );
+    return Array.from(combined.values());
+  }, [allGoals, completedMap]);
+
+  const formatAmount = (val?: string) => {
+    if (!val) return "0.00";
+    const amountNum = parseFloat(val) / 100;
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
+
+  const totalBalance = allGoals.reduce((sum, g) => sum + parseFloat(g.balance || "0"), 0);
 
   if (loading) {
     return (
@@ -226,7 +197,7 @@ export default function WealthFlowScreen() {
         <StatusBar style="dark" />
         <Header
           title="WealthFlow"
-          onBack={() => router.back()}
+          onBack={handleBack}
           rightElement={<PortfolioPreferenceMenu portfolioType="flow" />}
         />
         <PortfolioDetailSkeleton />
@@ -239,18 +210,33 @@ export default function WealthFlowScreen() {
       <StatusBar style="dark" />
       <Header
         title="WealthFlow"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="flow" />}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+      <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        className="flex-1"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="transparent"
+            colors={["#005F61"]}
+            progressBackgroundColor="#FFFFFF"
+          />
+        }
+      >
         <View className="px-5 py-2">
           {/* ── Hero Card ────────────────────────────────────────── */}
           <View
             className="relative overflow-hidden mb-8"
             style={{
-              width: 365,
-              height: 170,
+              width: "100%",
+              maxWidth: 365,
+              height: 190,
               borderTopLeftRadius: 50,
               borderTopRightRadius: 20,
               borderBottomRightRadius: 50,
@@ -264,29 +250,52 @@ export default function WealthFlowScreen() {
               alignSelf: "center",
             }}
           >
-            <Image
-              source={require("../../../assets/images/auto.png.png")}
-              className="absolute"
+            {/* Decorative Background Graphic */}
+            <View
+              pointerEvents="none"
               style={{
+                position: "absolute",
                 width: 180,
                 height: 180,
                 right: -40,
                 top: -10,
                 opacity: 0.3,
+                zIndex: 1,
               }}
-              resizeMode="contain"
-            />
+            >
+              <Image
+                source={require("../../../assets/images/auto.png.png")}
+                style={{ width: "100%", height: "100%" }}
+                resizeMode="contain"
+              />
+            </View>
 
             <View
-              style={{ position: "absolute", top: 25, left: 20, zIndex: 10 }}
+              style={{ position: "absolute", top: 22, left: 20, right: 20, zIndex: 10 }}
             >
               <View
                 className="flex-row items-center justify-between mb-1"
                 style={{ width: 280 }}
               >
-                <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-80">
-                  Total Savings
-                </Text>
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-80">
+                    Total Savings
+                  </Text>
+                  {showInterest && (
+                    <View
+                      style={{
+                        backgroundColor: "#0EA5E9",
+                        paddingHorizontal: 8,
+                        paddingVertical: 2.5,
+                        borderRadius: 20,
+                      }}
+                    >
+                      <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                        {flowRateLabel}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <TouchableOpacity
                   onPress={() => setShowBalance(!showBalance)}
                   className="p-1"
@@ -299,26 +308,33 @@ export default function WealthFlowScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View className="flex-row items-baseline mb-1">
+              <TouchableOpacity
+                onPress={() => router.push("/education/win-up" as any)}
+                activeOpacity={0.8}
+                className="flex-row items-baseline mb-1"
+              >
                 {showBalance ? (
                   <BalanceText
-                    amount="₦300,735.42"
+                    amount={`₦${formatAmount(totalBalance.toString())}`}
                     fontSize={31}
                     color="#1A1A1A"
                   />
                 ) : (
                   <Text className="text-[#1A1A1A] text-[31px] font-extrabold tracking-tight">
-                    ••••••••
+                    ***
                   </Text>
                 )}
-              </View>
+                <Text className="text-[#1A1A1A] text-[34px] font-light ml-4 mb-1">
+                  ›
+                </Text>
+              </TouchableOpacity>
 
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
                   <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-70">
-                    Your wealth grew to ₦230.00 today
+                    Your wealth grew to ₦0.00 today
                   </Text>
-                  <Text className="text-[#4CAF50] text-[15px] font-bold">↑</Text>
+                  <ArrowUp size={14} color="#4CAF50" style={{ marginLeft: 4 }} />
                 </View>
               )}
             </View>
@@ -329,7 +345,7 @@ export default function WealthFlowScreen() {
                 width: 160,
                 height: 40,
                 borderRadius: 18,
-                bottom: 20,
+                bottom: 16,
                 right: 20,
                 elevation: 3,
                 zIndex: 20,
@@ -360,19 +376,32 @@ export default function WealthFlowScreen() {
               >
                 What's on WealthFlow? 🚀
               </Text>
-              <Text
-                className="text-[10px] leading-[15px] mb-4"
-                style={{ color: THEME }}
-              >
-                To make saving effortless and consistent,{" "}
-                <Text className="font-bold">Wealth Flow</Text> allows you to put
-                your{" "}
-                <Text className="font-bold">wealth-building on autopilot.</Text>{" "}
-                It is designed to{" "}
-                <Text className="font-bold">remove the "decision fatigue"</Text>{" "}
-                of saving manually, ensuring you stay disciplined without having
-                to remember.
-              </Text>
+              <View>
+                {[
+                  {
+                    title: `Autopilot Wealth (${flowRateLabel}):`,
+                    text: `Put your wealth-building on autopilot and earn up to ${flowRateLabel} interest.`,
+                  },
+                  {
+                    title: "Flow Limits & Rules:",
+                    text: `Minimum target amount is ₦${minFlowNairaFormatted}. Lock duration ranges from ${minFlowDuration} to ${maxFlowDuration} days.`,
+                  },
+                  {
+                    title: "Early Liquidation Rule:",
+                    text: `Breaking a WealthFlow plan early attracts an early withdrawal penalty of ${flowPenaltyRate}%.`,
+                  },
+                ].map((tip, i) => (
+                  <View key={i} className="flex-row mb-3 items-start">
+                    <Text className="mr-2 text-[10px]">🚀</Text>
+                    <Text
+                      className="text-[10px] flex-1 leading-[15px]"
+                      style={{ color: THEME }}
+                    >
+                      <Text className="font-bold">{tip.title}</Text> {tip.text}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
           )}
 
@@ -511,7 +540,7 @@ export default function WealthFlowScreen() {
               ongoingPlans.length === 0 ? (
                 <EmptyState
                   icon="🏎️"
-                  text="You haven't created a Wealth Goal yet!"
+                  text="You haven't created a Wealth Flow yet!"
                   subtext="Start creating goals, your funds are locked until your defined target date is reached, preventing impulsive spending."
                 />
               ) : (
@@ -582,10 +611,45 @@ function AutoListItem({
   plan,
   isCompleted,
 }: {
-  plan: WealthGoal;
+  plan: Portfolio;
   isCompleted?: boolean;
 }) {
   const THEME_BG = "#D5EDFF";
+  const completed = Boolean(isCompleted || isPortfolioCompleted(plan));
+  
+  const formatAmount = (val: string) => {
+    if (!val) return "0.00";
+    const amountNum = parseFloat(val) / 100;
+    return amountNum.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+  };
+
+  const progress = completed
+    ? 1
+    : parseFloat(plan.targetAmount) > 0
+    ? parseFloat(plan.balance) / parseFloat(plan.targetAmount)
+    : 0;
+
+  const growthVal =
+    (plan as any).interestAccrued ??
+    (plan as any).accruedInterest ??
+    plan.dailyGrowth ??
+    (plan as any).totalYieldEarned ??
+    "0";
+  
+  const formattedDate = new Date(plan.maturityDate).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+
+  const getDaysLeft = () => {
+    const end = new Date(plan.maturityDate).getTime();
+    const now = new Date().getTime();
+    const diff = end - now;
+    if (diff <= 0) return 0;
+    return Math.ceil(diff / (1000 * 3600 * 24));
+  };
+
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -609,26 +673,29 @@ function AutoListItem({
         }}
       >
         <Text style={{ fontSize: 20 }}>
-          {plan.automationFrequency === "Daily" ? "⏰" : "📅"}
+          {plan.metadata?.autoSaveFrequency === "DAILY" ? "⏰" : "📅"}
         </Text>
       </View>
 
       <View className="flex-1">
         <View className="flex-row justify-between items-center mb-1">
-          <Text className="text-[14px] font-bold text-[#1A1A1A]">
-            {plan.title}
+          <Text className="text-[14px] font-bold text-[#1A1A1A] flex-1 mr-2" numberOfLines={1}>
+            {plan.name}
           </Text>
           <Text className="text-[14px] font-bold text-[#1A1A1A]">
-            ₦{plan.amount}
+            ₦{formatAmount(plan.targetAmount)}
           </Text>
         </View>
 
         <View className="flex-row justify-between items-center mb-2">
           <View>
-            <Text className="text-[10px] text-[#6B7280]">{plan.subtitle}</Text>
-            <Text className="text-[10px] text-[#4CAF50] font-bold">
-              Wealth growth ₦2,463.00 | Progressive: ₦50,000.00 ℹ️
-            </Text>
+            <Text className="text-[10px] text-[#6B7280]">{plan.metadata?.category || "Flow"}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
+                Wealth growth ₦{formatAmount(growthVal.toString())}{" "}
+              </Text>
+              <ArrowUp size={12} color="#4CAF50" />
+            </View>
           </View>
           <View className="flex-1 max-w-[120px] ml-4">
             <View
@@ -641,7 +708,7 @@ function AutoListItem({
             >
               <View
                 style={{
-                  width: `${plan.progress * 100}%`,
+                  width: `${Math.min(progress * 100, 100)}%`,
                   height: 4,
                   backgroundColor: isCompleted ? "#4CAF50" : "#0EA5E9",
                 }}
@@ -652,13 +719,13 @@ function AutoListItem({
 
         <View className="flex-row justify-between items-center">
           <Text className="text-[10px] text-[#9CA3AF] opacity-80">
-            {Math.round(plan.progress * 100)}%
+            {Math.round(Math.min(progress * 100, 100))}%
           </Text>
           <Text
             className="text-[10px] font-bold"
             style={{ color: isCompleted ? "#4CAF50" : "#9CA3AF" }}
           >
-            {isCompleted ? "Saving Completed" : `${plan.daysLeft} Weeks Left`}
+            {isCompleted ? "Saving Completed" : `${getDaysLeft()} Days Left`}
           </Text>
         </View>
       </View>

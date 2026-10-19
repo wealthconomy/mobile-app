@@ -1,15 +1,27 @@
-import { Bank, bankService } from "@/src/api/bankService";
-import { paymentService } from "@/src/api/paymentService";
 import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import {
+  useAddPayoutAccountMutation,
+  useGetSupportedBanksQuery,
+  useGetUserPayoutAccountsQuery,
+  useResolveBankAccountMutation,
+} from "@/src/store/api/payoutAccountApi";
+import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
+import { useInitiateWithdrawalMutation } from "@/src/store/api/withdrawalApi";
+import { useVerifyPinMutation } from "@/src/store/api/userApi";
+import { useGetKycStatusQuery, useGetKycDocumentsQuery } from "@/src/store/api/kycApi";
+import { updateKycLevel } from "@/src/store/slices/authSlice";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useQuery } from "@tanstack/react-query";
+import { PayoutAccount, PayoutBank } from "@/src/types/wallet";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState } from "@/src/store";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   ScrollView,
@@ -18,68 +30,18 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type Step =
   | "select-recipient"
   | "recipient-details"
   | "select-bank"
-  | "preview"
-  | "pin";
-
-const INITIAL_RECIPIENTS = [
-  {
-    id: 1,
-    name: "James Jackson",
-    bankName: "Opay",
-    accountNumber: "62345278396",
-  },
-  {
-    id: 2,
-    name: "Gem Mike",
-    bankName: "First Bank of Nigeria Limited",
-    accountNumber: "03638265782",
-  },
-  {
-    id: 3,
-    name: "Sarah Simon",
-    bankName: "Kuda Bank",
-    accountNumber: "1234567890",
-  },
-];
-
-const STORAGE_KEY = "@recent_recipients";
+  | "preview";
 
 export default function WithdrawScreen() {
   const { plan } = useLocalSearchParams<{ plan: string }>();
-  const [recipients, setRecipients] = useState(INITIAL_RECIPIENTS);
   const [step, setStep] = useState<Step>("select-recipient");
-  const pinRefs = useRef<Array<TextInput | null>>([]);
-  const [pinValues, setPinValues] = useState(["", "", "", ""]);
-
-  // Load recipients from storage on mount
-  useEffect(() => {
-    const loadRecipients = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          setRecipients(JSON.parse(stored));
-        }
-      } catch (e) {
-        console.error("Failed to load recipients", e);
-      }
-    };
-    loadRecipients();
-  }, []);
-
-  const saveRecipients = async (newRecipients: typeof INITIAL_RECIPIENTS) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newRecipients));
-    } catch (e) {
-      console.error("Failed to save recipients", e);
-    }
-  };
 
   const [showSuccess, setShowSuccess] = useState(false);
   const [amount, setAmount] = useState("");
@@ -87,17 +49,100 @@ export default function WithdrawScreen() {
   const [selectedBankCode, setSelectedBankCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [userName, setUserName] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
   const [narrative, setNarrative] = useState("");
   const [bankSearchQuery, setBankSearchQuery] = useState("");
-  const [loading, setLoading] = useState(false);
   const [wealthPlan] = useState(plan || "WealthFlex");
+  const [selectedPayoutAccountId, setSelectedPayoutAccountId] = useState<
+    string | null
+  >(null);
+
+  // RTK Query Hooks
+  const { data: walletSummary } = useGetWalletSummaryQuery();
+  const { data: savedPayoutsData, isLoading: isLoadingPayouts } =
+    useGetUserPayoutAccountsQuery();
+  const {
+    data: banksData,
+    isLoading: isLoadingBanks,
+    isError: isBankError,
+    refetch: refetchBanks,
+  } = useGetSupportedBanksQuery();
+  const [resolveAccount, { isLoading: isVerifying }] =
+    useResolveBankAccountMutation();
+  const [addPayoutAccount, { isLoading: isAddingPayout }] =
+    useAddPayoutAccountMutation();
+  const [initiateWithdrawal, { isLoading: isSubmittingWithdrawal }] =
+    useInitiateWithdrawalMutation();
+  const [verifyPinApi, { isLoading: isVerifyingPin }] = useVerifyPinMutation();
+
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [showKycModal, setShowKycModal] = useState(false);
+  const [pinValue, setPinValue] = useState("");
+  const [pinError, setPinError] = useState("");
+  const pinInputRef = useRef<TextInput>(null);
+
+  const savedPayouts = savedPayoutsData?.items || [];
+  const banks = banksData?.items || [];
+
+  const formattedWalletBalance = walletSummary?.currentBalance
+    ? (parseFloat(walletSummary.currentBalance) / 100).toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : "0.00";
+
+  // User & KYC Verification Status Gate
+  const dispatch = useDispatch();
+  const user = useSelector((state: RootState) => state.auth.user);
+  const { data: kycData, isLoading: isLoadingKycStatus } = useGetKycStatusQuery();
+  const { data: kycDocsResponse, isLoading: isLoadingKycDocs } = useGetKycDocumentsQuery();
+
+  const [localKyc2Completed, setLocalKyc2Completed] = useState(false);
+  const [isCheckingStorage, setIsCheckingStorage] = useState(true);
+
+  useEffect(() => {
+    AsyncStorage.getItem("@wealth_kyc_level_2_completed")
+      .then((val) => {
+        if (val === "true") {
+          setLocalKyc2Completed(true);
+        }
+      })
+      .finally(() => {
+        setIsCheckingStorage(false);
+      });
+  }, []);
+
+  const kycDocsPayload: any = kycDocsResponse?.data;
+  const kycDocs: any = kycDocsPayload?.data || kycDocsPayload;
+
+  const currentKycLevel = kycData?.data?.currentLevel ?? user?.kycLevel ?? 1;
+  const kycStatus = String(kycData?.data?.status || user?.kycStatus || "").toUpperCase();
+
+  const hasDocsVerified =
+    (kycDocs?.ninStatus === "Approved" && kycDocs?.faceStatus === "Approved") ||
+    (kycDocs?.faceVerified && (kycDocs?.ninProviderVerified || Boolean(kycDocs?.idNumber) || Boolean(kycDocs?.bvn))) ||
+    kycDocs?.faceVerified === true ||
+    kycDocs?.faceStatus === "Approved";
+
+  const isKycVerified =
+    currentKycLevel >= 2 ||
+    localKyc2Completed ||
+    Boolean(user?.isVerified) ||
+    kycStatus === "VERIFIED" ||
+    kycStatus === "APPROVED" ||
+    hasDocsVerified;
+
+  useEffect(() => {
+    if (isKycVerified && (user?.kycLevel || 1) < 2) {
+      dispatch(updateKycLevel(2));
+      AsyncStorage.setItem("@wealth_kyc_level_2_completed", "true").catch(() => {});
+    }
+  }, [isKycVerified, user?.kycLevel, dispatch]);
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
     const cleaned = val.replace(/[^\d.]/g, "");
-    const amount = parseFloat(cleaned) || 0;
-    return amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
+    const amountVal = parseFloat(cleaned) || 0;
+    return amountVal.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,");
   };
 
   const clearInputs = () => {
@@ -107,28 +152,35 @@ export default function WithdrawScreen() {
     setSelectedBankCode("");
     setUserName("");
     setNarrative("");
+    setSelectedPayoutAccountId(null);
   };
 
-  // Auto-fetch account name
+  // Auto-resolve bank account name from backend
   useEffect(() => {
-    const resolveName = async () => {
-      if (accountNumber.length === 10 && selectedBankCode) {
-        setIsVerifying(true);
+    let isMounted = true;
+    const resolve = async () => {
+      if (accountNumber.length === 10 && selectedBankCode && !userName) {
         try {
-          const resolvedName = await bankService.resolveAccount(
+          const res = await resolveAccount({
             accountNumber,
-            selectedBankCode,
-          );
-          setUserName(resolvedName);
-        } catch (error) {
-          console.error("Verification failed:", error);
-        } finally {
-          setIsVerifying(false);
+            bankCode: selectedBankCode,
+          }).unwrap();
+          if (isMounted && res?.accountName) {
+            setUserName(res.accountName);
+          }
+        } catch (error: any) {
+          console.warn("Verification failed:", error);
+          if (isMounted) {
+            setUserName("");
+          }
         }
       }
     };
-    resolveName();
-  }, [accountNumber, selectedBankCode]);
+    resolve();
+    return () => {
+      isMounted = false;
+    };
+  }, [accountNumber, selectedBankCode, resolveAccount, userName]);
 
   useEffect(() => {
     if (accountNumber.length === 10 && selectedBank === "Select bank") {
@@ -136,19 +188,8 @@ export default function WithdrawScreen() {
     }
   }, [accountNumber, selectedBank]);
 
-  const {
-    data: banks,
-    isLoading: isLoadingBanks,
-    isError: isBankError,
-    refetch: refetchBanks,
-  } = useQuery({
-    queryKey: ["banks"],
-    queryFn: bankService.fetchBanks,
-  });
-
   const handleBack = () => {
-    if (step === "pin") setStep("preview");
-    else if (step === "preview") setStep("recipient-details");
+    if (step === "preview") setStep("recipient-details");
     else if (step === "select-bank") setStep("recipient-details");
     else if (step === "recipient-details") setStep("select-recipient");
     else router.back();
@@ -159,13 +200,15 @@ export default function WithdrawScreen() {
     if (step === "recipient-details") return "Wealth Withdrawal";
     if (step === "select-bank") return "Select Bank";
     if (step === "preview") return `${wealthPlan} Preview`;
-    if (step === "pin") return "";
     return "";
   };
 
   const renderSelectRecipient = () => (
-    <Animated.View entering={FadeInDown.duration(600).delay(150)} className="px-5">
-      <Text className="text-[#4B5563] text-[14px] font-extrabold mb-1 mt-4">
+    <Animated.View
+      entering={FadeInDown.duration(600).delay(150)}
+      className="px-5"
+    >
+      <Text className="text-[#6B7280] text-[13px] mb-1 mt-4">
         Send to a recipient
       </Text>
 
@@ -185,7 +228,7 @@ export default function WithdrawScreen() {
             <Text className="text-[#1A1A1A] font-bold text-[15px]">
               Send to new recipient
             </Text>
-            <Text className="text-[#4B5563] text-[13px] font-bold mt-1">
+            <Text className="text-[#6B7280] text-[11px] mt-0.5">
               Transfer funds to a bank account not in your recent list
             </Text>
           </View>
@@ -194,20 +237,39 @@ export default function WithdrawScreen() {
       </View>
 
       <Text className="text-[#1A1A1A] font-extrabold text-[16px] mb-5 mt-6">
-        Recent Recipients
+        Saved Recipient Accounts
       </Text>
 
-      <View className="space-y-4 gap-4">
-        {recipients.map(
-          (item: (typeof INITIAL_RECIPIENTS)[0], index: number) => (
+      {isLoadingPayouts ? (
+        <View className="items-center justify-center py-8">
+          <ActivityIndicator color="#155D5F" size="small" />
+        </View>
+      ) : savedPayouts.length === 0 ? (
+        <View className="items-center justify-center py-8 px-4 bg-[#F9FAFB] rounded-2xl border border-gray-100 mb-6">
+          <MaterialCommunityIcons
+            name="account-clock-outline"
+            size={36}
+            color="#9CA3AF"
+          />
+          <Text className="text-[#1A1A1A] font-medium text-xs mt-2">
+            No saved recipients
+          </Text>
+          <Text className="text-[#6B7280] text-[11px] text-center mt-1">
+            Bank accounts you add or use will appear here for easy selection.
+          </Text>
+        </View>
+      ) : (
+        <View className="space-y-4 gap-4">
+          {savedPayouts.map((item: PayoutAccount, index: number) => (
             <TouchableOpacity
-              key={index}
-              className="flex-row items-center"
+              key={item.id || `payout-${index}`}
+              className="flex-row items-center p-3 rounded-xl bg-[#F8F8F8]"
               onPress={() => {
                 setAccountNumber(item.accountNumber);
                 setSelectedBank(item.bankName);
-                // In a real app, we'd find the bank code too
-                setUserName(item.name);
+                setSelectedBankCode(item.bankCode);
+                setUserName(item.accountName);
+                setSelectedPayoutAccountId(item.id);
                 setStep("recipient-details");
               }}
             >
@@ -218,139 +280,196 @@ export default function WithdrawScreen() {
                   color="#155D5F"
                 />
               </View>
-              <View>
+              <View className="flex-1">
                 <Text className="text-[#1A1A1A] font-bold text-sm">
-                  {item.name}
+                  {item.accountName}
                 </Text>
-                <Text className="text-[#4B5563] text-[13px] font-bold">
+                <Text className="text-[#6B7280] text-[11px]">
                   {item.bankName} - {item.accountNumber}
                 </Text>
               </View>
+              <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
             </TouchableOpacity>
-          ),
-        )}
-      </View>
+          ))}
+        </View>
+      )}
     </Animated.View>
   );
 
+  const handleAmountChange = (val: string) => {
+    const cleaned = val.replace(/[^\d]/g, "");
+    if (!cleaned) {
+      setAmount("");
+      return;
+    }
+    const num = parseInt(cleaned, 10);
+    setAmount(num.toLocaleString("en-US"));
+  };
+
   const renderRecipientDetails = () => (
-    <Animated.View entering={FadeInDown.duration(600).delay(150)} className="px-5">
-      <Text className="text-[#374151] text-[14px] font-extrabold mb-8 mt-4">
-        Amount(₦) <Text className="font-extrabold">₦3,500,000.00 max</Text>
+    <Animated.View
+      entering={FadeInDown.duration(600).delay(150)}
+      className="px-5"
+    >
+      <Text className="text-[#6B7280] text-[13px] mb-8 mt-4">
+        Wallet Balance:{" "}
+        <Text className="font-bold text-[#155D5F]">
+          ₦{formattedWalletBalance}
+        </Text>
       </Text>
 
-      <View className="space-y-6 gap-5">
-        <View>
-          <TextInput
-            placeholder="₦0.00"
-            placeholderTextColor="#9CA3AF"
-            className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
-            keyboardType="numeric"
-            value={amount}
-            onChangeText={setAmount}
-          />
-        </View>
-
-        <View>
-          <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
-            Bank Account Number
-          </Text>
-          <TextInput
-            placeholder="0000000000"
-            placeholderTextColor="#9CA3AF"
-            className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
-            keyboardType="numeric"
-            maxLength={10}
-            value={accountNumber}
-            onChangeText={setAccountNumber}
-          />
-        </View>
-
-        <View>
-          <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
-            Select Bank
-          </Text>
-          <TouchableOpacity
-            onPress={async () => {
-              setLoading(true);
-              await new Promise((res) => setTimeout(res, 600)); // Mock transition lag
-              setLoading(false);
-              setStep("select-bank");
-            }}
-            className="bg-[#F8F8F8] p-4 rounded-xl flex-row justify-between items-center"
-          >
-            <View className="flex-row items-center">
-              <View className="w-6 h-6 bg-gray-200 rounded-full items-center justify-center mr-3">
-                <MaterialCommunityIcons
-                  name="bank-outline"
-                  size={14}
-                  color="#6B7280"
-                />
-              </View>
-              <Text className="text-[#1A1A1A]">{selectedBank}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#1A1A1A" />
-          </TouchableOpacity>
-        </View>
-
-        <View>
-          <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
-            Bank User's Name
-          </Text>
-          <View className="relative">
-            <TextInput
-              placeholder="John Doe"
-              placeholderTextColor="#9CA3AF"
-              className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] pr-12"
-              value={userName}
-              onChangeText={setUserName}
-              editable={!isVerifying}
-            />
-            {isVerifying && (
-              <View className="absolute right-4 top-4">
-                <ActivityIndicator size="small" color="#155D5F" />
-              </View>
-            )}
-          </View>
-        </View>
-
-        <View>
-          <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
-            Narrative
-          </Text>
-          <TextInput
-            placeholder="Purpose (e.g. Rent)"
-            placeholderTextColor="#9CA3AF"
-            className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
-            value={narrative}
-            onChangeText={setNarrative}
-          />
-        </View>
-      </View>
-
       {(() => {
+        const walletBalanceInNaira = walletSummary?.currentBalance
+          ? parseFloat(walletSummary.currentBalance) / 100
+          : 0;
+        const numericAmount = parseFloat(amount.replace(/,/g, "")) || 0;
+        const isAmountExceeded = numericAmount > walletBalanceInNaira;
+
         const isFormValid =
-          amount &&
+          numericAmount > 0 &&
+          !isAmountExceeded &&
           accountNumber.length === 10 &&
           selectedBank !== "Select bank" &&
-          userName;
+          !!userName.trim();
+
         return (
-          <ThemedButton
-            title="Proceed"
-            onPress={async () => {
-              setLoading(true);
-              await new Promise((res) => setTimeout(res, 800));
-              setLoading(false);
-              setStep("preview");
-            }}
-            loading={loading}
-            disabled={!isFormValid || loading}
-            style={{
-              backgroundColor: !isFormValid || loading ? "#E0E0E0" : "#155D5F",
-              opacity: !isFormValid || loading ? 0.45 : 1,
-            }}
-            className="mt-10"
-          />
+          <View className="space-y-6 gap-5">
+            <View>
+              <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
+                Amount (₦)
+              </Text>
+              <View
+                className={`bg-[#F8F8F8] px-4 py-3.5 rounded-xl flex-row items-center ${
+                  isAmountExceeded ? "border border-red-500" : ""
+                }`}
+              >
+                <Text className="text-[#1A1A1A] font-semibold text-[16px] mr-1">
+                  ₦
+                </Text>
+                <TextInput
+                  placeholder="0.00"
+                  placeholderTextColor="#9CA3AF"
+                  className="flex-1 text-[#1A1A1A] font-semibold text-[16px] p-0"
+                  keyboardType="numeric"
+                  value={amount}
+                  onChangeText={handleAmountChange}
+                />
+              </View>
+              {isAmountExceeded && (
+                <Text className="text-red-500 text-[12px] font-medium mt-1 px-1">
+                  Amount is greater than wallet balance
+                </Text>
+              )}
+            </View>
+
+            <View>
+              <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
+                Bank Account Number
+              </Text>
+              <TextInput
+                placeholder="0000000000"
+                placeholderTextColor="#9CA3AF"
+                className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] font-semibold text-[15px]"
+                keyboardType="numeric"
+                maxLength={10}
+                value={accountNumber}
+                onChangeText={(val) => {
+                  setAccountNumber(val);
+                  setUserName("");
+                  setSelectedPayoutAccountId(null);
+                }}
+              />
+            </View>
+
+            <View>
+              <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
+                Select Bank
+              </Text>
+              <TouchableOpacity
+                onPress={() => setStep("select-bank")}
+                className="bg-[#F8F8F8] p-4 rounded-xl flex-row justify-between items-center"
+              >
+                <View className="flex-row items-center">
+                  <View className="w-6 h-6 bg-gray-200 rounded-full items-center justify-center mr-3">
+                    <MaterialCommunityIcons
+                      name="bank-outline"
+                      size={14}
+                      color="#6B7280"
+                    />
+                  </View>
+                  <Text
+                    className={`font-semibold ${
+                      selectedBank !== "Select bank"
+                        ? "text-[#1A1A1A]"
+                        : "text-[#9CA3AF]"
+                    }`}
+                  >
+                    {selectedBank}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#1A1A1A" />
+              </TouchableOpacity>
+            </View>
+
+            <View>
+              <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
+                Account Holder Name
+              </Text>
+              <View className="relative">
+                <TextInput
+                  placeholder={
+                    isVerifying
+                      ? "Resolving account name..."
+                      : "Account name will appear here"
+                  }
+                  placeholderTextColor="#9CA3AF"
+                  className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] pr-12 font-semibold"
+                  value={userName}
+                  onChangeText={setUserName}
+                  editable={false}
+                />
+                {isVerifying && (
+                  <View className="absolute right-4 top-4">
+                    <ActivityIndicator size="small" color="#155D5F" />
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View>
+              <Text className="text-[#1A1A1A] font-bold text-xs mb-2">
+                Narrative (Optional)
+              </Text>
+              <TextInput
+                placeholder="Purpose (e.g. Withdrawal)"
+                placeholderTextColor="#9CA3AF"
+                className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A]"
+                value={narrative}
+                onChangeText={setNarrative}
+              />
+            </View>
+
+            <ThemedButton
+              title="Proceed to Preview"
+              onPress={() => {
+                if (!isKycVerified) {
+                  setShowKycModal(true);
+                  return;
+                }
+                setStep("preview");
+              }}
+              disabled={!isFormValid}
+              textStyle={{
+                color: !isFormValid ? "#1A1A1A" : "#FFFFFF",
+                fontWeight: "600",
+              }}
+              style={{
+                backgroundColor: !isFormValid ? "#E0E0E0" : "#155D5F",
+                opacity: 1,
+              }}
+              className="mt-6"
+            />
+          </View>
         );
       })()}
     </Animated.View>
@@ -359,7 +478,7 @@ export default function WithdrawScreen() {
   const getFilteredBanks = () => {
     if (!banks) return [];
     if (!bankSearchQuery) return banks;
-    return banks.filter((bank: Bank) =>
+    return banks.filter((bank: PayoutBank) =>
       bank.name.toLowerCase().includes(bankSearchQuery.toLowerCase()),
     );
   };
@@ -399,17 +518,19 @@ export default function WithdrawScreen() {
           </View>
 
           <View className="space-y-4 gap-4">
-            {getFilteredBanks().map((bank: Bank) => (
+            {getFilteredBanks().map((bank: PayoutBank, index: number) => (
               <TouchableOpacity
-                key={bank.id}
+                key={`${bank.code || "bank"}-${index}`}
                 onPress={() => {
                   setSelectedBank(bank.name);
                   setSelectedBankCode(bank.code);
+                  setUserName(""); // reset username to trigger resolve
                   setStep("recipient-details");
                 }}
-                className="bg-[#F8F8F8] p-4 rounded-xl"
+                className="bg-[#F8F8F8] p-4 rounded-xl flex-row items-center justify-between"
               >
                 <Text className="text-[#1A1A1A] font-medium">{bank.name}</Text>
+                <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
               </TouchableOpacity>
             ))}
             {getFilteredBanks().length === 0 && (
@@ -425,17 +546,86 @@ export default function WithdrawScreen() {
     </View>
   );
 
+  const handleOpenPinPrompt = () => {
+    if (!isKycVerified) {
+      setShowKycModal(true);
+      return;
+    }
+    setPinValue("");
+    setPinError("");
+    setShowPinModal(true);
+    setTimeout(() => pinInputRef.current?.focus(), 300);
+  };
+
+  const handleVerifyAndSubmitWithdrawal = async (enteredPin: string) => {
+    if (enteredPin.length !== 4) return;
+    setPinError("");
+    try {
+      await verifyPinApi({ pin: enteredPin }).unwrap();
+      setShowPinModal(false);
+      await executeWithdrawal();
+    } catch (err: any) {
+      const msg = err?.data?.message || err?.message || "Incorrect transaction PIN. Please try again.";
+      setPinError(msg);
+      setPinValue("");
+    }
+  };
+
+  const executeWithdrawal = async () => {
+    const numericAmount = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
+    if (numericAmount <= 0) {
+      Alert.alert("Invalid Amount", "Please enter a valid amount.");
+      return;
+    }
+
+    try {
+      let payoutIdToUse = selectedPayoutAccountId;
+
+      // If user typed a payout account that isn't saved yet, save it first
+      if (!payoutIdToUse) {
+        const addedPayout = await addPayoutAccount({
+          accountNumber,
+          bankCode: selectedBankCode,
+          bankName: selectedBank,
+        }).unwrap();
+        payoutIdToUse = addedPayout?.id;
+      }
+
+      if (!payoutIdToUse) {
+        throw new Error("Unable to establish payout account details.");
+      }
+
+      // Initiate real withdrawal
+      await initiateWithdrawal({
+        payoutAccountId: payoutIdToUse,
+        amount: numericAmount,
+      }).unwrap();
+
+      setShowSuccess(true);
+    } catch (error: any) {
+      console.error("Withdrawal error:", error);
+      Alert.alert(
+        "Withdrawal Failed",
+        error?.data?.message ||
+          error?.message ||
+          "Failed to complete withdrawal. Please try again.",
+      );
+    }
+  };
+
   const renderPreview = () => (
-    <Animated.View entering={FadeInDown.duration(600).delay(150)} className="px-5">
+    <Animated.View
+      entering={FadeInDown.duration(600).delay(150)}
+      className="px-5"
+    >
       <Text className="text-[#6B7280] text-[13px] mb-8 mt-4">
         Please, recheck and confirm before making the transaction.
       </Text>
 
       <View
-        className="bg-[#F8F8F8] p-6 rounded-t-[24px] relative self-center"
+        className="bg-[#F6F6F6] p-6 rounded-t-[24px] relative w-full"
         style={{
-          width: 350,
-          minHeight: 220,
+          minHeight: 180,
           borderColor: "#fefcfc40",
           borderWidth: 0.8,
           borderBottomWidth: 0,
@@ -446,61 +636,53 @@ export default function WithdrawScreen() {
           elevation: 2,
         }}
       >
-        <View className="flex-row mb-6 mt-2">
-          <View className="flex-1">
-            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
-              Wealth to Withdraw
+        <View className="flex-row justify-between mb-6 mt-2 items-start">
+          <View>
+            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
+              Amount To Transfer
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[15px]">
+            <Text className="text-[#1A1A1A] font-bold text-[16px]">
               ₦{formatAmount(amount)}
             </Text>
           </View>
-          <View className="flex-1">
-            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
+          <View className="items-end">
+            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
               Account No.
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[15px]">
+            <Text className="text-[#1A1A1A] font-bold text-[16px]">
               {accountNumber || "0000000000"}
             </Text>
           </View>
         </View>
 
-        <View className="flex-row mb-6">
-          <View className="flex-1">
-            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
+        <View className="flex-row justify-between mb-6">
+          <View className="flex-1 mr-2">
+            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
               Account Name
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[15px] pr-2">
-              {userName || "Unknown"}
+            <Text
+              className="text-[#1A1A1A] font-bold text-[15px]"
+              numberOfLines={1}
+            >
+              {userName || "Unknown Recipient"}
             </Text>
           </View>
-          <View className="flex-1">
-            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
+          <View className="items-end">
+            <Text className="text-[#6B7280] text-[11px] mb-1.5 font-medium">
               Bank Name
             </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[15px] pr-2">
+            <Text
+              className="text-[#1A1A1A] font-bold text-[15px]"
+              numberOfLines={1}
+            >
               {selectedBank === "Select bank" ? "---" : selectedBank}
             </Text>
           </View>
         </View>
 
-        <View className="flex-row">
-          <View className="flex-1">
-            <Text className="text-[#9CA3AF] text-[12px] mb-1.5">
-              Narrative
-            </Text>
-            <Text className="text-[#1A1A1A] font-bold text-[15px]">
-              {narrative || "---"}
-            </Text>
-          </View>
-        </View>
-
         {/* Jagged Edge Components */}
-        <View
-          className="flex-row absolute -bottom-[10px] left-0 right-0 overflow-hidden"
-          style={{ width: 350.1 }}
-        >
-          {Array.from({ length: 38 }).map((_, i) => (
+        <View className="flex-row absolute -bottom-[10px] left-0 right-0 overflow-hidden w-full">
+          {Array.from({ length: 40 }).map((_, i) => (
             <View
               key={i}
               style={{
@@ -516,81 +698,10 @@ export default function WithdrawScreen() {
       </View>
 
       <ThemedButton
-        title="Confirm"
-        onPress={() => setStep("pin")}
+        title="Confirm Withdrawal"
+        onPress={handleOpenPinPrompt}
+        loading={isAddingPayout || isSubmittingWithdrawal}
         className="mt-14"
-      />
-    </Animated.View>
-  );
-
-  const renderPin = () => (
-    <Animated.View entering={FadeInDown.duration(600).delay(150)} className="px-5 items-center mt-6">
-      <Image
-        source={require("@/assets/images/change-pin.png")}
-        style={{ width: 120, height: 120, marginBottom: 10 }}
-        resizeMode="contain"
-      />
-      <Text className="text-[#155D5F] font-extrabold text-[24px] mb-2 mt-4">
-        Insert your Pin
-      </Text>
-      <Text className="text-[#6B7280] text-[13px] mb-8 text-center">
-        Please insert pin to complete transaction
-      </Text>
-
-      <View className="flex-row justify-center mb-8 w-full px-2" style={{ gap: 16 }}>
-        {[0, 1, 2, 3].map((i) => (
-          <TextInput
-            key={i}
-            value={pinValues[i]}
-            ref={(el) => { pinRefs.current[i] = el; }}
-            className="w-[55px] h-[55px] bg-[#F8F8F8] rounded-xl text-center text-[24px] font-bold text-[#1A1A1A]"
-            keyboardType="numeric"
-            maxLength={1}
-            secureTextEntry
-            onChangeText={(val) => {
-              const newPins = [...pinValues];
-              newPins[i] = val;
-              setPinValues(newPins);
-              if (val && i < 3) {
-                pinRefs.current[i + 1]?.focus();
-              }
-            }}
-          />
-        ))}
-      </View>
-
-      <ThemedButton
-        title="Confirm"
-        disabled={pinValues.join("").length !== 4 || loading}
-        loading={loading}
-        className="mt-6 w-full"
-        onPress={async () => {
-          setLoading(true);
-          await paymentService.transferFunds({
-            amount,
-            accountNumber,
-            bankName: selectedBank,
-            narrative,
-          });
-
-          const exists = recipients.some(
-            (r) => r.accountNumber === accountNumber,
-          );
-          if (!exists && accountNumber && userName) {
-            const newRes = {
-              id: Date.now(),
-              name: userName,
-              bankName: selectedBank,
-              accountNumber: accountNumber,
-            };
-            const updated = [newRes, ...recipients];
-            setRecipients(updated);
-            await saveRecipients(updated);
-          }
-
-          setLoading(false);
-          setShowSuccess(true);
-        }}
       />
     </Animated.View>
   );
@@ -605,31 +716,169 @@ export default function WithdrawScreen() {
         {step === "recipient-details" && renderRecipientDetails()}
         {step === "select-bank" && renderSelectBank()}
         {step === "preview" && renderPreview()}
-        {step === "pin" && renderPin()}
       </ScrollView>
 
       <Modal visible={showSuccess} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 justify-center items-center px-6">
-          <View className="bg-white rounded-[32px] p-8 items-center w-full max-w-[340px]">
+        <View className="flex-1 bg-black/50 justify-center items-center px-10">
+          <View className="bg-white rounded-[32px] p-8 items-center w-full">
             <Image
               source={require("@/assets/images/funds.png")}
-              style={{ width: 140, height: 140, marginBottom: 20 }}
+              style={{ width: 120, height: 120, marginBottom: 20 }}
               resizeMode="contain"
             />
-            <Text className="text-[#1A1A1A] font-extrabold text-[22px] text-center mb-4 leading-[28px]">
-              Wealth Withdrawal Successful! ✅
+            <Text className="text-[#1A1A1A] font-bold text-[20px] text-center mb-2">
+              Withdrawal Initiated ✅
             </Text>
-            <Text className="text-[#4B5563] text-[14px] text-center mb-8 leading-[22px]">
-              Dear WealthBuilder, you have successfully withdrawn ₦{formatAmount(amount)} from your {wealthPlan} savings portfolio. Keep building!
+            <Text className="text-[#6B7280] text-[12px] text-center mb-8 px-4">
+              Your withdrawal of ₦{formatAmount(amount)} from your wallet
+              account to {userName} ({selectedBank} - {accountNumber}) has been
+              submitted successfully.
             </Text>
             <ThemedButton
-              title="Confirm"
+              title="Done"
               onPress={() => {
                 setShowSuccess(false);
-                router.replace("/education/win-up");
+                router.replace("/(tabs)/my-account");
               }}
               className="w-full"
             />
+          </View>
+        </View>
+      </Modal>
+
+      {/* KYC Level 2 Verification Gate Modal */}
+      <Modal visible={!isKycVerified && !isCheckingStorage && !isLoadingKycStatus && !isLoadingKycDocs} transparent animationType="fade">
+        <View className="flex-1 bg-black/60 justify-center items-center px-6">
+          <View className="bg-white rounded-[28px] p-7 items-center w-full max-w-[340px]">
+            <View className="w-16 h-16 rounded-full bg-[#155D5F]/10 items-center justify-center mb-4">
+              <Ionicons name="shield-outline" size={34} color="#155D5F" />
+            </View>
+            <Text className="text-[#1A1A1A] font-extrabold text-[20px] text-center mb-2">
+              Identity Verification Required
+            </Text>
+            <Text className="text-[#64748B] text-[13.5px] text-center mb-6 leading-[20px]">
+              To enable withdrawals and protect your funds, Central Bank guidelines require you to complete KYC Level 2 identity verification.
+            </Text>
+            <ThemedButton
+              title="Verify Identity Now"
+              onPress={() => {
+                router.replace("/kyc/level2-intro");
+              }}
+              style={{ width: "100%", backgroundColor: "#155D5F", height: 50, borderRadius: 14 }}
+            />
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="mt-3.5 py-2"
+            >
+              <Text className="text-[#64748B] font-semibold text-[14px]">
+                Go Back
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 4-Digit Transaction PIN Authorization Modal */}
+      <Modal visible={showPinModal} transparent animationType="fade">
+        <View className="flex-1 bg-black/60 justify-center items-center px-6">
+          <View className="bg-white rounded-[28px] p-6 items-center w-full max-w-[340px]">
+            <View className="w-14 h-14 rounded-full bg-[#E6F4F4] items-center justify-center mb-3">
+              <Ionicons name="keypad-outline" size={28} color="#155D5F" />
+            </View>
+            <Text className="text-[#1A1A1A] font-extrabold text-[19px] text-center mb-1">
+              Enter Transaction PIN
+            </Text>
+            <Text className="text-[#6B7280] text-[12px] text-center mb-6">
+              Authorize withdrawal of ₦{formatAmount(amount)} to {userName || "recipient"}
+            </Text>
+
+            {/* Masked PIN Dots */}
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => pinInputRef.current?.focus()}
+              className="flex-row justify-center gap-3 mb-4"
+            >
+              {Array.from({ length: 4 }).map((_, index) => {
+                const isFilled = index < pinValue.length;
+                return (
+                  <View
+                    key={index}
+                    style={{
+                      width: 52,
+                      height: 56,
+                      borderRadius: 14,
+                      borderWidth: 2,
+                      borderColor: isFilled ? "#155D5F" : "#E5E7EB",
+                      backgroundColor: isFilled ? "#EEF7F8" : "#F9FAFB",
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    {isFilled && (
+                      <View
+                        style={{
+                          width: 14,
+                          height: 14,
+                          borderRadius: 7,
+                          backgroundColor: "#155D5F",
+                        }}
+                      />
+                    )}
+                  </View>
+                );
+              })}
+            </TouchableOpacity>
+
+            <TextInput
+              ref={pinInputRef}
+              value={pinValue}
+              onChangeText={(val) => {
+                const cleaned = val.replace(/[^0-9]/g, "").slice(0, 4);
+                setPinValue(cleaned);
+                setPinError("");
+                if (cleaned.length === 4) {
+                  handleVerifyAndSubmitWithdrawal(cleaned);
+                }
+              }}
+              keyboardType="numeric"
+              maxLength={4}
+              style={{ position: "absolute", opacity: 0, width: 1, height: 1 }}
+              autoFocus
+            />
+
+            {!!pinError && (
+              <Text className="text-[#DC2626] font-semibold text-[12px] text-center mb-3">
+                {pinError}
+              </Text>
+            )}
+
+            {isVerifyingPin || isSubmittingWithdrawal ? (
+              <View className="py-3 items-center">
+                <ActivityIndicator size="small" color="#155D5F" />
+                <Text className="text-[#6B7280] text-[11px] mt-1.5">
+                  Verifying PIN & initiating transfer...
+                </Text>
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              onPress={() => {
+                setShowPinModal(false);
+                router.push("/profile/security/change-pin" as any);
+              }}
+              className="mt-2 py-1.5"
+            >
+              <Text className="text-[#155D5F] font-bold text-[13px]">
+                Forgot PIN?
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setShowPinModal(false)}
+              className="mt-2 py-2"
+            >
+              <Text className="text-[#6B7280] font-semibold text-[13px]">Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

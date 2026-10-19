@@ -14,7 +14,8 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { authApi } from "../../api/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useVerifyOtpMutation, useRequestOtpMutation } from "../../src/store/api/authApi";
 
 const PRIMARY = "#155D5F";
 const DARK = "#323232";
@@ -34,6 +35,9 @@ export default function OtpScreen() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(60);
   const [isResending, setIsResending] = useState(false);
+
+  const [verifyOtpMutation] = useVerifyOtpMutation();
+  const [requestOtpMutation] = useRequestOtpMutation();
 
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
@@ -70,21 +74,37 @@ export default function OtpScreen() {
     }
     try {
       setIsVerifying(true);
-      await authApi.verifyOtp(email, code, context);
+      const res = await verifyOtpMutation({
+        destination: email,
+        purpose: context === "signup" ? "SIGNUP" : "RESET",
+        code,
+      }).unwrap();
+
+      const resData: any = res?.data || res;
+      const resetToken =
+        resData?.resetToken ||
+        resData?.token ||
+        resData?.accessToken ||
+        (res as any)?.resetToken ||
+        "";
+
+      if (resetToken) {
+        await AsyncStorage.setItem("@wealth_reset_token", resetToken).catch(() => {});
+      }
+
       if (context === "signup") {
-        // After signup OTP → go to Login
-        router.replace("/(auth)/login" as any);
+        router.replace("/(auth)/setup-pin" as any);
       } else {
-        // After forgot-password OTP → go to Reset Password
         router.push({
           pathname: "/(auth)/reset-password",
-          params: { email },
+          params: { email, resetToken },
         } as any);
       }
-    } catch {
+    } catch (err: any) {
+      const msg = err?.data?.message || err?.message || "Invalid or expired code. Please try again.";
       Alert.alert(
         "Verification Failed",
-        "Invalid or expired code. Please try again.",
+        Array.isArray(msg) ? msg.join(", ") : String(msg),
       );
     } finally {
       setIsVerifying(false);
@@ -95,11 +115,15 @@ export default function OtpScreen() {
     if (resendCooldown > 0) return;
     try {
       setIsResending(true);
-      await authApi.resendOtp(email, context);
+      await requestOtpMutation({
+        destination: email,
+        purpose: context === "signup" ? "SIGNUP" : "RESET",
+      }).unwrap();
       setResendCooldown(60);
       Alert.alert("Code Sent", "A new OTP has been sent to your email.");
-    } catch {
-      Alert.alert("Error", "Could not resend code. Please try again.");
+    } catch (err: any) {
+      const msg = err?.data?.message || err?.message || "Could not resend code. Please try again.";
+      Alert.alert("Error", Array.isArray(msg) ? msg.join(", ") : String(msg));
     } finally {
       setIsResending(false);
     }

@@ -43,7 +43,6 @@ export default function TabLayout() {
         name="portfolios"
         options={{
           title: "Portfolio",
-          unmountOnBlur: true,
           tabBarIcon: ({ color, focused }) => (
             <WealthSaveIcon focused={focused} color={color} />
           ),

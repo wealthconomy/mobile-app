@@ -1,0 +1,62 @@
+import { Blog } from "../../types/blog";
+import { ApiResponse, baseApi, PaginatedResponse } from "./baseApi";
+
+export const blogApi = baseApi.injectEndpoints({
+  endpoints: (builder) => ({
+    getBlogs: builder.query<ApiResponse<PaginatedResponse<Blog[]>>, { publishToApp?: boolean; publishToWeb?: boolean } | void>({
+      query: (params) => ({
+        url: "/client/blogs",
+        params: params || {},
+      }),
+      providesTags: ["Blog"],
+    }),
+
+    getBookmarkedBlogs: builder.query<ApiResponse<PaginatedResponse<Blog[]>>, void>({
+      query: () => ({
+        url: "/client/blogs/bookmarks",
+      }),
+      providesTags: ["Blog"],
+    }),
+
+    getBlogById: builder.query<ApiResponse<Blog>, string>({
+      query: (id) => ({
+        url: `/client/blogs/${id}`,
+      }),
+      providesTags: (result, error, id) => [{ type: "Blog", id }],
+    }),
+
+    toggleLike: builder.mutation<ApiResponse<void>, string>({
+      query: (id) => ({
+        url: `/client/blogs/${id}/like`,
+        method: "POST",
+      }),
+      invalidatesTags: (result, error, id) => [{ type: "Blog", id }, "Blog"],
+    }),
+
+    toggleBookmark: builder.mutation<ApiResponse<void>, string>({
+      query: (id) => ({
+        url: `/client/blogs/${id}/bookmark`,
+        method: "POST",
+      }),
+      invalidatesTags: (result, error, id) => [{ type: "Blog", id }, "Blog"],
+    }),
+
+    addComment: builder.mutation<ApiResponse<void>, { id: string; content: string }>({
+      query: ({ id, content }) => ({
+        url: `/client/blogs/${id}/comments`,
+        method: "POST",
+        body: { content },
+      }),
+      invalidatesTags: (result, error, { id }) => [{ type: "Blog", id }, "Blog"],
+    }),
+  }),
+});
+
+export const {
+  useGetBlogsQuery,
+  useGetBookmarkedBlogsQuery,
+  useGetBlogByIdQuery,
+  useToggleLikeMutation,
+  useToggleBookmarkMutation,
+  useAddCommentMutation,
+} = blogApi;
