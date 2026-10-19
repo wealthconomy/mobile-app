@@ -5,8 +5,8 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobileapp",
-    "userInterfaceStyle": "automatic",
+    "scheme": "wealthconomy",
+    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/images/icon.png",
       "resizeMode": "contain",
@@ -14,7 +14,12 @@
     },
     "ios": {
       "bundleIdentifier": "com.wealthconomy.app",
-      "supportsTablet": true,
+      "buildNumber": "1",
+      "icon": "./assets/images/icon-ios.png",
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Wealthconomy needs access to your photo library so you can select and upload profile photos and KYC verification documents.",
         "NSCameraUsageDescription": "Wealthconomy needs access to your camera so you can take profile photos and capture identification documents for secure KYC verification."
@@ -29,11 +34,7 @@
         "monochromeImage": "./assets/images/icon.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
-      ]
+      "permissions": ["android.permission.CAMERA"]
     },
     "web": {
       "bundler": "metro",
@@ -47,6 +48,12 @@
         {
           "photosPermission": "Wealthconomy needs access to your photo library so you can select and upload profile photos and KYC verification documents.",
           "cameraPermission": "Wealthconomy needs access to your camera so you can take profile photos and capture identification documents for secure KYC verification."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Wealthconomy to use Face ID to unlock the app."
         }
       ]
     ],

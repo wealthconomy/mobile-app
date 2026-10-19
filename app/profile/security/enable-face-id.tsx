@@ -1,4 +1,5 @@
 import Header from "@/src/components/common/Header";
+import * as LocalAuthentication from "expo-local-authentication";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -40,21 +41,106 @@ export default function EnableFaceIDScreen() {
   }, [currentBiometricsEnabled]);
 
   const handleBioToggle = async (value: boolean) => {
-    setIsBioEnabled(value);
-    try {
-      await toggleBiometrics({ biometricsEnabled: value }).unwrap();
-      Alert.alert(
-        "Biometrics Updated",
-        value
-          ? "Biometric authentication enabled successfully!"
-          : "Biometric authentication disabled."
-      );
-    } catch (err: any) {
-      setIsBioEnabled(!value);
-      Alert.alert(
-        "Error",
-        err?.data?.message || "Could not update biometric setting. Please try again."
-      );
+    if (value) {
+      // a) Check biometric hardware support
+      try {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        if (!hasHardware) {
+          Alert.alert(
+            "Biometrics Unavailable",
+            "This device does not support biometric hardware (Face ID or Touch ID/Fingerprint)."
+          );
+          setIsBioEnabled(false);
+          return;
+        }
+
+        // b) Check enrollment
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+        if (!isEnrolled) {
+          Alert.alert(
+            "No Biometrics Enrolled",
+            "No biometric data found on this device. Please set up Face ID or Fingerprint in your device Settings first."
+          );
+          setIsBioEnabled(false);
+          return;
+        }
+
+        // c) Authenticate user
+        const authResult = await LocalAuthentication.authenticateAsync({
+          promptMessage: "Confirm to enable Face ID",
+          fallbackLabel: "Use Passcode",
+          cancelLabel: "Cancel",
+        });
+
+        if (!authResult.success) {
+          if (authResult.error === "user_cancel" || authResult.error === "app_cancel") {
+            Alert.alert(
+              "Authentication Cancelled",
+              "Biometric confirmation was cancelled. Face ID has not been enabled."
+            );
+          } else {
+            Alert.alert(
+              "Authentication Failed",
+              "Biometric authentication failed. Please try again."
+            );
+          }
+          setIsBioEnabled(false);
+          return;
+        }
+      } catch (checkErr: any) {
+        Alert.alert(
+          "Biometrics Error",
+          checkErr?.message || "An unexpected error occurred while verifying biometrics."
+        );
+        setIsBioEnabled(false);
+        return;
+      }
+
+      // d) Only call endpoint with biometricsEnabled: true after authentication succeeds
+      setIsBioEnabled(true);
+      try {
+        await toggleBiometrics({ biometricsEnabled: true }).unwrap();
+        Alert.alert(
+          "Biometrics Updated",
+          "Biometric authentication enabled successfully!"
+        );
+      } catch (err: any) {
+        setIsBioEnabled(false);
+        let errorMsg = "Could not update biometric setting. Please check your network and try again.";
+        if (err?.status === 401) {
+          errorMsg = "Your session has expired. Please log in again.";
+        } else if (err?.status === 403) {
+          errorMsg = "You do not have permission to perform this action.";
+        } else if (err?.data?.message) {
+          errorMsg = err.data.message;
+        } else if (err?.error && typeof err.error === "string") {
+          errorMsg = err.error;
+        }
+        Alert.alert("Error", errorMsg);
+      }
+    } else {
+      // When turning biometrics off, call endpoint with biometricsEnabled: false
+      setIsBioEnabled(false);
+      try {
+        await toggleBiometrics({ biometricsEnabled: false }).unwrap();
+        Alert.alert(
+          "Biometrics Updated",
+          "Biometric authentication disabled."
+        );
+      } catch (err: any) {
+        setIsBioEnabled(true);
+        let errorMsg = "Could not update biometric setting. Please check your network and try again.";
+        if (err?.status === 401) {
+          errorMsg = "Your session has expired. Please log in again.";
+        } else if (err?.status === 403) {
+          errorMsg = "You do not have permission to perform this action.";
+        } else if (err?.data?.message) {
+          errorMsg = err.data.message;
+        } else if (err?.error && typeof err.error === "string") {
+          errorMsg = err.error;
+        }
+        Alert.alert("Error", errorMsg);
+      }
     }
   };
 
