@@ -14,7 +14,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.wealthconomy.app",
-      "buildNumber": "1",
+      "buildNumber": "3",
       "icon": "./assets/images/icon-ios.png",
       "supportsTablet": false,
       "config": {
