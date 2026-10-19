@@ -53,8 +53,17 @@ export default function KYCLevel3Screen() {
       return;
     }
 
+    const kycStatus = kycStatusResponse?.data?.status ?? user?.kycStatus;
     const isLevel3Verified =
-      currentLevel >= 3 ||
+      (currentLevel >= 3 &&
+        kycStatus !== "PENDING" &&
+        kycStatus !== "pending" &&
+        kycStatus !== "REJECTED" &&
+        kycStatus !== "rejected" &&
+        kycData?.utilityStatus !== "Pending" &&
+        kycData?.passportStatus !== "Pending" &&
+        kycData?.utilityStatus !== "Rejected" &&
+        kycData?.passportStatus !== "Rejected") ||
       (kycData?.utilityStatus === "Approved" && kycData?.passportStatus === "Approved");
 
     if (isLevel3Verified && step < 2) {

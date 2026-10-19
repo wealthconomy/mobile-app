@@ -325,6 +325,17 @@ export default function ChangePasswordScreen() {
                     )}
                   </TouchableOpacity>
                 </View>
+
+                {/* Forgot Password Link */}
+                <TouchableOpacity
+                  onPress={() => router.push("/(auth)/forgot-password" as any)}
+                  className="self-end mt-2.5"
+                  activeOpacity={0.7}
+                >
+                  <Text className="text-[13px] font-bold text-[#155D5F]">
+                    Forgot Password?
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
 

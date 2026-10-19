@@ -32,7 +32,15 @@ export default function KYCLevel3Intro() {
     (kycDocs?.faceVerified && (kycDocs?.ninProviderVerified || Boolean(kycDocs?.idNumber)));
 
   const isLevel3Verified =
-    currentLevel >= 3 ||
+    (currentLevel >= 3 &&
+      kycStatus !== "PENDING" &&
+      kycStatus !== "pending" &&
+      kycStatus !== "REJECTED" &&
+      kycStatus !== "rejected" &&
+      kycDocs?.utilityStatus !== "Pending" &&
+      kycDocs?.passportStatus !== "Pending" &&
+      kycDocs?.utilityStatus !== "Rejected" &&
+      kycDocs?.passportStatus !== "Rejected") ||
     (kycDocs?.utilityStatus === "Approved" && kycDocs?.passportStatus === "Approved");
 
   const isLevel2Pending = !isLevel2Verified && (kycStatus === "PENDING" || kycStatus === "pending");

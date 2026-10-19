@@ -1,5 +1,5 @@
 import { Link, useRouter } from "expo-router";
-import { Eye, EyeOff, Lock, Mail } from "lucide-react-native";
+import { AlertCircle, Eye, EyeOff, Lock, Mail } from "lucide-react-native";
 import { useState } from "react";
 import {
   Image,
@@ -76,16 +76,31 @@ export default function LoginScreen() {
     } catch (err: any) {
       const msg = err?.data?.message || err?.message || "";
       const msgStr = Array.isArray(msg) ? msg.join(", ") : String(msg);
-      if (msgStr.toLowerCase().includes("password")) {
-        setPasswordError("Incorrect password. Please try again.");
-      } else if (
-        msgStr.toLowerCase().includes("email") ||
-        msgStr.toLowerCase().includes("user") ||
-        msgStr.toLowerCase().includes("found")
+      const lower = msgStr.toLowerCase();
+
+      if (
+        lower.includes("invalid credential") ||
+        lower.includes("unauthorized") ||
+        lower.includes("incorrect") ||
+        lower.includes("not match")
       ) {
-        setEmailError("No account found with this email.");
+        setGeneralError(
+          "Incorrect email or password. Please double-check your credentials, or tap 'Forgot Password?' below to reset your password."
+        );
+      } else if (
+        lower.includes("not found") ||
+        lower.includes("user does not exist") ||
+        lower.includes("no account") ||
+        lower.includes("no user")
+      ) {
+        setEmailError("No account found with this email. Please check your email or sign up.");
+      } else if (lower.includes("password")) {
+        setPasswordError("Incorrect password. Please verify your password or tap 'Forgot Password?'.");
       } else {
-        setGeneralError(msgStr || "Incorrect email or password. Please try again.");
+        setGeneralError(
+          msgStr ||
+            "Incorrect email or password. Please confirm your login details or tap 'Forgot Password?' to reset."
+        );
       }
     } finally {
       setIsSubmitting(false);
@@ -160,13 +175,27 @@ export default function LoginScreen() {
                 backgroundColor: "#FEF2F2",
                 borderWidth: 1,
                 borderColor: "#FECACA",
-                borderRadius: 10,
+                borderRadius: 12,
                 paddingHorizontal: 14,
-                paddingVertical: 10,
+                paddingVertical: 12,
                 marginBottom: 16,
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: 10,
               }}
             >
-              <Text style={{ color: ERROR, fontSize: 13 }}>{generalError}</Text>
+              <AlertCircle size={18} color="#DC2626" style={{ marginTop: 2 }} />
+              <Text
+                style={{
+                  color: "#B91C1C",
+                  fontSize: 13,
+                  lineHeight: 19,
+                  fontWeight: "500",
+                  flex: 1,
+                }}
+              >
+                {generalError}
+              </Text>
             </Animated.View>
           ) : null}
 

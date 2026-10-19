@@ -27,6 +27,27 @@ export default function SecurityScreen() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteAccount, { isLoading: isDeleting }] = useDeleteAccountMutation();
   const [showLockedModal, setShowLockedModal] = useState(false);
+  const [kycModalInfo, setKycModalInfo] = useState<{
+    visible: boolean;
+    type: "verified" | "pending";
+    tier: "Level 2" | "Level 3";
+    title: string;
+    badgeText: string;
+    badgeBg: string;
+    badgeColor: string;
+    description: string;
+    primaryButtonText?: string;
+    onPrimaryPress?: () => void;
+  }>({
+    visible: false,
+    type: "verified",
+    tier: "Level 2",
+    title: "",
+    badgeText: "",
+    badgeBg: "",
+    badgeColor: "",
+    description: "",
+  });
   const user = useSelector((state: RootState) => state.auth.user);
   const { data: kycData } = useGetKycStatusQuery();
   const { data: kycDocsResponse } = useGetKycDocumentsQuery();
@@ -44,7 +65,15 @@ export default function SecurityScreen() {
     (kycDocs?.faceVerified && (kycDocs?.ninProviderVerified || Boolean(kycDocs?.idNumber)));
 
   const isLevel3Verified =
-    currentLevel >= 3 ||
+    (currentLevel >= 3 &&
+      kycStatus !== "PENDING" &&
+      kycStatus !== "pending" &&
+      kycStatus !== "REJECTED" &&
+      kycStatus !== "rejected" &&
+      kycDocs?.utilityStatus !== "Pending" &&
+      kycDocs?.passportStatus !== "Pending" &&
+      kycDocs?.utilityStatus !== "Rejected" &&
+      kycDocs?.passportStatus !== "Rejected") ||
     (kycDocs?.utilityStatus === "Approved" && kycDocs?.passportStatus === "Approved");
 
   const isLevel2Pending = !isLevel2Verified && (kycStatus === "PENDING" || kycStatus === "pending");
@@ -109,17 +138,36 @@ export default function SecurityScreen() {
               }
               onPress={() => {
                 if (isLevel2Verified) {
-                  Alert.alert(
-                    "Identity Verified ✅",
-                    "Your Level 2 Identity Verification has been approved. You can proceed to Level 3 Address Verification."
-                  );
+                  setKycModalInfo({
+                    visible: true,
+                    type: "verified",
+                    tier: "Level 2",
+                    title: "Identity Verified",
+                    badgeText: "Level 2 Verified",
+                    badgeBg: "#DCFCE7",
+                    badgeColor: "#166534",
+                    description:
+                      "Your Level 2 Identity Verification has been approved. You have full access to daily withdrawals and can proceed to Level 3 Address Verification.",
+                    primaryButtonText: isLevel3Verified ? undefined : "Proceed to Level 3",
+                    onPrimaryPress: () => {
+                      setKycModalInfo((prev) => ({ ...prev, visible: false }));
+                      router.push("/kyc/level3-intro");
+                    },
+                  });
                   return;
                 }
                 if (isLevel2Pending) {
-                  Alert.alert(
-                    "Verification In Review ⏳",
-                    "Your Level 2 identity documents have been submitted and are currently being reviewed by compliance. You will be notified once complete."
-                  );
+                  setKycModalInfo({
+                    visible: true,
+                    type: "pending",
+                    tier: "Level 2",
+                    title: "Verification In Review",
+                    badgeText: "In Review",
+                    badgeBg: "#FEF9C3",
+                    badgeColor: "#854D0E",
+                    description:
+                      "Your Level 2 identity documents have been submitted and are currently being reviewed by compliance. You will be notified once complete.",
+                  });
                   return;
                 }
                 router.push("/kyc/level2-intro");
@@ -161,17 +209,31 @@ export default function SecurityScreen() {
                   return;
                 }
                 if (isLevel3Verified) {
-                  Alert.alert(
-                    "Address Verified ✅",
-                    "Your Level 3 Address Verification is complete. You have full access to unlimited platform privileges."
-                  );
+                  setKycModalInfo({
+                    visible: true,
+                    type: "verified",
+                    tier: "Level 3",
+                    title: "Address Verified",
+                    badgeText: "Level 3 Verified",
+                    badgeBg: "#DCFCE7",
+                    badgeColor: "#166534",
+                    description:
+                      "Your Level 3 Address Verification is complete. You have full access to unlimited platform privileges, deposits, and withdrawals.",
+                  });
                   return;
                 }
                 if (isLevel3Pending) {
-                  Alert.alert(
-                    "Address In Review ⏳",
-                    "Your Level 3 address documents have been submitted and are currently being reviewed by compliance."
-                  );
+                  setKycModalInfo({
+                    visible: true,
+                    type: "pending",
+                    tier: "Level 3",
+                    title: "Address In Review",
+                    badgeText: "In Review",
+                    badgeBg: "#FEF9C3",
+                    badgeColor: "#854D0E",
+                    description:
+                      "Your Level 3 address documents have been submitted and are currently being reviewed by compliance.",
+                  });
                   return;
                 }
                 router.push("/kyc/level3-intro");
@@ -235,6 +297,82 @@ export default function SecurityScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Custom KYC Status Feedback Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={kycModalInfo.visible}
+        onRequestClose={() => setKycModalInfo((prev) => ({ ...prev, visible: false }))}
+      >
+        <View className="flex-1 justify-center items-center bg-black/50 px-5">
+          <View className="bg-white rounded-[28px] p-6 w-full max-w-[340px] items-center">
+            {/* Top Icon Badge */}
+            <View
+              className="w-16 h-16 rounded-full justify-center items-center mb-3"
+              style={{
+                backgroundColor: kycModalInfo.type === "verified" ? "#DCFCE7" : "#FEF9C3",
+              }}
+            >
+              <MaterialCommunityIcons
+                name={kycModalInfo.type === "verified" ? "shield-check" : "clock-outline"}
+                size={34}
+                color={kycModalInfo.type === "verified" ? "#166534" : "#854D0E"}
+              />
+            </View>
+
+            {/* Badge */}
+            {kycModalInfo.badgeText ? (
+              <View
+                className="mb-2 px-3 py-1 rounded-full"
+                style={{ backgroundColor: kycModalInfo.badgeBg }}
+              >
+                <Text
+                  className="text-[12px] font-bold"
+                  style={{ color: kycModalInfo.badgeColor }}
+                >
+                  {kycModalInfo.badgeText}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Title */}
+            <Text className="text-[20px] font-extrabold text-[#1E293B] text-center mb-2">
+              {kycModalInfo.title}
+            </Text>
+
+            {/* Description */}
+            <Text className="text-[14px] text-[#64748B] text-center mb-6 leading-5">
+              {kycModalInfo.description}
+            </Text>
+
+            {/* Action Buttons */}
+            <View className="w-full gap-y-3">
+              {kycModalInfo.primaryButtonText && kycModalInfo.onPrimaryPress && (
+                <TouchableOpacity
+                  onPress={kycModalInfo.onPrimaryPress}
+                  activeOpacity={0.8}
+                  className="bg-[#155D5F] py-4 rounded-xl items-center w-full"
+                >
+                  <Text className="text-white font-bold text-[16px]">
+                    {kycModalInfo.primaryButtonText}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                onPress={() => setKycModalInfo((prev) => ({ ...prev, visible: false }))}
+                activeOpacity={0.7}
+                className="bg-[#F1F5F9] py-4 rounded-xl items-center w-full"
+              >
+                <Text className="text-[#475569] font-semibold text-[16px]">
+                  {kycModalInfo.primaryButtonText ? "Close" : "Got It"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Level 3 Locked Modal */}
       <Modal

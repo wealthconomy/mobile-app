@@ -29,6 +29,8 @@ import { useDispatch, useSelector } from "react-redux";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppDispatch, RootState } from "../../store";
 import { useVerifyPasscodeMutation } from "../../store/api/userApi";
+import { useLoginMutation } from "../../store/api/authApi";
+import { logout } from "../../store/slices/authSlice";
 import { unlockAppFromInactivity } from "../../store/slices/appStatusSlice";
 
 const { width, height } = Dimensions.get("window");
@@ -49,8 +51,40 @@ export const AppInactivityLockModal: React.FC = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isBioAuthenticating, setIsBioAuthenticating] = useState(false);
 
+  const [loginApi, { isLoading: isVerifyingPassword }] = useLoginMutation();
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [unlockPassword, setUnlockPassword] = useState("");
+  const [showPasswordText, setShowPasswordText] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+
   const inputRef = useRef<TextInput>(null);
   const [verifyPasscodeApi] = useVerifyPasscodeMutation();
+
+  const handlePasswordUnlock = async () => {
+    if (!unlockPassword.trim()) {
+      setPasswordError("Please enter your account password.");
+      return;
+    }
+    setPasswordError("");
+    try {
+      await loginApi({
+        email: user?.email || "",
+        password: unlockPassword.trim(),
+      }).unwrap();
+      setShowPasswordModal(false);
+      setUnlockPassword("");
+      dispatch(unlockAppFromInactivity());
+    } catch (err: any) {
+      const msg = err?.data?.message || err?.message || "Incorrect password. Please try again.";
+      setPasswordError(typeof msg === "string" ? msg : "Incorrect password. Please try again.");
+    }
+  };
+
+  const handleLogoutFromLock = () => {
+    setShowPasswordModal(false);
+    dispatch(unlockAppFromInactivity());
+    dispatch(logout());
+  };
 
   // Prevent hardware back press on Android
   useEffect(() => {
@@ -371,10 +405,111 @@ export const AppInactivityLockModal: React.FC = () => {
                     />
                   )}
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowPasswordModal(true);
+                    setPasswordError("");
+                    setUnlockPassword("");
+                  }}
+                  activeOpacity={0.7}
+                  style={{ marginTop: 20, paddingVertical: 8 }}
+                >
+                  <Text style={{ color: PRIMARY, fontSize: 13.5, fontWeight: "600" }}>
+                    Forgot Passcode? Unlock with Password
+                  </Text>
+                </TouchableOpacity>
               </Animated.View>
             </ScrollView>
           </KeyboardAvoidingView>
         </SafeAreaView>
+
+        {/* Password Unlock Modal */}
+        <Modal visible={showPasswordModal} transparent animationType="slide">
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={{ flex: 1 }}
+          >
+            <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
+              <View style={{ backgroundColor: "#FFFFFF", borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 40 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "800", color: DARK }}>
+                    Unlock with Account Password
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setShowPasswordModal(false)}
+                    style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center" }}
+                  >
+                    <MaterialCommunityIcons name="close" size={18} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={{ fontSize: 13, color: "#6B7280", marginBottom: 16 }}>
+                  Enter your Wealthconomy account password to unlock your app session.
+                </Text>
+
+                <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 14, paddingHorizontal: 14, height: 50, marginBottom: 12 }}>
+                  <MaterialCommunityIcons name="lock-outline" size={20} color="#9CA3AF" />
+                  <TextInput
+                    value={unlockPassword}
+                    onChangeText={(t) => {
+                      setUnlockPassword(t);
+                      setPasswordError("");
+                    }}
+                    placeholder="Enter your account password"
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showPasswordText}
+                    style={{ flex: 1, marginLeft: 10, fontSize: 14, color: DARK }}
+                  />
+                  <TouchableOpacity onPress={() => setShowPasswordText(!showPasswordText)}>
+                    <MaterialCommunityIcons
+                      name={showPasswordText ? "eye-off-outline" : "eye-outline"}
+                      size={20}
+                      color="#9CA3AF"
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {!!passwordError && (
+                  <Text style={{ color: "#DC2626", fontSize: 12.5, fontWeight: "600", marginBottom: 12, textAlign: "center" }}>
+                    {passwordError}
+                  </Text>
+                )}
+
+                <TouchableOpacity
+                  onPress={handlePasswordUnlock}
+                  disabled={isVerifyingPassword}
+                  style={{
+                    backgroundColor: PRIMARY,
+                    height: 50,
+                    borderRadius: 14,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginTop: 6,
+                    marginBottom: 12,
+                  }}
+                >
+                  {isVerifyingPassword ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
+                      Unlock App
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleLogoutFromLock}
+                  style={{ alignItems: "center", paddingVertical: 10 }}
+                >
+                  <Text style={{ color: "#DC2626", fontWeight: "600", fontSize: 13.5 }}>
+                    Log Out of Wealthconomy
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
       </View>
     </Modal>
   );

@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSelector } from "react-redux";
+import { RootState } from "../../src/store";
 import { useForgotPasswordMutation } from "../../src/store/api/authApi";
 
 const PRIMARY = "#155D5F";
@@ -24,7 +26,8 @@ const ERROR = "#DC2626";
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const user = useSelector((state: RootState) => state.auth.user);
+  const [email, setEmail] = useState(user?.email || "");
   const [emailError, setEmailError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [forgotPasswordMutation] = useForgotPasswordMutation();

@@ -862,8 +862,20 @@ export default function WithdrawScreen() {
             ) : null}
 
             <TouchableOpacity
+              onPress={() => {
+                setShowPinModal(false);
+                router.push("/profile/security/change-pin" as any);
+              }}
+              className="mt-2 py-1.5"
+            >
+              <Text className="text-[#155D5F] font-bold text-[13px]">
+                Forgot PIN?
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               onPress={() => setShowPinModal(false)}
-              className="mt-4 py-2"
+              className="mt-2 py-2"
             >
               <Text className="text-[#6B7280] font-semibold text-[13px]">Cancel</Text>
             </TouchableOpacity>

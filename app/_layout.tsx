@@ -110,6 +110,12 @@ function RootLayoutNav() {
     const inAuthGroup = segments[0] === "(auth)";
     const inOnboarding = segments[0] === "onboarding";
     const inSetupPin = inAuthGroup && segments[1] === "setup-pin";
+    const inPasswordResetFlow =
+      inAuthGroup &&
+      (segments[1] === "forgot-password" ||
+        segments[1] === "otp" ||
+        segments[1] === "reset-password" ||
+        segments[1] === "success");
 
     // Check if authenticated user needs to setup their transaction PIN or app passcode
     const needsSecuritySetup =
@@ -126,11 +132,11 @@ function RootLayoutNav() {
         router.replace("/(auth)/login" as any);
       }
     } else if (needsSecuritySetup) {
-      if (!inSetupPin) {
+      if (!inSetupPin && !inPasswordResetFlow) {
         router.replace("/(auth)/setup-pin" as any);
       }
     } else if (inAuthGroup || inOnboarding) {
-      if (!inSetupPin) {
+      if (!inSetupPin && !inPasswordResetFlow) {
         router.replace("/(tabs)" as any);
       }
     }

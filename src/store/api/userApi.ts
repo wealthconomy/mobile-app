@@ -79,6 +79,18 @@ export interface UpdatePinRequest {
   newPin: string;
 }
 
+export interface ResetPinRequest {
+  newPin: string;
+  password?: string;
+  otp?: string;
+}
+
+export interface ResetPasscodeRequest {
+  newPasscode: string;
+  password?: string;
+  otp?: string;
+}
+
 export interface NotificationSettingsRequest {
   emailNotifications?: boolean;
   pushNotifications?: boolean;
@@ -245,6 +257,34 @@ export const userApi = baseApi.injectEndpoints({
         body,
       }),
     }),
+    forgotPin: builder.mutation<ApiResponse<any>, void>({
+      query: () => ({
+        url: "/user/pin/forgot",
+        method: "POST",
+      }),
+    }),
+    resetPin: builder.mutation<ApiResponse<any>, ResetPinRequest>({
+      query: (body) => ({
+        url: "/user/pin/reset",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["User"],
+    }),
+    forgotPasscode: builder.mutation<ApiResponse<any>, void>({
+      query: () => ({
+        url: "/user/passcode/forgot",
+        method: "POST",
+      }),
+    }),
+    resetPasscode: builder.mutation<ApiResponse<any>, ResetPasscodeRequest>({
+      query: (body) => ({
+        url: "/user/passcode/reset",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["User"],
+    }),
   }),
   overrideExisting: true,
 });
@@ -258,11 +298,15 @@ export const {
   useSetupPinMutation,
   useVerifyPinMutation,
   useUpdatePinMutation,
+  useForgotPinMutation,
+  useResetPinMutation,
   useUpdateNotificationSettingsMutation,
   useToggleBiometricsMutation,
   useDeleteAccountMutation,
   useSetupPasscodeMutation,
   useVerifyPasscodeMutation,
   useUpdatePasscodeMutation,
+  useForgotPasscodeMutation,
+  useResetPasscodeMutation,
   useJoinWaitlistMutation,
 } = userApi;
