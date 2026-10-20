@@ -6,6 +6,7 @@ import { setCredentials } from "@/src/store/slices/authSlice";
 import { useImageUpload } from "@/src/hooks/useImageUpload";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -149,45 +150,55 @@ export default function ProfileScreen() {
   };
 
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission Denied",
-        "We need access to your gallery to change your profile photo.",
-      );
-      return;
-    }
+    suspendAppLock(true);
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "We need access to your gallery to change your profile photo.",
+        );
+        return;
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-    if (!result.canceled && result.assets?.[0]?.uri) {
-      await handleImageSelected(result.assets[0].uri);
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        await handleImageSelected(result.assets[0].uri);
+      }
+    } finally {
+      suspendAppLock(false);
     }
   };
 
   const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission Denied",
-        "We need access to your camera to take a photo.",
-      );
-      return;
-    }
+    suspendAppLock(true);
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "We need access to your camera to take a photo.",
+        );
+        return;
+      }
 
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-    if (!result.canceled && result.assets?.[0]?.uri) {
-      await handleImageSelected(result.assets[0].uri);
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        await handleImageSelected(result.assets[0].uri);
+      }
+    } finally {
+      suspendAppLock(false);
     }
   };
 

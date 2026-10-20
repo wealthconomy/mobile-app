@@ -11,6 +11,7 @@ import Animated, {
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
 import { FaceFramingBrackets, KycButton } from "@/src/components/common";
 
 interface Step2ScanIdProps {
@@ -85,6 +86,7 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
   };
 
   const handlePickFromGallery = async () => {
+    suspendAppLock(true);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
@@ -114,6 +116,8 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
       }
     } catch (err) {
       console.log("Error picking ID from gallery:", err);
+    } finally {
+      suspendAppLock(false);
     }
   };
 

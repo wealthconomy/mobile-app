@@ -6,6 +6,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as Clipboard from "expo-clipboard";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
+import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
@@ -335,6 +336,7 @@ export default function ChatScreen() {
   const handleLaunchCamera = async () => {
     setShowAttachmentSheet(false);
     setTimeout(async () => {
+      suspendAppLock(true);
       try {
         console.log("[SupportChat] 📸 Requesting camera permissions...");
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -363,6 +365,8 @@ export default function ChatScreen() {
       } catch (err: any) {
         console.error("[SupportChat] ❌ Error launching camera:", err);
         setSendError("Unable to access camera: " + (err?.message || "Unknown error"));
+      } finally {
+        suspendAppLock(false);
       }
     }, 120);
   };
@@ -370,6 +374,7 @@ export default function ChatScreen() {
   const handleLaunchGallery = async () => {
     setShowAttachmentSheet(false);
     setTimeout(async () => {
+      suspendAppLock(true);
       try {
         console.log("[SupportChat] 🖼️ Launching photo library...");
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -401,6 +406,8 @@ export default function ChatScreen() {
           // Ignore secondary permission check failure
         }
         setSendError("Unable to open photo library: " + (err?.message || "Unknown error"));
+      } finally {
+        suspendAppLock(false);
       }
     }, 120);
   };

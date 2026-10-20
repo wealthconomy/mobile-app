@@ -103,7 +103,7 @@ export default function InviteScreen() {
                 />
                 <View className="absolute z-20 pb-5">
                   <Text className="text-[36px] font-extrabold text-[#155D5F]">
-                    ₦5,000
+                    ₦500
                   </Text>
                 </View>
               </View>

@@ -31,7 +31,11 @@ import { AppDispatch, RootState } from "../../store";
 import { useVerifyPasscodeMutation } from "../../store/api/userApi";
 import { useLoginMutation } from "../../store/api/authApi";
 import { logout } from "../../store/slices/authSlice";
-import { unlockAppFromInactivity } from "../../store/slices/appStatusSlice";
+import {
+  suspendAppLock,
+  unlockAppFromInactivity,
+} from "../../store/slices/appStatusSlice";
+import * as LocalAuthentication from "expo-local-authentication";
 
 const { width, height } = Dimensions.get("window");
 
@@ -50,6 +54,8 @@ export const AppInactivityLockModal: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [isBioAuthenticating, setIsBioAuthenticating] = useState(false);
+  const [canUseBiometrics, setCanUseBiometrics] = useState(false);
+  const [bioIconName, setBioIconName] = useState<"fingerprint" | "face-recognition">("fingerprint");
 
   const [loginApi, { isLoading: isVerifyingPassword }] = useLoginMutation();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -59,6 +65,70 @@ export const AppInactivityLockModal: React.FC = () => {
 
   const inputRef = useRef<TextInput>(null);
   const [verifyPasscodeApi] = useVerifyPasscodeMutation();
+
+  // Determine if biometric icon should be shown
+  useEffect(() => {
+    let isMounted = true;
+
+    async function checkBiometricsAvailability() {
+      // 1. Check if user has biometricsEnabled (from Redux user or stored local setting)
+      let isEnabled = Boolean(user?.biometricsEnabled);
+      if (!isEnabled) {
+        try {
+          const storedBio = await AsyncStorage.getItem("@wealth_biometrics_enabled");
+          if (storedBio === "true") {
+            isEnabled = true;
+          }
+        } catch {
+          // Ignore
+        }
+      }
+
+      if (!isEnabled) {
+        if (isMounted) setCanUseBiometrics(false);
+        return;
+      }
+
+      try {
+        // 2. Check device hardware
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        if (!hasHardware) {
+          if (isMounted) setCanUseBiometrics(false);
+          return;
+        }
+
+        // 3. Check enrollment
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+        if (!isEnrolled) {
+          if (isMounted) setCanUseBiometrics(false);
+          return;
+        }
+
+        // Detect supported auth types (Face ID vs Fingerprint)
+        try {
+          const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+          if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+            if (isMounted) setBioIconName("face-recognition");
+          } else {
+            if (isMounted) setBioIconName("fingerprint");
+          }
+        } catch {
+          if (isMounted) setBioIconName("fingerprint");
+        }
+
+        if (isMounted) setCanUseBiometrics(true);
+      } catch (err) {
+        if (isMounted) setCanUseBiometrics(false);
+      }
+    }
+
+    if (isInactivityLocked) {
+      checkBiometricsAvailability();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [isInactivityLocked, user?.biometricsEnabled]);
 
   const handlePasswordUnlock = async () => {
     if (!unlockPassword.trim()) {
@@ -155,17 +225,39 @@ export const AppInactivityLockModal: React.FC = () => {
   };
 
   const handleBiometricUnlock = async () => {
+    if (isBioAuthenticating) return;
     setIsBioAuthenticating(true);
     setErrorMessage("");
+    suspendAppLock(true);
     try {
-      // Simulate/trigger biometric unlock verification
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      dispatch(unlockAppFromInactivity());
-    } catch {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Unlock Wealthconomy",
+        fallbackLabel: "Use Passcode",
+        cancelLabel: "Cancel",
+        disableDeviceFallback: false,
+      });
+
+      if (result.success) {
+        dispatch(unlockAppFromInactivity());
+      } else {
+        // Cancelled or failed attempt: stay on passcode screen with no crash
+        if (
+          result.error !== "user_cancel" &&
+          result.error !== "app_cancel" &&
+          result.error !== "system_cancel"
+        ) {
+          setErrorMessage(
+            "Biometric authentication failed. Please enter your passcode."
+          );
+        }
+      }
+    } catch (err) {
+      console.log("Biometric unlock error:", err);
       setErrorMessage(
-        "Biometric authentication failed. Please use your passcode.",
+        "Biometric authentication failed. Please enter your passcode."
       );
     } finally {
+      suspendAppLock(false);
       setIsBioAuthenticating(false);
     }
   };
@@ -382,29 +474,35 @@ export const AppInactivityLockModal: React.FC = () => {
                 </View>
               )}
 
-              {/* Biometrics Action (Fingerprint Icon) */}
+              {/* Biometrics Action (Fingerprint / Face ID Icon) */}
               <Animated.View
                 entering={FadeInUp.duration(500).delay(300)}
                 style={styles.bottomActionWrapper}
               >
-                <TouchableOpacity
-                  style={styles.bioIconButton}
-                  onPress={handleBiometricUnlock}
-                  activeOpacity={0.7}
-                  disabled={isBioAuthenticating}
-                  accessibilityLabel="Unlock with Fingerprint"
-                  accessibilityRole="button"
-                >
-                  {isBioAuthenticating ? (
-                    <ActivityIndicator size="small" color={PRIMARY} />
-                  ) : (
-                    <MaterialCommunityIcons
-                      name="fingerprint"
-                      size={36}
-                      color={PRIMARY}
-                    />
-                  )}
-                </TouchableOpacity>
+                {canUseBiometrics && (
+                  <TouchableOpacity
+                    style={styles.bioIconButton}
+                    onPress={handleBiometricUnlock}
+                    activeOpacity={0.7}
+                    disabled={isBioAuthenticating}
+                    accessibilityLabel={
+                      bioIconName === "face-recognition"
+                        ? "Unlock with Face ID"
+                        : "Unlock with Fingerprint"
+                    }
+                    accessibilityRole="button"
+                  >
+                    {isBioAuthenticating ? (
+                      <ActivityIndicator size="small" color={PRIMARY} />
+                    ) : (
+                      <MaterialCommunityIcons
+                        name={bioIconName}
+                        size={36}
+                        color={PRIMARY}
+                      />
+                    )}
+                  </TouchableOpacity>
+                )}
 
                 <TouchableOpacity
                   onPress={() => {
@@ -413,7 +511,7 @@ export const AppInactivityLockModal: React.FC = () => {
                     setUnlockPassword("");
                   }}
                   activeOpacity={0.7}
-                  style={{ marginTop: 20, paddingVertical: 8 }}
+                  style={{ marginTop: canUseBiometrics ? 20 : 8, paddingVertical: 8 }}
                 >
                   <Text style={{ color: PRIMARY, fontSize: 13.5, fontWeight: "600" }}>
                     Forgot Passcode? Unlock with Password

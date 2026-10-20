@@ -1,6 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { Alert } from "react-native";
+import { suspendAppLock } from "../store/slices/appStatusSlice";
 
 export interface ImageSelectionResult {
   uri: string;
@@ -18,6 +19,7 @@ export const imageService = {
   async pickImageFromLibrary(
     options: ImagePicker.ImagePickerOptions = {}
   ): Promise<ImageSelectionResult | null> {
+    suspendAppLock(true);
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
@@ -52,6 +54,8 @@ export const imageService = {
       console.log("Error picking image from library:", error);
       Alert.alert("Error", "Could not pick image from library.");
       return null;
+    } finally {
+      suspendAppLock(false);
     }
   },
 
@@ -61,6 +65,7 @@ export const imageService = {
   async captureImageWithCamera(
     options: ImagePicker.ImagePickerOptions = {}
   ): Promise<ImageSelectionResult | null> {
+    suspendAppLock(true);
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
@@ -95,6 +100,8 @@ export const imageService = {
       console.log("Error capturing image with camera:", error);
       Alert.alert("Error", "Could not take photo with camera.");
       return null;
+    } finally {
+      suspendAppLock(false);
     }
   },
 

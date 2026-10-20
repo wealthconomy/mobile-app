@@ -8,6 +8,7 @@ import {
 import { useImageUpload } from "@/src/hooks/useImageUpload";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Check } from "lucide-react-native";
@@ -57,15 +58,20 @@ export default function GeneralSettingsScreen() {
   }, [group]);
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.8,
-    });
+    suspendAppLock(true);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
 
-    if (!result.canceled) {
-      setCoverImage(result.assets[0].uri);
+      if (!result.canceled) {
+        setCoverImage(result.assets[0].uri);
+      }
+    } finally {
+      suspendAppLock(false);
     }
   };
 

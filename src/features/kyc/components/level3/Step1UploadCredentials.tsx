@@ -6,6 +6,7 @@ import { IdCardDisplay, IdCardData } from './IdCardDisplay';
 import { DocumentUploadBox } from './DocumentUploadBox';
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
 import { KycFormInput, KycSelectTrigger } from "@/src/components/common";
 import { AlertCircle, Check, ChevronDown, Search, X } from "lucide-react-native";
 import { NIGERIA_STATES } from "@/src/constants/nigeriaLocations";
@@ -139,6 +140,7 @@ export const Step1UploadCredentials: React.FC<Props> = ({
     : undefined;
 
   const pickProofOfAddress = async () => {
+    suspendAppLock(true);
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["application/pdf", "image/*"],
@@ -150,10 +152,13 @@ export const Step1UploadCredentials: React.FC<Props> = ({
       }
     } catch (err) {
       console.log("Error picking proof of address:", err);
+    } finally {
+      suspendAppLock(false);
     }
   };
 
   const pickPassport = async () => {
+    suspendAppLock(true);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
@@ -169,6 +174,8 @@ export const Step1UploadCredentials: React.FC<Props> = ({
       }
     } catch (err) {
       console.log("Error picking passport image:", err);
+    } finally {
+      suspendAppLock(false);
     }
   };
 

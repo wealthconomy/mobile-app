@@ -61,7 +61,13 @@ export default function WealthPortfolioScreen() {
   );
 
   const { data: walletData, isLoading, refetch: refetchWallet } = useGetWalletSummaryQuery();
-  const { data: configData, refetch: refetchConfig } = useGetPortfolioConfigQuery();
+  const {
+    data: configData,
+    isLoading: isConfigLoading,
+    isFetching: isConfigFetching,
+    isError: isConfigError,
+    refetch: refetchConfig,
+  } = useGetPortfolioConfigQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
 
   const handleRefresh = async () => {
@@ -77,6 +83,7 @@ export default function WealthPortfolioScreen() {
   };
 
   const getRateLabel = (type: string) => {
+    if (isConfigError) return "--";
     const keyMap: Record<string, string> = {
       flex: "wealthflex",
       fix: "wealthfix",
@@ -112,6 +119,8 @@ export default function WealthPortfolioScreen() {
           hideInterest={preferences[item.type] === "Impact Wealth"}
           hasNotification={false}
           interestRate={getRateLabel(item.type)}
+          isLoadingRate={refreshing || isConfigFetching}
+          isRateError={isConfigError}
         />
       )}
     </View>
@@ -125,7 +134,7 @@ export default function WealthPortfolioScreen() {
       <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
 
       <FlatList
-        data={isLoading ? ([1, 2, 3, 4, 5, 6] as any[]) : PORTFOLIOS}
+        data={isLoading || isConfigLoading ? ([1, 2, 3, 4, 5, 6] as any[]) : PORTFOLIOS}
         keyExtractor={(item, index) =>
           typeof item === "number" ? index.toString() : item.id
         }

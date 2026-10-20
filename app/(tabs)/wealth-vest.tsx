@@ -2,7 +2,6 @@ import { StatusBar } from "expo-status-bar";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,8 +10,9 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RootState } from "../../src/store";
 import { useJoinWaitlistMutation } from "../../src/store/api/userApi";
 import { Ionicons } from "@expo/vector-icons";
@@ -58,6 +58,39 @@ export default function WealthVestScreen() {
   const [waitlistPosition, setWaitlistPosition] = useState<number | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("Real Estate");
 
+  // Check server state if user profile exposes waitlist membership
+  const serverHasJoined = Boolean((user as any)?.hasJoinedWaitlist || (user as any)?.waitlistJoined);
+  const serverWaitlistPos = (user as any)?.waitlistPosition;
+
+  useEffect(() => {
+    if (serverHasJoined) {
+      setHasJoined(true);
+      if (serverWaitlistPos) setWaitlistPosition(serverWaitlistPos);
+      return;
+    }
+
+    if (!user?.id) return;
+    const key = `@wealth_waitlist_joined_${user.id}`;
+    const posKey = `@wealth_waitlist_pos_${user.id}`;
+
+    AsyncStorage.getItem(key)
+      .then((val) => {
+        if (val === "true") {
+          setHasJoined(true);
+        }
+      })
+      .catch(() => {});
+
+    AsyncStorage.getItem(posKey)
+      .then((val) => {
+        if (val) {
+          const parsed = parseInt(val, 10);
+          if (!isNaN(parsed)) setWaitlistPosition(parsed);
+        }
+      })
+      .catch(() => {});
+  }, [user?.id, serverHasJoined, serverWaitlistPos]);
+
   const handleJoinWaitlist = async () => {
     try {
       const res = await joinWaitlistApi({
@@ -66,11 +99,20 @@ export default function WealthVestScreen() {
         fullName: `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || undefined,
         intendedInvestment: selectedCategory,
       }).unwrap();
+
       const pos = res?.data?.waitlistPosition;
       if (pos) {
         setWaitlistPosition(pos);
       }
       setHasJoined(true);
+
+      if (user?.id) {
+        AsyncStorage.setItem(`@wealth_waitlist_joined_${user.id}`, "true").catch(() => {});
+        if (pos) {
+          AsyncStorage.setItem(`@wealth_waitlist_pos_${user.id}`, String(pos)).catch(() => {});
+        }
+      }
+
       Alert.alert(
         "Waitlist Confirmed! 🎉",
         pos
@@ -78,9 +120,27 @@ export default function WealthVestScreen() {
           : (res?.message || "Thank you for registering your interest. You'll receive priority access as soon as allocations go live.")
       );
     } catch (err: any) {
-      const msg = err?.data?.message || err?.message || "Thank you for registering your interest.";
-      setHasJoined(true);
-      Alert.alert("Waitlist Confirmed! 🎉", msg);
+      const errorMsg = (err?.data?.message || err?.message || "").toString();
+      const lower = errorMsg.toLowerCase();
+      const isAlreadyJoined =
+        err?.status === 409 ||
+        lower.includes("already") ||
+        lower.includes("exist") ||
+        lower.includes("duplicate");
+
+      if (isAlreadyJoined) {
+        setHasJoined(true);
+        if (user?.id) {
+          AsyncStorage.setItem(`@wealth_waitlist_joined_${user.id}`, "true").catch(() => {});
+        }
+        Alert.alert(
+          "Already on Waitlist! 🎉",
+          "You are already registered on the Priority Waitlist. We'll notify you as soon as allocations go live."
+        );
+      } else {
+        const msg = errorMsg || "Unable to join waitlist. Please check your connection and try again.";
+        Alert.alert("Unable to Join Waitlist", msg);
+      }
     }
   };
 
@@ -133,20 +193,6 @@ export default function WealthVestScreen() {
             elevation: 4,
           }}
         >
-          {/* Subtle Watermark Illustration */}
-          <Image
-            source={require("../../assets/images/coming.png")}
-            style={{
-              position: "absolute",
-              right: -20,
-              bottom: -20,
-              width: 170,
-              height: 170,
-              opacity: 0.25,
-            }}
-            resizeMode="contain"
-          />
-
           <View className="bg-white/20 self-start px-3 py-1 rounded-full mb-3">
             <Text className="text-white text-[11px] font-bold">
               Cohort Allocation · Q3
@@ -157,7 +203,7 @@ export default function WealthVestScreen() {
             The Future of{"\n"}Wealth is Vesting.
           </Text>
 
-          <Text className="text-[#E6F4FE] text-[13px] leading-[20px] max-w-[280px]">
+          <Text className="text-[#E6F4FE] text-[13px] leading-[20px]">
             Move beyond regular saving. Start owning curated, high-yield alternative assets structured for long-term financial independence.
           </Text>
         </Animated.View>

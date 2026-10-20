@@ -1,5 +1,6 @@
 import Header from "@/src/components/common/Header";
 import * as LocalAuthentication from "expo-local-authentication";
+import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,8 +14,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSelector } from "react-redux";
-import { RootState } from "@/src/store";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "@/src/store";
+import { setBiometricsEnabled } from "@/src/store/slices/authSlice";
 import {
   useGetMyProfileQuery,
   useToggleBiometricsMutation,
@@ -27,6 +29,7 @@ const BRAND_TEAL = "#008185";
 const DARK = "#1A1A1A";
 
 export default function EnableFaceIDScreen() {
+  const dispatch = useDispatch<AppDispatch>();
   const authUser = useSelector((state: RootState) => state.auth.user);
   const { data: profileData } = useGetMyProfileQuery();
   const [toggleBiometrics, { isLoading: isTogglingBio }] = useToggleBiometricsMutation();
@@ -66,11 +69,17 @@ export default function EnableFaceIDScreen() {
         }
 
         // c) Authenticate user
-        const authResult = await LocalAuthentication.authenticateAsync({
-          promptMessage: "Confirm to enable Face ID",
-          fallbackLabel: "Use Passcode",
-          cancelLabel: "Cancel",
-        });
+        suspendAppLock(true);
+        let authResult;
+        try {
+          authResult = await LocalAuthentication.authenticateAsync({
+            promptMessage: "Confirm to enable Face ID",
+            fallbackLabel: "Use Passcode",
+            cancelLabel: "Cancel",
+          });
+        } finally {
+          suspendAppLock(false);
+        }
 
         if (!authResult.success) {
           if (authResult.error === "user_cancel" || authResult.error === "app_cancel") {
@@ -100,6 +109,7 @@ export default function EnableFaceIDScreen() {
       setIsBioEnabled(true);
       try {
         await toggleBiometrics({ biometricsEnabled: true }).unwrap();
+        dispatch(setBiometricsEnabled(true));
         Alert.alert(
           "Biometrics Updated",
           "Biometric authentication enabled successfully!"
@@ -123,6 +133,7 @@ export default function EnableFaceIDScreen() {
       setIsBioEnabled(false);
       try {
         await toggleBiometrics({ biometricsEnabled: false }).unwrap();
+        dispatch(setBiometricsEnabled(false));
         Alert.alert(
           "Biometrics Updated",
           "Biometric authentication disabled."
