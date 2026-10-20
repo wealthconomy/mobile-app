@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { loadAuthFromStorage } from './authSlice';
 
 export type LockoutType = 'MAINTENANCE' | 'SUSPENDED' | 'BLOCKED' | null;
 
@@ -61,6 +62,23 @@ const appStatusSlice = createSlice({
       state.isInactivityLocked = false;
     },
   },
+  extraReducers: (builder) => {
+    builder.addCase(loadAuthFromStorage.fulfilled, (state, action) => {
+      const payload = action.payload;
+      const isAuth = Boolean(payload?.token && (payload?.isAuthenticated ?? true));
+      const hasOnboarding = Boolean(payload?.hasCompletedOnboarding);
+      const hasPasscode = Boolean(payload?.user?.hasAppPasscode);
+      if (isAuth && hasOnboarding && hasPasscode) {
+        state.isInactivityLocked = true;
+      }
+    });
+    builder.addMatcher(
+      (action) => action.type === 'auth/logout',
+      (state) => {
+        state.isInactivityLocked = false;
+      }
+    );
+  },
 });
 
 export const {
@@ -69,4 +87,13 @@ export const {
   lockAppForInactivity,
   unlockAppFromInactivity,
 } = appStatusSlice.actions;
+
+let lockSuspended = false;
+
+export const suspendAppLock = (suspend: boolean) => {
+  lockSuspended = suspend;
+};
+
+export const isAppLockSuspended = () => lockSuspended;
+
 export default appStatusSlice.reducer;

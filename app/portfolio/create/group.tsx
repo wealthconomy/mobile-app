@@ -10,6 +10,7 @@ import { CreateGroupRequest, GroupFrequency } from "@/src/types/group";
 import { formatEarlyTerminationPenaltyRate, getDynamicPenaltyRate } from "@/src/utils/formatters";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Check, Share2, Upload, X } from "lucide-react-native";
@@ -729,14 +730,19 @@ function GroupTypeInfoCard({
 
 function Step1Identity({ data, update, hideGroupTypeSelector }: any) {
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 1,
-    });
-    if (!result.canceled) {
-      update("coverImage", result.assets[0].uri);
+    suspendAppLock(true);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 1,
+      });
+      if (!result.canceled) {
+        update("coverImage", result.assets[0].uri);
+      }
+    } finally {
+      suspendAppLock(false);
     }
   };
 

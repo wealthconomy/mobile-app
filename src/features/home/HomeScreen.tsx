@@ -32,10 +32,15 @@ export default function HomeScreen() {
     (state: RootState) => state.portfolioPreference,
   );
 
-  const { refetch: refetchWallet } = useGetWalletSummaryQuery();
+  const { isLoading: isWalletLoading, refetch: refetchWallet } = useGetWalletSummaryQuery();
   const { refetch: refetchActivities } = useGetMyActivitiesQuery({ limit: 5 });
-  const { data: configData, refetch: refetchConfig } =
-    useGetPortfolioConfigQuery();
+  const {
+    data: configData,
+    isLoading: isConfigLoading,
+    isFetching: isConfigFetching,
+    isError: isConfigError,
+    refetch: refetchConfig,
+  } = useGetPortfolioConfigQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
 
   const handleRefresh = async () => {
@@ -52,6 +57,7 @@ export default function HomeScreen() {
   };
 
   const getRateLabel = (type: string) => {
+    if (isConfigError) return "--";
     const keyMap: Record<string, string> = {
       flex: "wealthflex",
       fix: "wealthfix",
@@ -63,6 +69,9 @@ export default function HomeScreen() {
     const rateKey = keyMap[type] || `wealth${type}`;
     return rates?.[rateKey]?.label;
   };
+
+  const isRateLoading = refreshing || isConfigFetching;
+  const isPageLoading = loading || isConfigLoading || isWalletLoading;
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000);
@@ -98,7 +107,7 @@ export default function HomeScreen() {
         {/* Header Section */}
         <HomeHeader />
 
-        {loading ? (
+        {isPageLoading ? (
           <DashboardLoadingState />
         ) : (
           <>
@@ -131,6 +140,8 @@ export default function HomeScreen() {
                     title="WealthFlex"
                     description="Smart flexible savings; earn interest, access anytime."
                     interestRate={getRateLabel("flex")}
+                    isLoadingRate={isRateLoading}
+                    isRateError={isConfigError}
                     hideInterest={preferences["flex"] === "Impact Wealth"}
                   />
                 </View>
@@ -141,6 +152,8 @@ export default function HomeScreen() {
                     title="WealthFam"
                     description="Build a wealthy family; save for kids, spouse, and loved ones."
                     interestRate={getRateLabel("fam")}
+                    isLoadingRate={isRateLoading}
+                    isRateError={isConfigError}
                     hideInterest={preferences["fam"] === "Impact Wealth"}
                   />
                 </View>
@@ -151,6 +164,8 @@ export default function HomeScreen() {
                     title="WealthGoal"
                     description="Save with focus and smash every target."
                     interestRate={getRateLabel("goal")}
+                    isLoadingRate={isRateLoading}
+                    isRateError={isConfigError}
                     hideInterest={preferences["goal"] === "Impact Wealth"}
                   />
                 </View>
@@ -162,6 +177,8 @@ export default function HomeScreen() {
                     title="WealthFix"
                     description="Lock it in, block temptation, and watch your money grow."
                     interestRate={getRateLabel("fix")}
+                    isLoadingRate={isRateLoading}
+                    isRateError={isConfigError}
                     hideInterest={preferences["fix"] === "Impact Wealth"}
                   />
                 </View>
@@ -172,6 +189,8 @@ export default function HomeScreen() {
                     title="WealthFlow"
                     description="Automated savings for a continuous wealth flow."
                     interestRate={getRateLabel("flow")}
+                    isLoadingRate={isRateLoading}
+                    isRateError={isConfigError}
                     hideInterest={preferences["flow"] === "Impact Wealth"}
                   />
                 </View>
@@ -182,6 +201,8 @@ export default function HomeScreen() {
                     title="WealthGroup"
                     description="Save together, grow together and win together."
                     interestRate={getRateLabel("group")}
+                    isLoadingRate={isRateLoading}
+                    isRateError={isConfigError}
                     hideInterest={preferences["group"] === "Impact Wealth"}
                   />
                 </View>

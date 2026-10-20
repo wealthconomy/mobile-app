@@ -23,9 +23,16 @@ import "../global.css";
 import { AppDispatch, RootState, store } from "../src/store";
 import { loadAuthFromStorage } from "../src/store/slices/authSlice";
 import { loadGroupsFromStorage } from "../src/store/slices/wealthGroupSlice";
-import { lockAppForInactivity } from "../src/store/slices/appStatusSlice";
+import { lockAppForInactivity, isAppLockSuspended } from "../src/store/slices/appStatusSlice";
 
 const queryClient = new QueryClient();
+
+/**
+ * Inactivity Lock Timeout in milliseconds.
+ * Set to 0 to lock immediately upon the app moving to background.
+ * Can be changed to > 0 (e.g. 45000) for a delayed background lock.
+ */
+const LOCK_TIMEOUT_MS = 0;
 
 export { ErrorBoundary } from "expo-router";
 
@@ -79,18 +86,116 @@ function RootLayoutNav() {
     dispatch(loadGroupsFromStorage());
   }, [dispatch]);
 
-  // Inactivity / Background Auto-lock (45-60 seconds)
   const backgroundTimeRef = useRef<number | null>(null);
+  const latestStateRef = useRef({
+    segments,
+    user,
+    isAuthenticated,
+    hasCompletedOnboarding,
+  });
+
+  useEffect(() => {
+    latestStateRef.current = {
+      segments,
+      user,
+      isAuthenticated,
+      hasCompletedOnboarding,
+    };
+  }, [segments, user, isAuthenticated, hasCompletedOnboarding]);
+
+  // Cold-start lock safeguard: ensure passcode modal is showing before dashboard renders
+  const coldStartLockCheckedRef = useRef(false);
+  useEffect(() => {
+    if (isLoading) return;
+    if (!coldStartLockCheckedRef.current) {
+      coldStartLockCheckedRef.current = true;
+      const currentPath = segments.join("/");
+      const isExemptScreen =
+        segments[0] === "(auth)" ||
+        segments[0] === "onboarding" ||
+        currentPath.includes("setup-pin") ||
+        currentPath.includes("change-passcode");
+
+      if (
+        isAuthenticated &&
+        hasCompletedOnboarding &&
+        user?.hasAppPasscode &&
+        !isExemptScreen
+      ) {
+        dispatch(lockAppForInactivity());
+      }
+    }
+  }, [
+    isLoading,
+    isAuthenticated,
+    hasCompletedOnboarding,
+    user?.hasAppPasscode,
+    segments,
+    dispatch,
+  ]);
 
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (nextAppState === "background" || nextAppState === "inactive") {
-        backgroundTimeRef.current = Date.now();
+      // 3. Do NOT lock on 'inactive' alone (iOS system dialogs, Face ID prompt, notification shade)
+      if (nextAppState === "background") {
+        // 4. Do NOT lock when lock is temporarily suspended (camera, photo picker, document picker, biometrics)
+        if (isAppLockSuspended()) {
+          return;
+        }
+
+        const {
+          segments: currentSegments,
+          user: currentUser,
+          isAuthenticated: isAuth,
+          hasCompletedOnboarding: isOnboarded,
+        } = latestStateRef.current;
+
+        const currentPath = currentSegments.join("/");
+        // 5. Never lock on login, signup, onboarding, or passcode-creation screens
+        const isExemptScreen =
+          currentSegments[0] === "(auth)" ||
+          currentSegments[0] === "onboarding" ||
+          currentPath.includes("setup-pin") ||
+          currentPath.includes("change-passcode");
+
+        const hasPasscode = Boolean(currentUser?.hasAppPasscode);
+        const isEligibleToLock =
+          isAuth && isOnboarded && hasPasscode && !isExemptScreen;
+
+        if (isEligibleToLock) {
+          if (LOCK_TIMEOUT_MS === 0) {
+            // Immediate lock on background transition
+            dispatch(lockAppForInactivity());
+          } else {
+            backgroundTimeRef.current = Date.now();
+          }
+        }
       } else if (nextAppState === "active") {
-        if (backgroundTimeRef.current && isAuthenticated) {
-          const elapsedSeconds = (Date.now() - backgroundTimeRef.current) / 1000;
-          // If app was left in background for 45 seconds or more, lock it
-          if (elapsedSeconds >= 45) {
+        if (
+          LOCK_TIMEOUT_MS > 0 &&
+          backgroundTimeRef.current &&
+          !isAppLockSuspended()
+        ) {
+          const {
+            segments: currentSegments,
+            user: currentUser,
+            isAuthenticated: isAuth,
+            hasCompletedOnboarding: isOnboarded,
+          } = latestStateRef.current;
+
+          const currentPath = currentSegments.join("/");
+          const isExemptScreen =
+            currentSegments[0] === "(auth)" ||
+            currentSegments[0] === "onboarding" ||
+            currentPath.includes("setup-pin") ||
+            currentPath.includes("change-passcode");
+
+          const hasPasscode = Boolean(currentUser?.hasAppPasscode);
+          const isEligibleToLock =
+            isAuth && isOnboarded && hasPasscode && !isExemptScreen;
+
+          const elapsedMs = Date.now() - backgroundTimeRef.current;
+          if (isEligibleToLock && elapsedMs >= LOCK_TIMEOUT_MS) {
             dispatch(lockAppForInactivity());
           }
         }
@@ -100,7 +205,7 @@ function RootLayoutNav() {
 
     const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => subscription.remove();
-  }, [dispatch, isAuthenticated]);
+  }, [dispatch]);
 
   useEffect(() => {
     if (isLoading) {

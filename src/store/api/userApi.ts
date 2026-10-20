@@ -1,4 +1,4 @@
-import { setCredentials } from "../slices/authSlice";
+import { setCredentials, setBiometricsEnabled } from "../slices/authSlice";
 import { RootState } from "../index";
 import { baseApi, ApiResponse } from "./baseApi";
 
@@ -220,6 +220,14 @@ export const userApi = baseApi.injectEndpoints({
         body,
       }),
       invalidatesTags: ["User"],
+      async onQueryStarted(body, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(setBiometricsEnabled(body.biometricsEnabled));
+        } catch {
+          // Handled by caller
+        }
+      },
     }),
     deleteAccount: builder.mutation<ApiResponse<{ ok: boolean }>, void>({
       query: () => ({

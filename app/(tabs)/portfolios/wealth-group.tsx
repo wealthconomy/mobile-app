@@ -469,7 +469,7 @@ export default function WealthGroupScreen() {
       members: memberCount,
       image: g.coverImage
         ? { uri: sanitizeImageUrl(g.coverImage) }
-        : require("../../../assets/images/group_trending_1.png"),
+        : require("../../../assets/images/group1.png"),
     };
   });
 
@@ -1112,7 +1112,7 @@ function DiscoverySection({
 
 function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
   const [imgError, setImgError] = useState(false);
-  const fallbackImg = require("../../../assets/images/group_trending_1.png");
+  const fallbackImg = require("../../../assets/images/group1.png");
 
   return (
     <TouchableOpacity
