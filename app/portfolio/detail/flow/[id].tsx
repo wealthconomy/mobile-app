@@ -267,7 +267,7 @@ export default function FlowDetailScreen() {
       >
         <Stack.Screen options={SCREEN_OPTIONS} />
         <Header title="Review" onBack={handleBack} />
-        <Text style={{ color: "#6B7280", marginTop: 20 }}>Plan not found</Text>
+        <Text style={{ color: "#4B5563", fontSize: 14, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginTop: 20 }}>Plan not found</Text>
         <TouchableOpacity
           onPress={() => router.replace("/(tabs)/portfolios/wealth-flow")}
           style={{ marginTop: 16, backgroundColor: TEAL, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
@@ -604,7 +604,7 @@ export default function FlowDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Status</Text>
-                <Text style={[styles.value, { color: isCompleted || plan.status === "COMPLETED" ? "#10B981" : TEAL }]}>
+                <Text style={[styles.value, { color: isCompleted || plan.status === "COMPLETED" ? "#166534" : TEAL }]}>
                   {isCompleted ? "COMPLETED" : (plan.status || "ACTIVE")}
                 </Text>
               </View>
@@ -1044,7 +1044,9 @@ export default function FlowDetailScreen() {
                 <Text
                   style={{
                     fontSize: 13,
-                    color: "#6B7280",
+                    color: "#4B5563",
+                    fontFamily: "KumbhSans_600SemiBold",
+                    fontWeight: "600",
                     textAlign: "center",
                     marginBottom: 14,
                     lineHeight: 20,
@@ -1155,7 +1157,7 @@ export default function FlowDetailScreen() {
                       justifyContent: "center",
                     }}
                   >
-                    <Text style={{ fontSize: 14, color: "#6B7280", fontWeight: "600" }}>Cancel</Text>
+                    <Text style={{ fontSize: 14, color: "#4B5563", fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}>Cancel</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -1323,7 +1325,8 @@ const styles = StyleSheet.create({
   },
   sourceText: {
     fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "500",
+    color: "#4B5563",
+    fontFamily: "KumbhSans_600SemiBold",
+    fontWeight: "600",
   },
 });

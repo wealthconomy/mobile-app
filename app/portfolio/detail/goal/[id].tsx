@@ -250,7 +250,7 @@ export default function GoalDetailScreen() {
       >
         <Stack.Screen options={SCREEN_OPTIONS} />
         <Header title="Review" onBack={handleBack} />
-        <Text style={{ color: "#6B7280" }}>Goal not found</Text>
+        <Text style={{ color: "#4B5563", fontSize: 14, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}>Goal not found</Text>
         <ThemedButton
           title="Go Back"
           onPress={handleBack}
@@ -332,7 +332,7 @@ export default function GoalDetailScreen() {
           >
             {goal.name}
           </Text>
-          <Text style={{ color: "#6B7280", fontSize: 14, marginBottom: 16 }}>
+          <Text style={{ color: "#4B5563", fontSize: 14, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginBottom: 16 }}>
             {goal.metadata?.category || "Goal"}
           </Text>
           <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 28 }}>
@@ -565,7 +565,7 @@ export default function GoalDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Status</Text>
-                <Text style={[styles.value, { color: isCompleted || goal.status === "COMPLETED" ? "#10B981" : TEAL }]}>
+                <Text style={[styles.value, { color: isCompleted || goal.status === "COMPLETED" ? "#166534" : TEAL }]}>
                   {isCompleted ? "COMPLETED" : (goal.status || "ACTIVE")}
                 </Text>
               </View>
@@ -925,9 +925,12 @@ export default function GoalDetailScreen() {
                   Terminate Wealth Fund?
                 </Text>
                 <Text
+                  maxFontSizeMultiplier={1.35}
                   style={{
                     fontSize: 13,
-                    color: "#6B7280",
+                    color: "#4B5563",
+                    fontFamily: "KumbhSans_600SemiBold",
+                    fontWeight: "600",
                     textAlign: "center",
                     marginBottom: 14,
                     lineHeight: 18,

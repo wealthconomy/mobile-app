@@ -1474,7 +1474,7 @@ export default function TribeMembersScreen() {
           ListHeaderComponent={renderHeader()}
           ListEmptyComponent={
             <View className="items-center justify-center py-20 px-10">
-              <Text className="text-[#64748B] text-center text-base">
+              <Text className="text-[#4B5563] text-center text-base font-kumbh-semibold">
                 No members found
               </Text>
             </View>
@@ -1564,7 +1564,7 @@ export default function TribeMembersScreen() {
                     >
                       <Text
                         maxFontSizeMultiplier={1.35}
-                        className="text-[#1A1A1A] font-medium text-[13px] mr-1.5"
+                        className="text-[#1A1A1A] font-kumbh-semibold text-[13px] mr-1.5"
                         numberOfLines={1}
                         ellipsizeMode="tail"
                         style={{ flexShrink: 1 }}

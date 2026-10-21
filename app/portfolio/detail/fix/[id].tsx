@@ -248,7 +248,7 @@ export default function FixDetailScreen() {
       >
         <Stack.Screen options={SCREEN_OPTIONS} />
         <Header title="Review" onBack={handleBack} />
-        <Text style={{ color: "#6B7280" }}>Fix not found</Text>
+        <Text style={{ color: "#4B5563", fontSize: 14, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}>Fix not found</Text>
       </SafeAreaView>
     );
   }
@@ -359,7 +359,7 @@ export default function FixDetailScreen() {
           >
             {fix.name}
           </Text>
-          <Text style={{ color: "#6B7280", fontSize: 14, marginBottom: 16 }}>
+          <Text style={{ color: "#4B5563", fontSize: 14, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginBottom: 16 }}>
             {fix.metadata?.category || "Fix"}
           </Text>
           <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 28 }}>
@@ -1012,8 +1012,10 @@ export default function FixDetailScreen() {
             </Text>
             <Text
               style={{
-                fontSize: 12,
-                color: "#6B7280",
+                fontSize: 13,
+                color: "#4B5563",
+                fontFamily: "KumbhSans_600SemiBold",
+                fontWeight: "600",
                 textAlign: "center",
                 marginBottom: 14,
                 lineHeight: 18,
@@ -1277,7 +1279,9 @@ export default function FixDetailScreen() {
             <Text
               style={{
                 fontSize: 13,
-                color: "#6B7280",
+                color: "#4B5563",
+                fontFamily: "KumbhSans_600SemiBold",
+                fontWeight: "600",
                 textAlign: "center",
                 lineHeight: 20,
                 marginBottom: 16,

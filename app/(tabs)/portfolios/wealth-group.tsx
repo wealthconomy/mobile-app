@@ -832,11 +832,11 @@ export default function WealthGroupScreen() {
               paddingRight: 96,
             }}
           >
-            <Search size={18} color="#94A3B8" />
+            <Search size={18} color="#6B7280" />
             <TextInput
               placeholder="Search"
-              placeholderTextColor="#94A3B8"
-              className="flex-1 ml-3 text-[13px] font-medium"
+              placeholderTextColor="#6B7280"
+              className="flex-1 ml-3 text-[14px] font-kumbh-semibold text-[#1A1A1A]"
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
@@ -893,10 +893,12 @@ export default function WealthGroupScreen() {
               }}
             >
               <Text
+                maxFontSizeMultiplier={1.35}
                 style={{
-                  color: activeTab === "ongoing" ? THEME : "#64748B",
+                  color: activeTab === "ongoing" ? THEME : "#4B5563",
                   fontSize: 14,
-                  fontWeight: activeTab === "ongoing" ? "900" : "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                  fontWeight: activeTab === "ongoing" ? "700" : "600",
                 }}
               >
                 Progress Tracking
@@ -918,10 +920,12 @@ export default function WealthGroupScreen() {
               }}
             >
               <Text
+                maxFontSizeMultiplier={1.35}
                 style={{
-                  color: activeTab === "completed" ? THEME : "#64748B",
+                  color: activeTab === "completed" ? THEME : "#4B5563",
                   fontSize: 14,
-                  fontWeight: activeTab === "completed" ? "900" : "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                  fontWeight: activeTab === "completed" ? "700" : "600",
                 }}
               >
                 Completed Goals
@@ -987,7 +991,10 @@ export default function WealthGroupScreen() {
                             <Text className="text-[#155D5F] font-black">
                               ₦{currentNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </Text>
-                            <Text className="text-[11px] text-[#6B7280] font-medium">
+                            <Text
+                              maxFontSizeMultiplier={1.35}
+                              className="text-[12px] leading-[16px] text-[#4B5563] font-kumbh-semibold"
+                            >
                               {" "}({formattedPct})
                             </Text>
                           </Text>
@@ -1048,7 +1055,12 @@ export default function WealthGroupScreen() {
             </View>
           ) : (
             <View className="items-center justify-center py-10 mb-10">
-              <Text className="text-gray-400">No completed groups yet</Text>
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold"
+              >
+                No completed groups yet
+              </Text>
             </View>
           )}
         </View>

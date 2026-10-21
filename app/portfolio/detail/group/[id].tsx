@@ -2043,8 +2043,10 @@ export default function GroupDetailScreen() {
 
                 <Text
                   style={{
-                    color: "#6B7280",
+                    color: "#4B5563",
                     fontSize: 13,
+                    fontFamily: "KumbhSans_600SemiBold",
+                    fontWeight: "600",
                     textAlign: "center",
                     marginBottom: 16,
                   }}
@@ -2121,12 +2123,13 @@ export default function GroupDetailScreen() {
                         <Text
                           style={{
                             fontSize: 12,
+                            fontFamily: "KumbhSans_600SemiBold",
                             fontWeight: "600",
-                            color: "#6B7280",
+                            color: "#4B5563",
                           }}
                         >
                           Wallet Balance:{" "}
-                          <Text style={{ fontWeight: "700", color: "#059669" }}>
+                          <Text style={{ fontWeight: "700", color: "#166534" }}>
                             ₦{formattedBal}
                           </Text>
                         </Text>
@@ -2372,7 +2375,7 @@ export default function GroupDetailScreen() {
                   justifyContent: "center",
                 }}
               >
-                <Text style={{ color: "#64748B", fontWeight: "600" }}>
+                <Text style={{ color: "#4B5563", fontSize: 14, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}>
                   Cancel
                 </Text>
               </TouchableOpacity>
@@ -2920,7 +2923,9 @@ export default function GroupDetailScreen() {
                       <Text
                         style={{
                           fontSize: 13,
-                          color: "#6B7280",
+                          color: "#4B5563",
+                          fontFamily: "KumbhSans_600SemiBold",
+                          fontWeight: "600",
                           textAlign: "center",
                           marginBottom: 14,
                           lineHeight: 18,
@@ -3032,7 +3037,7 @@ export default function GroupDetailScreen() {
                               marginBottom: 6,
                             }}
                           >
-                            <Text style={{ fontSize: 12, color: "#6B7280" }}>
+                            <Text style={{ fontSize: 12, color: "#4B5563", fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}>
                               Your Total Savings
                             </Text>
                             <Text
@@ -3055,7 +3060,7 @@ export default function GroupDetailScreen() {
                                 : 0,
                             }}
                           >
-                            <Text style={{ fontSize: 12, color: "#6B7280" }}>
+                            <Text style={{ fontSize: 12, color: "#4B5563", fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}>
                               Group Maturity Date
                             </Text>
                             <Text
@@ -3178,7 +3183,7 @@ export default function GroupDetailScreen() {
                                 }}
                               >
                                 <Text
-                                  style={{ fontSize: 12, color: "#6B7280" }}
+                                  style={{ fontSize: 12, color: "#4B5563", fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}
                                 >
                                   Your Total Savings
                                 </Text>
@@ -3343,7 +3348,8 @@ export default function GroupDetailScreen() {
                             <Text
                               style={{
                                 fontSize: 14,
-                                color: "#6B7280",
+                                color: "#4B5563",
+                                fontFamily: "KumbhSans_600SemiBold",
                                 fontWeight: "600",
                               }}
                             >
@@ -3422,7 +3428,9 @@ export default function GroupDetailScreen() {
                 <Text
                   style={{
                     fontSize: 13,
-                    color: "#6B7280",
+                    color: "#4B5563",
+                    fontFamily: "KumbhSans_600SemiBold",
+                    fontWeight: "600",
                     textAlign: "center",
                     marginBottom: 14,
                     lineHeight: 18,
@@ -3483,7 +3491,8 @@ export default function GroupDetailScreen() {
                     <Text
                       style={{
                         fontSize: 14,
-                        color: "#6B7280",
+                        color: "#4B5563",
+                        fontFamily: "KumbhSans_600SemiBold",
                         fontWeight: "600",
                       }}
                     >

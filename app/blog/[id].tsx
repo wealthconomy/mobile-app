@@ -360,7 +360,10 @@ export default function BlogDetailScreen() {
                       <Text className="text-[#1A1A1A] font-bold text-sm">
                         {comment.userName || "Anonymous"}
                       </Text>
-                      <Text className="text-[#9CA3AF] text-[10px]">
+                      <Text
+                        maxFontSizeMultiplier={1.35}
+                        className="text-[#4B5563] text-[12px] leading-[16px] font-kumbh-semibold"
+                      >
                         {comment.timeAgo || comment.timePosted}
                       </Text>
                     </View>
@@ -377,7 +380,10 @@ export default function BlogDetailScreen() {
                   size={32}
                   color="#94A3B8"
                 />
-                <Text className="text-[12px] text-[#94A3B8] font-bold mt-2">
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  className="text-[12px] text-[#4B5563] font-kumbh-bold font-bold mt-2"
+                >
                   No comments yet. Be the first to join the conversation!
                 </Text>
               </View>

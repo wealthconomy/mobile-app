@@ -257,7 +257,10 @@ export default function WealthFlexScreen() {
           >
             <View className="flex-row items-center justify-between mb-1">
               <View className="flex-row items-center gap-2">
-                <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-90">
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  className="text-[#1A1A1A] text-[13px] font-kumbh-semibold"
+                >
                   Total Savings
                 </Text>
                 {showInterest && (
@@ -618,7 +621,7 @@ function TransactionItem({ item }: { item: WalletTransaction }) {
       <View className="items-end">
         <Text
           maxFontSizeMultiplier={1.35}
-          className={`font-bold text-[13px] mb-1.5 ${isCredit ? "text-[#10B981]" : "text-[#DC2626]"}`}
+          className={`font-bold text-[13px] mb-1.5 ${isCredit ? "text-[#166534]" : "text-[#DC2626]"}`}
         >
           {isCredit ? "+" : "-"}₦{formatAmount(item.amount)}
         </Text>

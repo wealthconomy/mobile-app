@@ -386,7 +386,7 @@ export default function CreateFlowScreen() {
         >
           <Text
             style={{
-              color: frequency ? "#1A1A1A" : "#9CA3AF",
+              color: frequency ? "#1A1A1A" : "#6B7280",
               fontSize: 15,
               fontWeight: frequency ? "600" : "400",
             }}
@@ -717,7 +717,7 @@ export default function CreateFlowScreen() {
         >
           {wealthTitle}
         </Text>
-        <Text style={{ color: "#6B7280", fontSize: 13, marginTop: 4 }}>
+        <Text style={{ color: "#4B5563", fontSize: 13, lineHeight: 18, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginTop: 4 }}>
           Target: ₦{targetAmount || "0.00"}
         </Text>
       </View>
@@ -873,8 +873,10 @@ export default function CreateFlowScreen() {
       </Text>
       <Text
         style={{
-          color: "#6B7280",
+          color: "#4B5563",
           fontSize: 13,
+          fontFamily: "KumbhSans_600SemiBold",
+          fontWeight: "600",
           textAlign: "center",
           marginBottom: 32,
           lineHeight: 20,
@@ -978,8 +980,10 @@ export default function CreateFlowScreen() {
 
       <Text
         style={{
-          color: "#6B7280",
+          color: "#4B5563",
           fontSize: 14,
+          fontFamily: "KumbhSans_600SemiBold",
+          fontWeight: "600",
           textAlign: "center",
           lineHeight: 22,
           marginBottom: 40,
@@ -1053,8 +1057,9 @@ export default function CreateFlowScreen() {
 
 const styles = StyleSheet.create({
   inputLabel: {
-    color: "#6B7280",
+    color: "#4B5563",
     fontSize: 13,
+    fontFamily: "KumbhSans_600SemiBold",
     fontWeight: "700",
     marginBottom: 8,
   },
@@ -1102,9 +1107,11 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F3F4F6",
   },
   previewLabel: {
-    color: "#6B7280",
+    color: "#4B5563",
     fontSize: 12,
-    fontWeight: "500",
+    lineHeight: 16,
+    fontFamily: "KumbhSans_600SemiBold",
+    fontWeight: "600",
     marginBottom: 4,
   },
   previewValue: {

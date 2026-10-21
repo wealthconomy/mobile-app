@@ -784,7 +784,8 @@ function Step1Identity({ data, update, hideGroupTypeSelector }: any) {
         <View style={{ marginBottom: 12 }}>
           <Text
             style={{
-              color: "#64748B",
+              color: "#4B5563",
+              fontFamily: "KumbhSans_600SemiBold",
               fontWeight: "700",
               fontSize: 13,
               marginBottom: 10,
@@ -884,7 +885,7 @@ function Step1Identity({ data, update, hideGroupTypeSelector }: any) {
       />
 
       <View className="mb-4">
-        <Text className="text-[#64748B] text-[13px] font-bold mb-2">
+        <Text className="text-[#4B5563] text-[13px] font-kumbh-bold mb-2">
           Group Cover Image (Optional)
         </Text>
         <View className="relative">
@@ -900,7 +901,7 @@ function Step1Identity({ data, update, hideGroupTypeSelector }: any) {
             ) : (
               <View className="items-center">
                 <Upload size={24} color="#64748B" className="mb-2" />
-                <Text className="text-gray-400 text-[12px]">
+                <Text className="text-[#4B5563] text-[12px] font-kumbh-semibold">
                   Browse a file in a PNG and JPG format
                 </Text>
               </View>
@@ -1089,7 +1090,8 @@ function Step2Financial({ data, update }: any) {
       <View style={{ marginBottom: 18 }}>
         <Text
           style={{
-            color: "#64748B",
+            color: "#4B5563",
+            fontFamily: "KumbhSans_600SemiBold",
             fontWeight: "700",
             fontSize: 13,
             marginBottom: 8,
@@ -1130,9 +1132,9 @@ function Step2Financial({ data, update }: any) {
                 color:
                   data.wealthPreference === "Interest Based"
                     ? "#1A1A1A"
-                    : "#6B7280",
-                fontWeight:
-                  data.wealthPreference === "Interest Based" ? "700" : "500",
+                    : "#4B5563",
+                fontWeight: "600",
+                fontFamily: "KumbhSans_600SemiBold",
                 fontSize: 13,
               }}
             >
@@ -1164,9 +1166,9 @@ function Step2Financial({ data, update }: any) {
                 color:
                   data.wealthPreference === "Impact Wealth"
                     ? "#1A1A1A"
-                    : "#6B7280",
-                fontWeight:
-                  data.wealthPreference === "Impact Wealth" ? "700" : "500",
+                    : "#4B5563",
+                fontWeight: "600",
+                fontFamily: "KumbhSans_600SemiBold",
                 fontSize: 13,
               }}
             >
@@ -1211,7 +1213,7 @@ function Step2Financial({ data, update }: any) {
       />
 
       {data.wealthPreference === "Interest Based" && (
-        <Text className="text-[10px] text-gray-400 italic">
+        <Text className="text-[12px] leading-[16px] text-[#4B5563] font-kumbh-semibold italic">
           Note: To earn the full interest, you must meet your target amount and
           reach this date.
         </Text>

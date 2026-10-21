@@ -227,7 +227,7 @@ export default function CreateGoalScreen() {
           {dayNames.map((d) => (
             <Text
               key={d}
-              style={{ width: "14.28%" as any, textAlign: "center", fontSize: 13, fontWeight: "600", color: "#6B7280" }}
+              style={{ width: "14.28%" as any, textAlign: "center", fontSize: 13, fontWeight: "600", fontFamily: "KumbhSans_600SemiBold", color: "#4B5563" }}
             >
               {d}
             </Text>
@@ -507,13 +507,13 @@ export default function CreateGoalScreen() {
               onPress={() => setWealthPreference("Interest Based")}
               style={{ flex: 1, backgroundColor: wealthPreference === "Interest Based" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: wealthPreference === "Interest Based" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: wealthPreference === "Interest Based" ? 2 : 0 }}
             >
-              <Text style={{ color: wealthPreference === "Interest Based" ? "#1A1A1A" : "#6B7280", fontWeight: wealthPreference === "Interest Based" ? "700" : "500", fontSize: 13 }}>Interest Based</Text>
+              <Text style={{ color: wealthPreference === "Interest Based" ? "#1A1A1A" : "#4B5563", fontWeight: "600", fontFamily: "KumbhSans_600SemiBold", fontSize: 13 }}>Interest Based</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               onPress={() => setWealthPreference("Impact Wealth")}
               style={{ flex: 1, backgroundColor: wealthPreference === "Impact Wealth" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: wealthPreference === "Impact Wealth" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: wealthPreference === "Impact Wealth" ? 2 : 0 }}
             >
-              <Text style={{ color: wealthPreference === "Impact Wealth" ? "#1A1A1A" : "#6B7280", fontWeight: wealthPreference === "Impact Wealth" ? "700" : "500", fontSize: 13 }}>Impact Wealth</Text>
+              <Text style={{ color: wealthPreference === "Impact Wealth" ? "#1A1A1A" : "#4B5563", fontWeight: "600", fontFamily: "KumbhSans_600SemiBold", fontSize: 13 }}>Impact Wealth</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1029,7 +1029,7 @@ export default function CreateGoalScreen() {
 
     return (
       <View className="px-5">
-        <Text className="text-[#6B7280] text-[13px] mb-8 mt-4">
+        <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mb-8 mt-4">
           Please, recheck and confirm before creating your goal.
         </Text>
 
@@ -1046,7 +1046,7 @@ export default function CreateGoalScreen() {
           {/* Row 1 */}
           <View className="flex-row justify-between mb-8">
             <View>
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                 Goal Amount
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1054,7 +1054,7 @@ export default function CreateGoalScreen() {
               </Text>
             </View>
             <View className="items-end">
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                 Category
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1066,7 +1066,7 @@ export default function CreateGoalScreen() {
           {/* Row 2 */}
           <View className="flex-row justify-between mb-8">
             <View>
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                 Funding Source
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1074,7 +1074,7 @@ export default function CreateGoalScreen() {
               </Text>
             </View>
             <View className="items-end">
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                 End Date
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1086,7 +1086,7 @@ export default function CreateGoalScreen() {
           {/* Row 3 */}
           <View className="flex-row justify-between mb-8">
             <View>
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                 {wealthPreference === "Interest Based" ? "Interest Rate" : "Preference"}
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1094,7 +1094,7 @@ export default function CreateGoalScreen() {
               </Text>
             </View>
             <View className="items-end">
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                 Method
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1106,7 +1106,7 @@ export default function CreateGoalScreen() {
           {/* Row 4: Debit Today */}
           <View className="flex-row justify-between mb-2">
             <View>
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                 Debit Today
               </Text>
               <Text style={{ color: "#155D5F", fontWeight: "700", fontSize: 16 }}>
@@ -1115,7 +1115,7 @@ export default function CreateGoalScreen() {
             </View>
             {!isManual ? (
               <View className="items-end">
-                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                   Auto-Debit Schedule
                 </Text>
                 <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1124,7 +1124,7 @@ export default function CreateGoalScreen() {
               </View>
             ) : (
               <View className="items-end">
-                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                   Deposit Type
                 </Text>
                 <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1175,7 +1175,7 @@ export default function CreateGoalScreen() {
       <Text className="text-[#1A1A1A] font-extrabold text-[24px] mt-6 mb-2">
         Insert your Pin
       </Text>
-      <Text className="text-[#6B7280] text-center text-[13px] mb-10 leading-[20px] px-4">
+      <Text className="text-[#4B5563] font-kumbh-semibold text-center text-[13px] mb-10 leading-[20px] px-4">
         You must insert your pin to confirm to completely create your Wealth
         Goal
       </Text>
@@ -1208,7 +1208,7 @@ export default function CreateGoalScreen() {
       />
 
       <View className="mb-10 px-8">
-        <Text className="text-[#6B7280] text-center text-[12px]">
+        <Text className="text-[#4B5563] font-kumbh-semibold text-center text-[13px] leading-[18px]">
           If you have forgotten your pin, change it from your settings page
         </Text>
       </View>
@@ -1247,7 +1247,7 @@ export default function CreateGoalScreen() {
         You have set a Wealth Goal🥳🎯
       </Text>
 
-      <Text className="text-[#6B7280] text-center text-[14px] leading-[22px] mb-8 px-2">
+      <Text className="text-[#4B5563] font-kumbh-semibold text-center text-[14px] leading-[22px] mb-8 px-2">
         Congratulations, WealthBuilder! Your WealthGoal has been created and funded successfully. Your savings journey towards your target has begun!🥳{"\n\n"}
         <Text className="font-bold text-[#1A1A1A]">
           Target Goal: ₦{formatAmount(amount)}{"\n"}

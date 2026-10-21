@@ -275,7 +275,10 @@ export default function WealthFamScreen() {
             >
               <View className="flex-row items-center justify-between mb-1">
                 <View className="flex-row items-center gap-2">
-                  <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-90">
+                  <Text
+                    maxFontSizeMultiplier={1.35}
+                    className="text-[#1A1A1A] text-[13px] font-kumbh-semibold"
+                  >
                     Total Savings
                   </Text>
                   {showInterest && (
@@ -331,7 +334,10 @@ export default function WealthFamScreen() {
 
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
-                  <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-80">
+                  <Text
+                    maxFontSizeMultiplier={1.35}
+                    className="text-[#1A1A1A] text-[12px] font-kumbh-semibold"
+                  >
                     Your wealth grew to ₦0.00 today
                   </Text>
                   <ArrowUp size={14} color="#4CAF50" style={{ marginLeft: 4 }} />

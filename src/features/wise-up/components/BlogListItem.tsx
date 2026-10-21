@@ -78,7 +78,7 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
             >
               <Text
                 maxFontSizeMultiplier={1.35}
-                className="text-[11px] leading-[14px] font-kumbh-semibold"
+                className="text-[12px] leading-[16px] font-kumbh-semibold"
                 style={{ color: styles.text }}
               >
                 {blog.category}
@@ -87,7 +87,7 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
             <View className="flex-row">
               <Text
                 maxFontSizeMultiplier={1.35}
-                className="text-[#1A1A1A] font-bold text-[13px] leading-tight flex-1 mr-2"
+                className="text-[#1A1A1A] font-kumbh-bold font-bold text-[14px] leading-tight flex-1 mr-2"
                 numberOfLines={2}
               >
                 {blog.title}
