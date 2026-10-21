@@ -415,6 +415,10 @@ function RootLayoutNav() {
               name="payment/insert-pin"
               options={{ headerShown: false }}
             />
+            <Stack.Screen
+              name="payment/return"
+              options={{ headerShown: false }}
+            />
             <Stack.Screen name="modal" options={{ presentation: "modal" }} />
           </Stack>
         </ThemeProvider>

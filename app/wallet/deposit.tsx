@@ -16,6 +16,8 @@ import * as Clipboard from "expo-clipboard";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as WebBrowser from "expo-web-browser";
+import { PAYMENT_RETURN_URL, PAYMENT_RETURN_SCHEME_URL } from "@/src/constants/payment";
+import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -205,7 +207,7 @@ export default function DepositScreen() {
           amountKobo,
           provider: "PAYSTACK",
           channel: "WEB",
-          redirectUrl: `${process.env.EXPO_PUBLIC_API_URL}/wallet/me`,
+          redirectUrl: PAYMENT_RETURN_URL,
           email: user?.email || "",
           idempotencyKey,
         }).unwrap();
@@ -213,12 +215,15 @@ export default function DepositScreen() {
         const checkoutUrl = response?.data?.checkoutUrl;
         const paymentRef = response?.data?.providerRef || response?.data?.id;
         if (checkoutUrl) {
-          await WebBrowser.openBrowserAsync(checkoutUrl);
-
-          // On Android, openBrowserAsync returns immediately (does not block).
-          // Wait 5 seconds to give the user time to complete payment before polling.
-          if (Platform.OS === "android") {
-            await new Promise((resolve) => setTimeout(resolve, 5000));
+          suspendAppLock(true);
+          try {
+            await WebBrowser.openAuthSessionAsync(
+              checkoutUrl,
+              PAYMENT_RETURN_SCHEME_URL,
+              { preferEphemeralSession: true },
+            );
+          } finally {
+            suspendAppLock(false);
           }
 
           // Verify payment status after returning from browser
@@ -266,7 +271,7 @@ export default function DepositScreen() {
               safeRefetch();
               Alert.alert(
                 "Payment Processing",
-                "Your payment is being processed. Your wallet balance will update shortly.",
+                "We haven't received your payment yet. If you were charged, your balance will update shortly.",
               );
             }
           } else {
