@@ -265,15 +265,16 @@ export default function WealthFlexScreen() {
                     style={{
                       backgroundColor: "#F44336",
                       paddingHorizontal: 8,
-                      paddingVertical: 2.5,
+                      paddingVertical: 3,
                       borderRadius: 20,
                     }}
                   >
                     <Text
+                      maxFontSizeMultiplier={1.35}
                       style={{
                         color: "#FFFFFF",
                         fontWeight: "700",
-                        fontSize: 9,
+                        fontSize: 12,
                       }}
                     >
                       {flexRateLabel}
@@ -314,7 +315,10 @@ export default function WealthFlexScreen() {
 
             {showInterest && (
               <View className="flex-row items-center space-x-1">
-                <Text className="text-[#64748B] text-[12px] font-medium opacity-80">
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold"
+                >
                   Your wealth grew by ₦{dailyGrowthFormatted} today
                 </Text>
                 <ArrowUp size={14} color="#4CAF50" style={{ marginLeft: 4 }} />
@@ -362,18 +366,18 @@ export default function WealthFlexScreen() {
             </TouchableOpacity>
 
             <Text
-              className="font-extrabold text-[12px] mb-4"
-              style={{ lineHeight: 12, color: "#F44336" }}
+              className="font-extrabold text-[13px] mb-4"
+              style={{ lineHeight: 18, color: "#991B1B" }}
             >
               What's on WealthFlex?
             </Text>
 
             <View>
               <View className="flex-row mb-3 items-start">
-                <Text className="mr-2 text-[10px]">👉</Text>
+                <Text className="mr-2 text-[13px]">👉</Text>
                 <Text
-                  className="text-[10px] flex-1 leading-[15px]"
-                  style={{ color: "#F44336" }}
+                  className="text-[13px] flex-1 leading-[18px] font-kumbh-semibold"
+                  style={{ color: "#991B1B" }}
                 >
                   <Text className="font-bold">Fast Funding:</Text> Use "Deposit
                   Funds" to see your unique wealth account details for the
@@ -382,10 +386,10 @@ export default function WealthFlexScreen() {
               </View>
 
               <View className="flex-row mb-3 items-start">
-                <Text className="mr-2 text-[10px]">👉</Text>
+                <Text className="mr-2 text-[13px]">👉</Text>
                 <Text
-                  className="text-[10px] flex-1 leading-[15px]"
-                  style={{ color: "#F44336" }}
+                  className="text-[13px] flex-1 leading-[18px] font-kumbh-semibold"
+                  style={{ color: "#991B1B" }}
                 >
                   <Text className="font-bold">Instant Impact:</Text> Watch your
                   funds reflect in seconds and start growing immediately at{" "}
@@ -394,10 +398,10 @@ export default function WealthFlexScreen() {
               </View>
 
               <View className="flex-row items-start">
-                <Text className="mr-2 text-[10px]">👉</Text>
+                <Text className="mr-2 text-[13px]">👉</Text>
                 <Text
-                  className="text-[10px] flex-1 leading-[15px]"
-                  style={{ color: "#F44336" }}
+                  className="text-[13px] flex-1 leading-[18px] font-kumbh-semibold"
+                  style={{ color: "#991B1B" }}
                 >
                   <Text className="font-bold">Deposit Limits:</Text> Minimum
                   deposit is{" "}
@@ -415,12 +419,12 @@ export default function WealthFlexScreen() {
           <TouchableOpacity
             className="flex-row items-center flex-1"
             style={{
-              height: 75,
+              minHeight: 78,
               borderRadius: 13,
               backgroundColor: "#F06358",
-              paddingTop: 21,
+              paddingTop: 12,
               paddingRight: 16,
-              paddingBottom: 21,
+              paddingBottom: 12,
               paddingLeft: 11,
               gap: 10,
             }}
@@ -439,7 +443,7 @@ export default function WealthFlexScreen() {
               <Text className="text-white font-bold text-[14px]">
                 Wealth Deposit
               </Text>
-              <Text className="text-white mt-2 text-[10px]">
+              <Text className="text-white opacity-95 mt-1 text-[12px] font-kumbh-semibold">
                 {"Add to your WealthFlex"}
               </Text>
             </View>
@@ -448,14 +452,14 @@ export default function WealthFlexScreen() {
           <TouchableOpacity
             className="flex-row items-center flex-1"
             style={{
-              height: 75,
+              minHeight: 78,
               borderRadius: 13,
               backgroundColor: "#FFF2F1",
               borderWidth: 0.7,
               borderColor: "#F06358",
-              paddingTop: 21,
+              paddingTop: 12,
               paddingRight: 16,
-              paddingBottom: 21,
+              paddingBottom: 12,
               paddingLeft: 11,
               gap: 10,
             }}
@@ -481,7 +485,7 @@ export default function WealthFlexScreen() {
               >
                 Withdraw Funds
               </Text>
-              <Text className="text-[10px] mt-2" style={{ color: "#F06358" }}>
+              <Text className="text-[12px] mt-1 font-kumbh-semibold" style={{ color: "#B91C1C" }}>
                 {"Move or send to your\ntraditional bank"}
               </Text>
             </View>
@@ -516,7 +520,10 @@ export default function WealthFlexScreen() {
             }}
           >
             {transactions.length === 0 ? (
-              <Text className="text-center text-gray-500 py-4">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-center text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold py-4"
+              >
                 No transactions found
               </Text>
             ) : (
@@ -595,23 +602,33 @@ function TransactionItem({ item }: { item: WalletTransaction }) {
       </View>
       <View className="flex-1">
         <Text
+          maxFontSizeMultiplier={1.35}
           className="text-[#1A1A1A] font-bold text-[13px] mb-1"
           numberOfLines={1}
         >
           {getTitle()}
         </Text>
-        <Text className="text-[#9CA3AF] text-[10px] font-medium">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-[#4B5563] text-[12px] leading-[16px] font-kumbh-semibold"
+        >
           {formattedDate}
         </Text>
       </View>
       <View className="items-end">
         <Text
+          maxFontSizeMultiplier={1.35}
           className={`font-bold text-[13px] mb-1.5 ${isCredit ? "text-[#10B981]" : "text-[#DC2626]"}`}
         >
           {isCredit ? "+" : "-"}₦{formatAmount(item.amount)}
         </Text>
-        <View className="bg-[#E7F5F5] px-2 py-0.5 rounded-md">
-          <Text className="text-[#155D5F] text-[9px] font-bold">Success</Text>
+        <View className="bg-[#E7F5F5] px-2 py-1 rounded-md">
+          <Text
+            maxFontSizeMultiplier={1.35}
+            className="text-[#155D5F] text-[12px] font-bold"
+          >
+            Success
+          </Text>
         </View>
       </View>
     </TouchableOpacity>

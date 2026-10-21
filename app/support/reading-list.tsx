@@ -131,7 +131,7 @@ export default function ReadingListScreen() {
           <Ionicons name="chevron-back" size={28} color="#1A1A1A" />
         </TouchableOpacity>
         
-        <Text className="text-[#1A1A1A] font-extrabold text-[28px]">
+        <Text maxFontSizeMultiplier={1.35} className="text-[#1A1A1A] font-extrabold text-[28px]">
           Your Reading List
         </Text>
       </View>
@@ -159,10 +159,10 @@ export default function ReadingListScreen() {
         ) : (
           <View className="items-center justify-center py-20">
             <Ionicons name="bookmark-outline" size={48} color="#D1D5DB" />
-            <Text className="text-[#6B7280] mt-4 font-medium">
+            <Text maxFontSizeMultiplier={1.35} className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-4">
               Your reading list is empty
             </Text>
-            <Text className="text-[#9CA3AF] text-xs text-center px-10 mt-2">
+            <Text maxFontSizeMultiplier={1.35} className="text-[#4B5563] text-[12px] leading-[16px] font-kumbh-semibold text-center px-10 mt-2">
               Save blogs you love and read them later here.
             </Text>
           </View>

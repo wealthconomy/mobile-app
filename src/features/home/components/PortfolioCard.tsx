@@ -50,7 +50,7 @@ export const PortfolioCard = ({
           iconName: "wallet-outline",
           route: "/portfolios/wealth-flex",
           image: require("../../../../assets/images/wallet.png"),
-          imageStyle: { position: "absolute", width: 90, height: 90, top: 15, left: 95, opacity: 0.25, transform: [{ rotate: "-5deg" }] },
+          imageStyle: { position: "absolute", width: 90, height: 90, top: 15, left: 95, opacity: 0.15, transform: [{ rotate: "-5deg" }] },
           interest: interestRate,
           badgeBg: "#F44336",
           badgeText: "#FFFFFF",
@@ -64,7 +64,7 @@ export const PortfolioCard = ({
           iconName: "rocket-outline",
           route: "/portfolios/wealth-goal",
           image: require("../../../../assets/images/arrow.png"),
-          imageStyle: { position: "absolute", width: 100, height: 100, top: 15, left: 90, opacity: 0.25, transform: [{ rotate: "-5deg" }] },
+          imageStyle: { position: "absolute", width: 100, height: 100, top: 15, left: 90, opacity: 0.15, transform: [{ rotate: "-5deg" }] },
           interest: interestRate,
           badgeBg: "#F3007A",
           badgeText: "#FFFFFF",
@@ -84,7 +84,7 @@ export const PortfolioCard = ({
             height: 110,
             top: 20,
             right: -20,
-            opacity: 0.25,
+            opacity: 0.15,
             transform: [{ rotate: "-9deg" }],
           },
           interest: interestRate,
@@ -106,7 +106,7 @@ export const PortfolioCard = ({
             height: 100,
             top: 35,
             right: -10,
-            opacity: 0.25,
+            opacity: 0.15,
             transform: [{ rotate: "-25deg" }],
           },
           interest: interestRate,
@@ -122,7 +122,7 @@ export const PortfolioCard = ({
           iconName: "refresh-outline",
           route: "/portfolios/wealth-flow",
           image: require("../../../../assets/images/auto.png.png"),
-          imageStyle: { position: "absolute", width: 90, height: 90, top: 25, right: 5, opacity: 0.25, transform: [{ rotate: "-1deg" }] },
+          imageStyle: { position: "absolute", width: 90, height: 90, top: 25, right: 5, opacity: 0.15, transform: [{ rotate: "-1deg" }] },
           interest: interestRate,
           badgeBg: "#0EA5E9",
           badgeText: "#FFFFFF",
@@ -142,7 +142,7 @@ export const PortfolioCard = ({
             height: 110,
             top: 40,
             right: -15,
-            opacity: 0.25,
+            opacity: 0.15,
             transform: [{ rotate: "-15deg" }],
           },
           interest: interestRate,
@@ -189,7 +189,7 @@ export const PortfolioCard = ({
       style={[
         {
           width: width || "100%",
-          height: 119,
+          height: 138,
           backgroundColor: styles.bg,
           borderColor: styles.border,
           borderTopLeftRadius: 50,
@@ -235,7 +235,8 @@ export const PortfolioCard = ({
             }}
           >
             <Text
-              style={{ color: badgeStyle.text, fontWeight: "700", fontSize: 9 }}
+              maxFontSizeMultiplier={1.35}
+              style={{ color: badgeStyle.text, fontWeight: "700", fontSize: 12 }}
             >
               {badgeValue}
             </Text>
@@ -252,7 +253,7 @@ export const PortfolioCard = ({
                 paddingVertical: 3,
                 borderRadius: 20,
                 minWidth: 44,
-                height: 18,
+                height: 20,
                 alignItems: "center",
                 justifyContent: "center",
               }}
@@ -273,7 +274,8 @@ export const PortfolioCard = ({
               }}
             >
               <Text
-                style={{ color: styles.badgeText, fontWeight: "700", fontSize: 9 }}
+                maxFontSizeMultiplier={1.35}
+                style={{ color: styles.badgeText, fontWeight: "700", fontSize: 12 }}
               >
                 {interestRate}
               </Text>
@@ -288,7 +290,8 @@ export const PortfolioCard = ({
               }}
             >
               <Text
-                style={{ color: styles.badgeText, fontWeight: "700", fontSize: 9 }}
+                maxFontSizeMultiplier={1.35}
+                style={{ color: styles.badgeText, fontWeight: "700", fontSize: 12 }}
               >
                 --
               </Text>
@@ -332,12 +335,16 @@ export const PortfolioCard = ({
       </View>
 
       <View className="z-10">
-        <Text className="text-[#1A1A1A] font-bold text-[14px] mb-0.5">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-[#1A1A1A] font-bold text-[14px] mb-0.5"
+        >
           {title}
         </Text>
         <Text
-          className="text-[#64748B] text-[9px] leading-[12px] font-bold pr-1"
-          numberOfLines={2}
+          maxFontSizeMultiplier={1.35}
+          className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold pr-1"
+          numberOfLines={3}
         >
           {description}
         </Text>
@@ -345,7 +352,10 @@ export const PortfolioCard = ({
 
       {showEarnTag && (
         <View className="absolute bottom-2 right-2 bg-white/80 px-2 py-0.5 rounded-full border border-gray-100">
-          <Text className="text-[#10B981] text-[8px] font-bold">
+          <Text
+            maxFontSizeMultiplier={1.35}
+            className="text-[#065F46] text-[12px] font-bold"
+          >
             Earn ₦2,475
           </Text>
         </View>

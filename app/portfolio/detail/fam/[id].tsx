@@ -384,7 +384,7 @@ export default function FamilyGoalDetailScreen() {
           >
             {plan.name}
           </Text>
-          <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 16 }}>
+          <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", lineHeight: 18, marginBottom: 16 }}>
             {plan.metadata?.familyMemberName
               ? `For ${plan.metadata.familyMemberName} (${plan.metadata.familyCategory || "Family"})`
               : "Family Pot"}
@@ -392,7 +392,7 @@ export default function FamilyGoalDetailScreen() {
           <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 28 }}>
             ₦{formatAmount(displayBalance)}
           </Text>
-          <Text style={{ color: "#9CA3AF", fontSize: 11, marginTop: 2 }}>
+          <Text style={{ color: "#4B5563", fontSize: 12, lineHeight: 16, fontWeight: "600", marginTop: 2 }}>
             of ₦{formatAmount(plan.targetAmount)} target
           </Text>
         </View>
@@ -429,10 +429,10 @@ export default function FamilyGoalDetailScreen() {
             marginBottom: 28,
           }}
         >
-          <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
+          <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16 }}>
             {progressPct}%
           </Text>
-          <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
+          <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16 }}>
             {getDaysLeft()} days Left
           </Text>
         </View>
@@ -487,7 +487,7 @@ export default function FamilyGoalDetailScreen() {
 
       <Text
         style={{
-          color: "#6B7280",
+          color: "#4B5563",
           textAlign: "center",
           fontSize: 14,
           lineHeight: 22,
@@ -720,6 +720,7 @@ export default function FamilyGoalDetailScreen() {
                   style={{
                     color: "#15803D",
                     fontSize: 12,
+                    fontWeight: "600",
                     textAlign: "center",
                     lineHeight: 18,
                   }}
@@ -752,10 +753,13 @@ export default function FamilyGoalDetailScreen() {
                   }}
                 >
                   <View style={{ flex: 1, marginRight: 12 }}>
-                    <Text style={{ fontWeight: "700", color: TEXT_DARK, fontSize: 14 }}>
+                    <Text
+                      maxFontSizeMultiplier={1.35}
+                      style={{ fontWeight: "700", color: TEXT_DARK, fontSize: 14 }}
+                    >
                       {getCleanTransactionTitle(txn, plan?.name)}
                     </Text>
-                    <Text style={{ color: "#9CA3AF", fontSize: 11, marginTop: 2 }}>
+                    <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16, marginTop: 2 }}>
                       {new Date(txn.createdAt).toLocaleDateString()} • {txn.reference}
                     </Text>
                   </View>
@@ -772,7 +776,7 @@ export default function FamilyGoalDetailScreen() {
               ))
             ) : (
               <View style={{ paddingVertical: 20, alignItems: "center" }}>
-                <Text style={{ color: "#9CA3AF", fontSize: 13 }}>No transactions recorded yet.</Text>
+                <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", lineHeight: 18 }}>No transactions recorded yet.</Text>
               </View>
             )}
           </View>
@@ -799,7 +803,7 @@ export default function FamilyGoalDetailScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 16, textAlign: "center" }}>
+                <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", lineHeight: 18, marginBottom: 16, textAlign: "center" }}>
                   Add extra funds directly from your main wallet to accelerate this family goal.
                 </Text>
 
@@ -813,7 +817,7 @@ export default function FamilyGoalDetailScreen() {
                     <>
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 6 }}>
                         <Text style={styles.inputLabel}>Amount (₦)</Text>
-                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#6B7280" }}>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#4B5563", lineHeight: 16 }}>
                           Wallet Balance: <Text style={{ fontWeight: "700", color: "#059669" }}>₦{formattedBal}</Text>
                         </Text>
                       </View>
@@ -973,7 +977,7 @@ export default function FamilyGoalDetailScreen() {
               Ready to withdraw your savings?
             </Text>
 
-            <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 20, textAlign: "center", lineHeight: 18, paddingHorizontal: 10 }}>
+            <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", marginBottom: 20, textAlign: "center", lineHeight: 18, paddingHorizontal: 10 }}>
               Your plan has reached maturity! Your full savings balance of <Text style={{ color: TEAL, fontWeight: "bold" }}>₦{formatAmount(plan.balance)}</Text> will be transferred directly to your Main Wallet.
             </Text>
 
@@ -1058,12 +1062,12 @@ export default function FamilyGoalDetailScreen() {
                         </Text>
                       </View>
 
-                      <Text style={{ fontSize: 12, color: "#7F1D1D", marginBottom: 12, lineHeight: 16 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#7F1D1D", marginBottom: 12, lineHeight: 16 }}>
                         Terminating early will incur a <Text style={{ fontWeight: "700" }}>{penaltyRate}</Text> penalty, deducted from your current balance.
                       </Text>
 
                       <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
-                        <Text style={{ fontSize: 12, color: "#6B7280" }}>Current Balance</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#4B5563", lineHeight: 16 }}>Current Balance</Text>
                         <Text style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}>
                           ₦{balNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </Text>
@@ -1235,10 +1239,11 @@ export default function FamilyGoalDetailScreen() {
 
 const styles = StyleSheet.create({
   label: {
-    color: "#6B7280",
-    fontSize: 11,
+    color: "#4B5563",
+    fontSize: 12,
+    lineHeight: 16,
     marginBottom: 6,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   value: {
     color: "#1A1A1A",

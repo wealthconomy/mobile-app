@@ -118,11 +118,11 @@ export default function HomeScreen() {
 
             <View className="mb-10">
               <View className="flex-row justify-between items-center mb-4">
-                <Text className="text-[#1A1A1A] font-bold text-lg">
+                <Text className="text-[#1A1A1A] font-bold text-lg" maxFontSizeMultiplier={1.35}>
                   Wealth Portfolios
                 </Text>
                 <TouchableOpacity onPress={() => router.push("/portfolios")}>
-                  <Text className="text-[#155D5F] text-sm font-medium">
+                  <Text className="text-[#155D5F] text-[14px] font-kumbh-bold" maxFontSizeMultiplier={1.35}>
                     View all
                   </Text>
                 </TouchableOpacity>
@@ -222,13 +222,13 @@ export default function HomeScreen() {
             {/* Recent Activities Section */}
             <View className="mb-6">
               <View className="flex-row justify-between items-center mb-5">
-                <Text className="text-[#1A1A1A] font-bold text-lg tracking-tight">
+                <Text className="text-[#1A1A1A] font-bold text-lg tracking-tight" maxFontSizeMultiplier={1.35}>
                   Recent Activities
                 </Text>
                 <TouchableOpacity
                   onPress={() => router.push("/transactions/activities")}
                 >
-                  <Text className="text-[#155D5F] text-[13px] font-bold">
+                  <Text className="text-[#155D5F] text-[14px] font-kumbh-bold" maxFontSizeMultiplier={1.35}>
                     View all
                   </Text>
                 </TouchableOpacity>

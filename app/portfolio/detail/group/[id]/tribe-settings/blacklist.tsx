@@ -108,11 +108,11 @@ export default function BlacklistScreen() {
           }}
           className="flex-row items-center px-3 mb-4"
         >
-          <Ionicons name="search-outline" size={20} color="#94A3B8" />
+          <Ionicons name="search-outline" size={20} color="#6B7280" />
           <TextInput
             className="flex-1 ml-2 text-[#1A1A1A] text-sm"
             placeholder="Search blacklist"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor="#6B7280"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -130,7 +130,12 @@ export default function BlacklistScreen() {
             contentContainerStyle={{ paddingBottom: 40 }}
             ListEmptyComponent={
               <View className="items-center justify-center py-20">
-                <Text className="text-[#64748B] text-sm">No blacklisted members</Text>
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  className="text-[#4B5563] text-sm font-semibold font-kumbh-semibold"
+                >
+                  No blacklisted members
+                </Text>
               </View>
             }
             renderItem={({ item }) => (
@@ -169,10 +174,19 @@ export default function BlacklistScreen() {
                     </View>
                   )}
                   <View className="flex-1">
-                    <Text className="text-[#1A1A1A] font-bold text-sm" numberOfLines={1}>
+                    <Text
+                      maxFontSizeMultiplier={1.35}
+                      className="text-[#1A1A1A] font-bold text-sm"
+                      numberOfLines={1}
+                    >
                       {item.name}
                     </Text>
-                    <Text className="text-[#64748B] text-xs">{item.savings}</Text>
+                    <Text
+                      maxFontSizeMultiplier={1.35}
+                      className="text-[#4B5563] text-[12px] font-semibold font-kumbh-semibold"
+                    >
+                      {item.savings}
+                    </Text>
                   </View>
                 </View>
 
@@ -186,7 +200,10 @@ export default function BlacklistScreen() {
                       borderRadius: 8,
                     }}
                   >
-                    <Text style={{ color: "#EF4444", fontWeight: "700", fontSize: 11 }}>
+                    <Text
+                      maxFontSizeMultiplier={1.35}
+                      style={{ color: "#EF4444", fontWeight: "700", fontSize: 12 }}
+                    >
                       Unblock
                     </Text>
                   </TouchableOpacity>
@@ -199,7 +216,10 @@ export default function BlacklistScreen() {
                       borderRadius: 8,
                     }}
                   >
-                    <Text style={{ color: "#4CAF50", fontWeight: "700", fontSize: 11 }}>
+                    <Text
+                      maxFontSizeMultiplier={1.35}
+                      style={{ color: "#166534", fontWeight: "700", fontSize: 12 }}
+                    >
                       Active
                     </Text>
                   </View>

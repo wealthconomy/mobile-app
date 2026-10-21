@@ -247,11 +247,14 @@ export default function WealthGoalScreen() {
                       style={{
                         backgroundColor: "#F3007A",
                         paddingHorizontal: 8,
-                        paddingVertical: 2.5,
+                        paddingVertical: 3,
                         borderRadius: 20,
                       }}
                     >
-                      <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                      <Text
+                        maxFontSizeMultiplier={1.35}
+                        style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 12 }}
+                      >
                         {goalRateLabel}
                       </Text>
                     </View>
@@ -333,8 +336,8 @@ export default function WealthGoalScreen() {
                 <Ionicons name="close" size={20} color="#F3007A" />
               </TouchableOpacity>
               <Text
-                className="font-extrabold text-[12px] mb-4"
-                style={{ color: "#F3007A" }}
+                className="font-extrabold text-[13px] mb-4"
+                style={{ color: "#A20050" }}
               >
                 What’s Wealth Goal? 🎯✨
               </Text>
@@ -354,10 +357,10 @@ export default function WealthGoalScreen() {
                   },
                 ].map((tip, i) => (
                   <View key={i} className="flex-row mb-3 items-start">
-                    <Text className="mr-2 text-[10px]">✅</Text>
+                    <Text className="mr-2 text-[12px]">✅</Text>
                     <Text
-                      className="text-[10px] flex-1 leading-[15px]"
-                      style={{ color: "#F3007A" }}
+                      className="text-[12px] flex-1 leading-[17px] font-kumbh-semibold"
+                      style={{ color: "#A20050" }}
                     >
                       <Text className="font-bold">{tip.title}</Text> {tip.text}
                     </Text>
@@ -382,7 +385,7 @@ export default function WealthGoalScreen() {
                   key={cat.id}
                   style={{
                     width: 160,
-                    height: 114,
+                    height: 122,
                     backgroundColor: "#FFEEF7",
                     borderRadius: 15,
                     padding: 12,
@@ -408,14 +411,15 @@ export default function WealthGoalScreen() {
                     )}
                   </View>
                   <Text
+                    maxFontSizeMultiplier={1.35}
                     className="font-bold text-[14px] mb-0.5"
                     style={{ color: "#F3007A" }}
                   >
                     {cat.title}
                   </Text>
                   <Text
-                    className="text-[9px] opacity-70"
-                    style={{ color: "#F3007A" }}
+                    className="text-[13px] leading-[18px] font-kumbh-semibold"
+                    style={{ color: "#A20050" }}
                   >
                     {cat.subtitle}
                   </Text>
@@ -513,7 +517,7 @@ export default function WealthGoalScreen() {
                   <Text className="text-[#F3007A] font-bold text-[16px] mt-4 mb-2">
                     You haven't created a Wealth Goal yet!
                   </Text>
-                  <Text className="text-[#F3007A] opacity-60 text-[11px] text-center">
+                  <Text className="text-[#A20050] text-[13px] leading-[18px] font-kumbh-semibold text-center">
                     Start creating goals to visual your journey toward your Win.
                   </Text>
                 </View>
@@ -524,7 +528,7 @@ export default function WealthGoalScreen() {
               )
             ) : completedGoals.length === 0 ? (
               <View className="items-center justify-center py-20 px-10">
-                <Text className="text-[#6B7280] italic">
+                <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold italic text-center">
                   No completed goals yet
                 </Text>
               </View>
@@ -618,6 +622,7 @@ function GoalListItem({ goal }: { goal: Portfolio }) {
           }}
         >
           <Text
+            maxFontSizeMultiplier={1.35}
             style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A", flex: 1, marginRight: 8 }}
             numberOfLines={1}
           >
@@ -627,7 +632,10 @@ function GoalListItem({ goal }: { goal: Portfolio }) {
             <Text style={{ fontSize: 12, marginRight: 2 }}>
               {isCompleted ? "🏆" : "🎯"}
             </Text>
-            <Text style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}
+            >
               ₦{formatAmount(goal.targetAmount)}
             </Text>
           </View>
@@ -642,11 +650,17 @@ function GoalListItem({ goal }: { goal: Portfolio }) {
           }}
         >
           <View style={{ flex: 1, marginRight: 8 }}>
-            <Text style={{ fontSize: 10, color: "#9CA3AF" }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 12, lineHeight: 16, color: "#4B5563", fontWeight: "600" }}
+            >
               {goal.metadata?.category || "Goal"}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
+              <Text
+                maxFontSizeMultiplier={1.35}
+                style={{ fontSize: 12, color: "#166534", fontWeight: "700" }}
+              >
                 Wealth growth ₦{formatAmount(growthVal.toString())}{" "}
               </Text>
               <ArrowUp size={12} color="#4CAF50" />
@@ -681,25 +695,32 @@ function GoalListItem({ goal }: { goal: Portfolio }) {
             alignItems: "center",
           }}
         >
-          <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
+          <Text
+            maxFontSizeMultiplier={1.35}
+            style={{ fontSize: 12, lineHeight: 16, color: "#4B5563", fontWeight: "600" }}
+          >
             End Date: {formattedDate}
           </Text>
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
-              width: 80,
+              width: 95,
               justifyContent: "space-between",
             }}
           >
-            <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 12, color: "#4B5563", fontWeight: "600" }}
+            >
               {Math.round(Math.min(progress * 100, 100))}%
             </Text>
             <Text
+              maxFontSizeMultiplier={1.35}
               style={{
-                fontSize: 9,
-                color: isCompleted ? "#4CAF50" : "#9CA3AF",
-                fontWeight: isCompleted ? "700" : "normal",
+                fontSize: 12,
+                color: isCompleted ? "#166534" : "#4B5563",
+                fontWeight: isCompleted ? "700" : "600",
               }}
             >
               {isCompleted ? "Goal Achieved" : `${getDaysLeft()} days Left`}

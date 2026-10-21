@@ -55,8 +55,8 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
     <View style={{ width: "100%" }}>
       <TouchableOpacity
         onPress={onPress}
-        className="flex-row items-center"
-        style={{ height: 81 }}
+        className="flex-row items-center py-2"
+        style={{ minHeight: 90 }}
         activeOpacity={0.7}
       >
         <Image
@@ -70,14 +70,15 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
           resizeMode="cover"
         />
 
-        <View className="flex-1 ml-4 h-[66px] justify-center">
+        <View className="flex-1 ml-3.5 justify-center">
           <View className="mb-1.5">
             <View
-              className="px-2 items-center justify-center rounded-[4px] self-start mb-1"
-              style={{ height: 15, backgroundColor: styles.bg }}
+              className="px-2 py-0.5 items-center justify-center rounded-[4px] self-start mb-1"
+              style={{ backgroundColor: styles.bg }}
             >
               <Text
-                className="text-[8px] font-bold"
+                maxFontSizeMultiplier={1.35}
+                className="text-[11px] leading-[14px] font-kumbh-semibold"
                 style={{ color: styles.text }}
               >
                 {blog.category}
@@ -85,6 +86,7 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
             </View>
             <View className="flex-row">
               <Text
+                maxFontSizeMultiplier={1.35}
                 className="text-[#1A1A1A] font-bold text-[13px] leading-tight flex-1 mr-2"
                 numberOfLines={2}
               >
@@ -100,7 +102,10 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
                     color={localIsBookmarked ? "#155D5F" : "#6B7280"}
                   />
                 </TouchableOpacity>
-                <Text className="text-[#6B7280] text-[10px] font-bold ml-1">
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  className="text-[#4B5563] text-[12px] font-kumbh-semibold ml-1"
+                >
                   {localBookmarks}
                 </Text>
               </View>
@@ -120,11 +125,19 @@ export const BlogListItem: React.FC<BlogListItemProps> = ({
               }}
               className="w-4 h-4 rounded-full bg-gray-200 mr-2"
             />
-            <View>
-              <Text className="text-[#6B7280] text-[9px] font-bold leading-tight">
+            <View className="flex-1">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[12px] leading-[16px] font-kumbh-semibold"
+                numberOfLines={1}
+              >
                 {typeof blog.author === 'string' ? blog.author : blog.author?.name}
               </Text>
-              <Text className="text-[#9CA3AF] text-[8px] font-medium leading-tight">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[12px] leading-[16px] font-kumbh-semibold"
+                numberOfLines={1}
+              >
                 {blog.timeAgo}{blog.readingDuration ? ` • ${blog.readingDuration}` : ""}
               </Text>
             </View>

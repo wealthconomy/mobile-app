@@ -283,11 +283,14 @@ export default function WealthFamScreen() {
                       style={{
                         backgroundColor: THEME,
                         paddingHorizontal: 8,
-                        paddingVertical: 2.5,
+                        paddingVertical: 3,
                         borderRadius: 20,
                       }}
                     >
-                      <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                      <Text
+                        maxFontSizeMultiplier={1.35}
+                        style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 12 }}
+                      >
                         {famRateLabel}
                       </Text>
                     </View>
@@ -368,7 +371,7 @@ export default function WealthFamScreen() {
                 <Ionicons name="close" size={20} color={THEME} />
               </TouchableOpacity>
               <Text
-                className="font-extrabold text-[12px] mb-4"
+                className="font-extrabold text-[13px] mb-4"
                 style={{ color: THEME }}
               >
                 What's on WealthFam? 🏡✨
@@ -389,9 +392,9 @@ export default function WealthFamScreen() {
                   },
                 ].map((tip, i) => (
                   <View key={i} className="flex-row mb-3 items-start">
-                    <Text className="mr-2 text-[10px]">✅</Text>
+                    <Text className="mr-2 text-[12px]">✅</Text>
                     <Text
-                      className="text-[10px] flex-1 leading-[15px]"
+                      className="text-[12px] flex-1 leading-[17px] font-kumbh-semibold"
                       style={{ color: THEME }}
                     >
                       <Text className="font-bold">{tip.title}</Text> {tip.text}
@@ -417,7 +420,7 @@ export default function WealthFamScreen() {
                   key={cat.id}
                   style={{
                     width: 160,
-                    height: 114,
+                    height: 124,
                     backgroundColor: THEME_BG,
                     borderRadius: 15,
                     padding: 12,
@@ -440,14 +443,16 @@ export default function WealthFamScreen() {
                     <Text className="text-[24px]">{cat.icon}</Text>
                   </View>
                   <Text
+                    maxFontSizeMultiplier={1.35}
                     className="font-bold text-[14px] mb-0.5"
                     style={{ color: THEME }}
                   >
                     {cat.title}
                   </Text>
                   <Text
-                    className="text-[9px] opacity-70"
+                    className="text-[13px] leading-[18px] font-kumbh-semibold"
                     style={{ color: THEME }}
+                    numberOfLines={2}
                   >
                     {cat.subtitle}
                   </Text>
@@ -545,7 +550,7 @@ export default function WealthFamScreen() {
                     You haven't created a WealthFam yet!
                   </Text>
                   <Text
-                    className="text-[11px] text-center opacity-60"
+                    className="text-[13px] leading-[18px] font-kumbh-semibold text-center"
                     style={{ color: THEME }}
                   >
                     Start saving goals for the people you love.
@@ -558,7 +563,7 @@ export default function WealthFamScreen() {
               )
             ) : completedPlans.length === 0 ? (
               <View className="items-center justify-center py-20 px-10">
-                <Text className="text-[#6B7280] italic">
+                <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold italic text-center">
                   No completed plans yet
                 </Text>
               </View>
@@ -670,6 +675,7 @@ function FamListItem({
           }}
         >
           <Text
+            maxFontSizeMultiplier={1.35}
             style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A", flex: 1, marginRight: 8 }}
             numberOfLines={1}
           >
@@ -679,7 +685,10 @@ function FamListItem({
             <Text style={{ fontSize: 12, marginRight: 2 }}>
               {isCompleted ? "🏆" : "🏡"}
             </Text>
-            <Text style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}
+            >
               ₦{formatAmount(plan.targetAmount)}
             </Text>
           </View>
@@ -694,11 +703,17 @@ function FamListItem({
           }}
         >
           <View style={{ flex: 1, marginRight: 8 }}>
-            <Text style={{ fontSize: 10, color: "#9CA3AF" }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 12, lineHeight: 16, color: "#4B5563", fontWeight: "600" }}
+            >
               {plan.metadata?.category || "Fam"}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
+              <Text
+                maxFontSizeMultiplier={1.35}
+                style={{ fontSize: 12, color: "#166534", fontWeight: "700" }}
+              >
                 Wealth growth ₦{formatAmount(growthVal.toString())}{" "}
               </Text>
               <ArrowUp size={12} color="#4CAF50" />
@@ -732,25 +747,32 @@ function FamListItem({
             alignItems: "center",
           }}
         >
-          <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
+          <Text
+            maxFontSizeMultiplier={1.35}
+            style={{ fontSize: 12, lineHeight: 16, color: "#4B5563", fontWeight: "600" }}
+          >
             End Date: {formattedDate}
           </Text>
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
-              width: 80,
+              width: 95,
               justifyContent: "space-between",
             }}
           >
-            <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 12, color: "#4B5563", fontWeight: "600" }}
+            >
               {Math.round(Math.min(progress * 100, 100))}%
             </Text>
             <Text
+              maxFontSizeMultiplier={1.35}
               style={{
-                fontSize: 9,
-                color: isCompleted ? "#4CAF50" : "#9CA3AF",
-                fontWeight: isCompleted ? "700" : "normal",
+                fontSize: 12,
+                color: isCompleted ? "#166534" : "#4B5563",
+                fontWeight: isCompleted ? "700" : "600",
               }}
             >
               {isCompleted ? "Plan Achieved" : `${getDaysLeft()} days Left`}

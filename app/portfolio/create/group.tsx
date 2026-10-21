@@ -650,11 +650,12 @@ function GroupTypeInfoCard({
         </View>
         <View style={{ flex: 1 }}>
           <Text
+            maxFontSizeMultiplier={1.35}
             style={{
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: "700",
               color: c.textColor,
-              opacity: 0.7,
+              opacity: 0.9,
               textTransform: "uppercase",
               letterSpacing: 0.5,
             }}
@@ -662,6 +663,7 @@ function GroupTypeInfoCard({
             Selected Group Type
           </Text>
           <Text
+            maxFontSizeMultiplier={1.35}
             style={{
               fontSize: 14,
               fontWeight: "800",
@@ -681,7 +683,8 @@ function GroupTypeInfoCard({
           }}
         >
           <Text
-            style={{ color: c.badgeColor, fontSize: 10, fontWeight: "700" }}
+            maxFontSizeMultiplier={1.35}
+            style={{ color: c.badgeColor, fontSize: 12, fontWeight: "700" }}
           >
             {c.badge}
           </Text>
@@ -693,8 +696,9 @@ function GroupTypeInfoCard({
         {c.rows.map((row, i) => (
           <View key={i}>
             <Text
+              maxFontSizeMultiplier={1.35}
               style={{
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: "700",
                 color: c.textColor,
                 marginBottom: 2,
@@ -703,11 +707,14 @@ function GroupTypeInfoCard({
               {row.label}
             </Text>
             <Text
+              maxFontSizeMultiplier={1.35}
               style={{
-                fontSize: 12,
+                fontSize: 13,
                 color: c.textColor,
-                opacity: 0.85,
+                opacity: 1,
                 lineHeight: 18,
+                fontWeight: "600",
+                fontFamily: "KumbhSans_600SemiBold",
               }}
             >
               {row.value}
@@ -817,11 +824,12 @@ function Step1Identity({ data, update, hideGroupTypeSelector }: any) {
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color={isSelected ? "white" : "#64748B"}
+                      color={isSelected ? "white" : "#4B5563"}
                     />
                   </View>
                   <View style={{ flex: 1, paddingRight: 8 }}>
                     <Text
+                      maxFontSizeMultiplier={1.35}
                       style={{
                         fontSize: 14,
                         fontWeight: "700",
@@ -831,11 +839,14 @@ function Step1Identity({ data, update, hideGroupTypeSelector }: any) {
                       {item.title}
                     </Text>
                     <Text
+                      maxFontSizeMultiplier={1.35}
                       style={{
-                        fontSize: 11,
-                        color: "#64748B",
+                        fontSize: 13,
+                        color: "#4B5563",
                         marginTop: 2,
-                        lineHeight: 15,
+                        lineHeight: 18,
+                        fontWeight: "600",
+                        fontFamily: "KumbhSans_600SemiBold",
                       }}
                     >
                       {item.subtitle}
@@ -907,7 +918,10 @@ function Step1Identity({ data, update, hideGroupTypeSelector }: any) {
       </View>
 
       <View className="mb-4">
-        <Text className="text-[#64748B] text-[13px] font-bold mb-2">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-[#4B5563] text-[13px] font-bold font-kumbh-bold mb-2"
+        >
           Group Description
         </Text>
         <TextInput
@@ -916,10 +930,14 @@ function Step1Identity({ data, update, hideGroupTypeSelector }: any) {
           value={data.description}
           onChangeText={(t) => update("description", t)}
           placeholder="Enter group description..."
+          placeholderTextColor="#6B7280"
           className="bg-gray-50 rounded-xl p-4 text-[#1A1A1A] border border-gray-100 min-h-[100px]"
           textAlignVertical="top"
         />
-        <Text className="text-right text-gray-400 text-[11px] mt-1">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-right text-[#4B5563] text-[12px] font-semibold font-kumbh-semibold mt-1"
+        >
           {data.description.split(/\s+/).filter(Boolean).length}/100 words
         </Text>
       </View>
@@ -1006,7 +1024,10 @@ function Step2Financial({ data, update }: any) {
           keyboardType="numeric"
         />
         {isBelowMinTarget && (
-          <Text className="text-red-500 text-[11px] mt-1 font-medium">
+          <Text
+            maxFontSizeMultiplier={1.35}
+            className="text-red-500 text-[12px] mt-1 font-semibold font-kumbh-semibold"
+          >
             Minimum target amount is ₦{minGroupNairaFormatted}
           </Text>
         )}
@@ -1026,7 +1047,10 @@ function Step2Financial({ data, update }: any) {
       )}
 
       <View className="mb-4">
-        <Text className="text-[#64748B] text-[13px] font-bold mb-2">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-[#4B5563] text-[13px] font-bold font-kumbh-bold mb-2"
+        >
           Contribution Frequency
         </Text>
         <TouchableOpacity
@@ -1034,13 +1058,13 @@ function Step2Financial({ data, update }: any) {
           onPress={() => setIsOpen(!isOpen)}
           className="h-14 bg-gray-50 rounded-xl px-4 flex-row items-center justify-between border border-gray-100"
         >
-          <Text className={data.frequency ? "text-[#1A1A1A]" : "text-gray-400"}>
+          <Text className={data.frequency ? "text-[#1A1A1A]" : "text-[#6B7280]"}>
             {data.frequency || "Daily, Weekly, or Monthly"}
           </Text>
           <Ionicons
             name={isOpen ? "chevron-up" : "chevron-down"}
             size={20}
-            color="#64748B"
+            color="#6B7280"
           />
         </TouchableOpacity>
         {isOpen && (
@@ -1212,27 +1236,42 @@ function Step3Membership({ data, update }: any) {
     <View className="space-y-6">
       <View className="mb-4">
         <View className="flex-row justify-between mb-2">
-          <Text className="text-[#64748B] text-[13px] font-bold">
+          <Text
+            maxFontSizeMultiplier={1.35}
+            className="text-[#4B5563] text-[13px] font-bold font-kumbh-bold"
+          >
             Members Limit
           </Text>
-          <Text className="text-gray-400 text-[11px]">{minM} min - {maxM} max</Text>
+          <Text
+            maxFontSizeMultiplier={1.35}
+            className="text-[#4B5563] text-[12px] font-semibold font-kumbh-semibold"
+          >
+            {minM} min - {maxM} max
+          </Text>
         </View>
         <TextInput
           placeholder={`e.g., ${minM} to ${maxM} members`}
+          placeholderTextColor="#6B7280"
           value={data.memberLimit}
           onChangeText={(t) => update("memberLimit", t)}
           keyboardType="numeric"
           className="h-14 bg-gray-50 rounded-xl px-4 text-[#1A1A1A] border border-gray-100"
         />
         {isInvalidLimit && (
-          <Text className="text-red-500 text-[11px] mt-1 font-medium">
+          <Text
+            maxFontSizeMultiplier={1.35}
+            className="text-red-500 text-[12px] mt-1 font-semibold font-kumbh-semibold"
+          >
             Limit must be between {minM} and {maxM} members
           </Text>
         )}
       </View>
 
       <View className="mb-4">
-        <Text className="text-[#64748B] text-[13px] font-bold mb-2">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-[#4B5563] text-[13px] font-bold font-kumbh-bold mb-2"
+        >
           Access Type
         </Text>
         <TouchableOpacity
@@ -1242,7 +1281,7 @@ function Step3Membership({ data, update }: any) {
         >
           <Text
             className={
-              data.accessType ? "text-[#1A1A1A] font-semibold" : "text-gray-400"
+              data.accessType ? "text-[#1A1A1A] font-semibold" : "text-[#6B7280]"
             }
           >
             {data.accessType || "Public/Open, Private/Invite-Only"}
@@ -1250,7 +1289,7 @@ function Step3Membership({ data, update }: any) {
           <Ionicons
             name={isOpen ? "chevron-up" : "chevron-down"}
             size={20}
-            color="#64748B"
+            color="#6B7280"
           />
         </TouchableOpacity>
         {isOpen && (
@@ -1270,7 +1309,10 @@ function Step3Membership({ data, update }: any) {
                     <Text className="text-[#1A1A1A] font-bold text-[14px]">
                       {opt}
                     </Text>
-                    <Text className="text-[#64748B] text-[11px] mt-0.5 leading-[16px]">
+                    <Text
+                      maxFontSizeMultiplier={1.35}
+                      className="text-[#4B5563] text-[13px] mt-0.5 leading-[18px] font-semibold font-kumbh-semibold"
+                    >
                       {isPublic
                         ? "Open group: Members can join immediately without waiting for admin approval."
                         : "Private group: Members send a join request. Admin can accept or reject each request."}
@@ -1284,13 +1326,16 @@ function Step3Membership({ data, update }: any) {
         )}
         {data.accessType && (
           <View className="bg-[#EEF7F8] p-3 rounded-xl mt-3 border border-[#D5EAE9]">
-            <Text className="text-[#155D5F] text-[12px] font-bold mb-0.5">
+            <Text className="text-[#155D5F] text-[13px] font-bold font-kumbh-bold mb-0.5">
               ℹ️{" "}
               {data.accessType.toLowerCase().includes("public")
                 ? "Public Group Policy"
                 : "Private Group Policy"}
             </Text>
-            <Text className="text-[#155D5F] text-[11px] leading-[16px]">
+            <Text
+              maxFontSizeMultiplier={1.35}
+              className="text-[#155D5F] text-[13px] leading-[18px] font-semibold font-kumbh-semibold"
+            >
               {data.accessType.toLowerCase().includes("public")
                 ? "People can join this group directly without you approving them."
                 : "People must request to join this group. You will have full control in settings to accept or reject them."}
@@ -1317,7 +1362,10 @@ function Step4Risk({ data, update, groupPenaltyRate = "10%" }: any) {
   return (
     <View className="space-y-6">
       <View className="mb-4">
-        <Text className="text-[#64748B] text-[13px] font-bold mb-2">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-[#4B5563] text-[13px] font-bold font-kumbh-bold mb-2"
+        >
           Late Payment Penalty
         </Text>
         <TouchableOpacity
@@ -1325,13 +1373,13 @@ function Step4Risk({ data, update, groupPenaltyRate = "10%" }: any) {
           onPress={() => setIsPenaltyOpen(!isPenaltyOpen)}
           className="h-14 bg-gray-50 rounded-xl px-4 flex-row items-center justify-between border border-gray-100"
         >
-          <Text className={data.penalty ? "text-[#1A1A1A]" : "text-gray-400"}>
+          <Text className={data.penalty ? "text-[#1A1A1A]" : "text-[#6B7280]"}>
             {data.penalty || "Select Penalty..."}
           </Text>
           <Ionicons
             name={isPenaltyOpen ? "chevron-up" : "chevron-down"}
             size={20}
-            color="#64748B"
+            color="#6B7280"
           />
         </TouchableOpacity>
         {isPenaltyOpen && (
@@ -1354,7 +1402,10 @@ function Step4Risk({ data, update, groupPenaltyRate = "10%" }: any) {
       </View>
 
       <View className="mb-4">
-        <Text className="text-[#64748B] text-[13px] font-bold mb-2">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-[#4B5563] text-[13px] font-bold font-kumbh-bold mb-2"
+        >
           Early Exit / Default Rule
         </Text>
         <TouchableOpacity
@@ -1362,16 +1413,19 @@ function Step4Risk({ data, update, groupPenaltyRate = "10%" }: any) {
           onPress={() => setIsExitOpen(!isExitOpen)}
           className="h-14 bg-gray-50 rounded-xl px-4 flex-row items-center justify-between border border-gray-100"
         >
-          <Text className={data.earlyExit ? "text-[#1A1A1A]" : "text-gray-400"}>
+          <Text className={data.earlyExit ? "text-[#1A1A1A]" : "text-[#6B7280]"}>
             {data.earlyExit || "Select Exit Rule..."}
           </Text>
           <Ionicons
             name={isExitOpen ? "chevron-up" : "chevron-down"}
             size={20}
-            color="#64748B"
+            color="#6B7280"
           />
         </TouchableOpacity>
-        <Text className="text-[#64748B] text-[11px] mt-1.5 px-1 leading-4">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-[#4B5563] text-[13px] mt-1.5 px-1 leading-[18px] font-semibold font-kumbh-semibold"
+        >
           Choose whether members can exit early before maturity and whether the
           platform exit penalty ({groupPenaltyRate}) applies.
         </Text>
@@ -1399,7 +1453,10 @@ function Step4Risk({ data, update, groupPenaltyRate = "10%" }: any) {
           <Text className="text-[#1A1A1A] font-bold text-[14px]">
             Emergency Withdrawal
           </Text>
-          <Text className="text-gray-400 text-[11px] mt-0.5">
+          <Text
+            maxFontSizeMultiplier={1.35}
+            className="text-[#4B5563] text-[13px] mt-0.5 leading-[18px] font-semibold font-kumbh-semibold"
+          >
             Allow members to withdraw funds during emergencies
           </Text>
         </View>
@@ -1422,7 +1479,10 @@ function Step4RiskRotational({ data, update, groupPenaltyRate = "10%" }: any) {
   return (
     <View className="space-y-6">
       <View className="mb-4">
-        <Text className="text-[#64748B] text-[13px] font-bold mb-2">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-[#4B5563] text-[13px] font-bold font-kumbh-bold mb-2"
+        >
           Late Payment Penalty
         </Text>
         <TouchableOpacity
@@ -1430,13 +1490,13 @@ function Step4RiskRotational({ data, update, groupPenaltyRate = "10%" }: any) {
           onPress={() => setIsPenaltyOpen(!isPenaltyOpen)}
           className="h-14 bg-gray-50 rounded-xl px-4 flex-row items-center justify-between border border-gray-100"
         >
-          <Text className={data.penalty ? "text-[#1A1A1A]" : "text-gray-400"}>
+          <Text className={data.penalty ? "text-[#1A1A1A]" : "text-[#6B7280]"}>
             {data.penalty || "Select Penalty..."}
           </Text>
           <Ionicons
             name={isPenaltyOpen ? "chevron-up" : "chevron-down"}
             size={20}
-            color="#64748B"
+            color="#6B7280"
           />
         </TouchableOpacity>
         {isPenaltyOpen && (
@@ -1547,7 +1607,10 @@ function Step5Review({ data, update }: any) {
         >
           {data.agreed && <Check size={14} color="white" />}
         </View>
-        <Text className="text-[#64748B] text-[13px] flex-1 leading-[19px]">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-[#4B5563] text-[13px] font-semibold font-kumbh-semibold flex-1 leading-[18px]"
+        >
           I agree to the WealthGroup Terms of Service and understand the
           financial responsibilities as group administrator.
         </Text>
@@ -1559,7 +1622,12 @@ function Step5Review({ data, update }: any) {
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
     <View className="flex-row justify-between py-2 border-b border-gray-100/50">
-      <Text className="text-[#64748B] text-[13px]">{label}</Text>
+      <Text
+        maxFontSizeMultiplier={1.35}
+        className="text-[#4B5563] text-[13px] font-semibold font-kumbh-semibold"
+      >
+        {label}
+      </Text>
       <Text className="text-[#1A1A1A] font-bold text-[13px]">{value}</Text>
     </View>
   );
@@ -1608,7 +1676,10 @@ function SuccessScreen({ onDone, onView, groupName }: any) {
             You’re Leading the Way! 🚀
           </Text>
 
-          <Text className="text-[14px] text-center text-[#64748B] leading-[22px] mt-1">
+          <Text
+            maxFontSizeMultiplier={1.35}
+            className="text-[14px] text-center text-[#4B5563] font-semibold font-kumbh-semibold leading-[22px] mt-1"
+          >
             {`Congratulations, WealthBuilder! Your group [${
               groupName || "Wealth Tribe"
             }] is officially live. You’ve just taken a massive step toward sustainable wealth for yourself and your community.`}
@@ -1638,8 +1709,8 @@ function SuccessScreen({ onDone, onView, groupName }: any) {
             onPress={onShare}
             className="w-full h-14 rounded-2xl border border-gray-200 flex-row items-center justify-center space-x-2"
           >
-            <Share2 size={20} color="#64748B" />
-            <Text className="text-[#64748B] font-bold">Invite Members</Text>
+            <Share2 size={20} color="#4B5563" />
+            <Text className="text-[#4B5563] font-bold">Invite Members</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -1658,7 +1729,7 @@ function CustomSwitch({ value, onValueChange }: any) {
         width: 44,
         height: 24,
         borderRadius: 12,
-        backgroundColor: value ? THEME : "#64748B",
+        backgroundColor: value ? THEME : "#6B7280",
         padding: 2,
       }}
     >
@@ -1692,17 +1763,30 @@ function getStepTitle(step: number) {
   }
 }
 
-function FormField({ label, placeholder, onChange, ...props }: any) {
+function FormField({ label, placeholder, onChange, helperText, ...props }: any) {
   return (
     <View className="mb-4">
-      <Text className="text-[#64748B] text-[13px] font-bold mb-2">{label}</Text>
+      <Text
+        maxFontSizeMultiplier={1.35}
+        className="text-[#4B5563] text-[13px] font-bold font-kumbh-bold mb-2"
+      >
+        {label}
+      </Text>
       <TextInput
         {...props}
         placeholder={placeholder}
-        placeholderTextColor="#94A3B8"
+        placeholderTextColor="#6B7280"
         onChangeText={onChange}
         className="h-14 bg-gray-50 rounded-xl px-4 text-[#1A1A1A] border border-gray-100"
       />
+      {helperText && (
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-[#4B5563] text-[12px] font-semibold font-kumbh-semibold mt-1"
+        >
+          {helperText}
+        </Text>
+      )}
     </View>
   );
 }

@@ -892,10 +892,10 @@ export default function GroupDetailScreen() {
                       position: "absolute",
                       top: -4,
                       right: -4,
-                      minWidth: 18,
-                      height: 18,
+                      minWidth: 20,
+                      height: 20,
                       paddingHorizontal: 4,
-                      borderRadius: 9,
+                      borderRadius: 10,
                       backgroundColor: "#EF4444",
                       borderWidth: 1.5,
                       borderColor: "white",
@@ -904,7 +904,8 @@ export default function GroupDetailScreen() {
                     }}
                   >
                     <Text
-                      style={{ color: "white", fontSize: 9, fontWeight: "800" }}
+                      maxFontSizeMultiplier={1.35}
+                      style={{ color: "white", fontSize: 12, fontWeight: "800" }}
                     >
                       {groupUnreadCount > 99 ? "99+" : groupUnreadCount}
                     </Text>
@@ -1039,10 +1040,12 @@ export default function GroupDetailScreen() {
               >
                 <View>
                   <Text
+                    maxFontSizeMultiplier={1.35}
                     style={{
-                      fontSize: 11,
-                      color: "#64748B",
+                      fontSize: 12,
+                      color: "#4B5563",
                       fontWeight: "600",
+                      fontFamily: "KumbhSans_600SemiBold",
                     }}
                   >
                     Member Contrib. / Cycle
@@ -1058,10 +1061,12 @@ export default function GroupDetailScreen() {
                 </View>
                 <View style={{ alignItems: "flex-end" }}>
                   <Text
+                    maxFontSizeMultiplier={1.35}
                     style={{
-                      fontSize: 11,
-                      color: "#64748B",
+                      fontSize: 12,
+                      color: "#4B5563",
                       fontWeight: "600",
+                      fontFamily: "KumbhSans_600SemiBold",
                     }}
                   >
                     Cycle Lump-Sum Payout
@@ -1253,12 +1258,24 @@ export default function GroupDetailScreen() {
               }}
             >
               <Text
-                style={{ fontSize: 13, fontWeight: "700", color: "#64748B" }}
+                maxFontSizeMultiplier={1.35}
+                style={{
+                  fontSize: 13,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                  color: "#4B5563",
+                }}
               >
                 {progressPct}%
               </Text>
               <Text
-                style={{ fontSize: 13, fontWeight: "700", color: "#64748B" }}
+                maxFontSizeMultiplier={1.35}
+                style={{
+                  fontSize: 13,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                  color: "#4B5563",
+                }}
               >
                 {getTimelineLeft()}
               </Text>
@@ -1611,11 +1628,14 @@ export default function GroupDetailScreen() {
                             Payout Order Pending
                           </Text>
                           <Text
+                            maxFontSizeMultiplier={1.35}
                             style={{
-                              fontSize: 11,
-                              color: "#B45309",
+                              fontSize: 12,
+                              color: "#92400E",
                               marginTop: 2,
-                              lineHeight: 15,
+                              lineHeight: 16,
+                              fontWeight: "600",
+                              fontFamily: "KumbhSans_600SemiBold",
                             }}
                           >
                             Rotational payout schedule must be confirmed by the
@@ -2137,7 +2157,7 @@ export default function GroupDetailScreen() {
                             color: isExceeding ? "#EF4444" : TEXT_DARK,
                           }}
                           placeholder="₦0.00"
-                          placeholderTextColor="#9CA3AF"
+                          placeholderTextColor="#6B7280"
                           keyboardType="numeric"
                           editable={!isFixedOrRotational}
                           returnKeyType="done"
@@ -2316,12 +2336,15 @@ export default function GroupDetailScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Join {groupName}</Text>
             <Text
+              maxFontSizeMultiplier={1.35}
               style={{
-                color: "#64748B",
+                color: "#4B5563",
                 fontSize: 13,
+                fontWeight: "600",
+                fontFamily: "KumbhSans_600SemiBold",
                 textAlign: "center",
                 marginVertical: 14,
-                lineHeight: 20,
+                lineHeight: 18,
               }}
             >
               You are requesting to join this tribe savings circle. The group
@@ -2420,11 +2443,14 @@ export default function GroupDetailScreen() {
             </Text>
 
             <Text
+              maxFontSizeMultiplier={1.35}
               style={{
-                color: "#64748B",
+                color: "#4B5563",
                 fontSize: 13,
+                fontWeight: "600",
+                fontFamily: "KumbhSans_600SemiBold",
                 textAlign: "center",
-                lineHeight: 20,
+                lineHeight: 18,
                 marginBottom: 20,
               }}
             >
@@ -2472,9 +2498,12 @@ export default function GroupDetailScreen() {
               {isGroupEnded ? "Withdraw to Wallet" : "Emergency Withdrawal"}
             </Text>
             <Text
+              maxFontSizeMultiplier={1.35}
               style={{
-                color: "#64748B",
+                color: "#4B5563",
                 fontSize: 13,
+                fontWeight: "600",
+                fontFamily: "KumbhSans_600SemiBold",
                 textAlign: "center",
                 marginTop: 6,
                 marginBottom: 16,
@@ -2513,10 +2542,12 @@ export default function GroupDetailScreen() {
                       }}
                     >
                       <Text
+                        maxFontSizeMultiplier={1.35}
                         style={{
                           fontSize: 13,
-                          fontWeight: "700",
-                          color: "#64748B",
+                          fontWeight: "600",
+                          fontFamily: "KumbhSans_600SemiBold",
+                          color: "#4B5563",
                         }}
                       >
                         Amount (₦)
@@ -2529,10 +2560,12 @@ export default function GroupDetailScreen() {
                         }}
                       >
                         <Text
+                          maxFontSizeMultiplier={1.35}
                           style={{
                             fontSize: 12,
                             fontWeight: "600",
-                            color: "#64748B",
+                            fontFamily: "KumbhSans_600SemiBold",
+                            color: "#4B5563",
                           }}
                         >
                           Savings:{" "}
@@ -2556,8 +2589,9 @@ export default function GroupDetailScreen() {
                             }}
                           >
                             <Text
+                              maxFontSizeMultiplier={1.35}
                               style={{
-                                fontSize: 11,
+                                fontSize: 12,
                                 fontWeight: "800",
                                 color: THEME,
                               }}
@@ -2588,7 +2622,7 @@ export default function GroupDetailScreen() {
                         },
                       ]}
                       placeholder="₦0.00"
-                      placeholderTextColor="#9CA3AF"
+                      placeholderTextColor="#6B7280"
                       keyboardType="numeric"
                       autoFocus
                       value={withdrawAmount ? `₦${withdrawAmount}` : ""}
@@ -2694,7 +2728,7 @@ export default function GroupDetailScreen() {
               style={{ marginTop: 14 }}
             >
               <Text
-                style={{ color: "#64748B", fontWeight: "600", fontSize: 13 }}
+                style={{ color: "#4B5563", fontWeight: "600", fontSize: 13 }}
               >
                 Cancel
               </Text>
@@ -2805,9 +2839,12 @@ export default function GroupDetailScreen() {
 
             {/* Description */}
             <Text
+              maxFontSizeMultiplier={1.35}
               style={{
                 fontSize: 14,
-                color: "#64748B",
+                color: "#4B5563",
+                fontWeight: "600",
+                fontFamily: "KumbhSans_600SemiBold",
                 textAlign: "center",
                 lineHeight: 21,
                 marginBottom: 24,
@@ -3042,10 +3079,13 @@ export default function GroupDetailScreen() {
                                 }}
                               />
                               <Text
+                                maxFontSizeMultiplier={1.35}
                                 style={{
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   color: "#991B1B",
-                                  lineHeight: 15,
+                                  lineHeight: 16,
+                                  fontWeight: "600",
+                                  fontFamily: "KumbhSans_600SemiBold",
                                 }}
                               >
                                 💡 Emergency Withdrawal is enabled for this
@@ -3510,7 +3550,15 @@ function SpecRow({
         borderBottomColor: "#E0F2F1",
       }}
     >
-      <Text style={{ fontSize: 13, fontWeight: "500", color: "#64748B" }}>
+      <Text
+        maxFontSizeMultiplier={1.35}
+        style={{
+          fontSize: 13,
+          fontWeight: "600",
+          fontFamily: "KumbhSans_600SemiBold",
+          color: "#4B5563",
+        }}
+      >
         {label}
       </Text>
       <Text style={{ fontSize: 13, fontWeight: "600", color: THEME }}>

@@ -202,7 +202,7 @@ export default function BlogDetailScreen() {
 
         <View className="px-5 pt-6">
           <View
-            className="px-2 py-0.5 rounded self-start mb-2"
+            className="px-2.5 py-1 rounded-md self-start mb-2"
             style={{
               backgroundColor:
                 blog.category === "WealthFlex"
@@ -219,28 +219,18 @@ export default function BlogDetailScreen() {
             }}
           >
             <Text
-              className="text-[10px] font-bold"
-              style={{
-                color:
-                  blog.category === "WealthFlex"
-                    ? "#F44336"
-                    : blog.category === "WealthGoal"
-                      ? "#F3007A"
-                      : blog.category === "WealthFix"
-                        ? "#FFCF65"
-                        : blog.category === "WealthFam"
-                          ? "#6366F1"
-                          : blog.category === "WealthFlow"
-                            ? "#0EA5E9"
-                            : "#4B5563",
-              }}
+              maxFontSizeMultiplier={1.35}
+              className="text-[13px] leading-[18px] text-[#4B5563] font-kumbh-semibold"
             >
               {blog.category}
             </Text>
           </View>
 
           <View className="mb-4">
-            <Text className="text-[#1A1A1A] font-bold text-[20px] leading-tight mb-2">
+            <Text
+              maxFontSizeMultiplier={1.35}
+              className="text-[#1A1A1A] font-bold text-[20px] leading-tight mb-2"
+            >
               {blog.title}
             </Text>
           </View>
@@ -251,10 +241,16 @@ export default function BlogDetailScreen() {
               className="w-8 h-8 rounded-full bg-gray-200 mr-2.5"
             />
             <View className="flex-1">
-              <Text className="text-[#1A1A1A] font-bold text-xs">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#1A1A1A] font-bold text-[14px] leading-[18px]"
+              >
                 {typeof blog.author === 'string' ? blog.author : blog.author?.name}
               </Text>
-              <Text className="text-[#6B7280] text-[10px]">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-0.5"
+              >
                 {blog.timeAgo}{blog.readingDuration ? ` • ${blog.readingDuration}` : ""}
               </Text>
             </View>
@@ -270,7 +266,10 @@ export default function BlogDetailScreen() {
                 size={20}
                 color={localIsLiked ? "#155D5F" : "#6B7280"}
               />
-              <Text className="text-[#6B7280] text-xs ml-2 font-bold">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold ml-2"
+              >
                 {localLikesCount}
               </Text>
             </TouchableOpacity>
@@ -279,7 +278,10 @@ export default function BlogDetailScreen() {
               className="flex-row items-center"
             >
               <Ionicons name="chatbubble-outline" size={20} color="#6B7280" />
-              <Text className="text-[#6B7280] text-xs ml-2 font-bold">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold ml-2"
+              >
                 {blog.comments?.length || 0}
               </Text>
             </View>
@@ -289,7 +291,10 @@ export default function BlogDetailScreen() {
               className="flex-row items-center"
             >
               <Ionicons name="share-social-outline" size={20} color="#6B7280" />
-              <Text className="text-[#6B7280] text-xs ml-2 font-bold">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold ml-2"
+              >
                 {localSharesCount}
               </Text>
             </TouchableOpacity>
@@ -302,7 +307,10 @@ export default function BlogDetailScreen() {
                 size={20}
                 color={localIsBookmarked ? "#155D5F" : "#6B7280"}
               />
-              <Text className="text-[#6B7280] text-xs ml-2 font-bold">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold ml-2"
+              >
                 {localBookmarks}
               </Text>
             </TouchableOpacity>
@@ -310,11 +318,23 @@ export default function BlogDetailScreen() {
 
           <View className="h-[1px] bg-gray-100 w-full mb-5 mt-4" />
 
-          <Text className="text-[#4B5563] text-sm leading-relaxed mb-6">
+          <Text
+            style={{
+              fontSize: 16,
+              lineHeight: 26,
+              color: "#374151",
+              fontWeight: "500",
+              fontFamily: "KumbhSans_500Medium",
+            }}
+            className="mb-6"
+          >
             {blog.content}
           </Text>
 
-          <Text className="text-[#1A1A1A] font-bold text-sm mb-6">
+          <Text
+            maxFontSizeMultiplier={1.35}
+            className="text-[#1A1A1A] font-bold text-[14px] leading-[20px] mb-6"
+          >
             Thanks for reading!
           </Text>
 
@@ -370,7 +390,7 @@ export default function BlogDetailScreen() {
             <TextInput
               className="flex-1 text-gray-900 py-1"
               placeholder="Write a message..."
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#6B7280"
               value={commentText}
               onChangeText={setCommentText}
               multiline

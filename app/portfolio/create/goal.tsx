@@ -428,7 +428,8 @@ export default function CreateGoalScreen() {
       {showRules && (
         <View
           style={{
-            width: 366,
+            width: "100%",
+            maxWidth: 366,
             borderRadius: 15,
             backgroundColor: "#FFE6F2B2",
           }}
@@ -438,24 +439,24 @@ export default function CreateGoalScreen() {
             className="absolute right-4 top-4 z-10"
             onPress={() => setShowRules(false)}
           >
-            <Ionicons name="close" size={20} color="#F3007A" />
+            <Ionicons name="close" size={20} color="#A20050" />
           </TouchableOpacity>
           <Text
-            style={{ color: "#F3007A" }}
-            className="font-extrabold text-[12px] mb-4"
+            style={{ color: "#A20050" }}
+            className="font-extrabold text-[13px] leading-[18px] mb-4"
           >
             Important "Need to Know" Rules
           </Text>
           <View className="space-y-4 gap-4">
             {wealthPreference === "Interest Based" && (
               <Text
-                style={{ color: "#F3007A" }}
-                className="text-[11px] leading-[16px]"
+                style={{ color: "#A20050" }}
+                className="text-[13px] leading-[18px] font-kumbh-semibold"
               >
                 👉{" "}
                 <Text
-                  style={{ color: "#F3007A" }}
-                  className="font-bold text-[12px]"
+                  style={{ color: "#A20050" }}
+                  className="font-bold text-[13px]"
                 >
                   Interest Rate:
                 </Text>{" "}
@@ -464,13 +465,13 @@ export default function CreateGoalScreen() {
               </Text>
             )}
             <Text
-              style={{ color: "#F3007A" }}
-              className="text-[11px] leading-[16px]"
+              style={{ color: "#A20050" }}
+              className="text-[13px] leading-[18px] font-kumbh-semibold"
             >
               👉{" "}
               <Text
-                style={{ color: "#F3007A" }}
-                className="font-bold text-[12px]"
+                style={{ color: "#A20050" }}
+                className="font-bold text-[13px]"
               >
                 The {penaltyRate} Breaking Fee:
               </Text>{" "}
@@ -478,13 +479,13 @@ export default function CreateGoalScreen() {
               set, a {penaltyRate} penalty fee applies to ensure financial discipline.
             </Text>
             <Text
-              style={{ color: "#F3007A" }}
-              className="text-[11px] leading-[16px]"
+              style={{ color: "#A20050" }}
+              className="text-[13px] leading-[18px] font-kumbh-semibold"
             >
               👉{" "}
               <Text
-                style={{ color: "#F3007A" }}
-                className="font-bold text-[12px]"
+                style={{ color: "#A20050" }}
+                className="font-bold text-[13px]"
               >
                 Goal Completion:
               </Text>{" "}
@@ -524,7 +525,7 @@ export default function CreateGoalScreen() {
           </Text>
           <TextInput
             placeholder="e.g., 'Tuition fee,' 'New Laptop,' or 'Wedding'"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#6B7280"
             className="bg-[#F3F4F6] p-4 rounded-xl text-[#1A1A1A] text-sm"
             value={goalName}
             onChangeText={setGoalName}
@@ -538,7 +539,7 @@ export default function CreateGoalScreen() {
           </Text>
           <TextInput
             placeholder="Rent, Travel, Education, Business, etc."
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#6B7280"
             className="bg-[#F3F4F6] p-4 rounded-xl text-[#1A1A1A] text-sm"
             value={category}
             onChangeText={setCategory}
@@ -564,7 +565,7 @@ export default function CreateGoalScreen() {
           </Text>
           <TextInput
             placeholder="₦0.00"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#6B7280"
             className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] font-bold text-base"
             keyboardType="numeric"
             value={amount ? `₦${amount}` : ""}
@@ -576,7 +577,7 @@ export default function CreateGoalScreen() {
           />
           {parseFloat(amount.replace(/[^\d.]/g, "")) > 0 &&
             parseFloat(amount.replace(/[^\d.]/g, "")) < minGoalNaira && (
-              <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+              <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
                 Minimum target goal is ₦{minGoalNairaFormatted}
               </Text>
             )}
@@ -588,7 +589,7 @@ export default function CreateGoalScreen() {
             <Text className="text-[#1A1A1A] font-bold text-[12px]">
               Manual Savings
             </Text>
-            <Text className="text-[#9CA3AF] text-[10px]">
+            <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-0.5">
               {isManual
                 ? "You will manually top up whenever you wish."
                 : "Automatic recurring debit enabled."}
@@ -611,7 +612,7 @@ export default function CreateGoalScreen() {
                 Starting Deposit (₦)
               </Text>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Text style={{ color: "#6B7280", fontSize: 11, fontWeight: "500" }}>
+                <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600" }}>
                   Wallet:{" "}
                   <Text style={{ color: "#1A1A1A", fontWeight: "700" }}>
                     ₦{walletBalanceNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -626,7 +627,7 @@ export default function CreateGoalScreen() {
                     borderRadius: 6,
                   }}
                 >
-                  <Text style={{ color: "#155D5F", fontSize: 10, fontWeight: "700" }}>
+                  <Text style={{ color: "#155D5F", fontSize: 12, fontWeight: "700" }}>
                     + Fund
                   </Text>
                 </TouchableOpacity>
@@ -634,7 +635,7 @@ export default function CreateGoalScreen() {
             </View>
             <TextInput
               placeholder="₦1,000.00"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#6B7280"
               className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] font-bold text-base"
               keyboardType="numeric"
               value={manualDepositAmount ? `₦${manualDepositAmount}` : ""}
@@ -653,27 +654,27 @@ export default function CreateGoalScreen() {
               const targetVal = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
               if (depositVal > walletBalanceNaira) {
                 return (
-                  <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                  <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
                     ⚠️ Insufficient wallet balance. Fund your wallet or enter a lower starting amount.
                   </Text>
                 );
               }
               if (depositVal > targetVal && targetVal > 0) {
                 return (
-                  <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                  <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
                     Starting deposit cannot exceed target goal amount.
                   </Text>
                 );
               }
               if (depositVal > 0 && depositVal < 100) {
                 return (
-                  <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                  <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
                     Minimum starting deposit is ₦100.00
                   </Text>
                 );
               }
               return (
-                <Text className="text-[#9CA3AF] text-[10px] mt-1">
+                <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-1">
                   Initial amount debited from your wallet today to kickstart your savings goal.
                 </Text>
               );
@@ -743,7 +744,7 @@ export default function CreateGoalScreen() {
                   Auto-Save Amount (₦)
                 </Text>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={{ color: "#6B7280", fontSize: 11, fontWeight: "500" }}>
+                  <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600" }}>
                     Wallet:{" "}
                     <Text style={{ color: "#1A1A1A", fontWeight: "700" }}>
                       ₦{walletBalanceNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -758,7 +759,7 @@ export default function CreateGoalScreen() {
                       borderRadius: 6,
                     }}
                   >
-                    <Text style={{ color: "#155D5F", fontSize: 10, fontWeight: "700" }}>
+                    <Text style={{ color: "#155D5F", fontSize: 12, fontWeight: "700" }}>
                       + Fund
                     </Text>
                   </TouchableOpacity>
@@ -766,7 +767,7 @@ export default function CreateGoalScreen() {
               </View>
               <TextInput
                 placeholder="₦0.00"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="#6B7280"
                 className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] font-bold text-base"
                 keyboardType="numeric"
                 value={autoSaveAmount ? `₦${autoSaveAmount}` : ""}
@@ -785,14 +786,14 @@ export default function CreateGoalScreen() {
                 const autoVal = parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) || 0;
                 if (autoVal > walletBalanceNaira) {
                   return (
-                    <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                    <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
                       ⚠️ Insufficient wallet balance for initial auto-save deduction.
                     </Text>
                   );
                 }
                 if (autoVal > targetVal && targetVal > 0) {
                   return (
-                    <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                    <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
                       Auto-save cannot exceed target goal amount.
                     </Text>
                   );
@@ -809,14 +810,14 @@ export default function CreateGoalScreen() {
                       }}
                       style={{ marginTop: 6 }}
                     >
-                      <Text style={{ color: "#0B575B", fontSize: 11, fontWeight: "600" }}>
+                      <Text style={{ color: "#0B575B", fontSize: 12, fontWeight: "600", lineHeight: 16 }}>
                         💡 Recommended: {calculateRecommendedSaving()?.split(" (")[0]}
                       </Text>
                     </TouchableOpacity>
                   );
                 }
                 return (
-                  <Text className="text-[#9CA3AF] text-[10px] mt-1">
+                  <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-1">
                     First amount debited today, then automatically deducted {frequency.toLowerCase()}.
                   </Text>
                 );
@@ -862,17 +863,17 @@ export default function CreateGoalScreen() {
                 <Ionicons name="calendar-outline" size={20} color="#155D5F" />
               </TouchableOpacity>
               {isBelowMinDuration && (
-                <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
                   Minimum lock duration is {minGoalDuration} days
                 </Text>
               )}
               {isAboveMaxDuration && (
-                <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
                   Maximum lock duration is {maxGoalDuration} days
                 </Text>
               )}
               {!isBelowMinDuration && !isAboveMaxDuration && (
-                <Text className="text-[#9CA3AF] text-[10px] mt-1.5 italic">
+                <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-1.5 italic">
                   Note: To earn the full interest, you must meet your target amount
                   and reach this date
                 </Text>
@@ -1320,7 +1321,7 @@ export default function CreateGoalScreen() {
           <View className="py-2">
             {step === "form" && (
               <View>
-                <Text className="px-5 text-[#6B7280] text-[13px] mb-4">
+                <Text className="px-5 text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mb-4">
                   Start aiming towards your goal
                 </Text>
                 {CATEGORY_DETAILS[category] && (
@@ -1341,10 +1342,10 @@ export default function CreateGoalScreen() {
                       </Text>
                     </View>
                     <View className="flex-1">
-                      <Text className="font-extrabold text-[16px] text-[#F3007A] mb-0.5">
+                      <Text className="font-extrabold text-[16px] text-[#A20050] mb-0.5">
                         {category}
                       </Text>
-                      <Text className="text-[11px] text-[#F3007A] opacity-70">
+                      <Text className="text-[13px] leading-[18px] text-[#A20050] font-kumbh-semibold">
                         {CATEGORY_DETAILS[category].subtitle}
                       </Text>
                     </View>

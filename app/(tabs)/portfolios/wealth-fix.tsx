@@ -331,11 +331,14 @@ export default function WealthFixScreen() {
                       style={{
                         backgroundColor: THEME_COLOR,
                         paddingHorizontal: 8,
-                        paddingVertical: 2.5,
+                        paddingVertical: 3,
                         borderRadius: 20,
                       }}
                     >
-                      <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                      <Text
+                        maxFontSizeMultiplier={1.35}
+                        style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 12 }}
+                      >
                         {fixRateLabel}
                       </Text>
                     </View>
@@ -420,8 +423,8 @@ export default function WealthFixScreen() {
               </TouchableOpacity>
               <View className="flex-row items-center mb-4">
                 <Text
-                  className="font-extrabold text-[12px] mr-1"
-                  style={{ color: THEME_COLOR }}
+                  className="font-extrabold text-[13px] mr-1"
+                  style={{ color: "#92400E" }}
                 >
                   What’s New on WealthFix? 🔓
                 </Text>
@@ -442,10 +445,10 @@ export default function WealthFixScreen() {
                   },
                 ].map((tip, i) => (
                   <View key={i} className="flex-row mb-3 items-start">
-                    <Text className="mr-2 text-[10px] opacity-70">⭐</Text>
+                    <Text className="mr-2 text-[12px] opacity-90">⭐</Text>
                     <Text
-                      className="text-[10px] flex-1 leading-[15px]"
-                      style={{ color: THEME_COLOR }}
+                      className="text-[12px] flex-1 leading-[17px] font-kumbh-semibold"
+                      style={{ color: "#92400E" }}
                     >
                       <Text className="font-extrabold">{tip.title}</Text>{" "}
                       {tip.text}
@@ -481,7 +484,7 @@ export default function WealthFixScreen() {
                   }
                   style={{
                     width: 170,
-                    height: 100,
+                    height: 104,
                     backgroundColor: "#FFF7E1",
                     borderRadius: 15,
                     padding: 12,
@@ -491,14 +494,15 @@ export default function WealthFixScreen() {
                 >
                   <View>
                     <Text
+                      maxFontSizeMultiplier={1.35}
                       className="font-bold text-[14px] mb-0.5"
-                      style={{ color: THEME_COLOR }}
+                      style={{ color: "#92400E" }}
                     >
                       {cat.title}
                     </Text>
                     <Text
-                      className="text-[9px] font-medium"
-                      style={{ color: THEME_COLOR, opacity: 0.8 }}
+                      className="text-[13px] leading-[18px] font-kumbh-semibold"
+                      style={{ color: "#92400E" }}
                     >
                       {cat.subtitle}
                     </Text>
@@ -508,8 +512,8 @@ export default function WealthFixScreen() {
                     style={{ paddingHorizontal: 12, paddingVertical: 4 }}
                   >
                     <Text
-                      className="text-[10px] font-bold"
-                      style={{ color: THEME_COLOR }}
+                      className="text-[12px] font-bold"
+                      style={{ color: "#92400E" }}
                     >
                       Earn {cat.earn}
                     </Text>
@@ -727,6 +731,7 @@ function FixListItem({ goal, themeColor, isUnlocked }: { goal: Portfolio, themeC
           }}
         >
           <Text
+            maxFontSizeMultiplier={1.35}
             style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A", flex: 1, marginRight: 8 }}
             numberOfLines={1}
           >
@@ -739,10 +744,11 @@ function FixListItem({ goal, themeColor, isUnlocked }: { goal: Portfolio, themeC
               </View>
             )}
             <Text
+              maxFontSizeMultiplier={1.35}
               style={{
                 fontSize: 12,
                 fontWeight: "700",
-                color: isUnlocked ? "#4CAF50" : "#1A1A1A",
+                color: isUnlocked ? "#166534" : "#1A1A1A",
               }}
             >
               {!isUnlocked && "🔒 "}₦{formatAmount(goal.balance)}
@@ -759,11 +765,17 @@ function FixListItem({ goal, themeColor, isUnlocked }: { goal: Portfolio, themeC
           }}
         >
           <View style={{ flex: 1, marginRight: 8 }}>
-            <Text style={{ fontSize: 10, color: "#9CA3AF" }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 12, lineHeight: 16, color: "#4B5563", fontWeight: "600" }}
+            >
               {goal.metadata?.category || "Fix"}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
+              <Text
+                maxFontSizeMultiplier={1.35}
+                style={{ fontSize: 12, color: "#166534", fontWeight: "700" }}
+              >
                 Wealth growth ₦{formatAmount(growthVal.toString())}{" "}
               </Text>
               <ArrowUp size={12} color="#4CAF50" />
@@ -798,25 +810,32 @@ function FixListItem({ goal, themeColor, isUnlocked }: { goal: Portfolio, themeC
             alignItems: "center",
           }}
         >
-          <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
+          <Text
+            maxFontSizeMultiplier={1.35}
+            style={{ fontSize: 12, lineHeight: 16, color: "#4B5563", fontWeight: "600" }}
+          >
             End Date: {formattedDate}
           </Text>
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
-              width: 80,
+              width: 105,
               justifyContent: "space-between",
             }}
           >
-            <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 12, color: "#4B5563", fontWeight: "600" }}
+            >
               {Math.round(Math.min(progress * 100, 100))}%
             </Text>
             <Text
+              maxFontSizeMultiplier={1.35}
               style={{
-                fontSize: 9,
-                color: isUnlocked ? "#4CAF50" : "#9CA3AF",
-                fontWeight: isUnlocked ? "700" : "normal",
+                fontSize: 12,
+                color: isUnlocked ? "#166534" : "#4B5563",
+                fontWeight: isUnlocked ? "700" : "600",
               }}
             >
               {isUnlocked ? "Wealth Retrieved" : `${getDaysLeft()} days Left`}

@@ -84,10 +84,10 @@ export default function WiseUpScreen() {
         
         <View className="flex-row justify-between items-center mb-6">
           <View className="flex-1 pr-4">
-            <Text className="text-[#1A1A1A] font-extrabold text-[28px]">
+            <Text maxFontSizeMultiplier={1.35} className="text-[#1A1A1A] font-extrabold text-[28px]">
               Hi WiseUp!
             </Text>
-            <Text className="text-[#6B7280] text-sm mt-1">
+            <Text maxFontSizeMultiplier={1.35} className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-1">
               Get smart about money and build wealth
             </Text>
           </View>
@@ -96,15 +96,15 @@ export default function WiseUpScreen() {
             className="bg-[#155D5F] px-3 py-2 rounded-lg flex-row items-center"
           >
             <Ionicons name="library-outline" size={16} color="white" />
-            <Text className="text-white ml-1 text-xs font-bold">Library</Text>
+            <Text maxFontSizeMultiplier={1.35} className="text-white ml-1 text-xs font-bold">Library</Text>
           </TouchableOpacity>
         </View>
 
         <View className="flex-row items-center bg-[#F8F8F8] px-4 py-2 rounded-xl mb-6">
-          <Ionicons name="search-outline" size={20} color="#9CA3AF" />
+          <Ionicons name="search-outline" size={20} color="#6B7280" />
           <TextInput
             placeholder="Search for topics"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#6B7280"
             className="flex-1 ml-3 h-10 text-[#1A1A1A]"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -176,7 +176,7 @@ export default function WiseUpScreen() {
         ) : (
           <View className="items-center justify-center py-20">
             <Ionicons name="document-text-outline" size={48} color="#D1D5DB" />
-            <Text className="text-[#6B7280] mt-4">No blogs found</Text>
+            <Text maxFontSizeMultiplier={1.35} className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-4">No blogs found</Text>
           </View>
         )}
       </ScrollView>

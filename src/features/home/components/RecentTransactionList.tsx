@@ -75,10 +75,16 @@ const RecentTransactionItem = ({ item, onPress }: RecentTransactionItemProps) =>
         <Text
           className="text-[#1A1A1A] font-bold text-[13px] mb-0.5"
           numberOfLines={1}
+          maxFontSizeMultiplier={1.35}
         >
           {getCleanTransactionTitle(item)}
         </Text>
-        <Text className="text-[#9CA3AF] text-[11px]">{formattedDate}</Text>
+        <Text
+          className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold"
+          maxFontSizeMultiplier={1.35}
+        >
+          {formattedDate}
+        </Text>
       </View>
 
       <View className="items-end shrink-0">
@@ -90,7 +96,12 @@ const RecentTransactionItem = ({ item, onPress }: RecentTransactionItemProps) =>
           {isCredit ? "+" : "-"}₦{formatAmount(item.amount)}
         </Text>
         <View className="bg-[#E7F5F5] px-2 py-0.5 rounded-[6px]">
-          <Text className="text-[9px] font-bold text-[#155D5F]">Success</Text>
+          <Text
+            className="text-[12px] font-bold text-[#155D5F]"
+            maxFontSizeMultiplier={1.35}
+          >
+            Success
+          </Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -125,7 +136,10 @@ export const RecentTransactionList = () => {
   if (transactions.length === 0) {
     return (
       <View className="mb-4 bg-[#F8F8F8] rounded-[24px] p-8 items-center justify-center">
-        <Text className="text-[#9CA3AF] font-medium text-sm">
+        <Text
+          className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold"
+          maxFontSizeMultiplier={1.35}
+        >
           No recent transactions
         </Text>
       </View>
