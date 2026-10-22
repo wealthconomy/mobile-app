@@ -21,6 +21,13 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
+import { AppToast, ToastState } from "../../src/components/common/AppToast";
+import {
+  REFERRAL_CLIPBOARD_PREFIX,
+  REFERRAL_CODE_PATTERN,
+} from "../../src/constants/referral";
 import { useRegisterMutation } from "../../src/store/api/authApi";
 
 const PRIMARY = "#155D5F";
@@ -60,8 +67,40 @@ export default function SignupScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [referralCode, setReferralCode] = useState("");
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handlePasteReferral = async () => {
+    try {
+      const clipText = await Clipboard.getStringAsync();
+      let candidate = (clipText || "").trim();
+      if (candidate.startsWith(REFERRAL_CLIPBOARD_PREFIX)) {
+        candidate = candidate.slice(REFERRAL_CLIPBOARD_PREFIX.length);
+      }
+      candidate = candidate.trim().toUpperCase();
+
+      if (REFERRAL_CODE_PATTERN.test(candidate)) {
+        setReferralCode(candidate);
+        clearError("referralCode");
+        setToast({
+          type: "success",
+          title: "Referral code added",
+        });
+      } else {
+        setToast({
+          type: "info",
+          title: "No referral code found on your clipboard. You can type it below.",
+        });
+      }
+    } catch {
+      setToast({
+        type: "info",
+        title: "No referral code found on your clipboard. You can type it below.",
+      });
+    }
+  };
 
   // Inline errors
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -123,7 +162,7 @@ export default function SignupScreen() {
         lastName: lastName.trim(),
         phone: formattedPhone,
         wealthPreference,
-        referralCode: referralCode ? referralCode.trim() : undefined,
+        referralCode: referralCode.trim() ? referralCode.trim() : undefined,
       }).unwrap();
       router.push({
         pathname: "/(auth)/otp",
@@ -178,6 +217,8 @@ export default function SignupScreen() {
           fieldErrors.firstName = "First name is required.";
         } else if (lower.includes("last name") || lower.includes("lastname")) {
           fieldErrors.lastName = "Last name is required.";
+        } else if (lower.includes("referral")) {
+          fieldErrors.referralCode = m;
         } else {
           unmapped.push(m);
         }
@@ -537,19 +578,65 @@ export default function SignupScreen() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(600).delay(610)}>
+          {!referralCode.trim() && !bannerDismissed && (
+            <View
+              style={{
+                backgroundColor: "#EEF7F8",
+                borderColor: "#C8E6E8",
+                borderWidth: 1,
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                marginBottom: 10,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <TouchableOpacity
+                onPress={handlePasteReferral}
+                activeOpacity={0.7}
+                style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}
+              >
+                <Ionicons name="clipboard-outline" size={16} color={PRIMARY} />
+                <Text
+                  style={{
+                    color: PRIMARY,
+                    fontSize: 12,
+                    fontWeight: "600",
+                    flex: 1,
+                    lineHeight: 16,
+                  }}
+                >
+                  Have a referral code from a friend? Tap to paste it.
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setBannerDismissed(true)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={{ marginLeft: 8, padding: 2 }}
+              >
+                <Ionicons name="close" size={16} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+          )}
           <F
             label="Referral Code (Optional)"
             field="referralCode"
             errors={errors}
           >
-            <View style={inputWrap(false)}>
+            <View style={inputWrap(!!errors.referralCode)}>
               <TextInput
                 placeholder="Referral Code"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="#6B7280"
                 style={{ flex: 1, fontSize: 15, color: DARK }}
                 autoCapitalize="characters"
+                maxLength={16}
                 value={referralCode}
-                onChangeText={setReferralCode}
+                onChangeText={(v) => {
+                  setReferralCode(v);
+                  clearError("referralCode");
+                }}
               />
             </View>
           </F>
@@ -684,6 +771,8 @@ export default function SignupScreen() {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </SafeAreaView>
   );
 }

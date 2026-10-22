@@ -293,7 +293,7 @@ export default function MyReferralsScreen() {
             <EmptyState
               icon="gift-outline"
               title="No rewards yet"
-              subtitle="Rewards are earned when your referrals complete their first transaction."
+              subtitle="Rewards are paid after a friend verifies their identity and makes a deposit."
             />
           ) : (
             rewards.map((item) => (
