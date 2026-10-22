@@ -5,14 +5,18 @@ import {
   useRecordDownloadMutation,
   useRemoveLibraryLikeMutation,
 } from "@/src/store/api/libraryApi";
+import {
+  isPdf,
+  downloadAndShareDocument,
+  openDocumentInApp,
+  openDownloadedDocument,
+} from "@/src/utils/documentFile";
+import { useDownloadedMaterials } from "@/src/hooks/useDownloadedMaterials";
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
-import * as FileSystem from "expo-file-system/legacy";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import * as Sharing from "expo-sharing";
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import * as WebBrowser from "expo-web-browser";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -123,58 +127,47 @@ export default function LibraryMaterialDetailScreen() {
     }
   };
 
+  const { isDownloaded, getDownload, markDownloaded, removeDownload, refresh } =
+    useDownloadedMaterials();
+
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
+
+  const downloaded = material
+    ? isDownloaded(material.id, material.documentUrl)
+    : false;
+
   const handleReadInApp = async () => {
-    if (!material?.documentUrl) return;
-    try {
-      await WebBrowser.openBrowserAsync(material.documentUrl);
-    } catch (error) {
-      console.error("Error opening in-app browser", error);
-    }
+    if (!material) return;
+    await openDocumentInApp(material);
   };
 
   const handleDownload = async () => {
-    if (!material?.documentUrl) return;
-    setIsDownloading(true);
-    try {
-      const ext = material.fileType
-        ? `.${material.fileType.toLowerCase()}`
-        : ".pdf";
-      const fileName = material.title.replace(/[^a-z0-9]/gi, "_") + ext;
-      const fileUri = FileSystem.documentDirectory + fileName;
+    if (!material?.documentUrl || !material.isDownloadable) return;
 
-      const downloadResult = await FileSystem.downloadAsync(
-        material.documentUrl,
-        fileUri,
-      );
-
-      if (downloadResult.status === 200) {
-        recordDownload(id as string);
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(downloadResult.uri, {
-            mimeType: "application/pdf",
-            dialogTitle: `Open ${material.title}`,
-          });
-        } else {
-          Alert.alert(
-            "Downloaded",
-            `"${material.title}" saved to your device.`,
-          );
-        }
-      } else {
-        Alert.alert(
-          "Download Failed",
-          "Could not download the file. Please try again.",
-        );
+    const existing = getDownload(material.id, material.documentUrl);
+    if (existing) {
+      const opened = await openDownloadedDocument(existing, material.title);
+      if (opened) {
+        return;
       }
-    } catch (error) {
-      console.error("Download error:", error);
-      Alert.alert(
-        "Download Failed",
-        "Something went wrong. Please check your connection and try again.",
-      );
-    } finally {
-      setIsDownloading(false);
+      // If opening failed because file is missing, remove entry and re-download
+      await removeDownload(material.id);
+    }
+
+    const result = await downloadAndShareDocument(material, {
+      onRecordDownload: (idToRecord) => recordDownload(idToRecord),
+      setIsDownloading,
+    });
+
+    if (result) {
+      await markDownloaded(material.id, {
+        ...result,
+        documentUrl: material.documentUrl,
+      });
     }
   };
 
@@ -187,40 +180,9 @@ export default function LibraryMaterialDetailScreen() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <SafeAreaView
-        style={{ flex: 1 }}
-        className="bg-white justify-center items-center"
-      >
-        <ActivityIndicator size="large" color="#155D5F" />
-      </SafeAreaView>
-    );
-  }
-
-  if (!material) {
-    return (
-      <SafeAreaView
-        style={{ flex: 1 }}
-        className="bg-white justify-center items-center px-5"
-      >
-        <Ionicons name="alert-circle-outline" size={48} color="#D1D5DB" />
-        <Text className="text-gray-500 mt-4 text-center">
-          Material not found or has been removed.
-        </Text>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mt-6 bg-[#155D5F] px-6 py-3 rounded-xl"
-        >
-          <Text className="text-white font-bold">Go Back</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
-
-  const dateDisplay = formatDate(
-    material.createdAt || material.timePosted || material.timeAgo,
-  );
+  const dateDisplay = material
+    ? formatDate(material.createdAt || material.timePosted || material.timeAgo)
+    : "";
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
@@ -241,10 +203,28 @@ export default function LibraryMaterialDetailScreen() {
         <View className="w-10" />
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-      >
+      {isLoading ? (
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color="#155D5F" />
+        </View>
+      ) : !material ? (
+        <View className="flex-1 justify-center items-center px-5">
+          <Ionicons name="alert-circle-outline" size={48} color="#D1D5DB" />
+          <Text className="text-gray-500 mt-4 text-center">
+            Material not found or has been removed.
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="mt-6 bg-[#155D5F] px-6 py-3 rounded-xl"
+          >
+            <Text className="text-white font-bold">Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
+        >
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
           <View className="px-5 py-6">
             {/* Cover image */}
@@ -268,7 +248,7 @@ export default function LibraryMaterialDetailScreen() {
             </Text>
 
             <View className="flex-row items-center mb-4">
-              <Text className="text-gray-500 text-sm">
+              <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold">
                 By {material.author}
                 {dateDisplay ? ` • ${dateDisplay}` : ""}
                 {material.readingDuration
@@ -277,7 +257,7 @@ export default function LibraryMaterialDetailScreen() {
               </Text>
             </View>
 
-            <Text className="text-gray-600 text-base leading-relaxed mb-6">
+            <Text className="text-[#374151] text-[15px] leading-[22px] font-kumbh mb-6">
               {material.description}
             </Text>
 
@@ -295,17 +275,19 @@ export default function LibraryMaterialDetailScreen() {
                 </TouchableOpacity>
               ) : (
                 <>
-                  <TouchableOpacity
-                    onPress={handleReadInApp}
-                    className="flex-1 bg-[#155D5F] py-3.5 rounded-xl flex-row items-center justify-center mr-3"
-                  >
-                    <Ionicons name="book-outline" size={20} color="#FFFFFF" />
-                    <Text className="text-white font-bold ml-2">
-                      Read in App
-                    </Text>
-                  </TouchableOpacity>
+                  {isPdf(material) && (
+                    <TouchableOpacity
+                      onPress={handleReadInApp}
+                      className={`flex-1 bg-[#155D5F] py-3.5 rounded-xl flex-row items-center justify-center ${material.isDownloadable ? "mr-3" : ""}`}
+                    >
+                      <Ionicons name="book-outline" size={20} color="#FFFFFF" />
+                      <Text className="text-white font-bold ml-2">
+                        Read in App
+                      </Text>
+                    </TouchableOpacity>
+                  )}
 
-                  {material.isDownloadable && (
+                  {material.isDownloadable ? (
                     <TouchableOpacity
                       onPress={handleDownload}
                       disabled={isDownloading}
@@ -316,16 +298,30 @@ export default function LibraryMaterialDetailScreen() {
                         <ActivityIndicator size="small" color="#155D5F" />
                       ) : (
                         <Ionicons
-                          name="download-outline"
+                          name={
+                            downloaded
+                              ? "checkmark-circle-outline"
+                              : "download-outline"
+                          }
                           size={20}
                           color="#155D5F"
                         />
                       )}
                       <Text className="text-[#155D5F] font-bold ml-2">
-                        {isDownloading ? "Downloading..." : "Download"}
+                        {isDownloading
+                          ? "Downloading..."
+                          : downloaded
+                            ? "Downloaded"
+                            : "Download"}
                       </Text>
                     </TouchableOpacity>
-                  )}
+                  ) : !isPdf(material) ? (
+                    <View className="flex-1 py-3.5 items-center justify-center">
+                      <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold text-center">
+                        This material is not available to read in the app.
+                      </Text>
+                    </View>
+                  ) : null}
                 </>
               )}
             </View>
@@ -353,9 +349,9 @@ export default function LibraryMaterialDetailScreen() {
                       <Ionicons
                         name="download-outline"
                         size={20}
-                        color="#9CA3AF"
+                        color="#6B7280"
                       />
-                      <Text className="text-gray-500 font-bold ml-2">
+                      <Text className="text-[#4B5563] font-kumbh-semibold text-[13px] ml-2">
                         {material.downloadsCount || 0}
                       </Text>
                     </View>
@@ -365,9 +361,9 @@ export default function LibraryMaterialDetailScreen() {
                     <Ionicons
                       name="chatbubble-outline"
                       size={20}
-                      color="#9CA3AF"
+                      color="#6B7280"
                     />
-                    <Text className="text-gray-500 font-bold ml-2">
+                    <Text className="text-[#4B5563] font-kumbh-semibold text-[13px] ml-2">
                       {material.commentsCount} Comments
                     </Text>
                   </View>
@@ -392,7 +388,7 @@ export default function LibraryMaterialDetailScreen() {
                           <Text className="font-bold text-gray-900">
                             {comment.userName}
                           </Text>
-                          <Text className="text-xs text-gray-400">
+                          <Text className="text-[12px] text-[#4B5563] font-kumbh-semibold">
                             {formatDate(
                               comment.createdAt ||
                                 comment.timePosted ||
@@ -400,7 +396,7 @@ export default function LibraryMaterialDetailScreen() {
                             )}
                           </Text>
                         </View>
-                        <Text className="text-gray-600 text-sm leading-relaxed">
+                        <Text className="text-[#374151] text-[14px] leading-[20px] font-kumbh">
                           {comment.content || comment.text}
                         </Text>
                       </View>
@@ -413,7 +409,7 @@ export default function LibraryMaterialDetailScreen() {
                       size={40}
                       color="#E5E7EB"
                     />
-                    <Text className="text-gray-400 mt-2">
+                    <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-2">
                       No comments yet. Be the first!
                     </Text>
                   </View>
@@ -450,6 +446,7 @@ export default function LibraryMaterialDetailScreen() {
           </View>
         )}
       </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }

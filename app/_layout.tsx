@@ -292,6 +292,14 @@ function RootLayoutNav() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
+              name="education/library"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="education/library/[id]"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
               name="support/index"
               options={{ headerShown: false }}
             />
