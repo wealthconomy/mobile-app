@@ -27,7 +27,7 @@
     },
     "android": {
       "package": "com.wealthconomy.app",
-      "versionCode": 4,
+      "versionCode": 6,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/icon.png",
