@@ -231,6 +231,7 @@ export default function CreateFlowScreen() {
             <Ionicons name="close" size={18} color="#005F61" />
           </TouchableOpacity>
           <Text
+            maxFontSizeMultiplier={1.35}
             style={{
               color: "#005F61",
               fontWeight: "700",
@@ -274,8 +275,10 @@ export default function CreateFlowScreen() {
               <Text
                 style={{
                   color: "#005F61",
-                  fontSize: 12,
+                  fontSize: 13,
                   lineHeight: 18,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
                   flex: 1,
                 }}
               >
@@ -292,7 +295,7 @@ export default function CreateFlowScreen() {
         <Text style={styles.inputLabel}>Wealth Title</Text>
         <TextInput
           placeholder="e.g. My Emergency automated fund"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#6B7280"
           value={wealthTitle}
           onChangeText={setWealthTitle}
           style={styles.textInput}
@@ -309,7 +312,7 @@ export default function CreateFlowScreen() {
             <Text style={styles.inputLabel}>Target Goal Amount (₦)</Text>
             <TextInput
               placeholder="e.g. 500,000"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#6B7280"
               value={targetAmount}
               onChangeText={(v) => setTargetAmount(formatAmount(v))}
               keyboardType="numeric"
@@ -319,11 +322,29 @@ export default function CreateFlowScreen() {
               ]}
             />
             {isBelowMinTarget ? (
-              <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+              <Text
+                style={{
+                  color: "#EF4444",
+                  fontSize: 12,
+                  lineHeight: 16,
+                  marginTop: 4,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                }}
+              >
                 Minimum target goal amount is ₦{minFlowNairaFormatted}
               </Text>
             ) : (
-              <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  lineHeight: 18,
+                  color: "#4B5563",
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                  marginTop: 4,
+                }}
+              >
                 The final target milestone you want to reach
               </Text>
             )}
@@ -336,13 +357,22 @@ export default function CreateFlowScreen() {
         <Text style={styles.inputLabel}>Starting Contribution (₦)</Text>
         <TextInput
           placeholder="e.g. 1,000 (Min ₦100)"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#6B7280"
           value={initialDeposit}
           onChangeText={(v) => setInitialDeposit(formatAmount(v))}
           keyboardType="numeric"
           style={styles.textInput}
         />
-        <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>
+        <Text
+          style={{
+            fontSize: 13,
+            lineHeight: 18,
+            color: "#4B5563",
+            fontWeight: "600",
+            fontFamily: "KumbhSans_600SemiBold",
+            marginTop: 4,
+          }}
+        >
           Amount deducted from funding source to open and activate this pot
         </Text>
       </View>
@@ -356,7 +386,7 @@ export default function CreateFlowScreen() {
         >
           <Text
             style={{
-              color: frequency ? "#1A1A1A" : "#9CA3AF",
+              color: frequency ? "#1A1A1A" : "#6B7280",
               fontSize: 15,
               fontWeight: frequency ? "600" : "400",
             }}
@@ -439,12 +469,30 @@ export default function CreateFlowScreen() {
               }
             />
             {isBelowMinDuration && (
-              <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+              <Text
+                style={{
+                  color: "#EF4444",
+                  fontSize: 12,
+                  lineHeight: 16,
+                  marginTop: 4,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                }}
+              >
                 Minimum lock duration is {minFlowDuration} days
               </Text>
             )}
             {isAboveMaxDuration && (
-              <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+              <Text
+                style={{
+                  color: "#EF4444",
+                  fontSize: 12,
+                  lineHeight: 16,
+                  marginTop: 4,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                }}
+              >
                 Maximum lock duration is {maxFlowDuration} days
               </Text>
             )}
@@ -543,7 +591,16 @@ export default function CreateFlowScreen() {
           <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 14 }}>
             Anytime Withdrawal
           </Text>
-          <Text style={{ color: "#6B7280", fontSize: 12, marginTop: 2 }}>
+          <Text
+            style={{
+              color: "#4B5563",
+              fontSize: 13,
+              lineHeight: 18,
+              fontWeight: "600",
+              fontFamily: "KumbhSans_600SemiBold",
+              marginTop: 2,
+            }}
+          >
             Switch on to withdraw funds before maturity date.
           </Text>
         </View>
@@ -584,7 +641,16 @@ export default function CreateFlowScreen() {
           <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 14 }}>
             Manual Mode
           </Text>
-          <Text style={{ color: "#6B7280", fontSize: 12, marginTop: 2 }}>
+          <Text
+            style={{
+              color: "#4B5563",
+              fontSize: 13,
+              lineHeight: 18,
+              fontWeight: "600",
+              fontFamily: "KumbhSans_600SemiBold",
+              marginTop: 2,
+            }}
+          >
             Switch on to deposit manually whenever you choose.
           </Text>
         </View>
@@ -651,7 +717,7 @@ export default function CreateFlowScreen() {
         >
           {wealthTitle}
         </Text>
-        <Text style={{ color: "#6B7280", fontSize: 13, marginTop: 4 }}>
+        <Text style={{ color: "#4B5563", fontSize: 13, lineHeight: 18, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginTop: 4 }}>
           Target: ₦{targetAmount || "0.00"}
         </Text>
       </View>
@@ -807,8 +873,10 @@ export default function CreateFlowScreen() {
       </Text>
       <Text
         style={{
-          color: "#6B7280",
+          color: "#4B5563",
           fontSize: 13,
+          fontFamily: "KumbhSans_600SemiBold",
+          fontWeight: "600",
           textAlign: "center",
           marginBottom: 32,
           lineHeight: 20,
@@ -912,8 +980,10 @@ export default function CreateFlowScreen() {
 
       <Text
         style={{
-          color: "#6B7280",
+          color: "#4B5563",
           fontSize: 14,
+          fontFamily: "KumbhSans_600SemiBold",
+          fontWeight: "600",
           textAlign: "center",
           lineHeight: 22,
           marginBottom: 40,
@@ -987,8 +1057,9 @@ export default function CreateFlowScreen() {
 
 const styles = StyleSheet.create({
   inputLabel: {
-    color: "#6B7280",
+    color: "#4B5563",
     fontSize: 13,
+    fontFamily: "KumbhSans_600SemiBold",
     fontWeight: "700",
     marginBottom: 8,
   },
@@ -1036,9 +1107,11 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F3F4F6",
   },
   previewLabel: {
-    color: "#6B7280",
+    color: "#4B5563",
     fontSize: 12,
-    fontWeight: "500",
+    lineHeight: 16,
+    fontFamily: "KumbhSans_600SemiBold",
+    fontWeight: "600",
     marginBottom: 4,
   },
   previewValue: {

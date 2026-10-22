@@ -278,7 +278,10 @@ export default function WealthFlowScreen() {
                 style={{ width: 280 }}
               >
                 <View className="flex-row items-center gap-2">
-                  <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-80">
+                  <Text
+                    maxFontSizeMultiplier={1.35}
+                    className="text-[#1A1A1A] text-[13px] font-kumbh-semibold"
+                  >
                     Total Savings
                   </Text>
                   {showInterest && (
@@ -286,11 +289,14 @@ export default function WealthFlowScreen() {
                       style={{
                         backgroundColor: "#0EA5E9",
                         paddingHorizontal: 8,
-                        paddingVertical: 2.5,
+                        paddingVertical: 3,
                         borderRadius: 20,
                       }}
                     >
-                      <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                      <Text
+                        maxFontSizeMultiplier={1.35}
+                        style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 12 }}
+                      >
                         {flowRateLabel}
                       </Text>
                     </View>
@@ -331,7 +337,10 @@ export default function WealthFlowScreen() {
 
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
-                  <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-70">
+                  <Text
+                    maxFontSizeMultiplier={1.35}
+                    className="text-[#1A1A1A] text-[12px] font-kumbh-semibold"
+                  >
                     Your wealth grew to ₦0.00 today
                   </Text>
                   <ArrowUp size={14} color="#4CAF50" style={{ marginLeft: 4 }} />
@@ -392,9 +401,9 @@ export default function WealthFlowScreen() {
                   },
                 ].map((tip, i) => (
                   <View key={i} className="flex-row mb-3 items-start">
-                    <Text className="mr-2 text-[10px]">🚀</Text>
+                    <Text className="mr-2 text-[12px]">🚀</Text>
                     <Text
-                      className="text-[10px] flex-1 leading-[15px]"
+                      className="text-[12px] flex-1 leading-[17px] font-kumbh-semibold"
                       style={{ color: THEME }}
                     >
                       <Text className="font-bold">{tip.title}</Text> {tip.text}
@@ -419,7 +428,7 @@ export default function WealthFlowScreen() {
                   key={cat.id}
                   style={{
                     width: "48%",
-                    height: 114,
+                    height: 124,
                     backgroundColor: THEME_BG,
                     borderRadius: 15,
                     padding: 12,
@@ -455,13 +464,14 @@ export default function WealthFlowScreen() {
                     />
                   </View>
                   <Text
+                    maxFontSizeMultiplier={1.35}
                     className="font-bold text-[14px] mb-0.5"
                     style={{ color: THEME }}
                   >
                     {cat.title}
                   </Text>
                   <Text
-                    className="text-[9px] opacity-70"
+                    className="text-[13px] leading-[18px] font-kumbh-semibold"
                     style={{ color: THEME }}
                     numberOfLines={2}
                   >
@@ -592,14 +602,15 @@ function EmptyState({
         <Text style={{ fontSize: 32 }}>{icon}</Text>
       </View>
       <Text
+        maxFontSizeMultiplier={1.35}
         className="font-bold text-[16px] text-center mb-2"
         style={{ color: "#323232" }}
       >
         {text}
       </Text>
       <Text
-        className="text-[11px] text-center opacity-70"
-        style={{ color: "#6B7280" }}
+        maxFontSizeMultiplier={1.35}
+        className="text-[13px] leading-[18px] font-kumbh-semibold text-center text-[#4B5563]"
       >
         {subtext}
       </Text>
@@ -689,9 +700,17 @@ function AutoListItem({
 
         <View className="flex-row justify-between items-center mb-2">
           <View>
-            <Text className="text-[10px] text-[#6B7280]">{plan.metadata?.category || "Flow"}</Text>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              className="text-[12px] leading-[16px] text-[#4B5563] font-kumbh-semibold"
+            >
+              {plan.metadata?.category || "Flow"}
+            </Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
+              <Text
+                maxFontSizeMultiplier={1.35}
+                style={{ fontSize: 12, color: "#166534", fontWeight: "700" }}
+              >
                 Wealth growth ₦{formatAmount(growthVal.toString())}{" "}
               </Text>
               <ArrowUp size={12} color="#4CAF50" />
@@ -718,12 +737,19 @@ function AutoListItem({
         </View>
 
         <View className="flex-row justify-between items-center">
-          <Text className="text-[10px] text-[#9CA3AF] opacity-80">
+          <Text
+            maxFontSizeMultiplier={1.35}
+            className="text-[12px] text-[#4B5563] font-kumbh-semibold"
+          >
             {Math.round(Math.min(progress * 100, 100))}%
           </Text>
           <Text
-            className="text-[10px] font-bold"
-            style={{ color: isCompleted ? "#4CAF50" : "#9CA3AF" }}
+            maxFontSizeMultiplier={1.35}
+            className="text-[12px] font-kumbh-semibold"
+            style={{
+              color: isCompleted ? "#166534" : "#4B5563",
+              fontWeight: isCompleted ? "700" : "600",
+            }}
           >
             {isCompleted ? "Saving Completed" : `${getDaysLeft()} Days Left`}
           </Text>

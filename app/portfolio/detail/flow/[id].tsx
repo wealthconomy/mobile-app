@@ -267,7 +267,7 @@ export default function FlowDetailScreen() {
       >
         <Stack.Screen options={SCREEN_OPTIONS} />
         <Header title="Review" onBack={handleBack} />
-        <Text style={{ color: "#6B7280", marginTop: 20 }}>Plan not found</Text>
+        <Text style={{ color: "#4B5563", fontSize: 14, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginTop: 20 }}>Plan not found</Text>
         <TouchableOpacity
           onPress={() => router.replace("/(tabs)/portfolios/wealth-flow")}
           style={{ marginTop: 16, backgroundColor: TEAL, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
@@ -387,13 +387,13 @@ export default function FlowDetailScreen() {
           >
             {plan.name}
           </Text>
-          <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 16 }}>
+          <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", lineHeight: 18, marginBottom: 16 }}>
             {plan.metadata?.wealthPreference || "WealthFlow"}
           </Text>
           <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 28 }}>
             ₦{formatAmount(displayBalance)}
           </Text>
-          <Text style={{ color: "#9CA3AF", fontSize: 11, marginTop: 2 }}>
+          <Text style={{ color: "#4B5563", fontSize: 12, lineHeight: 16, fontWeight: "600", marginTop: 2 }}>
             of ₦{formatAmount(plan.targetAmount)} target
           </Text>
         </View>
@@ -430,10 +430,10 @@ export default function FlowDetailScreen() {
             marginBottom: 28,
           }}
         >
-          <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
+          <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16 }}>
             {progressPct}%
           </Text>
-          <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
+          <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16 }}>
             {getDaysLeft()} days Left
           </Text>
         </View>
@@ -488,7 +488,7 @@ export default function FlowDetailScreen() {
 
       <Text
         style={{
-          color: "#6B7280",
+          color: "#4B5563",
           textAlign: "center",
           fontSize: 14,
           lineHeight: 22,
@@ -604,7 +604,7 @@ export default function FlowDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Status</Text>
-                <Text style={[styles.value, { color: isCompleted || plan.status === "COMPLETED" ? "#10B981" : TEAL }]}>
+                <Text style={[styles.value, { color: isCompleted || plan.status === "COMPLETED" ? "#166534" : TEAL }]}>
                   {isCompleted ? "COMPLETED" : (plan.status || "ACTIVE")}
                 </Text>
               </View>
@@ -721,6 +721,7 @@ export default function FlowDetailScreen() {
                   style={{
                     color: "#15803D",
                     fontSize: 12,
+                    fontWeight: "600",
                     textAlign: "center",
                     lineHeight: 18,
                   }}
@@ -753,10 +754,13 @@ export default function FlowDetailScreen() {
                   }}
                 >
                   <View style={{ flex: 1, marginRight: 12 }}>
-                    <Text style={{ fontWeight: "700", color: TEXT_DARK, fontSize: 14 }}>
+                    <Text
+                      maxFontSizeMultiplier={1.35}
+                      style={{ fontWeight: "700", color: TEXT_DARK, fontSize: 14 }}
+                    >
                       {getCleanTransactionTitle(txn, plan?.name)}
                     </Text>
-                    <Text style={{ color: "#9CA3AF", fontSize: 11, marginTop: 2 }}>
+                    <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16, marginTop: 2 }}>
                       {new Date(txn.createdAt).toLocaleDateString()} • {txn.reference}
                     </Text>
                   </View>
@@ -773,7 +777,7 @@ export default function FlowDetailScreen() {
               ))
             ) : (
               <View style={{ paddingVertical: 20, alignItems: "center" }}>
-                <Text style={{ color: "#9CA3AF", fontSize: 13 }}>No transactions recorded yet.</Text>
+                <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", lineHeight: 18 }}>No transactions recorded yet.</Text>
               </View>
             )}
           </View>
@@ -800,7 +804,7 @@ export default function FlowDetailScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 16, textAlign: "center" }}>
+                <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", lineHeight: 18, marginBottom: 16, textAlign: "center" }}>
                   Add extra funds directly from your main wallet to speed up your savings goal.
                 </Text>
 
@@ -814,7 +818,7 @@ export default function FlowDetailScreen() {
                     <>
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 6 }}>
                         <Text style={styles.inputLabel}>Amount (₦)</Text>
-                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#6B7280" }}>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#4B5563", lineHeight: 16 }}>
                           Wallet Balance: <Text style={{ fontWeight: "700", color: "#059669" }}>₦{formattedBal}</Text>
                         </Text>
                       </View>
@@ -981,7 +985,7 @@ export default function FlowDetailScreen() {
               Ready to withdraw your savings?
             </Text>
 
-            <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 20, textAlign: "center", lineHeight: 18, paddingHorizontal: 10 }}>
+            <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", marginBottom: 20, textAlign: "center", lineHeight: 18, paddingHorizontal: 10 }}>
               Your plan has reached maturity! Your full savings balance of <Text style={{ color: TEAL, fontWeight: "bold" }}>₦{formatAmount(plan.balance)}</Text> will be transferred directly to your Main Wallet.
             </Text>
 
@@ -1040,7 +1044,9 @@ export default function FlowDetailScreen() {
                 <Text
                   style={{
                     fontSize: 13,
-                    color: "#6B7280",
+                    color: "#4B5563",
+                    fontFamily: "KumbhSans_600SemiBold",
+                    fontWeight: "600",
                     textAlign: "center",
                     marginBottom: 14,
                     lineHeight: 20,
@@ -1076,12 +1082,12 @@ export default function FlowDetailScreen() {
                         </Text>
                       </View>
 
-                      <Text style={{ fontSize: 12, color: "#7F1D1D", marginBottom: 12, lineHeight: 16 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#7F1D1D", marginBottom: 12, lineHeight: 16 }}>
                         Terminating early will incur a <Text style={{ fontWeight: "700" }}>{penaltyRate}</Text> penalty, deducted from your current balance.
                       </Text>
 
                       <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
-                        <Text style={{ fontSize: 12, color: "#6B7280" }}>Current Balance</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#4B5563", lineHeight: 16 }}>Current Balance</Text>
                         <Text style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}>
                           ₦{balNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </Text>
@@ -1151,7 +1157,7 @@ export default function FlowDetailScreen() {
                       justifyContent: "center",
                     }}
                   >
-                    <Text style={{ fontSize: 14, color: "#6B7280", fontWeight: "600" }}>Cancel</Text>
+                    <Text style={{ fontSize: 14, color: "#4B5563", fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}>Cancel</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -1253,10 +1259,11 @@ export default function FlowDetailScreen() {
 
 const styles = StyleSheet.create({
   label: {
-    color: "#6B7280",
-    fontSize: 11,
+    color: "#4B5563",
+    fontSize: 12,
+    lineHeight: 16,
     marginBottom: 6,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   value: {
     color: "#1A1A1A",
@@ -1318,7 +1325,8 @@ const styles = StyleSheet.create({
   },
   sourceText: {
     fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "500",
+    color: "#4B5563",
+    fontFamily: "KumbhSans_600SemiBold",
+    fontWeight: "600",
   },
 });

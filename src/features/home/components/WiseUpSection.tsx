@@ -45,15 +45,15 @@ export const WiseUpCard = ({
       />
     </View>
     <Text
-      variant="caption"
-      className="font-kumbh-bold text-[#1A1A1A] leading-tight mb-1"
+      maxFontSizeMultiplier={1.35}
+      className="text-[#1A1A1A] text-[14px] leading-[18px] font-kumbh-bold font-bold mb-1"
       numberOfLines={1}
     >
       {title}
     </Text>
     <Text
-      variant="small"
-      className="text-[#9CA3AF] leading-[16px]"
+      maxFontSizeMultiplier={1.35}
+      className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold"
       numberOfLines={2}
     >
       {description}
@@ -78,12 +78,12 @@ export const WiseUpSection = ({
   return (
     <View className={containerClassName}>
       <View className="flex-row justify-between items-center mb-4">
-        <Text variant="h3" className="text-[#1A1A1A] font-kumbh-extrabold">Wise Up</Text>
+        <Text variant="h3" maxFontSizeMultiplier={1.35} className="text-[#1A1A1A] font-kumbh-extrabold">Wise Up</Text>
         {!hideViewAll && (
           <TouchableOpacity
             onPress={() => router.push("/education/wise-up" as any)}
           >
-            <Text variant="caption" className="text-[#155D5F] font-kumbh-medium">View all</Text>
+            <Text maxFontSizeMultiplier={1.35} className="text-[#155D5F] text-[14px] font-kumbh-bold">View all</Text>
           </TouchableOpacity>
         )}
       </View>

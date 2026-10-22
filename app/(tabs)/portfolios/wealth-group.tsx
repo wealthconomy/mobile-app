@@ -664,7 +664,10 @@ export default function WealthGroupScreen() {
                         borderRadius: 20,
                       }}
                     >
-                      <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                      <Text
+                        maxFontSizeMultiplier={1.35}
+                        style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 12 }}
+                      >
                         {groupRateLabel}
                       </Text>
                     </View>
@@ -705,7 +708,10 @@ export default function WealthGroupScreen() {
 
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
-                  <Text className="text-[#4B5563] text-[13px] font-extrabold">
+                  <Text
+                    maxFontSizeMultiplier={1.35}
+                    className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold"
+                  >
                     Your wealth grew by ₦{(ongoingGroups.reduce((acc, g) => acc + (parseFloat(g.dailyWealthGrowth?.toString() || "0")), 0) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} today
                   </Text>
                   <ArrowUp size={14} color="#4CAF50" />
@@ -753,7 +759,10 @@ export default function WealthGroupScreen() {
                   <View className="mb-2">
                     <Ionicons name={cat.icon as any} size={24} color={THEME} />
                   </View>
-                  <Text className="text-[9px] font-bold text-[#1A1A1A] text-center leading-[11px]">
+                  <Text
+                    maxFontSizeMultiplier={1.35}
+                    className="text-[12px] font-kumbh-semibold text-[#1A1A1A] text-center leading-[15px]"
+                  >
                     {cat.title}
                   </Text>
                 </TouchableOpacity>
@@ -786,8 +795,9 @@ export default function WealthGroupScreen() {
                 What's on Wealth Group?
               </Text>
               <Text
-                className="text-[12px] leading-[18px] mb-4 font-medium pr-6"
-                style={{ color: "#155D5F", opacity: 0.9 }}
+                maxFontSizeMultiplier={1.35}
+                className="text-[13px] leading-[18px] mb-4 font-kumbh-semibold pr-6"
+                style={{ color: "#155D5F" }}
               >
                 A community-powered savings feature ({groupRateLabel}) for collective financial goals. Groups support between <Text className="font-bold">{groupMinMembers} to {groupMaxMembers} members</Text>.
               </Text>
@@ -822,11 +832,11 @@ export default function WealthGroupScreen() {
               paddingRight: 96,
             }}
           >
-            <Search size={18} color="#94A3B8" />
+            <Search size={18} color="#6B7280" />
             <TextInput
               placeholder="Search"
-              placeholderTextColor="#94A3B8"
-              className="flex-1 ml-3 text-[13px] font-medium"
+              placeholderTextColor="#6B7280"
+              className="flex-1 ml-3 text-[14px] font-kumbh-semibold text-[#1A1A1A]"
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
@@ -883,10 +893,12 @@ export default function WealthGroupScreen() {
               }}
             >
               <Text
+                maxFontSizeMultiplier={1.35}
                 style={{
-                  color: activeTab === "ongoing" ? THEME : "#64748B",
+                  color: activeTab === "ongoing" ? THEME : "#4B5563",
                   fontSize: 14,
-                  fontWeight: activeTab === "ongoing" ? "900" : "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                  fontWeight: activeTab === "ongoing" ? "700" : "600",
                 }}
               >
                 Progress Tracking
@@ -908,10 +920,12 @@ export default function WealthGroupScreen() {
               }}
             >
               <Text
+                maxFontSizeMultiplier={1.35}
                 style={{
-                  color: activeTab === "completed" ? THEME : "#64748B",
+                  color: activeTab === "completed" ? THEME : "#4B5563",
                   fontSize: 14,
-                  fontWeight: activeTab === "completed" ? "900" : "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                  fontWeight: activeTab === "completed" ? "700" : "600",
                 }}
               >
                 Completed Goals
@@ -977,7 +991,10 @@ export default function WealthGroupScreen() {
                             <Text className="text-[#155D5F] font-black">
                               ₦{currentNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </Text>
-                            <Text className="text-[11px] text-[#6B7280] font-medium">
+                            <Text
+                              maxFontSizeMultiplier={1.35}
+                              className="text-[12px] leading-[16px] text-[#4B5563] font-kumbh-semibold"
+                            >
                               {" "}({formattedPct})
                             </Text>
                           </Text>
@@ -1015,7 +1032,10 @@ export default function WealthGroupScreen() {
                 <Text className="text-[18px] font-black text-[#155D5F] mb-4">
                   Create or Join a group
                 </Text>
-                <Text className="text-[11px] text-center text-[#155D5F] opacity-70 px-10 leading-[18px]">
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  className="text-[13px] text-center text-[#155D5F] px-10 leading-[18px] font-kumbh-semibold"
+                >
                   For users who want to start a new savings circle (leads to
                   choosing Fixed, Flex, or Rotational). {"\n"}
                   For users with an invite code or those looking for "Open"
@@ -1035,7 +1055,12 @@ export default function WealthGroupScreen() {
             </View>
           ) : (
             <View className="items-center justify-center py-10 mb-10">
-              <Text className="text-gray-400">No completed groups yet</Text>
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold"
+              >
+                No completed groups yet
+              </Text>
             </View>
           )}
         </View>
@@ -1053,7 +1078,8 @@ function TipRow({ label, text }: { label: string; text: string }) {
         •
       </Text>
       <Text
-        style={{ color: "#155D5F", flex: 1, flexShrink: 1, fontSize: 11.5, lineHeight: 17 }}
+        maxFontSizeMultiplier={1.35}
+        style={{ color: "#155D5F", flex: 1, flexShrink: 1, fontSize: 13, lineHeight: 18, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}
       >
         <Text style={{ fontWeight: "800" }}>{label}:</Text> {text}
       </Text>
@@ -1126,7 +1152,7 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
       className="bg-white rounded-[12px] border border-[#E8E8E8] overflow-hidden"
       style={{
         width: 170,
-        height: 196,
+        height: 228,
         marginRight: 10,
         padding: 8,
         paddingBottom: 8,
@@ -1157,27 +1183,32 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
               top: 4,
               left: 4,
               backgroundColor: "rgba(21, 93, 95, 0.9)",
-              paddingHorizontal: 5,
-              paddingVertical: 1.5,
+              paddingHorizontal: 6,
+              paddingVertical: 2,
               borderRadius: 4,
             }}
           >
-            <Text style={{ fontSize: 8, fontWeight: "800", color: "#FFFFFF" }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 12, fontWeight: "700", color: "#FFFFFF" }}
+            >
               {item.groupTypeLabel}
             </Text>
           </View>
         </View>
 
-        <View className="mt-1">
+        <View className="mt-1.5">
           <Text
             numberOfLines={1}
-            className="text-[11px] font-black text-[#1A1A1A] mb-0.5 font-bold"
+            maxFontSizeMultiplier={1.35}
+            className="text-[14px] leading-[18px] font-bold text-[#1A1A1A] mb-0.5 font-kumbh-bold"
           >
             {item.title}
           </Text>
           <Text
             numberOfLines={1}
-            className="text-[9px] text-[#64748B] font-extrabold mb-0.5"
+            maxFontSizeMultiplier={1.35}
+            className="text-[12px] leading-[16px] text-[#4B5563] font-kumbh-semibold mb-0.5"
           >
             {item.category}
           </Text>
@@ -1186,7 +1217,8 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
           <View className="mb-0.5">
             <Text
               numberOfLines={1}
-              className="text-[10px] text-[#155D5F] font-black font-bold"
+              maxFontSizeMultiplier={1.35}
+              className="text-[13px] leading-[18px] text-[#155D5F] font-bold font-kumbh-bold"
             >
               {item.targetAmountText}
             </Text>
@@ -1196,25 +1228,38 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
           <View className="flex-row justify-between items-center mb-0.5">
             <Text
               numberOfLines={1}
-              className="text-[9px] text-[#4B5563] font-semibold flex-1 mr-1"
+              maxFontSizeMultiplier={1.35}
+              className="text-[12px] leading-[16px] text-[#4B5563] font-kumbh-semibold flex-1 mr-1"
             >
               {item.contributionText}
             </Text>
-            <Text className="text-[9px] text-[#64748B] font-bold">
+            <Text
+              maxFontSizeMultiplier={1.35}
+              className="text-[12px] leading-[16px] text-[#4B5563] font-kumbh-semibold"
+            >
               Ends: {item.endDate}
             </Text>
           </View>
 
           <View className="flex-row justify-between items-center">
             <View className="flex-row items-baseline space-x-0.5">
-              <Text className="text-[8px] text-[#4CAF50] font-bold">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[12px] leading-[16px] text-[#166534] font-kumbh-semibold"
+              >
                 Wealth Growth
               </Text>
-              <Text className="text-[9px] text-[#4CAF50] font-black font-bold">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[12px] leading-[16px] text-[#166534] font-bold font-kumbh-bold ml-1"
+              >
                 {item.growth}
               </Text>
             </View>
-            <Text className="text-[9px] text-[#155D5F] font-black">
+            <Text
+              maxFontSizeMultiplier={1.35}
+              className="text-[12px] leading-[16px] text-[#4B5563] font-kumbh-semibold"
+            >
               {item.members} {item.members === 1 ? "Member" : "Members"}
             </Text>
           </View>
@@ -1222,7 +1267,7 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
       </View>
 
       <TouchableOpacity
-        className="w-full h-[28px] rounded-[7px] items-center justify-center p-1 mt-1"
+        className="w-full h-[32px] rounded-[7px] items-center justify-center p-1 mt-1.5"
         style={{ backgroundColor: THEME }}
         onPress={() =>
           router.push({
@@ -1231,7 +1276,12 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
           })
         }
       >
-        <Text className="text-white text-[10px] font-black">View Group</Text>
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-white text-[12px] font-bold font-kumbh-bold"
+        >
+          View Group
+        </Text>
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -1372,7 +1422,10 @@ function CompletedGroupCard({
           }}
         >
           <Ionicons name={badgeIcon} size={12} color={badgeColor} style={{ marginRight: 4 }} />
-          <Text style={{ fontSize: 11, fontWeight: "800", color: badgeColor }}>
+          <Text
+            maxFontSizeMultiplier={1.35}
+            style={{ fontSize: 12, fontWeight: "700", color: badgeColor }}
+          >
             {badgeLabel}
           </Text>
         </View>
@@ -1380,7 +1433,8 @@ function CompletedGroupCard({
         {/* Secondary info line */}
         <Text
           numberOfLines={1}
-          style={{ fontSize: 11, fontWeight: "600", color: infoColor, opacity: 0.9 }}
+          maxFontSizeMultiplier={1.35}
+          style={{ fontSize: 12, fontWeight: "600", color: infoColor, fontFamily: "KumbhSans_600SemiBold" }}
         >
           {infoText}
         </Text>

@@ -162,6 +162,7 @@ export default function GeneralSettingsScreen() {
                 value={category}
                 onChangeText={setCategory}
                 placeholder="eg., Rent, Festival, Business, etc."
+                placeholderTextColor="#6B7280"
               />
             </View>
 
@@ -182,8 +183,11 @@ export default function GeneralSettingsScreen() {
                 onPress={pickImage}
                 className="w-full h-14 bg-white border border-[#E2E8F0] rounded-2xl flex-row items-center justify-center"
               >
-                <Ionicons name="create-outline" size={20} color="#64748B" />
-                <Text className="ml-2 text-[#64748B] font-medium text-base">
+                <Ionicons name="create-outline" size={20} color="#4B5563" />
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  className="ml-2 text-[#4B5563] font-semibold font-kumbh-semibold text-base"
+                >
                   {coverImage ? "Change picture" : "Upload picture"}
                 </Text>
               </TouchableOpacity>
@@ -233,7 +237,7 @@ export default function GeneralSettingsScreen() {
                         className={`text-base ${
                           visibility === opt
                             ? "text-[#155D5F] font-bold"
-                            : "text-[#64748B]"
+                            : "text-[#4B5563] font-medium"
                         }`}
                       >
                         {opt}

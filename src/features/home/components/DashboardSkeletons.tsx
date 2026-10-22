@@ -5,7 +5,7 @@ export const PortfolioCardSkeleton = () => (
   <View
     style={{
       width: "100%",
-      height: 119,
+      height: 138,
       backgroundColor: "#F9F9F9",
       borderTopLeftRadius: 50,
       borderTopRightRadius: 20,
@@ -89,7 +89,7 @@ export const RecentActivitySkeleton = () => (
       </View>
       <Skeleton
         width="30%"
-        height={10}
+        height={12}
         style={{ borderRadius: 4, backgroundColor: "#EEEEEE" }}
       />
     </View>
@@ -250,8 +250,8 @@ export const DashboardLoadingState = () => (
       />
       <Skeleton
         width="100%"
-        height={100}
-        borderRadius={24}
+        height={104}
+        borderRadius={15}
         style={{ backgroundColor: "#EEEEEE" }}
       />
     </View>
@@ -282,7 +282,7 @@ export const DashboardLoadingState = () => (
             />
             <Skeleton
               width={140}
-              height={14}
+              height={15}
               style={{
                 borderRadius: 4,
                 marginBottom: 6,
@@ -290,7 +290,12 @@ export const DashboardLoadingState = () => (
               }}
             />
             <Skeleton
-              width={100}
+              width={160}
+              height={10}
+              style={{ borderRadius: 4, marginBottom: 4, backgroundColor: "#EEEEEE" }}
+            />
+            <Skeleton
+              width={120}
               height={10}
               style={{ borderRadius: 4, backgroundColor: "#EEEEEE" }}
             />

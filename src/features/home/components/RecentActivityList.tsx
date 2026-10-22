@@ -34,10 +34,20 @@ const ActivityItem = ({
       {icon}
     </View>
     <View className="flex-1 mr-2">
-      <Text className="text-[#1A1A1A] font-bold text-sm mb-0.5" numberOfLines={1}>
+      <Text
+        className="text-[#1A1A1A] font-kumbh-bold font-bold text-sm mb-0.5"
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.35}
+      >
         {title}
       </Text>
-      <Text className="text-[#6B7280] text-[10px]">{subtitle}</Text>
+      <Text
+        className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold"
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.35}
+      >
+        {subtitle}
+      </Text>
     </View>
     <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
   </TouchableOpacity>
@@ -87,7 +97,9 @@ export const RecentActivityList = () => {
   if (activities.length === 0) {
     return (
       <View className="mb-4 bg-[#F8F8F8] rounded-[40px] p-8 items-center justify-center">
-        <Text className="text-[#9CA3AF] font-medium text-sm">No recent activities</Text>
+        <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold" maxFontSizeMultiplier={1.35}>
+          No recent activities
+        </Text>
       </View>
     );
   }

@@ -129,7 +129,7 @@ export default function RiskSettingsScreen() {
                         className={`text-base ${
                           penalty === opt
                             ? "text-[#155D5F] font-bold"
-                            : "text-[#64748B]"
+                            : "text-[#4B5563] font-medium"
                         }`}
                       >
                         {opt}
@@ -151,7 +151,10 @@ export default function RiskSettingsScreen() {
                     Rotational Savings Policy
                   </Text>
                 </View>
-                <Text className="text-[#155D5F] text-xs leading-5">
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  className="text-[#155D5F] text-[13px] leading-[18px] font-semibold font-kumbh-semibold"
+                >
                   Early exit and emergency withdrawal features do not apply to Rotational Groups because payouts are automated per cycle based on rotation order.
                 </Text>
               </View>
@@ -163,7 +166,10 @@ export default function RiskSettingsScreen() {
                       <Text className="text-[#1A1A1A] font-bold text-base mb-1">
                         Allow Early Exit
                       </Text>
-                      <Text className="text-[#64748B] text-xs">
+                      <Text
+                        maxFontSizeMultiplier={1.35}
+                        className="text-[#4B5563] text-[13px] leading-[18px] font-semibold font-kumbh-semibold"
+                      >
                         Allow members to leave before the tribe goal completes. When enabled, the platform early exit penalty will apply upon exit.
                       </Text>
                     </View>
@@ -182,7 +188,10 @@ export default function RiskSettingsScreen() {
                       <Text className="text-[#1A1A1A] font-bold text-base mb-1">
                         Emergency Withdrawal
                       </Text>
-                      <Text className="text-[#64748B] text-xs">
+                      <Text
+                        maxFontSizeMultiplier={1.35}
+                        className="text-[#4B5563] text-[13px] leading-[18px] font-semibold font-kumbh-semibold"
+                      >
                         Allow emergency access to savings in critical cases.
                       </Text>
                     </View>

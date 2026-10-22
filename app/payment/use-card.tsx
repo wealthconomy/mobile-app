@@ -17,6 +17,8 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
 import { useLinkMandateMutation, useLazyVerifyPaymentQuery, useListMyMandatesQuery } from "@/src/store/api/paymentApi";
 import * as WebBrowser from "expo-web-browser";
+import { PAYMENT_RETURN_URL, PAYMENT_RETURN_SCHEME_URL } from "@/src/constants/payment";
+import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
 
 export default function UseCardScreen() {
   const router = useRouter();
@@ -49,14 +51,23 @@ export default function UseCardScreen() {
         userId: user?.id || "",
         email,
         channel: "WEB",
-        redirectUrl: `${process.env.EXPO_PUBLIC_API_URL}/payments/mandates/me`,
+        redirectUrl: PAYMENT_RETURN_URL,
         idempotencyKey,
       }).unwrap();
 
       const checkoutUrl = response?.data?.checkoutUrl;
       const paymentRef = response?.data?.providerRef || response?.data?.id;
       if (checkoutUrl) {
-        await WebBrowser.openBrowserAsync(checkoutUrl);
+        suspendAppLock(true);
+        try {
+          await WebBrowser.openAuthSessionAsync(
+            checkoutUrl,
+            PAYMENT_RETURN_SCHEME_URL,
+            { preferEphemeralSession: true },
+          );
+        } finally {
+          suspendAppLock(false);
+        }
 
         if (paymentRef) {
           setVerifying(true);

@@ -168,10 +168,12 @@ export default function GroupDiscoveryScreen() {
               }}
             >
               <Text
+                maxFontSizeMultiplier={1.35}
                 style={{
                   fontSize: 12,
                   fontWeight: "700",
-                  color: selectedCategory === cat ? "white" : "#64748B",
+                  fontFamily: "KumbhSans_700Bold",
+                  color: selectedCategory === cat ? "white" : "#4B5563",
                 }}
               >
                 {cat}
@@ -236,6 +238,7 @@ export default function GroupDiscoveryScreen() {
                         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                           <Text
                             numberOfLines={1}
+                            maxFontSizeMultiplier={1.35}
                             style={{ fontSize: 15, fontWeight: "800", color: "#1A1A1A", flex: 1, marginRight: 8 }}
                           >
                             {group.name}
@@ -252,7 +255,12 @@ export default function GroupDiscoveryScreen() {
                                   borderColor: "#BBF7D0",
                                 }}
                               >
-                                <Text style={{ fontSize: 9, fontWeight: "800", color: "#166534" }}>🛡️ Vetted</Text>
+                                <Text
+                                  maxFontSizeMultiplier={1.35}
+                                  style={{ fontSize: 12, fontWeight: "700", fontFamily: "KumbhSans_700Bold", color: "#166534" }}
+                                >
+                                  🛡️ Vetted
+                                </Text>
                               </View>
                             )}
                             <View
@@ -263,7 +271,10 @@ export default function GroupDiscoveryScreen() {
                                 borderRadius: 6,
                               }}
                             >
-                              <Text style={{ fontSize: 9, fontWeight: "800", color: THEME }}>
+                              <Text
+                                maxFontSizeMultiplier={1.35}
+                                style={{ fontSize: 12, fontWeight: "700", fontFamily: "KumbhSans_700Bold", color: THEME }}
+                              >
                                 {(group.groupType || (group as any).type || "FIXED").toString().includes("FLEX")
                                   ? "Flex"
                                   : (group.groupType || (group as any).type || "FIXED").toString().includes("ROTATIONAL")
@@ -279,22 +290,35 @@ export default function GroupDiscoveryScreen() {
                                 borderRadius: 6,
                               }}
                             >
-                              <Text style={{ fontSize: 10, fontWeight: "700", color: "#475569" }}>
+                              <Text
+                                maxFontSizeMultiplier={1.35}
+                                style={{ fontSize: 12, fontWeight: "700", fontFamily: "KumbhSans_700Bold", color: "#4B5563" }}
+                              >
                                 {group.category || "Tribe"}
                               </Text>
                             </View>
                           </View>
                         </View>
 
-                        <Text numberOfLines={1} style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+                        <Text
+                          numberOfLines={1}
+                          maxFontSizeMultiplier={1.35}
+                          style={{ fontSize: 13, lineHeight: 18, color: "#4B5563", fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginTop: 2 }}
+                        >
                           {group.description || "Collective growth tribe"}
                         </Text>
 
                         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: THEME }}>
+                          <Text
+                            maxFontSizeMultiplier={1.35}
+                            style={{ fontSize: 12, fontWeight: "700", fontFamily: "KumbhSans_700Bold", color: THEME }}
+                          >
                             Target: ₦{targetFormatted}
                           </Text>
-                          <Text style={{ fontSize: 11, color: "#94A3B8", fontWeight: "600" }}>
+                          <Text
+                            maxFontSizeMultiplier={1.35}
+                            style={{ fontSize: 12, color: "#4B5563", fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}
+                          >
                             {group.membersCount || 1} / {group.membersLimit || 10} members
                           </Text>
                         </View>
@@ -306,10 +330,16 @@ export default function GroupDiscoveryScreen() {
             ) : (
               <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 60 }}>
                 <Users size={48} color="#CBD5E1" />
-                <Text style={{ fontSize: 16, fontWeight: "700", color: "#64748B", marginTop: 12 }}>
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  style={{ fontSize: 16, fontWeight: "700", fontFamily: "KumbhSans_700Bold", color: "#1A1A1A", marginTop: 12 }}
+                >
                   No tribes found
                 </Text>
-                <Text style={{ fontSize: 12, color: "#94A3B8", textAlign: "center", marginTop: 4, paddingHorizontal: 30 }}>
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  style={{ fontSize: 13, lineHeight: 18, color: "#4B5563", fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", textAlign: "center", marginTop: 4, paddingHorizontal: 30 }}
+                >
                   Try changing your search keywords or be the first to start a new tribe!
                 </Text>
               </View>

@@ -27,22 +27,24 @@ const TodoCard = ({
     className="rounded-[15px] p-4 mr-4 relative"
     style={{
       width: 218,
-      height: 91,
+      height: 104,
       backgroundColor: "#FFCF6533",
     }}
   >
     <View className="flex-row justify-between items-start mb-1">
       <Text
-        className="text-[#1A1A1A] font-bold text-[14px] leading-tight flex-1 mr-2"
+        className="text-[#1A1A1A] font-kumbh-bold font-bold text-[14px] leading-tight flex-1 mr-2"
         numberOfLines={1}
+        maxFontSizeMultiplier={1.35}
       >
         {title}
       </Text>
       <View className="mt-[-2px]">{icon}</View>
     </View>
     <Text
-      className="text-[#64748B] text-[10px] leading-[14px] font-medium pr-2"
+      className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold pr-2"
       numberOfLines={2}
+      maxFontSizeMultiplier={1.35}
     >
       {description}
     </Text>
@@ -170,7 +172,9 @@ export const TodoSection = () => {
   return (
     <View>
       <View className="flex-row justify-between items-center mb-4">
-        <Text className="text-[#1A1A1A] font-bold text-lg">Todo</Text>
+        <Text className="text-[#1A1A1A] font-bold text-lg" maxFontSizeMultiplier={1.35}>
+          Todo
+        </Text>
       </View>
       <ScrollView
         horizontal

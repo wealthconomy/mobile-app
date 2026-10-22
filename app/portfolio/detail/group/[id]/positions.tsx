@@ -180,7 +180,16 @@ export default function PayoutPositionsScreen() {
               Rotational Payout Sequence
             </Text>
           </View>
-          <Text style={{ fontSize: 12, color: "#64748B", lineHeight: 18 }}>
+          <Text
+            maxFontSizeMultiplier={1.35}
+            style={{
+              fontSize: 13,
+              color: "#4B5563",
+              lineHeight: 18,
+              fontWeight: "600",
+              fontFamily: "KumbhSans_600SemiBold",
+            }}
+          >
             Arrange the payout order (1 to {items.length}) for active members in{" "}
             <Text style={{ fontWeight: "700", color: THEME }}>{group?.name || "Group"}</Text>. In each cycle, the member at position #1 receives the pool payout next.
           </Text>
@@ -189,7 +198,16 @@ export default function PayoutPositionsScreen() {
         {isLoadingMembers ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <ActivityIndicator size="large" color={THEME} />
-            <Text style={{ marginTop: 12, color: "#64748B", fontSize: 13 }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{
+                marginTop: 12,
+                color: "#4B5563",
+                fontSize: 13,
+                fontWeight: "600",
+                fontFamily: "KumbhSans_600SemiBold",
+              }}
+            >
               Loading group members...
             </Text>
           </View>
@@ -266,10 +284,23 @@ export default function PayoutPositionsScreen() {
 
                 {/* Name & Role */}
                 <View style={{ flex: 1, paddingRight: 8 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#1A1A1A" }}>
+                  <Text
+                    maxFontSizeMultiplier={1.35}
+                    style={{ fontSize: 14, fontWeight: "700", color: "#1A1A1A" }}
+                  >
                     {item.name}
                   </Text>
-                  <Text style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>
+                  <Text
+                    maxFontSizeMultiplier={1.35}
+                    style={{
+                      fontSize: 13,
+                      lineHeight: 18,
+                      color: "#4B5563",
+                      marginTop: 2,
+                      fontWeight: "600",
+                      fontFamily: "KumbhSans_600SemiBold",
+                    }}
+                  >
                     {item.role === "CREATOR" || item.role === "OWNER"
                       ? "Group Admin"
                       : "Active Member"}

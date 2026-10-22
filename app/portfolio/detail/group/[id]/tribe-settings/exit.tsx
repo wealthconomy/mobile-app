@@ -70,7 +70,10 @@ export default function ExitGroupScreen() {
             <Text className="text-[26px] font-bold text-[#1A1A1A] mb-2 text-center">
               Exiting Group?
             </Text>
-            <Text className="text-[14px] text-[#64748B] text-center px-4">
+            <Text
+              maxFontSizeMultiplier={1.35}
+              className="text-[14px] text-[#4B5563] text-center px-4 font-semibold font-kumbh-semibold"
+            >
               Leaving a group affects your tribe standing and payout schedule.
             </Text>
           </View>
@@ -94,7 +97,10 @@ export default function ExitGroupScreen() {
           </View>
 
           <View className="w-full mb-8">
-            <Text className="text-[14px] text-[#64748B] font-medium mb-3">
+            <Text
+              maxFontSizeMultiplier={1.35}
+              className="text-[14px] text-[#4B5563] font-semibold font-kumbh-semibold mb-3"
+            >
               Reason for leaving (Optional)
             </Text>
             <TextInput
@@ -102,6 +108,7 @@ export default function ExitGroupScreen() {
               multiline
               textAlignVertical="top"
               placeholder="Tell the admin why you are leaving..."
+              placeholderTextColor="#6B7280"
               value={reason}
               onChangeText={setReason}
             />
@@ -113,7 +120,10 @@ export default function ExitGroupScreen() {
                 <Ionicons name="lock-closed" size={18} color="#DC2626" style={{ marginRight: 6 }} />
                 <Text className="text-[#991B1B] font-bold text-sm">Early Exit is Locked</Text>
               </View>
-              <Text className="text-[#7F1D1D] text-xs leading-5">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#7F1D1D] text-[13px] leading-[18px] font-semibold font-kumbh-semibold"
+              >
                 The admin has set a No Withdrawal policy for this tribe. Voluntary early exit is not permitted until the group reaches its maturity date.
               </Text>
             </View>
@@ -136,7 +146,16 @@ export default function ExitGroupScreen() {
                   Early Exit Penalty Applies
                 </Text>
               </View>
-              <Text style={{ color: "#78350F", fontSize: 12, lineHeight: 18 }}>
+              <Text
+                maxFontSizeMultiplier={1.35}
+                style={{
+                  color: "#78350F",
+                  fontSize: 13,
+                  lineHeight: 18,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                }}
+              >
                 A <Text style={{ fontWeight: "700" }}>{groupPenaltyRate} penalty</Text> will be deducted from your accumulated savings for exiting early. The remaining balance will be credited directly to your Main Wallet.
               </Text>
             </View>
@@ -147,7 +166,7 @@ export default function ExitGroupScreen() {
               onPress={() => router.back()}
               className="w-full h-14 bg-white border border-[#E2E8F0] rounded-2xl items-center justify-center mb-4"
             >
-              <Text className="text-[#64748B] font-bold text-base">
+              <Text className="text-[#4B5563] font-bold text-base">
                 Stay with Group
               </Text>
             </TouchableOpacity>
@@ -202,12 +221,15 @@ export default function ExitGroupScreen() {
                   Exit Tribe?
                 </Text>
                 <Text
+                  maxFontSizeMultiplier={1.35}
                   style={{
                     fontSize: 13,
-                    color: "#6B7280",
+                    color: "#4B5563",
                     textAlign: "center",
                     marginBottom: 14,
                     lineHeight: 18,
+                    fontWeight: "600",
+                    fontFamily: "KumbhSans_600SemiBold",
                   }}
                 >
                   {(group as any)?.penaltySetting === "IMMEDIATE_5" || (group as any)?.penaltySetting?.includes("IMMEDIATE")
@@ -232,11 +254,13 @@ export default function ExitGroupScreen() {
                   >
                     <Ionicons name="warning" size={20} color="#D97706" />
                     <Text
+                      maxFontSizeMultiplier={1.35}
                       style={{
                         flex: 1,
                         fontSize: 13,
                         color: "#78350F",
                         fontWeight: "600",
+                        fontFamily: "KumbhSans_600SemiBold",
                         lineHeight: 18,
                       }}
                     >
@@ -260,11 +284,13 @@ export default function ExitGroupScreen() {
                   >
                     <Ionicons name="checkmark-circle" size={20} color="#15803D" />
                     <Text
+                      maxFontSizeMultiplier={1.35}
                       style={{
                         flex: 1,
                         fontSize: 13,
                         color: "#166534",
                         fontWeight: "600",
+                        fontFamily: "KumbhSans_600SemiBold",
                         lineHeight: 18,
                       }}
                     >
@@ -287,7 +313,7 @@ export default function ExitGroupScreen() {
                       justifyContent: "center",
                     }}
                   >
-                    <Text style={{ fontSize: 14, color: "#6B7280", fontWeight: "600" }}>Cancel</Text>
+                    <Text style={{ fontSize: 14, color: "#4B5563", fontWeight: "600" }}>Cancel</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity

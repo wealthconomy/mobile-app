@@ -98,7 +98,10 @@ export const WealthCard = ({ style }: { style?: any } = {}) => {
       >
         <View style={{ gap: 4 }}>
           <View className="flex-row items-center justify-between">
-            <Text className="text-white text-[13px] font-medium opacity-70">
+            <Text
+              className="text-white text-[13px] leading-[18px] font-kumbh-semibold opacity-95"
+              maxFontSizeMultiplier={1.35}
+            >
               Total Wealth
             </Text>
             <TouchableOpacity
@@ -137,7 +140,10 @@ export const WealthCard = ({ style }: { style?: any } = {}) => {
 
           {showInterest && (
             <View className="flex-row items-center space-x-1 mt-1">
-              <Text className="text-white text-[12px] font-medium">
+              <Text
+                className="text-white text-[12px] font-kumbh-semibold"
+                maxFontSizeMultiplier={1.35}
+              >
                 Your wealth grew by ₦{walletData?.dailyGrowth ? (parseFloat(walletData.dailyGrowth.toString()) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"} today
               </Text>
               <ArrowUp size={14} color="#95F370" />
@@ -160,7 +166,10 @@ export const WealthCard = ({ style }: { style?: any } = {}) => {
           activeOpacity={0.9}
           onPress={() => router.push("/portfolios/" as any)}
         >
-          <Text className="text-[#1A1A1A] font-bold text-[12px]">
+          <Text
+            className="text-[#1A1A1A] font-bold text-[12px]"
+            maxFontSizeMultiplier={1.35}
+          >
             View Wealth
           </Text>
         </TouchableOpacity>

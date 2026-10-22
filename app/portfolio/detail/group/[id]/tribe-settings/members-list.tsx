@@ -56,13 +56,13 @@ const FILTER_OPTIONS = [
 
 const StatusBadge = ({ status }: { status: string }) => {
   let bgColor = "#F3F4F6";
-  let textColor = "#64748B";
+  let textColor = "#4B5563";
 
   switch (status) {
     case "Paid":
     case "PAID":
       bgColor = "#E6F7ED";
-      textColor = "#4CAF50";
+      textColor = "#166534";
       break;
     case "Unpaid":
     case "UNPAID":
@@ -96,7 +96,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     case "EXITED":
     case "Exited":
       bgColor = "#F1F5F9";
-      textColor = "#64748B";
+      textColor = "#4B5563";
       break;
   }
 
@@ -104,17 +104,18 @@ const StatusBadge = ({ status }: { status: string }) => {
     <View
       style={{
         backgroundColor: bgColor,
-        minWidth: 48,
-        maxWidth: 56,
+        minWidth: 50,
+        maxWidth: 64,
         height: 24,
         borderRadius: 5,
-        paddingHorizontal: 3,
+        paddingHorizontal: 4,
       }}
       className="items-center justify-center"
     >
       <Text
+        maxFontSizeMultiplier={1.35}
         style={{ color: textColor }}
-        className="text-[11px] font-bold"
+        className="text-[12px] font-bold"
         numberOfLines={1}
       >
         {status}
@@ -137,7 +138,12 @@ const StatItem = ({
   trendType?: "up" | "down";
 }) => (
   <View className="flex-row justify-between items-center py-2.5 border-b border-gray-50">
-    <Text className="text-[#64748B] text-[13px] font-medium">{label}</Text>
+    <Text
+      maxFontSizeMultiplier={1.35}
+      className="text-[#4B5563] text-[13px] font-semibold font-kumbh-semibold"
+    >
+      {label}
+    </Text>
     <View className="flex-row items-center">
       {isTrend && (
         <View className="mr-1">
@@ -149,8 +155,9 @@ const StatItem = ({
         </View>
       )}
       <Text
+        maxFontSizeMultiplier={1.35}
         style={{
-          color: isTrend ? (trendType === "up" ? "#4CAF50" : "#EF4444") : color,
+          color: isTrend ? (trendType === "up" ? "#166534" : "#EF4444") : color,
         }}
         className="text-[14px] font-bold"
       >
@@ -615,7 +622,10 @@ const UserDetailModal = ({
                       >
                         {user.name}
                       </Text>
-                      <Text className="text-[#64748B] text-[13px] mt-0.5">
+                      <Text
+                        maxFontSizeMultiplier={1.35}
+                        className="text-[#4B5563] text-[13px] font-semibold font-kumbh-semibold mt-0.5"
+                      >
                         Total Saving
                       </Text>
                       <Text className="text-[#155D5F] text-[24px] font-bold mt-0.5">
@@ -662,7 +672,7 @@ const UserDetailModal = ({
                           size={20}
                           color="#4CAF50"
                         />
-                        <Text className="text-[#4CAF50] font-bold text-[14px] ml-1">
+                        <Text className="text-[#166534] font-bold text-[14px] ml-1">
                           {isApproving ? "Approving..." : "Approve"}
                         </Text>
                       </TouchableOpacity>
@@ -706,7 +716,7 @@ const UserDetailModal = ({
                               size={17}
                               color="#4CAF50"
                             />
-                            <Text className="text-[#4CAF50] font-bold text-[12px]">
+                            <Text className="text-[#166534] font-bold text-[12px]">
                               {isSendingReminder ? "Sending..." : "Reminder"}
                             </Text>
                           </TouchableOpacity>
@@ -850,7 +860,7 @@ const UserDetailModal = ({
                             size={20}
                             color="#4CAF50"
                           />
-                          <Text className="text-[#4CAF50] font-bold text-base ml-2">
+                          <Text className="text-[#166534] font-bold text-base ml-2">
                             Unblacklist Member
                           </Text>
                         </View>
@@ -871,9 +881,11 @@ const UserDetailModal = ({
                       }}
                     >
                       <Text
+                        maxFontSizeMultiplier={1.35}
                         style={{
-                          color: "#64748B",
-                          fontWeight: "700",
+                          color: "#4B5563",
+                          fontWeight: "600",
+                          fontFamily: "KumbhSans_600SemiBold",
                           fontSize: 13,
                         }}
                       >
@@ -1342,11 +1354,11 @@ export default function TribeMembersScreen() {
         }}
         className="flex-row items-center px-[12px] mb-4"
       >
-        <Ionicons name="search-outline" size={20} color="#94A3B8" />
+        <Ionicons name="search-outline" size={20} color="#6B7280" />
         <TextInput
           className="flex-1 ml-2 text-[#1A1A1A] text-base"
           placeholder="Search member"
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor="#6B7280"
           value={searchQuery}
           onChangeText={setSearchQuery}
           style={{ paddingVertical: 6 }}
@@ -1357,20 +1369,32 @@ export default function TribeMembersScreen() {
         onPress={() => setIsFilterModalVisible(true)}
         className="flex-row items-center mb-6"
       >
-        <Text className="text-[#1A1A1A] text-[14px] font-medium mr-1">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-[#1A1A1A] text-[14px] font-medium mr-1"
+        >
           {selectedStatus}
         </Text>
         <Ionicons name="caret-down" size={12} color="#1A1A1A" />
       </TouchableOpacity>
 
       <View className="flex-row items-center px-[10px] mb-4">
-        <Text className="flex-1 text-[12px] font-medium text-[#64748B] mr-2">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="flex-1 text-[13px] font-semibold font-kumbh-semibold text-[#4B5563] mr-2"
+        >
           Names
         </Text>
-        <Text className="w-[66px] text-[12px] font-medium text-[#64748B] text-center mr-4">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="w-[64px] text-[13px] font-semibold font-kumbh-semibold text-[#4B5563] text-center mr-2"
+        >
           Status
         </Text>
-        <Text className="w-[85px] text-[12px] font-medium text-[#64748B] text-right">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="w-[82px] text-[13px] font-semibold font-kumbh-semibold text-[#4B5563] text-right"
+        >
           Total savings
         </Text>
       </View>
@@ -1450,7 +1474,7 @@ export default function TribeMembersScreen() {
           ListHeaderComponent={renderHeader()}
           ListEmptyComponent={
             <View className="items-center justify-center py-20 px-10">
-              <Text className="text-[#64748B] text-center text-base">
+              <Text className="text-[#4B5563] text-center text-base font-kumbh-semibold">
                 No members found
               </Text>
             </View>
@@ -1539,7 +1563,8 @@ export default function TribeMembersScreen() {
                       style={{ minWidth: 0 }}
                     >
                       <Text
-                        className="text-[#1A1A1A] font-medium text-[13px] mr-1.5"
+                        maxFontSizeMultiplier={1.35}
+                        className="text-[#1A1A1A] font-kumbh-semibold text-[13px] mr-1.5"
                         numberOfLines={1}
                         ellipsizeMode="tail"
                         style={{ flexShrink: 1 }}
@@ -1548,7 +1573,10 @@ export default function TribeMembersScreen() {
                       </Text>
                       {item.isAdmin && (
                         <View className="bg-[#155D5F] px-1.5 py-0.5 rounded-md shrink-0">
-                          <Text className="text-white text-[8px] font-bold">
+                          <Text
+                            maxFontSizeMultiplier={1.35}
+                            className="text-white text-[12px] font-bold font-kumbh-bold"
+                          >
                             Admin
                           </Text>
                         </View>
@@ -1556,13 +1584,14 @@ export default function TribeMembersScreen() {
                     </View>
                   </View>
 
-                  <View className="w-[66px] items-center justify-center shrink-0 mr-4">
+                  <View className="w-[64px] items-center justify-center shrink-0 mr-2">
                     <StatusBadge status={item.status} />
                   </View>
 
-                  <View className="w-[85px] flex-row items-center justify-end shrink-0">
+                  <View className="w-[82px] flex-row items-center justify-end shrink-0">
                     <Text
-                      className="text-[#155D5F] font-bold text-[12px]"
+                      maxFontSizeMultiplier={1.35}
+                      className="text-[#155D5F] font-bold text-[13px] font-kumbh-bold"
                       numberOfLines={1}
                       style={{ flexShrink: 1 }}
                     >

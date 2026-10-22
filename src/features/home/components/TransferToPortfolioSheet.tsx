@@ -1,4 +1,4 @@
-﻿import { RootState } from "@/src/store";
+import { RootState } from "@/src/store";
 import { useListGroupsQuery } from "@/src/store/api/groupApi";
 import {
   useGetPortfoliosQuery,
@@ -405,7 +405,10 @@ export const TransferToPortfolioSheet = ({
             marginBottom: 20,
           }}
         >
-          <Text style={{ fontSize: 18, fontWeight: "800", color: "#1A1A1A" }}>
+          <Text
+            maxFontSizeMultiplier={1.35}
+            style={{ fontSize: 18, fontWeight: "800", color: "#1A1A1A" }}
+          >
             Select a Portfolio to TopUp
           </Text>
           <TouchableOpacity
@@ -443,10 +446,16 @@ export const TransferToPortfolioSheet = ({
               >
                 <Ionicons name="wallet-outline" size={32} color="#9CA3AF" />
               </View>
-              <Text className="text-[16px] font-bold text-[#1A1A1A] mb-2 text-center">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[16px] font-bold text-[#1A1A1A] mb-2 text-center"
+              >
                 No Active Portfolios Found
               </Text>
-              <Text className="text-[13px] text-[#6B7280] text-center mb-6 leading-5">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[13px] text-[#374151] text-center mb-6 leading-5 font-kumbh-semibold"
+              >
                 You haven't created any active savings portfolios or groups to
                 top up yet. Create a goal to start building wealth!
               </Text>
@@ -546,10 +555,11 @@ export const TransferToPortfolioSheet = ({
                           }}
                         >
                           <Text
+                            maxFontSizeMultiplier={1.35}
                             style={{
                               color: "#FFFFFF",
                               fontWeight: "700",
-                              fontSize: 9,
+                              fontSize: 12,
                             }}
                           >
                             {getRateLabel(portfolio.type)}
@@ -566,10 +576,11 @@ export const TransferToPortfolioSheet = ({
                         }}
                       >
                         <Text
+                          maxFontSizeMultiplier={1.35}
                           style={{
                             color: "#FFFFFF",
                             fontWeight: "700",
-                            fontSize: 9,
+                            fontSize: 12,
                           }}
                         >
                           {portfolio.type === "group" ? "Deposit" : "Top Up"}
@@ -580,6 +591,7 @@ export const TransferToPortfolioSheet = ({
 
                   <View style={{ zIndex: 10 }}>
                     <Text
+                      maxFontSizeMultiplier={1.35}
                       style={{
                         fontSize: 13,
                         fontWeight: "700",
@@ -589,11 +601,13 @@ export const TransferToPortfolioSheet = ({
                       {portfolio.title}
                     </Text>
                     <Text
+                      maxFontSizeMultiplier={1.35}
                       style={{
-                        fontSize: 9,
-                        color: "#64748B",
+                        fontSize: 13,
+                        color: "#4B5563",
                         marginTop: 2,
-                        lineHeight: 12,
+                        lineHeight: 18,
+                        fontWeight: "600",
                       }}
                       numberOfLines={2}
                     >

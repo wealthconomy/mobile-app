@@ -35,8 +35,9 @@ export const CategoryChips: React.FC<CategoryChipsProps> = ({
             style={{ minWidth: "28%" }}
           >
             <Text
-              className={`font-semibold text-[11px] text-center ${
-                isSelected ? "text-white" : "text-[#6B7280]"
+              maxFontSizeMultiplier={1.35}
+              className={`text-[12px] leading-[16px] font-kumbh-semibold text-center ${
+                isSelected ? "text-white" : "text-[#4B5563]"
               }`}
             >
               {cat}

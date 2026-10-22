@@ -292,6 +292,14 @@ function RootLayoutNav() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
+              name="education/library"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="education/library/[id]"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
               name="support/index"
               options={{ headerShown: false }}
             />
@@ -413,6 +421,10 @@ function RootLayoutNav() {
             />
             <Stack.Screen
               name="payment/insert-pin"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="payment/return"
               options={{ headerShown: false }}
             />
             <Stack.Screen name="modal" options={{ presentation: "modal" }} />
