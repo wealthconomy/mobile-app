@@ -1,3 +1,4 @@
+import { useReferralEnabled } from "@/src/hooks/useReferralEnabled";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { Text, TouchableOpacity, View } from "react-native";
@@ -96,6 +97,7 @@ export const AccountMenuSections = React.memo(
     onNavigate,
     onLogoutPress,
   }: AccountMenuSectionsProps) => {
+    const isReferralEnabled = useReferralEnabled({ refreshOnFocus: true });
     return (
       <>
         {/* Menu Items Group 1 */}
@@ -108,19 +110,21 @@ export const AccountMenuSections = React.memo(
               label="Personal Information"
               onPress={() => onNavigate("/profile")}
             />
-            <MenuItem
-              icon={
-                <MaterialCommunityIcons
-                  name="party-popper"
-                  size={18}
-                  color="#155D5F"
-                />
-              }
-              iconBgColor="#E0F2F1"
-              iconColor="#155D5F"
-              label="Invitations & Referrals"
-              onPress={() => onNavigate("/profile/invite")}
-            />
+            {isReferralEnabled && (
+              <MenuItem
+                icon={
+                  <MaterialCommunityIcons
+                    name="party-popper"
+                    size={18}
+                    color="#155D5F"
+                  />
+                }
+                iconBgColor="#E0F2F1"
+                iconColor="#155D5F"
+                label="Invitations & Referrals"
+                onPress={() => onNavigate("/profile/invite")}
+              />
+            )}
             <MenuItem
               icon="flag"
               iconBgColor="#E0F2F1"

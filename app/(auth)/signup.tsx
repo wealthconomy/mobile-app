@@ -29,6 +29,7 @@ import {
   REFERRAL_CODE_PATTERN,
 } from "../../src/constants/referral";
 import { useRegisterMutation } from "../../src/store/api/authApi";
+import { useReferralEnabled } from "../../src/hooks/useReferralEnabled";
 
 const PRIMARY = "#155D5F";
 const DARK = "#323232";
@@ -56,6 +57,7 @@ const WEALTH_PREFERENCES = [
 ];
 
 export default function SignupScreen() {
+  const isReferralEnabled = useReferralEnabled();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -162,7 +164,10 @@ export default function SignupScreen() {
         lastName: lastName.trim(),
         phone: formattedPhone,
         wealthPreference,
-        referralCode: referralCode.trim() ? referralCode.trim() : undefined,
+        referralCode:
+          isReferralEnabled && referralCode.trim()
+            ? referralCode.trim()
+            : undefined,
       }).unwrap();
       router.push({
         pathname: "/(auth)/otp",
@@ -577,70 +582,72 @@ export default function SignupScreen() {
           </F>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.duration(600).delay(610)}>
-          {!referralCode.trim() && !bannerDismissed && (
-            <View
-              style={{
-                backgroundColor: "#EEF7F8",
-                borderColor: "#C8E6E8",
-                borderWidth: 1,
-                borderRadius: 10,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                marginBottom: 10,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <TouchableOpacity
-                onPress={handlePasteReferral}
-                activeOpacity={0.7}
-                style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}
-              >
-                <Ionicons name="clipboard-outline" size={16} color={PRIMARY} />
-                <Text
+          {isReferralEnabled && (
+            <Animated.View entering={FadeInDown.duration(600).delay(610)}>
+              {!referralCode.trim() && !bannerDismissed && (
+                <View
                   style={{
-                    color: PRIMARY,
-                    fontSize: 12,
-                    fontWeight: "600",
-                    flex: 1,
-                    lineHeight: 16,
+                    backgroundColor: "#EEF7F8",
+                    borderColor: "#C8E6E8",
+                    borderWidth: 1,
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    marginBottom: 10,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                   }}
                 >
-                  Have a referral code from a friend? Tap to paste it.
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setBannerDismissed(true)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                style={{ marginLeft: 8, padding: 2 }}
+                  <TouchableOpacity
+                    onPress={handlePasteReferral}
+                    activeOpacity={0.7}
+                    style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}
+                  >
+                    <Ionicons name="clipboard-outline" size={16} color={PRIMARY} />
+                    <Text
+                      style={{
+                        color: PRIMARY,
+                        fontSize: 12,
+                        fontWeight: "600",
+                        flex: 1,
+                        lineHeight: 16,
+                      }}
+                    >
+                      Have a referral code from a friend? Tap to paste it.
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setBannerDismissed(true)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    style={{ marginLeft: 8, padding: 2 }}
+                  >
+                    <Ionicons name="close" size={16} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+              )}
+              <F
+                label="Referral Code (Optional)"
+                field="referralCode"
+                errors={errors}
               >
-                <Ionicons name="close" size={16} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
+                <View style={inputWrap(!!errors.referralCode)}>
+                  <TextInput
+                    placeholder="Referral Code"
+                    placeholderTextColor="#6B7280"
+                    style={{ flex: 1, fontSize: 15, color: DARK }}
+                    autoCapitalize="characters"
+                    maxLength={16}
+                    value={referralCode}
+                    onChangeText={(v) => {
+                      setReferralCode(v);
+                      clearError("referralCode");
+                    }}
+                  />
+                </View>
+              </F>
+            </Animated.View>
           )}
-          <F
-            label="Referral Code (Optional)"
-            field="referralCode"
-            errors={errors}
-          >
-            <View style={inputWrap(!!errors.referralCode)}>
-              <TextInput
-                placeholder="Referral Code"
-                placeholderTextColor="#6B7280"
-                style={{ flex: 1, fontSize: 15, color: DARK }}
-                autoCapitalize="characters"
-                maxLength={16}
-                value={referralCode}
-                onChangeText={(v) => {
-                  setReferralCode(v);
-                  clearError("referralCode");
-                }}
-              />
-            </View>
-          </F>
-          </Animated.View>
 
           {/* T&C Checkbox */}
           <Animated.View entering={FadeInDown.duration(600).delay(650)}>

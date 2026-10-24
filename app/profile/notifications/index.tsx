@@ -91,7 +91,19 @@ export default function NotificationsScreen() {
         console.error("Failed to mark notification read:", error);
       }
     }
-    if (item.data?.route) {
+    const isReferral =
+      (typeof (item as any).type === "string" &&
+        (item as any).type.toLowerCase().includes("referral")) ||
+      (typeof item.kind === "string" &&
+        item.kind.toLowerCase().includes("referral")) ||
+      (typeof item.title === "string" &&
+        item.title.toLowerCase().includes("referral")) ||
+      (typeof item.data?.type === "string" &&
+        item.data.type.toLowerCase().includes("referral"));
+
+    if (isReferral) {
+      router.push("/profile/my-referrals" as any);
+    } else if (item.data?.route) {
       router.push(item.data.route as any);
     } else if (item.kind === "group" && item.data?.groupId) {
       router.push(`/portfolio/detail/group/${item.data.groupId}` as any);

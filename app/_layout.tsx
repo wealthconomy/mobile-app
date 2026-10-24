@@ -15,6 +15,10 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useRef } from "react";
 import { GlobalLockoutModal } from "../src/components/common/GlobalLockoutModal";
 import { AppInactivityLockModal } from "../src/components/common/AppInactivityLockModal";
+import { UpdateRequiredModal } from "../src/components/common/UpdateRequiredModal";
+import { SoftUpdatePrompt } from "../src/components/common/SoftUpdatePrompt";
+import { useAppUpdateRequired } from "../src/hooks/useAppUpdateRequired";
+import { useSoftAppUpdate } from "../src/hooks/useSoftAppUpdate";
 import { ActivityIndicator, AppState, AppStateStatus, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -57,12 +61,6 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync().catch(() => {});
-    }
-  }, [loaded]);
-
   if (!loaded) return null;
 
   return (
@@ -77,9 +75,57 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
+  const {
+    isUpdateRequired,
+    minAppVersion,
+    currentVersion: requiredHookCurrentVersion,
+    isReady,
+  } = useAppUpdateRequired();
+  const {
+    isSoftPromptCandidate,
+    isForcedUpdateByDeadline,
+    currentVersion: softHookCurrentVersion,
+    latestAppVersion,
+    updateDeadline,
+    updateMessage,
+    isSnoozed,
+    dismissPrompt,
+  } = useSoftAppUpdate();
   const { isAuthenticated, hasCompletedOnboarding, isLoading, user } = useSelector(
     (state: RootState) => state.auth,
   );
+  const { isLocked, isInactivityLocked } = useSelector(
+    (state: RootState) => state.appStatus,
+  );
+
+  const appVersion = softHookCurrentVersion || requiredHookCurrentVersion || null;
+  const isForcedUpdate = isUpdateRequired || isForcedUpdateByDeadline;
+  const forcedUpdateMessage = isForcedUpdateByDeadline ? (updateMessage || null) : null;
+  const requiredVersion = isForcedUpdateByDeadline ? latestAppVersion : minAppVersion;
+
+  const currentPath = segments.join("/");
+  const isExemptScreen =
+    segments[0] === "(auth)" ||
+    segments[0] === "onboarding" ||
+    currentPath.includes("setup-pin") ||
+    currentPath.includes("change-passcode");
+
+  const isSoftPromptEligible =
+    isAuthenticated &&
+    hasCompletedOnboarding &&
+    !isExemptScreen &&
+    !isForcedUpdate &&
+    !isLocked &&
+    !isInactivityLocked;
+
+  const showSoftPrompt = isSoftPromptCandidate && !isSnoozed && isSoftPromptEligible;
+
+  // Hide native splash screen only once both fonts and initial version check are ready
+  useEffect(() => {
+    if (isReady) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isReady]);
 
   useEffect(() => {
     dispatch(loadAuthFromStorage());
@@ -432,8 +478,28 @@ function RootLayoutNav() {
         </ThemeProvider>
       </QueryClientProvider>
       {/* Global modals: Lockout and Inactivity Session Shield */}
-      <GlobalLockoutModal />
-      <AppInactivityLockModal />
+      {!isForcedUpdate && (
+        <>
+          <GlobalLockoutModal />
+          <AppInactivityLockModal />
+        </>
+      )}
+      {/* Soft update prompt (only when not forced, not locked, not on exempt screen, etc.) */}
+      <SoftUpdatePrompt
+        visible={showSoftPrompt}
+        currentVersion={appVersion}
+        latestAppVersion={latestAppVersion}
+        updateDeadline={updateDeadline}
+        updateMessage={updateMessage}
+        onDismiss={dismissPrompt}
+      />
+      {/* Full-screen absolute overlay: Update Required */}
+      <UpdateRequiredModal
+        visible={isForcedUpdate}
+        message={forcedUpdateMessage}
+        currentVersion={appVersion}
+        requiredVersion={requiredVersion}
+      />
     </SafeAreaProvider>
   );
 }

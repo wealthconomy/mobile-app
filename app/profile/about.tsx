@@ -1,12 +1,14 @@
 import Header from "@/src/components/common/Header";
+import { openStore } from "@/src/constants/appLinks";
+import { useSoftAppUpdate } from "@/src/hooks/useSoftAppUpdate";
+import { getVersionLabel } from "@/src/utils/appInfo";
+import { formatDeadlineDate, isFutureDate } from "@/src/utils/appVersion";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import React from "react";
 import {
-  Alert,
   Image,
-  Linking,
-  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -15,29 +17,26 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const TEAL = "#155D5F";
-const PLAY_STORE_URL =
-  "https://play.google.com/store/apps/details?id=com.wealthconomy.app";
-const APP_STORE_URL = "https://apps.apple.com/app/id6740000000";
 
 export default function AboutScreen() {
-  const handleVersionCheck = async () => {
-    const targetUrl = Platform.OS === "ios" ? APP_STORE_URL : PLAY_STORE_URL;
-    try {
-      const supported = await Linking.canOpenURL(targetUrl);
-      if (supported) {
-        await Linking.openURL(targetUrl);
-      } else {
-        Alert.alert(
-          "Check for Updates",
-          "You are on the latest version of Wealthconomy (v1.0.0).",
-        );
-      }
-    } catch {
-      Alert.alert(
-        "Check for Updates",
-        "You are on the latest version of Wealthconomy (v1.0.0).",
-      );
-    }
+  const {
+    isUpdateAvailable,
+    latestAppVersion,
+    updateDeadline,
+    isLoading,
+    isError,
+  } = useSoftAppUpdate();
+
+  const versionLabel = getVersionLabel();
+  const showStatusLine = !isLoading && !isError;
+
+  const isDeadlineInFuture = isFutureDate(updateDeadline);
+  const formattedDeadline = isDeadlineInFuture
+    ? formatDeadlineDate(updateDeadline)
+    : null;
+
+  const handleUpdatePress = () => {
+    openStore();
   };
 
   return (
@@ -64,7 +63,7 @@ export default function AboutScreen() {
           </Text>
           <View className="bg-[#E6F4F4] px-3 py-1 rounded-full mb-2">
             <Text className="text-[#155D5F] font-bold text-[12px]">
-              Version 1.0.0 (Build 100)
+              Version {versionLabel}
             </Text>
           </View>
           <Text className="text-[#6B7280] text-[13px] text-center px-6 leading-[18px]">
@@ -75,7 +74,7 @@ export default function AboutScreen() {
 
         <View className="h-[1px] bg-gray-100 my-4" />
 
-        {/* Legal & App Links */}
+        {/* Legal & App Information */}
         <Text className="text-[#6B7280] font-extrabold text-[12px] uppercase tracking-wider mb-3 px-1">
           Legal & App Information
         </Text>
@@ -111,14 +110,96 @@ export default function AboutScreen() {
 
           <View className="h-[1px] bg-gray-200/50 mx-4" />
 
-          <AboutMenuItem
-            icon={
-              <Ionicons name="arrow-up-circle-outline" size={22} color={TEAL} />
-            }
-            title="Version Upgrade / Check Updates"
-            subtitle="Redirect to Play Store / App Store for latest build"
-            onPress={handleVersionCheck}
-          />
+          {/* App Version & Status Row */}
+          <View className="p-4 rounded-2xl">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1 mr-2">
+                <View className="w-10 h-10 bg-[#E6F4F4] rounded-xl items-center justify-center mr-4">
+                  <MaterialCommunityIcons
+                    name="cellphone-cog"
+                    size={22}
+                    color={TEAL}
+                  />
+                </View>
+                <Text className="text-[#1A1A1A] font-bold text-[15px]">
+                  App version
+                </Text>
+              </View>
+              <Text className="text-[#4B5563] font-semibold text-[14px]">
+                {versionLabel}
+              </Text>
+            </View>
+
+            {/* Status line below App version */}
+            {showStatusLine && (
+              <View className="mt-3 pt-3 border-t border-gray-100 flex-row items-center justify-between">
+                <View className="flex-1 mr-3">
+                  {isUpdateAvailable ? (
+                    <>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          color: "#155D5F",
+                          fontWeight: "600",
+                          fontFamily: "KumbhSans_600SemiBold",
+                        }}
+                      >
+                        Update available: version {latestAppVersion}
+                      </Text>
+                      {formattedDeadline && (
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            color: "#B45309",
+                            fontWeight: "600",
+                            fontFamily: "KumbhSans_600SemiBold",
+                            marginTop: 2,
+                          }}
+                        >
+                          Update by {formattedDeadline}
+                        </Text>
+                      )}
+                    </>
+                  ) : (
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: "#166534",
+                        fontWeight: "600",
+                        fontFamily: "KumbhSans_600SemiBold",
+                      }}
+                    >
+                      You're up to date
+                    </Text>
+                  )}
+                </View>
+
+                {isUpdateAvailable && (
+                  <TouchableOpacity
+                    onPress={handleUpdatePress}
+                    activeOpacity={0.8}
+                    style={{
+                      backgroundColor: TEAL,
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      borderRadius: 10,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#FFFFFF",
+                        fontWeight: "700",
+                        fontSize: 13,
+                        fontFamily: "KumbhSans_700Bold",
+                      }}
+                    >
+                      Update
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -157,3 +238,4 @@ function AboutMenuItem({
     </TouchableOpacity>
   );
 }
+

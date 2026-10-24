@@ -15,6 +15,30 @@ export const formatKoboAmount = (val: number | string): string => {
 };
 
 /**
+ * Formats a kobo value into whole Naira (e.g. 50000 -> "₦500", 500000 -> "₦5,000", 5000000 -> "₦50,000").
+ * Decimals are only included if the amount has fractional kobo (e.g. 50050 -> "₦500.50").
+ * Uses a manual thousands separator without Intl.
+ * Invalid, missing, or non-positive values return null.
+ */
+export const formatNairaWhole = (kobo?: number | string | null): string | null => {
+  if (kobo === null || kobo === undefined || kobo === "") return null;
+  const num = typeof kobo === "string" ? parseFloat(kobo.replace(/,/g, "").trim()) : Number(kobo);
+  if (isNaN(num) || !isFinite(num) || num <= 0) return null;
+
+  const addCommas = (str: string): string => str.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const nairaVal = num / 100;
+
+  if (num % 100 === 0) {
+    const whole = Math.round(nairaVal);
+    return `₦${addCommas(whole.toString())}`;
+  }
+
+  const fixed = nairaVal.toFixed(2);
+  const [intPart, decPart] = fixed.split(".");
+  return `₦${addCommas(intPart)}.${decPart}`;
+};
+
+/**
  * Detects amounts in kobo (e.g., "(Penalty: 13750 kobo)", "200000 kobo completed", "Transfer 200000", "₦200000") and converts them to Naira (e.g., "₦2,000.00").
  */
 export const formatCurrencyInText = (text?: string): string => {

@@ -4,30 +4,26 @@ export interface RefereeProfile {
   id?: string;
   firstName?: string;
   lastName?: string;
-  email?: string;
-  phone?: string;
   imageUrl?: string;
 }
 
 export interface RefereeItem {
   id: string;
-  referrerId?: string;
-  refereeId?: string;
   code?: string;
-  status?: string;
+  status: "PENDING" | "PAID" | "CANCELLED" | string;
   amountKobo?: string | number;
   isValid?: boolean;
-  paidAt?: string;
+  paidAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
   totalRewardsEarnedKobo?: string | number;
   referee?: RefereeProfile;
+  referrerId?: string;
+  refereeId?: string;
   // Optional fallbacks for backward compatibility
   firstName?: string;
   lastName?: string;
   name?: string;
-  email?: string;
-  phone?: string;
   imageUrl?: string;
   cumulativeSpend?: string;
   totalRewards?: string;
@@ -35,8 +31,8 @@ export interface RefereeItem {
 
 export interface ReferralsListResponseData {
   items: RefereeItem[];
-  nextCursor?: string;
-  prevCursor?: string;
+  nextCursor?: string | null;
+  prevCursor?: string | null;
   pageSize?: number;
   hasNext?: boolean;
   hasPrev?: boolean;
@@ -48,6 +44,7 @@ export interface ReferralRewardItem {
   amount?: string | number;
   status: "PENDING" | "PAID" | "CANCELLED" | string;
   createdAt?: string;
+  paidAt?: string | null;
   refereeName?: string;
   description?: string;
 }
@@ -112,6 +109,8 @@ export const referralApi = baseApi.injectEndpoints({
 
 export const {
   useGetMyReferralsQuery,
+  useLazyGetMyReferralsQuery,
   useGetMyReferralRewardsQuery,
+  useLazyGetMyReferralRewardsQuery,
   useGetMyReferralSummaryQuery,
 } = referralApi;
