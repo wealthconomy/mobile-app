@@ -2,7 +2,9 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   BackHandler,
+  Keyboard,
   Dimensions,
   Image,
   KeyboardAvoidingView,
@@ -15,6 +17,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -36,14 +39,26 @@ import {
   unlockAppFromInactivity,
 } from "../../store/slices/appStatusSlice";
 import * as LocalAuthentication from "expo-local-authentication";
+import { PasscodeKeypad } from "./PasscodeKeypad";
 
-const { width, height } = Dimensions.get("window");
+const USE_CUSTOM_KEYPAD = Platform.OS === "android";
 
 const PRIMARY = "#155D5F";
 const BRAND_TEAL = "#008185";
 const DARK = "#1A1A1A";
 
 export const AppInactivityLockModal: React.FC = () => {
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isCompact = windowHeight <= 700;
+
+  // Responsive passcode box dimensions: clamp width between 40 and 48, min 24dp side margin
+  const pinGap = windowWidth < 360 ? 8 : 10;
+  const boxWidth = Math.min(
+    48,
+    Math.max(40, Math.floor((windowWidth - 2 * 24 - 5 * pinGap) / 6)),
+  );
+  const boxHeight = Math.round(boxWidth * 1.12);
+
   const dispatch = useDispatch<AppDispatch>();
   const { isInactivityLocked } = useSelector(
     (state: RootState) => state.appStatus,
@@ -64,6 +79,7 @@ export const AppInactivityLockModal: React.FC = () => {
   const [passwordError, setPasswordError] = useState("");
 
   const inputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
   const [verifyPasscodeApi] = useVerifyPasscodeMutation();
 
   // Determine if biometric icon should be shown
@@ -163,17 +179,21 @@ export const AppInactivityLockModal: React.FC = () => {
     return () => sub.remove();
   }, [isInactivityLocked]);
 
+  // Reset state when lock appears; for iOS, focus the native input
   useEffect(() => {
     if (isInactivityLocked) {
       setPasscode("");
       setErrorMessage("");
-      const timer = setTimeout(() => {
-        inputRef.current?.focus();
-      }, 350);
-      return () => clearTimeout(timer);
+      if (!USE_CUSTOM_KEYPAD) {
+        const timer = setTimeout(() => {
+          inputRef.current?.focus();
+        }, 150);
+        return () => clearTimeout(timer);
+      }
     }
   }, [isInactivityLocked]);
 
+  // Native keyboard input handler (iOS)
   const handlePasscodeChange = (val: string) => {
     const cleaned = val.replace(/[^0-9]/g, "").slice(0, 6);
     setPasscode(cleaned);
@@ -182,6 +202,32 @@ export const AppInactivityLockModal: React.FC = () => {
     if (cleaned.length === 6) {
       executeVerification(cleaned);
     }
+  };
+
+  // In-app numeric keypad handlers (Android)
+  const handleCustomKeypadDigit = (digit: string) => {
+    if (isVerifying) return;
+    if (passcode.length >= 6) return;
+    const next = passcode + digit;
+    setPasscode(next);
+    setErrorMessage("");
+    if (next.length === 6) {
+      executeVerification(next);
+    }
+  };
+
+  const handleCustomKeypadBackspace = () => {
+    if (isVerifying) return;
+    if (passcode.length > 0) {
+      setPasscode((prev) => prev.slice(0, -1));
+      setErrorMessage("");
+    }
+  };
+
+  const handleCustomKeypadClear = () => {
+    if (isVerifying) return;
+    setPasscode("");
+    setErrorMessage("");
   };
 
   const executeVerification = async (entered: string) => {
@@ -194,7 +240,9 @@ export const AppInactivityLockModal: React.FC = () => {
       } else {
         setErrorMessage("Invalid passcode. Please try again.");
         setPasscode("");
-        setTimeout(() => inputRef.current?.focus(), 250);
+        if (!USE_CUSTOM_KEYPAD) {
+          setTimeout(() => inputRef.current?.focus(), 250);
+        }
       }
     } catch (err: any) {
       const msg = err?.data?.message || err?.message || "";
@@ -206,7 +254,9 @@ export const AppInactivityLockModal: React.FC = () => {
         if (savedPasscode && savedPasscode !== entered) {
           setErrorMessage("Invalid passcode. Please try again.");
           setPasscode("");
-          setTimeout(() => inputRef.current?.focus(), 250);
+          if (!USE_CUSTOM_KEYPAD) {
+            setTimeout(() => inputRef.current?.focus(), 250);
+          }
         } else {
           dispatch(unlockAppFromInactivity());
         }
@@ -217,7 +267,9 @@ export const AppInactivityLockModal: React.FC = () => {
             : "Invalid passcode. Please try again."
         );
         setPasscode("");
-        setTimeout(() => inputRef.current?.focus(), 250);
+        if (!USE_CUSTOM_KEYPAD) {
+          setTimeout(() => inputRef.current?.focus(), 250);
+        }
       }
     } finally {
       setIsVerifying(false);
@@ -289,9 +341,9 @@ export const AppInactivityLockModal: React.FC = () => {
 
           {/* Fluid Diagonal Wave Paths */}
           <Svg
-            width={width}
-            height={height}
-            viewBox={`0 0 ${width} ${height}`}
+            width={windowWidth}
+            height={windowHeight}
+            viewBox={`0 0 ${windowWidth} ${windowHeight}`}
             fill="none"
             style={StyleSheet.absoluteFillObject}
           >
@@ -320,40 +372,40 @@ export const AppInactivityLockModal: React.FC = () => {
 
             {/* Top Diagonal Fluid Wave */}
             <Path
-              d={`M-20,-20 Q${width * 0.4},${height * 0.18} ${width + 40},40 L${width + 40},-20 Z`}
+              d={`M-20,-20 Q${windowWidth * 0.4},${windowHeight * 0.18} ${windowWidth + 40},40 L${windowWidth + 40},-20 Z`}
               fill="url(#waveGrad1)"
             />
 
             {/* Middle Diagonal Flowing Wave */}
             <Path
-              d={`M-30,${height * 0.45} Q${width * 0.5},${height * 0.35} ${width + 30},${height * 0.55} L${width + 30},${height * 0.72} Q${width * 0.4},${height * 0.65} -30,${height * 0.58} Z`}
+              d={`M-30,${windowHeight * 0.45} Q${windowWidth * 0.5},${windowHeight * 0.35} ${windowWidth + 30},${windowHeight * 0.55} L${windowWidth + 30},${windowHeight * 0.72} Q${windowWidth * 0.4},${windowHeight * 0.65} -30,${windowHeight * 0.58} Z`}
               fill="url(#waveGrad2)"
             />
 
             {/* Bottom Swooping Wave */}
             <Path
-              d={`M-30,${height + 20} Q${width * 0.5},${height * 0.82} ${width + 30},${height + 20} Z`}
+              d={`M-30,${windowHeight + 20} Q${windowWidth * 0.5},${windowHeight * 0.82} ${windowWidth + 30},${windowHeight + 20} Z`}
               fill="url(#waveGrad1)"
             />
 
             {/* Faded Diagonal Accent Circles */}
             <Circle
-              cx={width * 0.85}
-              cy={height * 0.22}
+              cx={windowWidth * 0.85}
+              cy={windowHeight * 0.22}
               r={34}
               fill="#155D5F"
               fillOpacity="0.05"
             />
             <Circle
-              cx={width * 0.15}
-              cy={height * 0.7}
+              cx={windowWidth * 0.15}
+              cy={windowHeight * 0.7}
               r={48}
               fill="#008185"
               fillOpacity="0.04"
             />
             <Circle
-              cx={width * 0.88}
-              cy={height * 0.78}
+              cx={windowWidth * 0.88}
+              cy={windowHeight * 0.78}
               r={22}
               fill="#155D5F"
               fillOpacity="0.06"
@@ -361,169 +413,292 @@ export const AppInactivityLockModal: React.FC = () => {
           </Svg>
         </View>
 
-        <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+        <SafeAreaView
+          style={{ flex: 1 }}
+          edges={USE_CUSTOM_KEYPAD ? ["top"] : ["top", "bottom"]}
+        >
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : undefined}
             style={{ flex: 1 }}
           >
-            <ScrollView
-              contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              {/* User Avatar with Glowing Double Ring */}
-              <Animated.View
-                entering={FadeInDown.duration(500)}
-                style={styles.avatarSection}
+            <View style={{ flex: 1, justifyContent: "space-between" }}>
+              <ScrollView
+                contentContainerStyle={[
+                  styles.scrollContent,
+                  USE_CUSTOM_KEYPAD
+                    ? {
+                        paddingTop: isCompact
+                          ? 10
+                          : Math.max(16, Math.round(windowHeight * 0.04)),
+                        paddingBottom: 8,
+                      }
+                    : {
+                        paddingTop: Math.round(
+                          windowHeight * (Platform.OS === "ios" ? 0.1 : 0.08),
+                        ),
+                        paddingBottom: 24,
+                      },
+                ]}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                bounces={false}
               >
-                <View style={styles.outerRing}>
-                  <View style={styles.innerRing}>
-                    {user?.imageUrl ? (
-                      <Image
-                        source={{ uri: user.imageUrl }}
-                        style={styles.avatarImage}
-                      />
-                    ) : (
-                      <View style={styles.avatarPlaceholder}>
-                        <Text style={styles.avatarInitial}>{userInitials}</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              </Animated.View>
-
-              {/* Title & Subtitle */}
-              <Animated.View
-                entering={FadeInDown.duration(500).delay(100)}
-                style={styles.textSection}
-              >
-                <Text style={styles.greetingTitle}>
-                  Welcome Back, {displayName}{" "}
-                </Text>
-                <Text style={styles.loginSubtitle}>
-                  Log in with your passcode
-                </Text>
-              </Animated.View>
-
-              {/* App Standard 6-Box PinInput with Native Keyboard */}
-              <Animated.View
-                entering={FadeInDown.duration(500).delay(200)}
-                style={{ width: "100%" }}
-              >
-                <Pressable
-                  onPress={() => inputRef.current?.focus()}
-                  style={styles.pinWrapper}
+                {/* User Avatar with Glowing Double Ring */}
+                <Animated.View
+                  entering={FadeInDown.duration(500)}
+                  style={[
+                    styles.avatarSection,
+                    isCompact && styles.avatarSectionCompact,
+                  ]}
                 >
-                  <View style={styles.boxesRow}>
-                    {Array(6)
-                      .fill(0)
-                      .map((_, i) => {
-                        const isFilled = passcode.length > i;
-                        const isCurrent = passcode.length === i;
-                        return (
-                          <View
-                            key={i}
+                  <View
+                    style={[
+                      styles.outerRing,
+                      isCompact && styles.outerRingCompact,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.innerRing,
+                        isCompact && styles.innerRingCompact,
+                      ]}
+                    >
+                      {user?.imageUrl ? (
+                        <Image
+                          source={{ uri: user.imageUrl }}
+                          style={[
+                            styles.avatarImage,
+                            isCompact && styles.avatarImageCompact,
+                          ]}
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.avatarPlaceholder,
+                            isCompact && styles.avatarPlaceholderCompact,
+                          ]}
+                        >
+                          <Text
                             style={[
-                              styles.box,
-                              {
-                                borderColor: isCurrent
-                                  ? PRIMARY
-                                  : isFilled
-                                    ? PRIMARY
-                                    : "#E5E7EB",
-                                backgroundColor: isFilled
-                                  ? "#EEF7F8"
-                                  : "#FFFFFF",
-                                shadowColor: isCurrent ? PRIMARY : "#000",
-                                shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: isCurrent ? 0.12 : 0.03,
-                                shadowRadius: 6,
-                                elevation: isCurrent ? 3 : 1,
-                              },
+                              styles.avatarInitial,
+                              isCompact && styles.avatarInitialCompact,
                             ]}
                           >
-                            {isFilled && <View style={styles.filledDot} />}
-                          </View>
-                        );
-                      })}
+                            {userInitials}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
+                </Animated.View>
 
-                  <TextInput
-                    ref={inputRef}
-                    value={passcode}
-                    onChangeText={handlePasscodeChange}
-                    keyboardType="numeric"
-                    maxLength={6}
-                    style={styles.hiddenNativeInput}
-                    autoFocus
-                    caretHidden
-                  />
-                </Pressable>
-              </Animated.View>
-
-              {/* Error Message */}
-              {!!errorMessage && (
-                <Text style={styles.errorText}>{errorMessage}</Text>
-              )}
-
-              {/* Loading Indicator */}
-              {isVerifying && (
-                <View style={styles.loadingRow}>
-                  <ActivityIndicator size="small" color={PRIMARY} />
-                  <Text style={styles.loadingText}>Unlocking account...</Text>
-                </View>
-              )}
-
-              {/* Biometrics Action (Fingerprint / Face ID Icon) */}
-              <Animated.View
-                entering={FadeInUp.duration(500).delay(300)}
-                style={styles.bottomActionWrapper}
-              >
-                {canUseBiometrics && (
-                  <TouchableOpacity
-                    style={styles.bioIconButton}
-                    onPress={handleBiometricUnlock}
-                    activeOpacity={0.7}
-                    disabled={isBioAuthenticating}
-                    accessibilityLabel={
-                      bioIconName === "face-recognition"
-                        ? "Unlock with Face ID"
-                        : "Unlock with Fingerprint"
-                    }
-                    accessibilityRole="button"
+                {/* Title & Subtitle */}
+                <Animated.View
+                  entering={FadeInDown.duration(500).delay(100)}
+                  style={[
+                    styles.textSection,
+                    isCompact && styles.textSectionCompact,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.greetingTitle,
+                      isCompact && styles.greetingTitleCompact,
+                    ]}
                   >
-                    {isBioAuthenticating ? (
-                      <ActivityIndicator size="small" color={PRIMARY} />
-                    ) : (
-                      <MaterialCommunityIcons
-                        name={bioIconName}
-                        size={36}
-                        color={PRIMARY}
+                    Welcome Back, {displayName}{" "}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.loginSubtitle,
+                      isCompact && styles.loginSubtitleCompact,
+                    ]}
+                  >
+                    Log in with your passcode
+                  </Text>
+                </Animated.View>
+
+                {/* App Standard 6-Box PinInput with accessibility label */}
+                <Animated.View
+                  entering={FadeInDown.duration(500).delay(200)}
+                  style={{ width: "100%" }}
+                >
+                  <Pressable
+                    onPress={
+                      !USE_CUSTOM_KEYPAD ? () => inputRef.current?.focus() : undefined
+                    }
+                    disabled={USE_CUSTOM_KEYPAD}
+                    style={[styles.pinWrapper, isCompact && styles.pinWrapperCompact]}
+                    accessible={true}
+                    accessibilityRole={USE_CUSTOM_KEYPAD ? "text" : "button"}
+                    accessibilityLabel={`Passcode, ${passcode.length} of 6 digits entered`}
+                  >
+                    <View style={[styles.boxesRow, { gap: pinGap }]}>
+                      {Array(6)
+                        .fill(0)
+                        .map((_, i) => {
+                          const isFilled = passcode.length > i;
+                          const isCurrent = passcode.length === i;
+                          return (
+                            <View
+                              key={i}
+                              style={[
+                                styles.box,
+                                {
+                                  width: boxWidth,
+                                  height: boxHeight,
+                                  borderRadius: isCompact ? 14 : 16,
+                                  borderColor: isCurrent
+                                    ? PRIMARY
+                                    : isFilled
+                                      ? PRIMARY
+                                      : "#E5E7EB",
+                                  backgroundColor: isFilled
+                                    ? "#EEF7F8"
+                                    : "#FFFFFF",
+                                  shadowColor: isCurrent ? PRIMARY : "#000",
+                                  shadowOffset: { width: 0, height: 2 },
+                                  shadowOpacity: isCurrent ? 0.12 : 0.03,
+                                  shadowRadius: 6,
+                                  elevation: isCurrent ? 3 : 1,
+                                },
+                              ]}
+                            >
+                              {isFilled && <View style={styles.filledDot} />}
+                            </View>
+                          );
+                        })}
+                    </View>
+
+                    {!USE_CUSTOM_KEYPAD && (
+                      <TextInput
+                        ref={inputRef}
+                        value={passcode}
+                        onChangeText={handlePasscodeChange}
+                        keyboardType="numeric"
+                        maxLength={6}
+                        style={styles.hiddenNativeInput}
+                        autoFocus={Platform.OS === "ios"}
+                        showSoftInputOnFocus
+                        caretHidden
                       />
                     )}
-                  </TouchableOpacity>
+                  </Pressable>
+                </Animated.View>
+
+                {/* Error Message */}
+                {!!errorMessage && (
+                  <Text
+                    style={[
+                      styles.errorText,
+                      isCompact && styles.errorTextCompact,
+                    ]}
+                  >
+                    {errorMessage}
+                  </Text>
                 )}
 
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowPasswordModal(true);
-                    setPasswordError("");
-                    setUnlockPassword("");
-                  }}
-                  activeOpacity={0.7}
-                  style={{ marginTop: canUseBiometrics ? 20 : 8, paddingVertical: 8 }}
+                {/* Loading Indicator */}
+                {isVerifying && (
+                  <View
+                    style={[
+                      styles.loadingRow,
+                      isCompact && styles.loadingRowCompact,
+                    ]}
+                  >
+                    <ActivityIndicator size="small" color={PRIMARY} />
+                    <Text style={styles.loadingText}>Unlocking account...</Text>
+                  </View>
+                )}
+
+                {/* Biometrics Action (Styled circular button) & Forgot Passcode link */}
+                <Animated.View
+                  entering={FadeInUp.duration(500).delay(300)}
+                  style={[
+                    styles.bottomActionWrapper,
+                    isCompact && styles.bottomActionWrapperCompact,
+                  ]}
                 >
-                  <Text style={{ color: PRIMARY, fontSize: 13.5, fontWeight: "600" }}>
-                    Forgot Passcode? Unlock with Password
-                  </Text>
-                </TouchableOpacity>
-              </Animated.View>
-            </ScrollView>
+                  {canUseBiometrics && (
+                    <TouchableOpacity
+                      style={[
+                        styles.bioIconButton,
+                        isCompact && styles.bioIconButtonCompact,
+                      ]}
+                      onPress={handleBiometricUnlock}
+                      activeOpacity={0.7}
+                      disabled={isBioAuthenticating}
+                      accessibilityLabel={
+                        bioIconName === "face-recognition"
+                          ? "Unlock with Face ID"
+                          : "Unlock with Fingerprint"
+                      }
+                      accessibilityRole="button"
+                    >
+                      {isBioAuthenticating ? (
+                        <ActivityIndicator size="small" color={PRIMARY} />
+                      ) : (
+                        <MaterialCommunityIcons
+                          name={bioIconName}
+                          size={isCompact ? 28 : 36}
+                          color={PRIMARY}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowPasswordModal(true);
+                      setPasswordError("");
+                      setUnlockPassword("");
+                    }}
+                    activeOpacity={0.7}
+                    style={{
+                      marginTop: canUseBiometrics
+                        ? isCompact
+                          ? 8
+                          : 16
+                        : isCompact
+                          ? 4
+                          : 8,
+                      paddingVertical: 6,
+                    }}
+                  >
+                    <Text style={{ color: PRIMARY, fontSize: 13.5, fontWeight: "600" }}>
+                      Forgot Passcode? Unlock with Password
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              </ScrollView>
+
+              {/* In-App Numeric Keypad Panel at the bottom (Android) */}
+              {USE_CUSTOM_KEYPAD && (
+                <Animated.View entering={FadeInUp.duration(400)}>
+                  <PasscodeKeypad
+                    onDigit={handleCustomKeypadDigit}
+                    onBackspace={handleCustomKeypadBackspace}
+                    onClear={handleCustomKeypadClear}
+                    disabled={isVerifying}
+                  />
+                </Animated.View>
+              )}
+            </View>
           </KeyboardAvoidingView>
         </SafeAreaView>
 
         {/* Password Unlock Modal */}
-        <Modal visible={showPasswordModal} transparent animationType="slide">
+        <Modal
+          visible={showPasswordModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowPasswordModal(false)}
+          onShow={() => {
+            setTimeout(() => {
+              passwordInputRef.current?.focus();
+            }, 150);
+          }}
+        >
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={{ flex: 1 }}
@@ -549,6 +724,7 @@ export const AppInactivityLockModal: React.FC = () => {
                 <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 14, paddingHorizontal: 14, height: 50, marginBottom: 12 }}>
                   <MaterialCommunityIcons name="lock-outline" size={20} color="#9CA3AF" />
                   <TextInput
+                    ref={passwordInputRef}
                     value={unlockPassword}
                     onChangeText={(t) => {
                       setUnlockPassword(t);
@@ -623,7 +799,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-start",
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === "ios" ? Math.round(height * 0.10) : Math.round(height * 0.08),
+    paddingTop: 48,
     paddingBottom: 24,
   },
   // Ambient Glowing Bubbles
@@ -647,7 +823,7 @@ const styles = StyleSheet.create({
   },
   centerRightBubble: {
     position: "absolute",
-    top: height * 0.42,
+    top: "42%",
     right: -40,
     width: 160,
     height: 160,
@@ -658,6 +834,9 @@ const styles = StyleSheet.create({
   avatarSection: {
     marginBottom: 16,
   },
+  avatarSectionCompact: {
+    marginBottom: 10,
+  },
   outerRing: {
     width: 92,
     height: 92,
@@ -667,6 +846,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1.5,
     borderColor: `${PRIMARY}25`,
+  },
+  outerRingCompact: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   innerRing: {
     width: 76,
@@ -681,10 +865,20 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 4,
   },
+  innerRingCompact: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+  },
   avatarImage: {
     width: 72,
     height: 72,
     borderRadius: 36,
+  },
+  avatarImageCompact: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
   },
   avatarPlaceholder: {
     width: 72,
@@ -694,14 +888,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  avatarPlaceholderCompact: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+  },
   avatarInitial: {
     fontSize: 28,
     fontWeight: "800",
     color: PRIMARY,
   },
+  avatarInitialCompact: {
+    fontSize: 24,
+  },
   textSection: {
     alignItems: "center",
     marginBottom: 32,
+  },
+  textSectionCompact: {
+    marginBottom: 14,
   },
   greetingTitle: {
     fontSize: 23,
@@ -710,11 +915,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 6,
   },
+  greetingTitleCompact: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
   loginSubtitle: {
     fontSize: 14,
     color: "#6B7280",
     fontWeight: "500",
     textAlign: "center",
+  },
+  loginSubtitleCompact: {
+    fontSize: 13,
   },
   pinWrapper: {
     position: "relative",
@@ -722,10 +934,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
+  pinWrapperCompact: {
+    marginBottom: 10,
+  },
   boxesRow: {
     flexDirection: "row",
     gap: 10,
     justifyContent: "center",
+  },
+  boxesRowCompact: {
+    gap: 8,
   },
   box: {
     width: 48,
@@ -734,6 +952,11 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
+  },
+  boxCompact: {
+    width: 42,
+    height: 48,
+    borderRadius: 14,
   },
   filledDot: {
     width: 12,
@@ -754,11 +977,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 16,
   },
+  errorTextCompact: {
+    fontSize: 12,
+    marginBottom: 8,
+  },
   loadingRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     marginBottom: 16,
+  },
+  loadingRowCompact: {
+    marginBottom: 8,
   },
   loadingText: {
     fontSize: 13,
@@ -769,6 +999,9 @@ const styles = StyleSheet.create({
     marginTop: 20,
     width: "100%",
     alignItems: "center",
+  },
+  bottomActionWrapperCompact: {
+    marginTop: 10,
   },
   bioIconButton: {
     width: 64,
@@ -784,5 +1017,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 3,
+  },
+  bioIconButtonCompact: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
 });

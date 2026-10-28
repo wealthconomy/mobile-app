@@ -13,7 +13,10 @@ import {
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useRef } from "react";
-import { GlobalLockoutModal } from "../src/components/common/GlobalLockoutModal";
+import {
+  GlobalLockoutModal,
+  DEV_FORCE_LOCKOUT,
+} from "../src/components/common/GlobalLockoutModal";
 import { AppInactivityLockModal } from "../src/components/common/AppInactivityLockModal";
 import { UpdateRequiredModal } from "../src/components/common/UpdateRequiredModal";
 import { SoftUpdatePrompt } from "../src/components/common/SoftUpdatePrompt";
@@ -103,6 +106,8 @@ function RootLayoutNav() {
   const forcedUpdateMessage = isForcedUpdateByDeadline ? (updateMessage || null) : null;
   const requiredVersion = isForcedUpdateByDeadline ? latestAppVersion : minAppVersion;
 
+  const isEffectiveLocked = isLocked || Boolean(__DEV__ && DEV_FORCE_LOCKOUT);
+
   const currentPath = segments.join("/");
   const isExemptScreen =
     segments[0] === "(auth)" ||
@@ -115,7 +120,7 @@ function RootLayoutNav() {
     hasCompletedOnboarding &&
     !isExemptScreen &&
     !isForcedUpdate &&
-    !isLocked &&
+    !isEffectiveLocked &&
     !isInactivityLocked;
 
   const showSoftPrompt = isSoftPromptCandidate && !isSnoozed && isSoftPromptEligible;
@@ -481,18 +486,20 @@ function RootLayoutNav() {
       {!isForcedUpdate && (
         <>
           <GlobalLockoutModal />
-          <AppInactivityLockModal />
+          {!isEffectiveLocked && <AppInactivityLockModal />}
         </>
       )}
       {/* Soft update prompt (only when not forced, not locked, not on exempt screen, etc.) */}
-      <SoftUpdatePrompt
-        visible={showSoftPrompt}
-        currentVersion={appVersion}
-        latestAppVersion={latestAppVersion}
-        updateDeadline={updateDeadline}
-        updateMessage={updateMessage}
-        onDismiss={dismissPrompt}
-      />
+      {!isEffectiveLocked && (
+        <SoftUpdatePrompt
+          visible={showSoftPrompt}
+          currentVersion={appVersion}
+          latestAppVersion={latestAppVersion}
+          updateDeadline={updateDeadline}
+          updateMessage={updateMessage}
+          onDismiss={dismissPrompt}
+        />
+      )}
       {/* Full-screen absolute overlay: Update Required */}
       <UpdateRequiredModal
         visible={isForcedUpdate}
