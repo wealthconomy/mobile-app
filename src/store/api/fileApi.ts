@@ -26,7 +26,6 @@ export const fileApi = baseApi.injectEndpoints({
             Accept: "application/json",
           };
           if (token) {
-            headers.authorization = `Bearer ${token}`;
             headers.Authorization = `Bearer ${token}`;
           }
 

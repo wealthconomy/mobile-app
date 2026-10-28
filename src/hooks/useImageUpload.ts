@@ -128,9 +128,9 @@ export function useImageUpload() {
         }
         throw new Error("Upload response missing cloud URL.");
       } catch (err: any) {
-        // Log immediately after upload rejects on Android
+        // Log first attempt warning on Android (warn instead of error to prevent dev redbox when fallback succeeds)
         if (Platform.OS === "android") {
-          console.error(`[useImageUpload][android] ❌ Upload rejected:`, {
+          console.warn(`[useImageUpload][android] ⚠️ First upload attempt rejected:`, {
             platform: Platform.OS,
             fileObject,
             rawError: err?.data || err?.message || err,
@@ -172,7 +172,7 @@ export function useImageUpload() {
           }
         }
 
-        console.log("Image upload error:", err);
+        console.error("❌ [useImageUpload] Image upload failed on all attempts:", err);
         if (allowFallback) {
           console.warn("Falling back to local URI for testing/dev mode.");
           return uri;
