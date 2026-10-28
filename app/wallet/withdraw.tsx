@@ -1,4 +1,4 @@
-﻿import {
+import {
   useAddPayoutAccountMutation,
   useGetSupportedBanksQuery,
   useGetUserPayoutAccountsQuery,
@@ -69,7 +69,7 @@ export default function WithdrawScreen() {
 
   // User & KYC Verification Status Gate
   const user = useSelector((state: RootState) => state.auth.user);
-  const { data: kycData } = useGetKycStatusQuery();
+  const { data: kycData } = useGetKycStatusQuery(undefined, { refetchOnMountOrArgChange: true });
   const currentKycLevel = kycData?.data?.currentLevel ?? user?.kycLevel ?? 1;
   const isKycVerified = currentKycLevel >= 2;
 

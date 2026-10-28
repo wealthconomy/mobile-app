@@ -22,10 +22,10 @@ interface Props {
   setAddressData: React.Dispatch<React.SetStateAction<AddressFormData>>;
   proofOfAddress: string | null;
   proofOfAddressName?: string | null;
-  passport: string | null;
+  passport?: string | null;
   passportName?: string | null;
   setProofOfAddress: (uri: string | null, name?: string | null) => void;
-  setPassport: (uri: string | null, name?: string | null) => void;
+  setPassport?: (uri: string | null, name?: string | null) => void;
   onConfirm: () => void;
   isLoading?: boolean;
   error?: string;
@@ -67,12 +67,10 @@ export const Step1UploadCredentials: React.FC<Props> = ({
     state?: boolean;
     city?: boolean;
     proofOfAddress?: boolean;
-    passport?: boolean;
   }>({});
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
 
   // Check if documents were rejected and not yet replaced by user
-  const isPassportRejected = passportStatus === "Rejected" && !isPassportReplaced;
   const isUtilityRejected = utilityStatus === "Rejected" && !isUtilityReplaced;
 
   // Modal states for State and City/LGA pickers
@@ -109,14 +107,6 @@ export const Step1UploadCredentials: React.FC<Props> = ({
     return undefined;
   };
 
-  const validatePassport = (doc: string | null): string | undefined => {
-    if (!doc) return "International passport document is required";
-    if (isPassportRejected) {
-      return `Passport rejected (${passportRejectionReason || "blurry or illegible"}). Please upload a clear photo.`;
-    }
-    return undefined;
-  };
-
   // Real-time in-line errors: active once touched or upon submit attempt
   const inlineStreetError = (touched.streetAddress || hasAttemptedSubmit)
     ? validateStreet(addressData.streetAddress)
@@ -134,10 +124,6 @@ export const Step1UploadCredentials: React.FC<Props> = ({
     ? validateProof(proofOfAddress)
     : undefined;
 
-  const inlinePassportError = (touched.passport || hasAttemptedSubmit)
-    ? validatePassport(passport)
-    : undefined;
-
   const pickProofOfAddress = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -150,25 +136,6 @@ export const Step1UploadCredentials: React.FC<Props> = ({
       }
     } catch (err) {
       console.log("Error picking proof of address:", err);
-    }
-  };
-
-  const pickPassport = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsEditing: true,
-        quality: 0.9,
-      });
-      if (!result.canceled && result.assets && result.assets[0]?.uri) {
-        setPassport(
-          result.assets[0].uri,
-          result.assets[0].fileName || "passport.jpg"
-        );
-        setTouched((prev) => ({ ...prev, passport: true }));
-      }
-    } catch (err) {
-      console.log("Error picking passport image:", err);
     }
   };
 
@@ -256,13 +223,8 @@ export const Step1UploadCredentials: React.FC<Props> = ({
     } else if (isUtilityRejected) {
       list.push("New Proof of Address (rejected)");
     }
-    if (!passport) {
-      list.push("International Passport");
-    } else if (isPassportRejected) {
-      list.push("New International Passport (rejected)");
-    }
     return list;
-  }, [addressData, proofOfAddress, passport, isPassportRejected, isUtilityRejected]);
+  }, [addressData, proofOfAddress, isUtilityRejected]);
 
   const handlePressSubmit = () => {
     setHasAttemptedSubmit(true);
@@ -271,16 +233,14 @@ export const Step1UploadCredentials: React.FC<Props> = ({
       state: true,
       city: true,
       proofOfAddress: true,
-      passport: true,
     });
 
     const isStreetValid = !validateStreet(addressData.streetAddress);
     const isStateValid = !validateState(addressData.state);
     const isCityValid = !validateCity(addressData.city);
     const isProofValid = !validateProof(proofOfAddress);
-    const isPassportValid = !validatePassport(passport);
 
-    if (!isStreetValid || !isStateValid || !isCityValid || !isProofValid || !isPassportValid) {
+    if (!isStreetValid || !isStateValid || !isCityValid || !isProofValid) {
       return;
     }
 
@@ -302,7 +262,7 @@ export const Step1UploadCredentials: React.FC<Props> = ({
         </Animated.View>
 
         {/* Global Rejection Notice Banner */}
-        {(isPassportRejected || isUtilityRejected || overallRejectionReason) && (
+        {(isUtilityRejected || overallRejectionReason) && (
           <Animated.View entering={FadeInDown.duration(600).delay(250)} className="mt-4 mb-2">
             <View
               style={{
@@ -320,9 +280,7 @@ export const Step1UploadCredentials: React.FC<Props> = ({
                 </Text>
               </View>
               <Text style={{ fontSize: 13, color: "#7F1D1D", lineHeight: 18 }}>
-                {isPassportRejected && passportRejectionReason
-                  ? `Your International Passport was rejected: "${passportRejectionReason}". Please upload a clearer copy.`
-                  : isUtilityRejected && utilityRejectionReason
+                {isUtilityRejected && utilityRejectionReason
                   ? `Your Proof of Address was rejected: "${utilityRejectionReason}". Please upload a new document.`
                   : overallRejectionReason || "One or more documents were rejected. Please review and re-upload."}
               </Text>
@@ -395,10 +353,10 @@ export const Step1UploadCredentials: React.FC<Props> = ({
 
         <Animated.View entering={FadeInDown.duration(600).delay(400)} className="mt-2 mb-4">
            <Text className="text-[#155D5F] font-bold text-[18px] mb-1">
-             Upload Verification Documents
+             Upload Proof of Address
            </Text>
            <Text className="text-[#64748B] text-[13px] mb-4">
-             Utility bills (electricity, water, waste) must be dated within the last 3 months
+             Utility bills (electricity, water, waste) or bank statements must be dated within the last 3 months
            </Text>
 
            <DocumentUploadBox 
@@ -412,20 +370,6 @@ export const Step1UploadCredentials: React.FC<Props> = ({
               onRemove={() => {
                 setProofOfAddress(null, null);
                 setTouched((prev) => ({ ...prev, proofOfAddress: true }));
-              }} 
-           />
-
-           <DocumentUploadBox 
-              label="International Passport" 
-              imageUri={passport}
-              fileName={passportName}
-              error={inlinePassportError}
-              status={isPassportReplaced ? "Pending" : passportStatus}
-              rejectionReason={passportRejectionReason}
-              onPick={pickPassport} 
-              onRemove={() => {
-                setPassport(null, null);
-                setTouched((prev) => ({ ...prev, passport: true }));
               }} 
            />
         </Animated.View>

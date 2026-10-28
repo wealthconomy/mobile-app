@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
 import { useGetKycDocumentsQuery, useGetKycStatusQuery } from "@/src/store/api/kycApi";
@@ -23,8 +23,8 @@ export default function SecurityScreen() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showLockedModal, setShowLockedModal] = useState(false);
   const user = useSelector((state: RootState) => state.auth.user);
-  const { data: kycData } = useGetKycStatusQuery();
-  const { data: kycDocsResponse } = useGetKycDocumentsQuery();
+  const { data: kycData } = useGetKycStatusQuery(undefined, { refetchOnMountOrArgChange: true });
+  const { data: kycDocsResponse } = useGetKycDocumentsQuery(undefined, { refetchOnMountOrArgChange: true });
 
   const kycDocsPayload: any = kycDocsResponse?.data;
   const kycDocs: any = kycDocsPayload?.data || kycDocsPayload;
@@ -32,30 +32,102 @@ export default function SecurityScreen() {
   const currentLevel = kycData?.data?.currentLevel ?? user?.kycLevel ?? 1;
   const kycStatus = kycData?.data?.status ?? user?.kycStatus;
 
-  // Level 2 is verified if currentLevel >= 2 OR if NIN & Face are approved/verified
+  const ninStatusUpper = (kycDocs?.ninStatus || "").toUpperCase();
+  const faceStatusUpper = (kycDocs?.faceStatus || "").toUpperCase();
+  const utilityStatusUpper = (kycDocs?.utilityStatus || "").toUpperCase();
+  const kycStatusUpper = (kycStatus || "").toUpperCase();
+
+  const isNinRejected = ninStatusUpper === "REJECTED";
+  const isFaceRejected = faceStatusUpper === "REJECTED";
+  const isLevel2Rejected = isNinRejected || isFaceRejected || kycStatusUpper === "REJECTED";
+
+  // Level 2 is verified ONLY if not rejected, and either both are Approved or user is verified level >= 2
   const isLevel2Verified =
-    currentLevel >= 2 ||
-    (kycDocs?.ninStatus === "Approved" && kycDocs?.faceStatus === "Approved") ||
-    (kycDocs?.faceVerified && (kycDocs?.ninProviderVerified || Boolean(kycDocs?.idNumber)));
+    !isLevel2Rejected &&
+    ((ninStatusUpper === "APPROVED" && faceStatusUpper === "APPROVED") ||
+      (kycStatusUpper === "VERIFIED" && currentLevel >= 2));
 
   const isLevel3Verified =
-    currentLevel >= 3 ||
-    (kycDocs?.utilityStatus === "Approved" && kycDocs?.passportStatus === "Approved");
+    isLevel2Verified &&
+    utilityStatusUpper !== "REJECTED" &&
+    (currentLevel >= 3 || utilityStatusUpper === "APPROVED");
 
-  const isLevel2Pending = !isLevel2Verified && (kycStatus === "PENDING" || kycStatus === "pending");
+  const hasIdUpload = Boolean(kycDocs?.idImageUrl || user?.idImageUrl);
+  const hasFaceUpload = Boolean(
+    kycDocs?.faceImageUrl ||
+    kycDocs?.selfieUrl ||
+    user?.faceImageUrl ||
+    user?.imageUrl ||
+    kycDocs?.faceVerified
+  );
+  const hasAllLevel2Data = hasIdUpload && hasFaceUpload;
+
+  // It is ONLY truly pending if user actually provided BOTH required documents
+  const isLevel2Pending =
+    !isLevel2Verified &&
+    !isLevel2Rejected &&
+    hasAllLevel2Data &&
+    (kycStatusUpper === "PENDING" || ninStatusUpper === "PENDING" || faceStatusUpper === "PENDING");
+
+  const idReason = isNinRejected ? (kycDocs?.ninRejectionReason || kycDocs?.rejectionReason) : null;
+  const faceReason = isFaceRejected ? (kycDocs?.faceRejectionReason || kycDocs?.rejectionReason) : null;
+  const generalReason =
+    kycDocs?.rejectionReason ||
+    kycDocs?.ninRejectionReason ||
+    kycDocs?.faceRejectionReason ||
+    user?.kycRejectionReason;
+
+  const specificRejectionReason =
+    isNinRejected && isFaceRejected && idReason && faceReason && idReason !== faceReason
+      ? `ID: ${idReason} | Face: ${faceReason}`
+      : idReason || faceReason || generalReason;
+
+  const isLevel2Incomplete = !isLevel2Verified && !isLevel2Rejected && !hasAllLevel2Data;
+
+  const hasLevel3AddressDoc = Boolean(
+    kycDocs?.addressDocUrl ||
+    kycDocs?.proofOfAddressUrl ||
+    kycDocs?.utilityBillUrl
+  );
 
   const isLevel3Rejected =
+    !isLevel3Verified &&
     isLevel2Verified &&
-    (kycDocs?.passportStatus === "Rejected" ||
-      kycDocs?.utilityStatus === "Rejected" ||
-      kycStatus === "REJECTED" ||
-      kycStatus === "rejected");
+    hasLevel3AddressDoc &&
+    utilityStatusUpper === "REJECTED";
 
   const isLevel3Pending =
     isLevel2Verified &&
     !isLevel3Verified &&
     !isLevel3Rejected &&
-    (Boolean(kycDocs?.addressDocUrl || kycDocs?.passportUrl) || kycStatus === "PENDING" || kycStatus === "pending");
+    hasLevel3AddressDoc &&
+    (utilityStatusUpper === "PENDING" || utilityStatusUpper === "IN_REVIEW");
+
+  useEffect(() => {
+    console.log("\n================ [APP: SECURITY SCREEN KYC SNAPSHOT] ================");
+    console.log("Redux User Object:", {
+      id: user?.id,
+      name: `${user?.firstName || ""} ${user?.lastName || ""}`,
+      kycLevel: user?.kycLevel,
+      kycStatus: user?.kycStatus,
+      kycVerified: user?.kycVerified,
+      rejectionReason: user?.kycRejectionReason,
+    });
+    console.log("Calculated UI Levels:", {
+      currentLevel,
+      kycStatus,
+      isLevel2Verified,
+      isLevel2Pending,
+      isLevel2Incomplete,
+      hasAllLevel2Data,
+      isLevel3Verified,
+      isLevel3Pending,
+      isLevel3Rejected,
+    });
+    console.log("Raw Server /kyc/status:", kycData);
+    console.log("Raw Server /kyc/documents:", kycDocsResponse);
+    console.log("======================================================================\n");
+  }, [user, currentLevel, kycStatus, isLevel2Verified, isLevel3Verified, isLevel2Pending, isLevel2Incomplete, hasAllLevel2Data, kycData, kycDocsResponse]);
 
   const handleDeleteAccount = () => {
     // Simulate deletion and navigate to login
@@ -79,13 +151,29 @@ export default function SecurityScreen() {
           <View className="gap-y-[12px]">
             <MenuItem
               title="Identity Verification (Level 2)"
-              subtitle="BVN, Government ID & Face Verification"
+              subtitle={
+                isLevel2Verified
+                  ? "National ID & biometric face verified"
+                  : isLevel2Rejected
+                  ? specificRejectionReason
+                    ? `Rejected: ${specificRejectionReason}`
+                    : "Verification rejected - tap to review & re-upload"
+                  : isLevel2Incomplete
+                  ? "Incomplete - Tap to upload ID & Face ID"
+                  : isLevel2Pending
+                  ? "ID & face selfie submitted - under review"
+                  : "Scan your ID & verify with Face ID"
+              }
               badge={
                 isLevel2Verified
                   ? { text: "Verified", bg: "#DCFCE7", color: "#166534" }
+                  : isLevel2Rejected
+                  ? { text: "Action Required", bg: "#FEF2F2", color: "#DC2626" }
+                  : isLevel2Incomplete
+                  ? { text: "Incomplete", bg: "#FEF3C7", color: "#B45309" }
                   : isLevel2Pending
                   ? { text: "In Review", bg: "#FEF9C3", color: "#854D0E" }
-                  : { text: "Required", bg: "#FEF3C7", color: "#92400E" }
+                  : { text: "Required", bg: "#E0F2FE", color: "#0369A1" }
               }
               icon={
                 <MaterialCommunityIcons
@@ -99,13 +187,6 @@ export default function SecurityScreen() {
                   Alert.alert(
                     "Identity Verified ✅",
                     "Your Level 2 Identity Verification has been approved. You can proceed to Level 3 Address Verification."
-                  );
-                  return;
-                }
-                if (isLevel2Pending) {
-                  Alert.alert(
-                    "Verification In Review ⏳",
-                    "Your Level 2 identity documents have been submitted and are currently being reviewed by compliance. You will be notified once complete."
                   );
                   return;
                 }

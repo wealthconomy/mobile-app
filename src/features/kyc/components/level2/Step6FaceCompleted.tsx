@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { View, Text, Image, TouchableOpacity, ActivityIndicator } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
@@ -23,31 +23,11 @@ export const Step6FaceCompleted: React.FC<Step6FaceCompletedProps> = ({
   isLoading = false,
   error,
 }) => {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Auto-continue after 3.5s only if there is no error and not already loading
-  useEffect(() => {
-    if (isLoading || error) {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      return;
-    }
-
-    timerRef.current = setTimeout(() => {
-      onContinue();
-    }, 3500);
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [onContinue, isLoading, error]);
-
   const handleRetakePress = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
     if (onRetake) onRetake();
   };
 
   const handleConfirmPress = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
     onContinue();
   };
 

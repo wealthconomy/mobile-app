@@ -16,8 +16,8 @@ const THEME_TEAL = "#155D5F";
 export default function KYCLevel3Intro() {
   const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
-  const { data: kycData } = useGetKycStatusQuery();
-  const { data: kycDocsResponse } = useGetKycDocumentsQuery();
+  const { data: kycData } = useGetKycStatusQuery(undefined, { refetchOnMountOrArgChange: true });
+  const { data: kycDocsResponse } = useGetKycDocumentsQuery(undefined, { refetchOnMountOrArgChange: true });
 
   const kycDocsPayload: any = kycDocsResponse?.data;
   const kycDocs: any = kycDocsPayload?.data || kycDocsPayload;
@@ -25,37 +25,62 @@ export default function KYCLevel3Intro() {
   const currentLevel = kycData?.data?.currentLevel ?? user?.kycLevel ?? 1;
   const kycStatus = kycData?.data?.status ?? user?.kycStatus;
 
-  // Level 2 is verified if currentLevel >= 2 OR if NIN & Face are approved/verified
+  const ninStatusUpper = (kycDocs?.ninStatus || "").toUpperCase();
+  const faceStatusUpper = (kycDocs?.faceStatus || "").toUpperCase();
+  const utilityStatusUpper = (kycDocs?.utilityStatus || "").toUpperCase();
+  const kycStatusUpper = (kycStatus || "").toUpperCase();
+
+  const isLevel2Rejected =
+    ninStatusUpper === "REJECTED" ||
+    faceStatusUpper === "REJECTED" ||
+    kycStatusUpper === "REJECTED";
+
+  // Level 2 is verified ONLY if not rejected, and either both are Approved or user is verified level >= 2
   const isLevel2Verified =
-    currentLevel >= 2 ||
-    (kycDocs?.ninStatus === "Approved" && kycDocs?.faceStatus === "Approved") ||
-    (kycDocs?.faceVerified && (kycDocs?.ninProviderVerified || Boolean(kycDocs?.idNumber)));
+    !isLevel2Rejected &&
+    ((ninStatusUpper === "APPROVED" && faceStatusUpper === "APPROVED") ||
+      (kycStatusUpper === "VERIFIED" && currentLevel >= 2));
+
+  const hasLevel3AddressDoc = Boolean(
+    kycDocs?.addressDocUrl ||
+    kycDocs?.proofOfAddressUrl ||
+    kycDocs?.utilityBillUrl
+  );
 
   const isLevel3Verified =
-    currentLevel >= 3 ||
-    (kycDocs?.utilityStatus === "Approved" && kycDocs?.passportStatus === "Approved");
+    isLevel2Verified &&
+    utilityStatusUpper !== "REJECTED" &&
+    (currentLevel >= 3 || utilityStatusUpper === "APPROVED");
 
-  const isLevel2Pending = !isLevel2Verified && (kycStatus === "PENDING" || kycStatus === "pending");
+  const hasIdUpload = Boolean(kycDocs?.idImageUrl || user?.idImageUrl);
+  const hasFaceUpload = Boolean(
+    kycDocs?.faceImageUrl ||
+    kycDocs?.selfieUrl ||
+    user?.faceImageUrl ||
+    user?.imageUrl ||
+    kycDocs?.faceVerified
+  );
+  const hasAllLevel2Data = hasIdUpload && hasFaceUpload;
+
+  const isLevel2Pending = !isLevel2Verified && hasAllLevel2Data && (kycStatusUpper === "PENDING" || ninStatusUpper === "PENDING" || faceStatusUpper === "PENDING");
 
   const isLevel3Rejected =
+    !isLevel3Verified &&
     isLevel2Verified &&
-    (kycDocs?.passportStatus === "Rejected" ||
-      kycDocs?.utilityStatus === "Rejected" ||
-      kycStatus === "REJECTED" ||
-      kycStatus === "rejected");
+    hasLevel3AddressDoc &&
+    utilityStatusUpper === "REJECTED";
 
   const isLevel3Pending =
     isLevel2Verified &&
     !isLevel3Verified &&
     !isLevel3Rejected &&
-    (Boolean(kycDocs?.addressDocUrl || kycDocs?.passportUrl) || kycStatus === "PENDING" || kycStatus === "pending");
+    hasLevel3AddressDoc &&
+    (utilityStatusUpper === "PENDING" || utilityStatusUpper === "IN_REVIEW");
 
   const rejectionReason =
-    (kycDocs?.passportStatus === "Rejected" && kycDocs?.passportRejectionReason) ||
     (kycDocs?.utilityStatus === "Rejected" && kycDocs?.utilityRejectionReason) ||
-    kycData?.data?.kycRejectionReason ||
-    user?.kycRejectionReason ||
-    "";
+    (kycStatus === "REJECTED" ? (kycData?.data?.kycRejectionReason || user?.kycRejectionReason) : null) ||
+    "Document verification was not approved. Please review and re-upload your proof of address.";
 
 
   const benefits = [

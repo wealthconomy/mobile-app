@@ -89,7 +89,23 @@ export const fileApi = baseApi.injectEndpoints({
             if (mimeType.toLowerCase() === "image/jpg") {
               mimeType = "image/jpeg";
             }
-            formData.append("file", { uri: arg.uri, name: filename, type: mimeType } as any);
+            if (Platform.OS === "web") {
+              try {
+                if (arg.uri.startsWith("data:") || arg.uri.startsWith("blob:") || arg.uri.startsWith("http")) {
+                  const blobRes = await fetch(arg.uri);
+                  const blob = await blobRes.blob();
+                  const file = new File([blob], filename, { type: mimeType || blob.type || "image/jpeg" });
+                  formData.append("file", file);
+                } else {
+                  formData.append("file", arg.uri);
+                }
+              } catch (webErr) {
+                console.warn("[fileApi:web] Could not fetch Blob from URI, fallback to raw:", webErr);
+                formData.append("file", arg.uri);
+              }
+            } else {
+              formData.append("file", { uri: arg.uri, name: filename, type: mimeType } as any);
+            }
           } else {
             return { error: { status: "CUSTOM_ERROR", error: "Invalid upload arguments provided: missing uri or FormData" } };
           }

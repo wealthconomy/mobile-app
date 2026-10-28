@@ -120,13 +120,6 @@ export default function MyAccountScreen() {
 
   const handleKycPress = useCallback(() => {
     if (effectiveKycLevel < 2) {
-      if (activeUser?.kycStatus === "PENDING" || activeUser?.kycStatus === "pending") {
-        Alert.alert(
-          "Verification In Review ⏳",
-          "Your Level 2 identity documents have been submitted and are currently being reviewed by compliance."
-        );
-        return;
-      }
       router.push("/kyc/level2-intro");
     } else if (effectiveKycLevel === 2) {
       router.push("/kyc/level3-intro");
@@ -136,7 +129,7 @@ export default function MyAccountScreen() {
         "Your account is verified at Level 3. You have full access to unlimited deposits, withdrawals, and wealth advisory."
       );
     }
-  }, [router, effectiveKycLevel, activeUser]);
+  }, [router, effectiveKycLevel]);
 
   const handleOpenLogoutModal = useCallback(() => {
     setShowLogoutModal(true);
