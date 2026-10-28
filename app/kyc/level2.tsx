@@ -339,9 +339,9 @@ export default function KYCLevel2Screen() {
       console.log("Resolved imageUrl:", imageUrl);
       console.log("=======================================================================\n");
 
-      // Strict validation: Must be a remote public http(s) URL
-      if (!imageUrl || (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://"))) {
-        throw new Error("Could not obtain a valid public cloud URL for your ID image. Please try again.");
+      // Strict validation: Must be a non-empty remote https URL
+      if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.startsWith("https://")) {
+        throw new Error("Could not obtain a secure uploaded URL for your ID image. Please try again.");
       }
 
       const payload = {
@@ -371,13 +371,9 @@ export default function KYCLevel2Screen() {
   };
 
   // Step 5 Capture
-  const handleFaceScanComplete = (photoUri?: string, base64?: string) => {
-    if (photoUri) {
-      setCapturedSelfie(photoUri);
-    }
-    if (base64) {
-      setCapturedSelfieBase64(base64);
-    }
+  const handleFaceScanComplete = (photoUri: string, base64: string) => {
+    setCapturedSelfie(photoUri);
+    setCapturedSelfieBase64(base64);
     setStep(6);
   };
 
@@ -435,10 +431,17 @@ export default function KYCLevel2Screen() {
         }
       }
 
+      // If no selfie base64, do NOT call face-verify: show error and send user back to face step
+      if (!capturedSelfie || !safeBase64 || safeBase64.trim().length === 0) {
+        setLocalError("We couldn't capture your face. Please try again.");
+        setStep(5);
+        return;
+      }
+
       const sessionId = `session_${Date.now()}`;
       const payload: any = {
         biometricSessionId: sessionId,
-        imageBase64: safeBase64 || "mock_base64_string",
+        imageBase64: safeBase64,
         ...(uploadedSelfieUrl ? { faceImageUrl: uploadedSelfieUrl, imageUrl: uploadedSelfieUrl } : {}),
       };
 

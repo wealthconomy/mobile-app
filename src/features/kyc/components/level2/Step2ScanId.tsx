@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { View, Text, TouchableOpacity, Image } from "react-native";
+import { View, Text, TouchableOpacity, Image, Alert, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, {
   useSharedValue,
@@ -13,14 +13,14 @@ import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
 import { FaceFramingBrackets, KycButton } from "@/src/components/common";
+import { ALLOW_KYC_PLACEHOLDERS } from "@/src/constants/kycDev";
 
 interface Step2ScanIdProps {
-  onStartScanning: (photoUri?: string) => void;
+  onStartScanning: (photoUri: string) => void;
   onBack?: () => void;
 }
 
 const THEME_TEAL = "#155D5F";
-const ACTUAL_ID_FALLBACK_URI = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=80";
 
 export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
   onStartScanning,
@@ -52,39 +52,73 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
   const handleCapture = async () => {
     suspendAppLock(true);
     try {
+      if (!permission?.granted) {
+        let currentPerm = permission;
+        if (!currentPerm?.granted && currentPerm?.canAskAgain) {
+          currentPerm = await requestPermission();
+        }
+        if (!currentPerm?.granted) {
+          Alert.alert(
+            "Camera Access Needed",
+            "Camera access is needed to capture your ID. Please open settings and enable camera access.",
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Open Settings", onPress: () => Linking.openSettings() },
+            ]
+          );
+          return;
+        }
+      }
+
       if (cameraRef.current) {
         try {
           const photo = await cameraRef.current.takePictureAsync({
             quality: 0.6,
           });
           if (photo?.uri) {
+            let finalUri = photo.uri;
             try {
               const manipulated = await manipulateAsync(
                 photo.uri,
                 [{ resize: { width: 1000 } }],
                 { compress: 0.7, format: SaveFormat.JPEG }
               );
-              const uriToUse = manipulated?.uri || photo.uri;
-              setCapturedUri(uriToUse);
-              setTimeout(() => {
-                onStartScanning(uriToUse);
-              }, 800);
-              return;
+              if (manipulated?.uri) {
+                finalUri = manipulated.uri;
+              }
             } catch (manipErr) {
               console.log("ID manipulation error:", manipErr);
             }
-            setCapturedUri(photo.uri);
-            setTimeout(() => {
-              onStartScanning(photo.uri);
-            }, 800);
-            return;
+
+            // Must be a non-empty, local file URI (never http/https)
+            if (
+              finalUri &&
+              typeof finalUri === "string" &&
+              finalUri.trim().length > 0 &&
+              !finalUri.startsWith("http://") &&
+              !finalUri.startsWith("https://")
+            ) {
+              setCapturedUri(finalUri);
+              setTimeout(() => {
+                onStartScanning(finalUri);
+              }, 800);
+              return;
+            }
           }
         } catch (error) {
           console.log("Error taking photo:", error);
         }
       }
-      // Fallback if simulated or camera unavailable
-      onStartScanning(ACTUAL_ID_FALLBACK_URI);
+
+      if (__DEV__ && ALLOW_KYC_PLACEHOLDERS) {
+        onStartScanning("file:///mock_id_card.jpg");
+        return;
+      }
+
+      Alert.alert(
+        "Capture Failed",
+        "We couldn't capture the photo. Please try again."
+      );
     } finally {
       suspendAppLock(false);
     }
@@ -100,23 +134,32 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
       });
       if (!result.canceled && result.assets && result.assets[0]?.uri) {
         const pickedUri = result.assets[0].uri;
+        let finalUri = pickedUri;
         try {
           const manipulated = await manipulateAsync(
             pickedUri,
             [{ resize: { width: 1000 } }],
             { compress: 0.7, format: SaveFormat.JPEG }
           );
-          const finalUri = manipulated?.uri || pickedUri;
+          if (manipulated?.uri) {
+            finalUri = manipulated.uri;
+          }
+        } catch {
+          finalUri = pickedUri;
+        }
+
+        if (
+          finalUri &&
+          typeof finalUri === "string" &&
+          finalUri.trim().length > 0 &&
+          !finalUri.startsWith("http://") &&
+          !finalUri.startsWith("https://")
+        ) {
           setCapturedUri(finalUri);
           setTimeout(() => {
             onStartScanning(finalUri);
           }, 600);
           return;
-        } catch {
-          setCapturedUri(pickedUri);
-          setTimeout(() => {
-            onStartScanning(pickedUri);
-          }, 600);
         }
       }
     } catch (err) {
@@ -128,9 +171,8 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
 
   return (
     <View style={{ flex: 1, backgroundColor: "white", paddingHorizontal: 22, paddingTop: 16 }}>
-      {/* Main Center Content exactly matching Image 4 (Scan ID) */}
+      {/* Main Center Content */}
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        {/* Title exactly matching Image 4 without subtitle */}
         <Text
           style={{
             fontSize: 26,
@@ -143,7 +185,7 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
           Scan ID
         </Text>
 
-        {/* Scan Card Outer Gray Frame matching Image 4 exactly (#C4C9D4) */}
+        {/* Scan Card Outer Frame */}
         <View
           style={{
             width: "94%",
@@ -156,7 +198,7 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
             justifyContent: "center",
           }}
         >
-          {/* Live actual camera image feed without any fake ID overlay */}
+          {/* Live camera feed */}
           {permission?.granted && !capturedUri && (
             <CameraView
               ref={cameraRef}
@@ -166,23 +208,61 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
           )}
 
           {!permission?.granted && !capturedUri && (
-            <TouchableOpacity
-              onPress={requestPermission}
-              activeOpacity={0.8}
+            <View
               style={{
                 width: "100%",
                 height: "100%",
                 backgroundColor: "#C4C9D4",
                 alignItems: "center",
                 justifyContent: "center",
-                padding: 20,
+                padding: 24,
               }}
             >
-              <Ionicons name="camera" size={40} color="#155D5F" />
-              <Text style={{ fontSize: 15, fontWeight: "600", color: "#155D5F", marginTop: 10 }}>
-                Tap to Enable Live Camera
+              <Ionicons name="camera-outline" size={44} color="#155D5F" />
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: "700",
+                  color: "#155D5F",
+                  marginTop: 12,
+                  textAlign: "center",
+                }}
+              >
+                Camera access is needed to capture your ID
               </Text>
-            </TouchableOpacity>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#475569",
+                  marginTop: 6,
+                  textAlign: "center",
+                  lineHeight: 18,
+                }}
+              >
+                Please allow camera access to take a photo of your government ID document.
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  if (permission?.canAskAgain) {
+                    requestPermission();
+                  } else {
+                    Linking.openSettings();
+                  }
+                }}
+                activeOpacity={0.8}
+                style={{
+                  marginTop: 16,
+                  backgroundColor: "#155D5F",
+                  paddingHorizontal: 22,
+                  paddingVertical: 12,
+                  borderRadius: 14,
+                }}
+              >
+                <Text style={{ color: "white", fontWeight: "700", fontSize: 14 }}>
+                  {permission?.canAskAgain ? "Enable Camera" : "Open Settings"}
+                </Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {capturedUri ? (
@@ -193,7 +273,7 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
             />
           ) : null}
 
-          {/* Center White Brackets Framing Viewport (290x260) */}
+          {/* Center White Brackets Framing Viewport */}
           <FaceFramingBrackets
             width={290}
             height={260}
@@ -202,8 +282,8 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
             strokeWidth={5}
             containerStyle={{ overflow: "hidden" }}
           >
-            {/* Animated Cyan Scan Line + Dark Teal Shading Overlay below line matching Image 4 */}
-            {!capturedUri && (
+            {/* Animated Cyan Scan Line */}
+            {!capturedUri && permission?.granted && (
               <Animated.View
                 style={[
                   {
@@ -215,7 +295,6 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
                   animatedLineStyle,
                 ]}
               >
-                {/* 2px Bright Cyan Laser Line */}
                 <View
                   style={{
                     height: 2.5,
@@ -226,7 +305,6 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
                     shadowRadius: 8,
                   }}
                 />
-                {/* Dark Teal Shading Overlay stretching downwards across bottom of card */}
                 <View
                   style={{
                     height: 260,

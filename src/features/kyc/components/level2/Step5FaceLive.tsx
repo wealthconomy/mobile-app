@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { View, Text, Image, TouchableOpacity, Dimensions } from "react-native";
+import { View, Text, TouchableOpacity, Alert, Linking } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, {
@@ -13,9 +13,10 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { FaceFramingBrackets } from "@/src/components/common";
 import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
+import { ALLOW_KYC_PLACEHOLDERS } from "@/src/constants/kycDev";
 
 interface Step5FaceLiveProps {
-  onScanComplete: (photoUri?: string, base64?: string) => void;
+  onScanComplete: (photoUri: string, base64: string) => void;
   onBack?: () => void;
 }
 
@@ -32,13 +33,24 @@ export const Step5FaceLive: React.FC<Step5FaceLiveProps> = ({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!permission?.granted) {
+    if (!permission?.granted && permission?.canAskAgain) {
       requestPermission();
     }
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [permission?.granted]);
+
+  const resetScan = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    progressWidth.value = 0;
+    setProgressText(0);
+    setIsScanning(false);
+    setIsCapturing(false);
+  };
 
   const finishScan = async () => {
     setIsCapturing(true);
@@ -49,6 +61,8 @@ export const Step5FaceLive: React.FC<Step5FaceLiveProps> = ({
             quality: 0.3,
           });
           if (photo?.uri) {
+            let finalUri = photo.uri;
+            let finalBase64: string | undefined;
             try {
               // Highly lightweight compression (320px width, 0.25 quality) -> ~15-20KB base64 payload
               const manipulated = await manipulateAsync(
@@ -56,28 +70,70 @@ export const Step5FaceLive: React.FC<Step5FaceLiveProps> = ({
                 [{ resize: { width: 320 } }],
                 { compress: 0.25, format: SaveFormat.JPEG, base64: true }
               );
-              if (manipulated?.uri && manipulated?.base64) {
-                onScanComplete(manipulated.uri, manipulated.base64);
-                return;
+              if (manipulated?.uri) {
+                finalUri = manipulated.uri;
+              }
+              if (manipulated?.base64) {
+                finalBase64 = manipulated.base64;
               }
             } catch (manipErr) {
-              console.log("Selfie manipulation error, using fallback:", manipErr);
+              console.log("Selfie manipulation error:", manipErr);
             }
-            onScanComplete(photo.uri);
-            return;
+
+            if (
+              finalUri &&
+              typeof finalUri === "string" &&
+              finalUri.trim().length > 0 &&
+              !finalUri.startsWith("http://") &&
+              !finalUri.startsWith("https://") &&
+              finalBase64 &&
+              finalBase64.trim().length > 0
+            ) {
+              onScanComplete(finalUri, finalBase64);
+              return;
+            }
           }
         } catch (err) {
           console.log("Selfie capture err:", err);
         }
       }
-      onScanComplete();
+
+      if (__DEV__ && ALLOW_KYC_PLACEHOLDERS) {
+        onScanComplete("file:///mock_face_selfie.jpg", "mock_base64_string");
+        return;
+      }
+
+      resetScan();
+      Alert.alert(
+        "Capture Failed",
+        "We couldn't capture your face. Please try again."
+      );
     } finally {
       suspendAppLock(false);
     }
   };
 
-  const handleStartScan = () => {
+  const handleStartScan = async () => {
     if (isScanning || isCapturing) return;
+
+    if (!permission?.granted) {
+      let currentPerm = permission;
+      if (!currentPerm?.granted && currentPerm?.canAskAgain) {
+        currentPerm = await requestPermission();
+      }
+      if (!currentPerm?.granted) {
+        Alert.alert(
+          "Camera Access Needed",
+          "Camera access is needed for face verification. Please open settings and enable camera access.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Open Settings", onPress: () => Linking.openSettings() },
+          ]
+        );
+        return;
+      }
+    }
+
     suspendAppLock(true);
     setIsScanning(true);
     setProgressText(0);
@@ -116,7 +172,7 @@ export const Step5FaceLive: React.FC<Step5FaceLiveProps> = ({
 
   return (
     <View style={{ flex: 1, backgroundColor: "#0F172A", position: "relative" }}>
-      {/* Live Front Camera or High-Fidelity Portrait Fallback */}
+      {/* Live Front Camera */}
       {permission?.granted ? (
         <CameraView
           ref={cameraRef}
@@ -124,13 +180,62 @@ export const Step5FaceLive: React.FC<Step5FaceLiveProps> = ({
           style={{ width: "100%", height: "100%", position: "absolute" }}
         />
       ) : (
-        <Image
-          source={{
-            uri: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=1000&auto=format&fit=crop",
+        <View
+          style={{
+            width: "100%",
+            height: "100%",
+            backgroundColor: "#0F172A",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            position: "absolute",
           }}
-          style={{ width: "100%", height: "100%", position: "absolute" }}
-          resizeMode="cover"
-        />
+        >
+          <Ionicons name="camera-outline" size={48} color="#2CC0C5" />
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: "700",
+              color: "white",
+              marginTop: 14,
+              textAlign: "center",
+            }}
+          >
+            Camera Access Needed
+          </Text>
+          <Text
+            style={{
+              fontSize: 13,
+              color: "#94A3B8",
+              marginTop: 6,
+              textAlign: "center",
+              lineHeight: 20,
+            }}
+          >
+            Camera access is needed to capture your face for live verification.
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              if (permission?.canAskAgain) {
+                requestPermission();
+              } else {
+                Linking.openSettings();
+              }
+            }}
+            activeOpacity={0.8}
+            style={{
+              marginTop: 18,
+              backgroundColor: "#2CC0C5",
+              paddingHorizontal: 24,
+              paddingVertical: 12,
+              borderRadius: 14,
+            }}
+          >
+            <Text style={{ color: "#0F172A", fontWeight: "700", fontSize: 14 }}>
+              {permission?.canAskAgain ? "Enable Camera" : "Open Settings"}
+            </Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Subtle back navigation */}
