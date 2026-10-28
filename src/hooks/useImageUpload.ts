@@ -65,7 +65,7 @@ export function useImageUpload() {
         mimeType = "image/jpeg";
       }
 
-      // 4. Construct explicit file object (uri, name, type) for Android multipart serialization
+      // 4. Construct FormData (Web requires actual Blob/File; Native iOS/Android requires { uri, name, type } object)
       const fileObject = {
         uri: cleanUri,
         name: filename,
@@ -73,11 +73,25 @@ export function useImageUpload() {
       };
 
       const formData = new FormData();
-      formData.append("file", fileObject as any);
-
-      // Log immediately before upload on Android
-      if (Platform.OS === "android") {
-        console.log(`[useImageUpload][android] 🚀 Initiating upload with file object:`, JSON.stringify(fileObject, null, 2));
+      if (Platform.OS === "web") {
+        try {
+          if (cleanUri.startsWith("data:") || cleanUri.startsWith("blob:") || cleanUri.startsWith("http")) {
+            const blobRes = await fetch(cleanUri);
+            const blob = await blobRes.blob();
+            const file = new File([blob], filename, { type: mimeType || blob.type || "image/jpeg" });
+            formData.append("file", file);
+          } else {
+            formData.append("file", cleanUri);
+          }
+        } catch (webBlobErr) {
+          console.warn("[useImageUpload:web] Could not fetch Blob from URI, fallback to raw:", webBlobErr);
+          formData.append("file", cleanUri);
+        }
+      } else {
+        formData.append("file", fileObject as any);
+        if (Platform.OS === "android") {
+          console.log(`[useImageUpload][android] 🚀 Initiating upload with file object:`, JSON.stringify(fileObject, null, 2));
+        }
       }
 
       try {

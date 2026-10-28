@@ -93,8 +93,8 @@ export default function WithdrawScreen() {
   // User & KYC Verification Status Gate
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
-  const { data: kycData, isLoading: isLoadingKycStatus } = useGetKycStatusQuery();
-  const { data: kycDocsResponse, isLoading: isLoadingKycDocs } = useGetKycDocumentsQuery();
+  const { data: kycData, isLoading: isLoadingKycStatus } = useGetKycStatusQuery(undefined, { refetchOnMountOrArgChange: true });
+  const { data: kycDocsResponse, isLoading: isLoadingKycDocs } = useGetKycDocumentsQuery(undefined, { refetchOnMountOrArgChange: true });
 
   const [localKyc2Completed, setLocalKyc2Completed] = useState(false);
   const [isCheckingStorage, setIsCheckingStorage] = useState(true);
@@ -113,7 +113,6 @@ export default function WithdrawScreen() {
 
   const kycDocsPayload: any = kycDocsResponse?.data;
   const kycDocs: any = kycDocsPayload?.data || kycDocsPayload;
-
   const currentKycLevel = kycData?.data?.currentLevel ?? user?.kycLevel ?? 1;
   const kycStatus = String(kycData?.data?.status || user?.kycStatus || "").toUpperCase();
 

@@ -50,39 +50,44 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
   });
 
   const handleCapture = async () => {
-    if (cameraRef.current) {
-      try {
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.6,
-        });
-        if (photo?.uri) {
-          try {
-            const manipulated = await manipulateAsync(
-              photo.uri,
-              [{ resize: { width: 1000 } }],
-              { compress: 0.7, format: SaveFormat.JPEG }
-            );
-            const uriToUse = manipulated?.uri || photo.uri;
-            setCapturedUri(uriToUse);
+    suspendAppLock(true);
+    try {
+      if (cameraRef.current) {
+        try {
+          const photo = await cameraRef.current.takePictureAsync({
+            quality: 0.6,
+          });
+          if (photo?.uri) {
+            try {
+              const manipulated = await manipulateAsync(
+                photo.uri,
+                [{ resize: { width: 1000 } }],
+                { compress: 0.7, format: SaveFormat.JPEG }
+              );
+              const uriToUse = manipulated?.uri || photo.uri;
+              setCapturedUri(uriToUse);
+              setTimeout(() => {
+                onStartScanning(uriToUse);
+              }, 800);
+              return;
+            } catch (manipErr) {
+              console.log("ID manipulation error:", manipErr);
+            }
+            setCapturedUri(photo.uri);
             setTimeout(() => {
-              onStartScanning(uriToUse);
+              onStartScanning(photo.uri);
             }, 800);
             return;
-          } catch (manipErr) {
-            console.log("ID manipulation error:", manipErr);
           }
-          setCapturedUri(photo.uri);
-          setTimeout(() => {
-            onStartScanning(photo.uri);
-          }, 800);
-          return;
+        } catch (error) {
+          console.log("Error taking photo:", error);
         }
-      } catch (error) {
-        console.log("Error taking photo:", error);
       }
+      // Fallback if simulated or camera unavailable
+      onStartScanning(ACTUAL_ID_FALLBACK_URI);
+    } finally {
+      suspendAppLock(false);
     }
-    // Fallback if simulated or camera unavailable
-    onStartScanning(ACTUAL_ID_FALLBACK_URI);
   };
 
   const handlePickFromGallery = async () => {

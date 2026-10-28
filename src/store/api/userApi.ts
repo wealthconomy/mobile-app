@@ -129,6 +129,9 @@ export const userApi = baseApi.injectEndpoints({
       async onQueryStarted(_, { dispatch, queryFulfilled, getState }) {
         try {
           const { data } = await queryFulfilled;
+          console.log("\n================ [APP: GET /user/me PROFILE RESPONSE] ================");
+          console.log(JSON.stringify(data, null, 2));
+          console.log("======================================================================\n");
           const token = (getState() as RootState).auth.token || "";
           const refreshToken = (getState() as RootState).auth.refreshToken || "";
           if (token && data.data) {
@@ -140,8 +143,8 @@ export const userApi = baseApi.injectEndpoints({
               })
             );
           }
-        } catch {
-          // fetch failed
+        } catch (err: any) {
+          console.log("❌ [APP: GET /user/me FAILED]:", err?.error || err);
         }
       },
     }),

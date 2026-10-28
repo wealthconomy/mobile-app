@@ -13,7 +13,7 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "bundleIdentifier": "com.wealthconomy.app",
+      "bundleIdentifier": "com.wealth070steam.Wealthconomy",
       "buildNumber": "7",
       "icon": "./assets/images/icon-ios.png",
       "supportsTablet": false,
@@ -22,7 +22,8 @@
       },
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Wealthconomy needs access to your photo library so you can select and upload profile photos and KYC verification documents.",
-        "NSCameraUsageDescription": "Wealthconomy needs access to your camera so you can take profile photos and capture identification documents for secure KYC verification."
+        "NSCameraUsageDescription": "Wealthconomy needs access to your camera so you can take profile photos and capture identification documents for secure KYC verification.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -33,11 +34,15 @@
         "backgroundColor": "#FFFFFF",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "usesCleartextTraffic": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT"
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { View } from "react-native";
+import { View, Text } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 import { updateKycLevel } from "@/src/store/slices/authSlice";
 import { RootState } from "@/src/store";
 import {
@@ -12,9 +12,11 @@ import {
   useScanIdMutation,
   useFaceVerifyMutation,
   useGetKycDocumentsQuery,
+  useGetKycStatusQuery,
 } from "@/src/store/api/kycApi";
 import { useUpdateMyProfileMutation, useGetMyProfileQuery } from "@/src/store/api/userApi";
 import { useImageUpload } from "@/src/hooks/useImageUpload";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 
 import {
   Step1PersonalData,
@@ -33,8 +35,9 @@ export default function KYCLevel2Screen() {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
 
-  const { data: userProfileResponse } = useGetMyProfileQuery();
-  const { data: kycDocsResponse } = useGetKycDocumentsQuery();
+  const { data: userProfileResponse } = useGetMyProfileQuery(undefined, { refetchOnMountOrArgChange: true });
+  const { data: kycDocsResponse } = useGetKycDocumentsQuery(undefined, { refetchOnMountOrArgChange: true });
+  const { data: kycStatusResponse } = useGetKycStatusQuery(undefined, { refetchOnMountOrArgChange: true });
   const [submitLevel2Info, { isLoading: isSubmittingInfo, error: submitInfoError }] =
     useSubmitLevel2InfoMutation();
   const [scanId, { isLoading: isScanningId, error: scanIdError }] =
@@ -49,6 +52,32 @@ export default function KYCLevel2Screen() {
   const [capturedSelfieBase64, setCapturedSelfieBase64] = useState<string | undefined>(undefined);
   const [capturedIdPhoto, setCapturedIdPhoto] = useState<string | undefined>(undefined);
   const [localError, setLocalError] = useState<string | null>(null);
+
+  const kycPayload: any = kycDocsResponse?.data;
+  const kycData = kycPayload?.data || kycPayload;
+
+  const ninStatusUpper = (kycData?.ninStatus || "").toUpperCase();
+  const faceStatusUpper = (kycData?.faceStatus || "").toUpperCase();
+  const kycStatusUpper = (kycStatusResponse?.data?.status || user?.kycStatus || "").toUpperCase();
+
+  const isNinRejected = ninStatusUpper === "REJECTED";
+  const isFaceRejected = faceStatusUpper === "REJECTED";
+  const isLevel2Rejected = isNinRejected || isFaceRejected || kycStatusUpper === "REJECTED";
+
+  const idReason = isNinRejected ? (kycData?.ninRejectionReason || kycData?.rejectionReason) : null;
+  const faceReason = isFaceRejected ? (kycData?.faceRejectionReason || kycData?.rejectionReason) : null;
+  const generalReason =
+    kycData?.rejectionReason ||
+    kycData?.ninRejectionReason ||
+    kycData?.faceRejectionReason ||
+    kycStatusResponse?.data?.kycRejectionReason ||
+    (kycStatusResponse?.data as any)?.reason ||
+    user?.kycRejectionReason;
+
+  const specificRejectionReason =
+    isNinRejected && isFaceRejected && idReason && faceReason && idReason !== faceReason
+      ? `ID: ${idReason} | Face: ${faceReason}`
+      : idReason || faceReason || generalReason;
 
   // Form data for Step 1
   const [formData, setFormData] = useState<FormData>({
@@ -78,41 +107,6 @@ export default function KYCLevel2Screen() {
 
   // Pre-populate user profile data and existing KYC documents data if available
   useEffect(() => {
-    const kycPayload: any = kycDocsResponse?.data;
-    const kycData = kycPayload?.data || kycPayload;
-
-    const isLevel2Complete =
-      (user?.kycLevel !== undefined && user.kycLevel >= 2) ||
-      kycDocsResponse?.data?.faceVerified === true;
-
-    if (isLevel2Complete) {
-      dispatch(updateKycLevel(2));
-      AsyncStorage.setItem("@wealth_kyc_level_2_completed", "true").catch(() => {});
-      if (step < 7) {
-        router.replace("/kyc/level3-intro");
-        return;
-      }
-    }
-
-    const isLevel2Rejected =
-      !isLevel2Complete &&
-      (kycData?.ninStatus === "Rejected" ||
-        kycData?.faceStatus === "Rejected" ||
-        user?.kycStatus === "REJECTED" ||
-        user?.kycStatus === "rejected");
-
-    const isLevel2Pending =
-      !isLevel2Complete &&
-      !isLevel2Rejected &&
-      (user?.kycStatus === "PENDING" ||
-        user?.kycStatus === "pending" ||
-        Boolean(kycData?.faceImageUrl || kycData?.idImageUrl));
-
-    if (isLevel2Pending && step < 7) {
-      router.replace("/kyc/level2-intro");
-      return;
-    }
-
     const profilePayload: any = userProfileResponse?.data;
     const profileUser = profilePayload?.data || profilePayload || user;
 
@@ -304,6 +298,21 @@ export default function KYCLevel2Screen() {
     } catch (err: any) {
       console.log("\n❌ [STEP 1: SUBMIT LEVEL 2 INFO ERROR]:", JSON.stringify(err, null, 2));
       console.log("===================================================================\n");
+      const errMsg = (err?.data?.message || err?.message || "").toLowerCase();
+      // If BVN was already submitted or info exists from a prior attempt, advance to Step 2 so user can upload ID and Face
+      if (
+        errMsg.includes("already") ||
+        errMsg.includes("exist") ||
+        errMsg.includes("bvn") ||
+        Boolean(user?.bvn)
+      ) {
+        setScannedData((prev) => ({
+          ...prev,
+          firstName: `${formData.firstName} ${formData.lastName}`.trim(),
+          dateOfBirth: formData.dateOfBirth,
+        }));
+        setStep(2);
+      }
     }
   };
 
@@ -374,17 +383,70 @@ export default function KYCLevel2Screen() {
 
   // Step 6 Submission
   const handleStep6Continue = async () => {
+    setLocalError(null);
     try {
+      let uploadedSelfieUrl: string | undefined;
+      if (capturedSelfie) {
+        try {
+          console.log("[KYC 2 - STEP 6]: Optimizing and uploading face selfie to cloud storage...");
+          let selfieUriToUpload = capturedSelfie;
+          try {
+            const optimizedSelfie = await manipulateAsync(
+              capturedSelfie,
+              [{ resize: { width: 480 } }],
+              { compress: 0.4, format: SaveFormat.JPEG }
+            );
+            if (optimizedSelfie?.uri) {
+              selfieUriToUpload = optimizedSelfie.uri;
+            }
+          } catch (optErr) {
+            console.log("Selfie cloud optimization fallback:", optErr);
+          }
+
+          uploadedSelfieUrl = await uploadImage(selfieUriToUpload, {
+            name: "face_selfie.jpg",
+            allowFallback: false,
+          });
+          console.log("[KYC 2 - STEP 6]: Face selfie uploaded successfully:", uploadedSelfieUrl);
+        } catch (uploadErr) {
+          console.warn("[KYC 2 - STEP 6]: Cloud selfie upload warning (continuing with biometric verify):", uploadErr);
+        }
+      }
+
+      // Ensure base64 string is cleaned and ultra-lightweight (< 30KB) to prevent HTTP 413 Payload Too Large
+      let safeBase64 = capturedSelfieBase64 || "";
+      if (safeBase64.includes(",")) {
+        safeBase64 = safeBase64.split(",")[1];
+      }
+
+      // If safeBase64 is missing or oversized (> 60,000 chars ~ 45KB), re-compress to 280px / 0.2 quality
+      if (capturedSelfie && (!safeBase64 || safeBase64.length > 60000)) {
+        try {
+          const recompressed = await manipulateAsync(
+            capturedSelfie,
+            [{ resize: { width: 280 } }],
+            { compress: 0.2, format: SaveFormat.JPEG, base64: true }
+          );
+          if (recompressed?.base64) {
+            safeBase64 = recompressed.base64;
+          }
+        } catch (recompErr) {
+          console.log("[KYC 2] Safe base64 recompression:", recompErr);
+        }
+      }
+
       const sessionId = `session_${Date.now()}`;
-      const payload = {
+      const payload: any = {
         biometricSessionId: sessionId,
-        imageBase64: capturedSelfieBase64 || "mock_base64_string",
+        imageBase64: safeBase64 || "mock_base64_string",
+        ...(uploadedSelfieUrl ? { faceImageUrl: uploadedSelfieUrl, imageUrl: uploadedSelfieUrl } : {}),
       };
 
       console.log("\n================ [KYC 2 - STEP 6: FACE VERIFY REQUEST] ================");
       console.log("Endpoint: POST /kyc/level-2/face-verify");
       console.log("biometricSessionId:", sessionId);
-      console.log("imageBase64 length:", capturedSelfieBase64?.length || 0);
+      console.log("imageBase64 length:", safeBase64?.length || 0);
+      if (uploadedSelfieUrl) console.log("faceImageUrl:", uploadedSelfieUrl);
       console.log("=======================================================================\n");
 
       const response = await faceVerify(payload).unwrap();
@@ -393,18 +455,22 @@ export default function KYCLevel2Screen() {
       console.log("Response from server:", JSON.stringify(response, null, 2));
       console.log("========================================================================\n");
 
-      dispatch(updateKycLevel(2));
-      AsyncStorage.setItem("@wealth_kyc_level_2_completed", "true").catch(() => {});
       setStep(7);
     } catch (err: any) {
       console.log("\n❌ [KYC 2 - STEP 6: FACE VERIFY ERROR]:", err);
       console.log("=======================================================================\n");
+      const errMessage =
+        err?.data?.message ||
+        err?.message ||
+        (err?.status === 413 ? "Photo file was too large. Please retake photo." : "Face verification failed. Please try again.");
+      setLocalError(errMessage);
     }
   };
 
   const handleFinishAll = () => {
-    dispatch(updateKycLevel(2));
-    AsyncStorage.setItem("@wealth_kyc_level_2_completed", "true").catch(() => {});
+    if (user?.kycStatus === "VERIFIED" || (user?.kycLevel && user.kycLevel >= 2)) {
+      dispatch(updateKycLevel(2));
+    }
     router.replace("/(tabs)");
   };
 
@@ -428,6 +494,33 @@ export default function KYCLevel2Screen() {
         style={step === 5 || step === 6 ? "light" : "dark"}
         translucent={true}
       />
+
+      {isLevel2Rejected && specificRejectionReason && step !== 5 && (
+        <View
+          style={{
+            marginHorizontal: 20,
+            marginTop: 8,
+            marginBottom: 4,
+            padding: 12,
+            backgroundColor: "#FEF2F2",
+            borderColor: "#FECACA",
+            borderWidth: 1,
+            borderRadius: 16,
+            flexDirection: "row",
+            alignItems: "flex-start",
+          }}
+        >
+          <Ionicons name="alert-circle" size={20} color="#DC2626" style={{ marginTop: 1 }} />
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#991B1B" }}>
+              Re-submission Notice
+            </Text>
+            <Text style={{ fontSize: 12, color: "#B91C1C", marginTop: 2, lineHeight: 16 }}>
+              {specificRejectionReason}
+            </Text>
+          </View>
+        </View>
+      )}
 
       {step === 1 && (
         <Step1PersonalData
@@ -457,7 +550,11 @@ export default function KYCLevel2Screen() {
           onConfirm={handleStep3Confirm}
           onBack={handleBack}
           isLoading={isScanningId || isUploadingImage}
-          error={localError || formatErrorMessage(scanIdError)}
+          error={
+            localError ||
+            formatErrorMessage(scanIdError) ||
+            (isNinRejected && idReason ? `ID Issue: ${idReason}` : undefined)
+          }
         />
       )}
 
@@ -479,16 +576,23 @@ export default function KYCLevel2Screen() {
         <Step6FaceCompleted
           photoUri={capturedSelfie}
           onContinue={handleStep6Continue}
-          onRetake={() => setStep(5)}
-          isLoading={isVerifyingFace}
-          error={formatErrorMessage(faceVerifyError)}
+          onRetake={() => {
+            setLocalError(null);
+            setStep(5);
+          }}
+          isLoading={isVerifyingFace || isUploadingImage}
+          error={
+            localError ||
+            formatErrorMessage(faceVerifyError) ||
+            (isFaceRejected && faceReason ? `Face Issue: ${faceReason}` : undefined)
+          }
         />
       )}
 
       {step === 7 && (
         <Step7Congratulation
           onFinish={handleFinishAll}
-          isPending={false}
+          isPending={user?.kycStatus !== "VERIFIED" && (user?.kycLevel || 1) < 2}
         />
       )}
     </SafeAreaView>

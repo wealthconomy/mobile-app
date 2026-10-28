@@ -1,4 +1,4 @@
-import { updateKycLevel } from "../slices/authSlice";
+import { updateKycLevel, updateKycStatus, updateKycInfo } from "../slices/authSlice";
 import { baseApi, ApiResponse } from "./baseApi";
 
 export interface KycStatusResponse {
@@ -24,11 +24,15 @@ export interface ScanIdRequest {
 export interface FaceVerifyRequest {
   biometricSessionId: string;
   imageBase64: string;
+  faceImageUrl?: string;
+  imageUrl?: string;
 }
 
 export interface UploadLevel3DocsRequest {
   addressDocUrl: string;
-  passportUrl: string;
+  proofOfAddressUrl?: string;
+  utilityBillUrl?: string;
+  passportUrl?: string;
 }
 
 export interface KycDocumentsResponse {
@@ -76,11 +80,21 @@ export const kycApi = baseApi.injectEndpoints({
       async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          if (data?.data?.currentLevel !== undefined) {
-            dispatch(updateKycLevel(data.data.currentLevel));
+          console.log("\n================ [APP: GET /kyc/status RESPONSE] ================");
+          console.log(JSON.stringify(data, null, 2));
+          console.log("=================================================================\n");
+          const kycData = (data as any)?.data || data;
+          if (kycData) {
+            dispatch(
+              updateKycInfo({
+                level: kycData.currentLevel !== undefined ? kycData.currentLevel : kycData.kycLevel,
+                status: kycData.status || kycData.kycStatus,
+                rejectionReason: kycData.kycRejectionReason || kycData.rejectionReason,
+              })
+            );
           }
-        } catch {
-          // fetch failed
+        } catch (err: any) {
+          console.log("❌ [APP: GET /kyc/status FAILED]:", err?.error || err);
         }
       },
     }),
@@ -94,12 +108,20 @@ export const kycApi = baseApi.injectEndpoints({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          console.log("[kycApi:submitLevel2Info SUCCESS]:", data);
-          if (data?.data?.currentLevel !== undefined) {
-            dispatch(updateKycLevel(data.data.currentLevel));
+          console.log("\n================ [APP: POST /kyc/level-2/submit-info RESPONSE] ================");
+          console.log(JSON.stringify(data, null, 2));
+          console.log("===============================================================================\n");
+          const kycData = (data as any)?.data || data;
+          if (kycData) {
+            dispatch(
+              updateKycInfo({
+                level: kycData.currentLevel !== undefined ? kycData.currentLevel : kycData.kycLevel,
+                status: kycData.status || kycData.kycStatus,
+              })
+            );
           }
         } catch (err: any) {
-          console.log("[kycApi:submitLevel2Info FAILED]:", err?.error || err);
+          console.log("❌ [APP: POST /kyc/level-2/submit-info FAILED]:", err?.error || err);
         }
       },
     }),
@@ -113,12 +135,20 @@ export const kycApi = baseApi.injectEndpoints({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          console.log("[kycApi:scanId SUCCESS]:", data);
-          if (data?.data?.currentLevel !== undefined) {
-            dispatch(updateKycLevel(data.data.currentLevel));
+          console.log("\n================ [APP: POST /kyc/level-2/scan-id RESPONSE] ================");
+          console.log(JSON.stringify(data, null, 2));
+          console.log("===========================================================================\n");
+          const kycData = (data as any)?.data || data;
+          if (kycData) {
+            dispatch(
+              updateKycInfo({
+                level: kycData.currentLevel !== undefined ? kycData.currentLevel : kycData.kycLevel,
+                status: kycData.status || kycData.kycStatus,
+              })
+            );
           }
         } catch (err: any) {
-          console.log("[kycApi:scanId FAILED]:", err?.error || err);
+          console.log("❌ [APP: POST /kyc/level-2/scan-id FAILED]:", err?.error || err);
         }
       },
     }),
@@ -132,12 +162,20 @@ export const kycApi = baseApi.injectEndpoints({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          console.log("[kycApi:faceVerify SUCCESS]:", data);
-          if (data?.data?.currentLevel !== undefined) {
-            dispatch(updateKycLevel(data.data.currentLevel));
+          console.log("\n================ [APP: POST /kyc/level-2/face-verify RESPONSE] ================");
+          console.log(JSON.stringify(data, null, 2));
+          console.log("==============================================================================\n");
+          const kycData = (data as any)?.data || data;
+          if (kycData) {
+            dispatch(
+              updateKycInfo({
+                level: kycData.currentLevel !== undefined ? kycData.currentLevel : kycData.kycLevel,
+                status: kycData.status || kycData.kycStatus,
+              })
+            );
           }
         } catch (err: any) {
-          console.log("[kycApi:faceVerify FAILED]:", err?.error || err);
+          console.log("❌ [APP: POST /kyc/level-2/face-verify FAILED]:", err?.error || err);
         }
       },
     }),
@@ -145,17 +183,30 @@ export const kycApi = baseApi.injectEndpoints({
       query: (body) => ({
         url: "/kyc/level-3/upload-docs",
         method: "POST",
-        body,
+        body: {
+          ...body,
+          proofOfAddressUrl: body.addressDocUrl,
+          utilityBillUrl: body.addressDocUrl,
+        },
       }),
       invalidatesTags: ["Kyc", "User"],
       async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          if (data?.data?.currentLevel !== undefined) {
-            dispatch(updateKycLevel(data.data.currentLevel));
+          console.log("\n================ [APP: POST /kyc/level-3/upload-docs RESPONSE] ================");
+          console.log(JSON.stringify(data, null, 2));
+          console.log("==============================================================================\n");
+          const kycData = (data as any)?.data || data;
+          if (kycData) {
+            dispatch(
+              updateKycInfo({
+                level: kycData.currentLevel !== undefined ? kycData.currentLevel : kycData.kycLevel,
+                status: kycData.status || kycData.kycStatus,
+              })
+            );
           }
-        } catch {
-          // upload failed
+        } catch (err: any) {
+          console.log("❌ [APP: POST /kyc/level-3/upload-docs FAILED]:", err?.error || err);
         }
       },
     }),
@@ -165,18 +216,43 @@ export const kycApi = baseApi.injectEndpoints({
       async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          const kycDocsPayload: any = data?.data;
-          const kycDocs: any = kycDocsPayload?.data || kycDocsPayload;
-          const isL2 =
-            (kycDocs?.ninStatus === "Approved" && kycDocs?.faceStatus === "Approved") ||
-            (kycDocs?.faceVerified && (kycDocs?.ninProviderVerified || Boolean(kycDocs?.idNumber) || Boolean(kycDocs?.bvn))) ||
-            kycDocs?.faceVerified === true ||
-            kycDocs?.faceStatus === "Approved";
-          if (isL2) {
-            dispatch(updateKycLevel(2));
+          console.log("\n================ [APP: GET /kyc/documents RESPONSE] ================");
+          console.log(JSON.stringify(data, null, 2));
+          console.log("===================================================================\n");
+          const kycPayload: any = (data as any)?.data || data;
+          if (kycPayload) {
+            const ninUpper = (kycPayload.ninStatus || "").toUpperCase();
+            const faceUpper = (kycPayload.faceStatus || "").toUpperCase();
+            const kycStatusUpper = (kycPayload.kycStatus || "").toUpperCase();
+            const isRejected = ninUpper === "REJECTED" || faceUpper === "REJECTED" || kycStatusUpper === "REJECTED";
+            const isLevel2Approved = ninUpper === "APPROVED" && faceUpper === "APPROVED";
+
+            if (isRejected) {
+              const idReason = ninUpper === "REJECTED" ? (kycPayload.ninRejectionReason || kycPayload.rejectionReason) : null;
+              const faceReason = faceUpper === "REJECTED" ? (kycPayload.faceRejectionReason || kycPayload.rejectionReason) : null;
+              const reason = (idReason && faceReason && idReason !== faceReason)
+                ? `ID: ${idReason} | Face: ${faceReason}`
+                : idReason || faceReason || kycPayload.kycRejectionReason || kycPayload.rejectionReason;
+
+              dispatch(
+                updateKycInfo({
+                  level: 1,
+                  status: "REJECTED",
+                  rejectionReason: reason,
+                })
+              );
+            } else if (isLevel2Approved) {
+              dispatch(
+                updateKycInfo({
+                  level: 2,
+                  status: "VERIFIED",
+                  rejectionReason: null,
+                })
+              );
+            }
           }
-        } catch {
-          // fetch failed
+        } catch (err: any) {
+          console.log("❌ [APP: GET /kyc/documents FAILED]:", err?.error || err);
         }
       },
     }),

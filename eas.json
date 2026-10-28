@@ -1,6 +1,6 @@
 {
   "cli": {
-    "version": ">= 10.0.0",
+    "version": ">= 18.10.0",
     "appVersionSource": "local"
   },
   "build": {
@@ -8,13 +8,15 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "APP_VARIANT": "development"
+        "APP_VARIANT": "development",
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "APP_VARIANT": "preview"
+        "APP_VARIANT": "preview",
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       },
       "ios": {
         "simulator": false
@@ -23,7 +25,8 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "APP_VARIANT": "production"
+        "APP_VARIANT": "production",
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       },
       "android": {
         "buildType": "app-bundle"

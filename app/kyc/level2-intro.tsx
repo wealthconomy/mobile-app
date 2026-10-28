@@ -16,8 +16,8 @@ const THEME_TEAL = "#155D5F";
 export default function KYCLevel2Intro() {
   const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
-  const { data: kycDocsResponse } = useGetKycDocumentsQuery();
-  const { data: kycStatusResponse } = useGetKycStatusQuery();
+  const { data: kycDocsResponse } = useGetKycDocumentsQuery(undefined, { refetchOnMountOrArgChange: true });
+  const { data: kycStatusResponse } = useGetKycStatusQuery(undefined, { refetchOnMountOrArgChange: true });
 
   const kycDocsPayload: any = kycDocsResponse?.data;
   const kycDocs: any = kycDocsPayload?.data || kycDocsPayload;
@@ -25,24 +25,67 @@ export default function KYCLevel2Intro() {
   const currentLevel = kycStatusResponse?.data?.currentLevel ?? user?.kycLevel ?? 1;
   const kycStatus = kycStatusResponse?.data?.status ?? user?.kycStatus;
 
-  const isLevel2Complete =
-    currentLevel >= 2 ||
-    (kycDocs?.ninStatus === "Approved" && kycDocs?.faceStatus === "Approved") ||
-    (kycDocs?.faceVerified && (kycDocs?.ninProviderVerified || Boolean(kycDocs?.idNumber)));
+  const ninStatusUpper = (kycDocs?.ninStatus || "").toUpperCase();
+  const faceStatusUpper = (kycDocs?.faceStatus || "").toUpperCase();
+  const kycStatusUpper = (kycStatus || "").toUpperCase();
 
-  const isLevel2Rejected =
-    !isLevel2Complete &&
-    (kycDocs?.ninStatus === "Rejected" ||
-      kycDocs?.faceStatus === "Rejected" ||
-      kycStatus === "REJECTED" ||
-      kycStatus === "rejected");
+  const isNinRejected = ninStatusUpper === "REJECTED";
+  const isFaceRejected = faceStatusUpper === "REJECTED";
+  const isKycStatusRejected = kycStatusUpper === "REJECTED";
 
+  const isLevel2Rejected = isNinRejected || isFaceRejected || isKycStatusRejected;
+
+  const isLevel2Approved =
+    (ninStatusUpper === "APPROVED" && faceStatusUpper === "APPROVED") ||
+    kycStatusUpper === "VERIFIED";
+
+  const isLevel2Complete = !isLevel2Rejected && isLevel2Approved && currentLevel >= 2;
+
+  // Extract specific rejection reasons
+  const idReason = isNinRejected ? (kycDocs?.ninRejectionReason || kycDocs?.rejectionReason) : null;
+  const faceReason = isFaceRejected ? (kycDocs?.faceRejectionReason || kycDocs?.rejectionReason) : null;
+  const generalReason =
+    kycDocs?.rejectionReason ||
+    kycDocs?.ninRejectionReason ||
+    kycDocs?.faceRejectionReason ||
+    kycStatusResponse?.data?.kycRejectionReason ||
+    (kycStatusResponse?.data as any)?.reason ||
+    user?.kycRejectionReason ||
+    user?.rejectionReason ||
+    (user as any)?.reason;
+
+  const specificRejectionReason =
+    isNinRejected && isFaceRejected && idReason && faceReason && idReason !== faceReason
+      ? `ID: ${idReason} | Face: ${faceReason}`
+      : idReason || faceReason || generalReason;
+
+  const rejectionDetail =
+    isNinRejected && isFaceRejected
+      ? "ID Document & Face Selfie were both rejected"
+      : isNinRejected
+      ? "Government ID was rejected"
+      : isFaceRejected
+      ? "Live Face Selfie was rejected"
+      : "Level 2 Verification was rejected";
+
+  const hasIdUpload = Boolean(kycDocs?.idImageUrl || user?.idImageUrl);
+  const hasFaceUpload = Boolean(
+    kycDocs?.faceImageUrl ||
+    kycDocs?.selfieUrl ||
+    user?.faceImageUrl ||
+    user?.imageUrl ||
+    kycDocs?.faceVerified
+  );
+  const hasAllLevel2Data = hasIdUpload && hasFaceUpload;
+
+  // It is ONLY truly in review if the user has actually uploaded BOTH required documents!
   const isLevel2Pending =
     !isLevel2Complete &&
     !isLevel2Rejected &&
-    (kycStatus === "PENDING" ||
-      kycStatus === "pending" ||
-      Boolean(kycDocs?.faceImageUrl || kycDocs?.idImageUrl));
+    hasAllLevel2Data &&
+    (kycStatus === "PENDING" || kycStatus === "pending" || kycDocs?.ninStatus === "Pending" || kycDocs?.faceStatus === "Pending");
+
+  const isLevel2Incomplete = !isLevel2Complete && !isLevel2Rejected && !hasAllLevel2Data;
 
   const benefits = [
     {
@@ -122,7 +165,7 @@ export default function KYCLevel2Intro() {
             <View className="flex-row items-center mb-3">
               <CheckCircle2 size={18} color={THEME_TEAL} />
               <Text className="text-[#1A1A1A] ml-3 font-medium text-[14px]">
-                Government Issued ID Card
+                Government ID (NIN, Driver's License, or International Passport)
               </Text>
             </View>
             <View className="flex-row items-center">
@@ -157,19 +200,37 @@ export default function KYCLevel2Intro() {
                     Verification In Review ⏳
                   </Text>
                   <Text className="text-amber-800 text-[12px] mt-0.5 leading-[17px]">
-                    Your documents have been submitted and are currently being reviewed by compliance. You will be notified once verified.
+                    Your ID and live face selfie have been submitted and are currently being reviewed by compliance.
                   </Text>
                 </View>
               </View>
             ) : isLevel2Rejected ? (
-              <View className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-center">
-                <Ionicons name="alert-circle" size={24} color="#DC2626" />
+              <View className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-start">
+                <Ionicons name="alert-circle" size={24} color="#DC2626" style={{ marginTop: 2 }} />
                 <View className="flex-1 ml-3">
                   <Text className="text-red-900 font-bold text-[14px]">
-                    Action Required ⚠️
+                    {rejectionDetail} ⚠️
                   </Text>
-                  <Text className="text-red-800 text-[12px] mt-0.5 leading-[17px]">
-                    One or more of your identity credentials were rejected. Please review and re-submit.
+                  <Text className="text-red-800 text-[13px] mt-1 leading-[18px]">
+                    {specificRejectionReason
+                      ? `Reason: "${specificRejectionReason}". Please re-take with clearer framing and re-submit.`
+                      : "One or more of your identity credentials were rejected. Please review and re-submit your ID and face selfie."}
+                  </Text>
+                </View>
+              </View>
+            ) : isLevel2Incomplete && (kycStatus === "PENDING" || kycStatus === "pending" || hasIdUpload || hasFaceUpload) ? (
+              <View className="mb-4 bg-blue-50 border border-blue-200 rounded-2xl p-4 flex-row items-center">
+                <Ionicons name="information-circle" size={24} color="#2563EB" />
+                <View className="flex-1 ml-3">
+                  <Text className="text-blue-900 font-bold text-[14px]">
+                    Incomplete Verification
+                  </Text>
+                  <Text className="text-blue-800 text-[12px] mt-0.5 leading-[17px]">
+                    {!hasIdUpload && !hasFaceUpload
+                      ? "Government ID and live face scan are required to verify your identity. Tap below to upload both."
+                      : !hasIdUpload
+                      ? "Government ID photo is missing. Tap below to capture and submit your ID."
+                      : "Live face scan is missing. Tap below to complete your face scan."}
                   </Text>
                 </View>
               </View>
@@ -179,10 +240,12 @@ export default function KYCLevel2Intro() {
               title={
                 isLevel2Complete
                   ? "Proceed to Level 3 Address"
-                  : isLevel2Pending
-                  ? "Verification Under Review"
                   : isLevel2Rejected
-                  ? "Re-submit Verification"
+                  ? "Re-submit Level 2 Verification"
+                  : isLevel2Pending
+                  ? "Re-take / Re-submit Verification"
+                  : isLevel2Incomplete && (kycStatus === "PENDING" || kycStatus === "pending")
+                  ? "Continue & Upload Required Documents"
                   : "Start Verification"
               }
               onPress={() => {
@@ -190,17 +253,10 @@ export default function KYCLevel2Intro() {
                   router.replace("/kyc/level3-intro");
                   return;
                 }
-                if (isLevel2Pending) {
-                  Alert.alert(
-                    "Verification In Review ⏳",
-                    "Your identity documents are currently under review by compliance. You cannot re-submit while review is in progress."
-                  );
-                  return;
-                }
                 router.push("/kyc/level2");
               }}
               style={{
-                backgroundColor: isLevel2Pending ? "#94A3B8" : THEME_TEAL,
+                backgroundColor: isLevel2Rejected ? "#DC2626" : THEME_TEAL,
                 height: 60,
                 borderRadius: 20,
               }}

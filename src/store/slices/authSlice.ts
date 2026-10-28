@@ -99,6 +99,10 @@ const authSlice = createSlice({
         u.kycLevel = state.user.kycLevel;
       }
       state.user = u;
+      if (state.user?.kycStatus === "VERIFIED" || state.user?.kycVerified) {
+        state.user.kycRejectionReason = null;
+        state.user.rejectionReason = null;
+      }
       state.token = action.payload.token;
       if (action.payload.refreshToken) {
         state.refreshToken = action.payload.refreshToken;
@@ -141,6 +145,44 @@ const authSlice = createSlice({
         AsyncStorage.setItem("@wealth_kyc_level_2_completed", "true").catch(() => {});
       }
     },
+    updateKycStatus: (state, action: PayloadAction<string>) => {
+      if (state.user) {
+        state.user.kycStatus = action.payload;
+        if (action.payload === "VERIFIED") {
+          state.user.kycVerified = true;
+          state.user.kycRejectionReason = null;
+          state.user.rejectionReason = null;
+        } else if (action.payload === "REJECTED") {
+          state.user.kycVerified = false;
+        }
+        saveAuthToStorage(state);
+      }
+    },
+    updateKycInfo: (
+      state,
+      action: PayloadAction<{ level?: number; status?: string; rejectionReason?: string | null }>
+    ) => {
+      if (state.user) {
+        if (action.payload.level !== undefined) {
+          state.user.kycLevel = action.payload.level;
+        }
+        if (action.payload.status !== undefined) {
+          state.user.kycStatus = action.payload.status;
+          if (action.payload.status === "VERIFIED") {
+            state.user.kycVerified = true;
+            state.user.kycRejectionReason = null;
+            state.user.rejectionReason = null;
+          } else if (action.payload.status === "REJECTED") {
+            state.user.kycVerified = false;
+          }
+        }
+        if (action.payload.rejectionReason !== undefined) {
+          state.user.kycRejectionReason = action.payload.rejectionReason || null;
+          state.user.rejectionReason = action.payload.rejectionReason || null;
+        }
+        saveAuthToStorage(state);
+      }
+    },
     resetKycLevel: (state) => {
       if (state.user) {
         state.user.kycLevel = 1;
@@ -177,7 +219,14 @@ const authSlice = createSlice({
     builder.addCase(loadAuthFromStorage.fulfilled, (state, action) => {
       state.isLoading = false;
       if (action.payload) {
-        if (action.payload.user) state.user = action.payload.user;
+        if (action.payload.user) {
+          state.user = action.payload.user;
+          // Clear any stale rejection reason if user is already verified
+          if (state.user?.kycStatus === "VERIFIED" || state.user?.kycVerified) {
+            state.user.kycRejectionReason = null;
+            state.user.rejectionReason = null;
+          }
+        }
         if (action.payload.token) {
           state.token = action.payload.token;
           state.isAuthenticated = Boolean(action.payload.isAuthenticated ?? true);
@@ -202,6 +251,8 @@ export const {
   setLoading,
   completeOnboarding,
   updateKycLevel,
+  updateKycStatus,
+  updateKycInfo,
   resetKycLevel,
   setHasTransactionPin,
   setHasAppPasscode,
