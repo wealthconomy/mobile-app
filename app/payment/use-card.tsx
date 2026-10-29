@@ -31,13 +31,6 @@ export default function UseCardScreen() {
   const { data: mandatesData, refetch: refetchMandates } = useListMyMandatesQuery();
   const [verifying, setVerifying] = useState(false);
 
-  useEffect(() => {
-    if (mandatesData) {
-      console.log("=== LINKED MANDATES DATA ===");
-      console.log(JSON.stringify(mandatesData, null, 2));
-    }
-  }, [mandatesData]);
-
   const handleConfirm = async () => {
     if (!email) {
       Alert.alert("Error", "Please provide a valid email address.");
@@ -74,17 +67,15 @@ export default function UseCardScreen() {
           let verified = false;
           for (let i = 0; i < 5; i++) {
             try {
-              console.log(`Checking card linking status (Attempt ${i + 1}/5)...`);
               const verifyRes = await verifyPayment(paymentRef).unwrap();
-              console.log("Card verify response:", JSON.stringify(verifyRes, null, 2));
 
               const status = verifyRes?.data?.status;
               if (status === "SUCCESSFUL" || status === "SUCCEEDED") {
                 verified = true;
                 break;
               }
-            } catch (e) {
-              console.warn(`Card verification attempt ${i + 1} failed:`, e);
+            } catch {
+              console.warn(`Card verification attempt ${i + 1} failed`);
             }
             // Wait 2.5 seconds before retrying
             await new Promise((resolve) => setTimeout(resolve, 2500));
@@ -94,8 +85,8 @@ export default function UseCardScreen() {
           if (verified) {
             try {
               refetchMandates();
-            } catch (e) {
-              console.warn("Failed to refetch mandates:", e);
+            } catch {
+              console.warn("Failed to refetch mandates");
             }
             setShowSuccess(true);
           } else {
@@ -111,7 +102,7 @@ export default function UseCardScreen() {
         throw new Error("Checkout URL not found in API response.");
       }
     } catch (err: any) {
-      console.error("Link mandate error:", err);
+      console.error("Link mandate error");
       Alert.alert("Error", err?.data?.message || err?.message || "Failed to link payment method.");
     }
   };

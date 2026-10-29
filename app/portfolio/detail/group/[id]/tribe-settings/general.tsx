@@ -89,8 +89,8 @@ export default function GeneralSettingsScreen() {
         } else if (coverImage.startsWith("file://") || coverImage.startsWith("content://")) {
           try {
             uploadedCoverUrl = await uploadImage(coverImage, { allowFallback: false });
-          } catch (e) {
-            console.warn("Image upload failed in settings:", e);
+          } catch {
+            console.warn("Image upload failed in settings");
             uploadedCoverUrl = undefined;
           }
         }

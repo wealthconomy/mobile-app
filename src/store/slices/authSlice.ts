@@ -31,8 +31,8 @@ const saveAuthToStorage = async (state: AuthState) => {
       hasCompletedOnboarding: state.hasCompletedOnboarding,
     };
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
-  } catch (error) {
-    console.error("Error saving auth to storage:", error);
+  } catch {
+    console.error("Error saving auth to storage");
   }
 };
 
@@ -63,8 +63,8 @@ export const loadAuthFromStorage = createAsyncThunk(
         }
         return parsed;
       }
-    } catch (error) {
-      console.error("Error loading auth from storage:", error);
+    } catch {
+      console.error("Error loading auth from storage");
     }
     return null;
   }

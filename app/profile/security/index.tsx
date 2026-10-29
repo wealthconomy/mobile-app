@@ -99,32 +99,6 @@ export default function SecurityScreen() {
   const isLevel3Rejected = checkIsLevel3Rejected(kycDocs, user);
   const isLevel3Pending = checkIsLevel3Pending(kycDocs, user);
 
-  useEffect(() => {
-    console.log("\n================ [APP: SECURITY SCREEN KYC SNAPSHOT] ================");
-    console.log("Redux User Object:", {
-      id: user?.id,
-      name: `${user?.firstName || ""} ${user?.lastName || ""}`,
-      kycLevel: user?.kycLevel,
-      kycStatus: user?.kycStatus,
-      kycVerified: user?.kycVerified,
-      rejectionReason: user?.kycRejectionReason,
-    });
-    console.log("Calculated UI Levels:", {
-      currentLevel,
-      kycStatus,
-      isLevel2Verified,
-      isLevel2Pending,
-      isLevel2Incomplete,
-      hasAllLevel2Data,
-      isLevel3Verified,
-      isLevel3Pending,
-      isLevel3Rejected,
-    });
-    console.log("Raw Server /kyc/status:", kycData);
-    console.log("Raw Server /kyc/documents:", kycDocsResponse);
-    console.log("======================================================================\n");
-  }, [user, currentLevel, kycStatus, isLevel2Verified, isLevel3Verified, isLevel2Pending, isLevel2Incomplete, hasAllLevel2Data, kycData, kycDocsResponse]);
-
   const handleDeleteAccount = async () => {
     try {
       await deleteAccount().unwrap();
@@ -133,7 +107,7 @@ export default function SecurityScreen() {
       Alert.alert("Account Deleted", "Your account has been permanently deleted.");
       router.replace("/(auth)/login");
     } catch (err: any) {
-      console.error("Failed to delete account:", err);
+      console.error("Failed to delete account");
       const msg = err?.data?.message || err?.message || "Failed to delete account. Please try again.";
       Alert.alert("Error", msg);
     }

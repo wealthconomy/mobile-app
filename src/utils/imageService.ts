@@ -50,8 +50,7 @@ export const imageService = {
         width: asset.width,
         height: asset.height,
       };
-    } catch (error) {
-      console.log("Error picking image from library:", error);
+    } catch {
       Alert.alert("Error", "Could not pick image from library.");
       return null;
     } finally {
@@ -96,8 +95,7 @@ export const imageService = {
         width: asset.width,
         height: asset.height,
       };
-    } catch (error) {
-      console.log("Error capturing image with camera:", error);
+    } catch {
       Alert.alert("Error", "Could not take photo with camera.");
       return null;
     } finally {
@@ -119,8 +117,7 @@ export const imageService = {
         encoding: "base64" as any,
       });
       return base64String;
-    } catch (error) {
-      console.log("Error converting image to base64:", error);
+    } catch {
       return null;
     }
   },

@@ -163,9 +163,7 @@ export default function CreateFlowScreen() {
     setIsSubmitting(true);
 
     try {
-      console.log("🏎️ [WealthFlow Create] Verifying PIN...");
       await verifyPin({ pin: enteredPin }).unwrap();
-      console.log("✅ [WealthFlow Create] PIN verified successfully");
 
       const targetAmountKobo = Math.round((parseFloat(targetAmount.replace(/,/g, "")) || 0) * 100);
       const initialDepositKobo = Math.round((parseFloat(initialDeposit.replace(/,/g, "")) || 100) * 100);
@@ -188,17 +186,14 @@ export default function CreateFlowScreen() {
         },
       };
 
-      console.log("🏎️ [WealthFlow Create Request] POST /api/v1/portfolios/wealthflow with payload:\n", JSON.stringify(payload, null, 2));
-
-      const res = await createPortfolio({
+      await createPortfolio({
         type: "wealthflow",
         body: payload,
       }).unwrap();
 
-      console.log("✅ [WealthFlow Create Success] Received response:\n", JSON.stringify(res, null, 2));
       setStep("success");
     } catch (err: any) {
-      console.error("❌ [WealthFlow Create Error] Failed to create portfolio:\n", JSON.stringify(err, null, 2));
+      console.error("[WealthFlow Create Error] Failed to create portfolio");
       const message =
         err?.data?.message ||
         err?.message ||

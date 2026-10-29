@@ -120,8 +120,8 @@ export default function GroupNotificationsScreen() {
     if (!item.isRead) {
       try {
         await markRead({ id: item.id }).unwrap();
-      } catch (error) {
-        console.error("Failed to mark notification read:", error);
+      } catch {
+        console.error("Failed to mark notification read");
       }
     }
   };

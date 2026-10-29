@@ -1138,8 +1138,8 @@ export default function TribeMembersScreen() {
         message: `Join our Wealth Group on Wealthconomy! Group ID: ${id}\nhttps://wealthconomy.org/invite`,
         url: "https://wealthconomy.org/invite",
       });
-    } catch (error) {
-      console.error(error);
+    } catch {
+      console.error("Failed to share group invite");
     }
   };
 

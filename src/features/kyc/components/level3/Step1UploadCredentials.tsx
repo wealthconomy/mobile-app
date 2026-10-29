@@ -136,8 +136,8 @@ export const Step1UploadCredentials: React.FC<Props> = ({
         setProofOfAddress(result.assets[0].uri, result.assets[0].name);
         setTouched((prev) => ({ ...prev, proofOfAddress: true }));
       }
-    } catch (err) {
-      console.log("Error picking proof of address:", err);
+    } catch {
+      // Document picker cancelled or failed
     } finally {
       suspendAppLock(false);
     }

@@ -322,9 +322,7 @@ export default function FlowDetailScreen() {
         pin: actionPin,
       };
 
-      console.log(`🏎️ [WealthFlow Withdraw Request] POST /api/v1/portfolios/${plan.id}/withdraw-to-wallet:`, payload);
-      const res = await withdrawToWallet({ id: plan.id, type: "wealthflow", body: payload }).unwrap();
-      console.log("✅ [WealthFlow Withdraw Success] Response:", res);
+      await withdrawToWallet({ id: plan.id, type: "wealthflow", body: payload }).unwrap();
 
       Alert.alert("Withdrawal Successful", `Successfully transferred ₦${num.toLocaleString()} to your main wallet.`);
       setShowWithdrawModal(false);
@@ -332,7 +330,7 @@ export default function FlowDetailScreen() {
       setActionPin("");
       refetchFlow();
     } catch (err: any) {
-      console.error("❌ [WealthFlow Withdraw Error]:", err);
+      console.error("[WealthFlow Withdraw Error] Failed to withdraw");
       const message = err?.data?.message || err?.message || "Failed to withdraw funds. Please check your PIN and balance.";
       Alert.alert("Withdrawal Failed", message);
     } finally {
@@ -348,16 +346,14 @@ export default function FlowDetailScreen() {
 
     setIsProcessing(true);
     try {
-      console.log(`🏎️ [WealthFlow Terminate Request] POST /api/v1/portfolios/${plan.id}/terminate`);
-      const res = await terminatePortfolio({ id: plan.id, body: { pin: actionPin } }).unwrap();
-      console.log("✅ [WealthFlow Terminate Success] Response:", res);
+      await terminatePortfolio({ id: plan.id, body: { pin: actionPin } }).unwrap();
 
       Alert.alert("Portfolio Terminated", "Your WealthFlow plan has been closed and funds returned to your wallet.");
       setShowTerminateModal(false);
       setActionPin("");
       router.replace("/(tabs)/portfolios/wealth-flow");
     } catch (err: any) {
-      console.error("❌ [WealthFlow Terminate Error]:", err);
+      console.error("[WealthFlow Terminate Error] Failed to terminate");
       const message = err?.data?.message || err?.message || "Failed to terminate portfolio. Please verify your PIN.";
       Alert.alert("Termination Failed", message);
     } finally {

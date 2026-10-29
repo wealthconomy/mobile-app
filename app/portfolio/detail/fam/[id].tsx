@@ -319,9 +319,7 @@ export default function FamilyGoalDetailScreen() {
         pin: actionPin,
       };
 
-      console.log(`👨‍👩‍👧 [WealthFam Withdraw Request] POST /api/v1/portfolios/${plan.id}/withdraw-to-wallet:`, payload);
-      const res = await withdrawToWallet({ id: plan.id, type: "wealthfam", body: payload }).unwrap();
-      console.log("✅ [WealthFam Withdraw Success] Response:", res);
+      await withdrawToWallet({ id: plan.id, type: "wealthfam", body: payload }).unwrap();
 
       Alert.alert("Withdrawal Successful", `Successfully transferred ₦${num.toLocaleString()} to your main wallet.`);
       setShowWithdrawModal(false);
@@ -329,7 +327,7 @@ export default function FamilyGoalDetailScreen() {
       setActionPin("");
       refetchFam();
     } catch (err: any) {
-      console.error("❌ [WealthFam Withdraw Error]:", err);
+      console.error("[WealthFam Withdraw Error] Failed to withdraw");
       const message = err?.data?.message || err?.message || "Failed to withdraw funds. Please check your PIN and balance.";
       Alert.alert("Withdrawal Failed", message);
     } finally {
@@ -345,16 +343,14 @@ export default function FamilyGoalDetailScreen() {
 
     setIsProcessing(true);
     try {
-      console.log(`👨‍👩‍👧 [WealthFam Terminate Request] POST /api/v1/portfolios/${plan.id}/terminate`);
-      const res = await terminatePortfolio({ id: plan.id, body: { pin: actionPin } }).unwrap();
-      console.log("✅ [WealthFam Terminate Success] Response:", res);
+      await terminatePortfolio({ id: plan.id, body: { pin: actionPin } }).unwrap();
 
       Alert.alert("Portfolio Terminated", "Your WealthFam plan has been closed and funds returned to your wallet.");
       setShowTerminateModal(false);
       setActionPin("");
       router.replace("/(tabs)/portfolios/wealth-fam");
     } catch (err: any) {
-      console.error("❌ [WealthFam Terminate Error]:", err);
+      console.error("[WealthFam Terminate Error] Failed to terminate");
       const message = err?.data?.message || err?.message || "Failed to terminate portfolio. Please verify your PIN.";
       Alert.alert("Termination Failed", message);
     } finally {

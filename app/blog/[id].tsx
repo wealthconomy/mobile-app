@@ -78,7 +78,7 @@ export default function BlogDetailScreen() {
       AsyncStorage.setItem(
         `@wealthconomy_blog_shares_${blogId}`,
         String(nextCount)
-      ).catch((err) => console.warn("Failed to persist share count:", err));
+      ).catch(() => console.warn("Failed to persist share count"));
 
       await Share.share(
         Platform.OS === "ios"
@@ -95,8 +95,8 @@ export default function BlogDetailScreen() {
           dialogTitle: `Share "${blog.title}"`,
         }
       );
-    } catch (error) {
-      console.error("Error sharing:", error);
+    } catch {
+      console.error("Error sharing");
     }
   };
 
@@ -125,8 +125,8 @@ export default function BlogDetailScreen() {
           await sound.unloadAsync();
         }
       });
-    } catch (error) {
-      console.log("Error playing sound:", error);
+    } catch {
+      // Audio playback failed silently
     }
     toggleLike(id as string);
   };

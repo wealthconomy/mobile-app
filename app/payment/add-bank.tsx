@@ -51,23 +51,15 @@ export default function AddBankScreen() {
             accountNumber,
             bankCode: selectedBank.code,
           };
-          console.log("=== API REQUEST ===");
-          console.log("Endpoint: POST /api/v1/payout-accounts/resolve");
-          console.log("Payload:", JSON.stringify(payload, null, 2));
           
           const res = await resolveAccount(payload).unwrap();
-          
-          console.log("=== API RESPONSE ===");
-          console.log("Success:", JSON.stringify(res, null, 2));
           
           if (isMounted) {
             setUserName(res.accountName);
             setResolveError(null);
           }
         } catch (error: any) {
-          console.log("=== API ERROR ===");
-          console.log("Error:", JSON.stringify(error, null, 2));
-          console.warn("Bank verification failed:", error);
+          console.warn("Bank verification failed");
           if (isMounted) {
             setUserName("");
             setResolveError(
@@ -104,7 +96,7 @@ export default function AddBankScreen() {
       Alert.alert("Success", "Bank account added successfully!");
       router.back();
     } catch (err: any) {
-      console.error("Failed to add payout account:", err);
+      console.error("Failed to add payout account");
       Alert.alert("Error", err?.data?.message || err?.message || "Failed to add bank account");
     }
   };

@@ -83,28 +83,16 @@ export function useImageUpload() {
           } else {
             formData.append("file", cleanUri);
           }
-        } catch (webBlobErr) {
-          console.warn("[useImageUpload:web] Could not fetch Blob from URI, fallback to raw:", webBlobErr);
+        } catch {
+          console.warn("[useImageUpload:web] Could not fetch Blob from URI, fallback to raw");
           formData.append("file", cleanUri);
         }
       } else {
         formData.append("file", fileObject as any);
-        if (Platform.OS === "android") {
-          console.log(`[useImageUpload][android] 🚀 Initiating upload with file object:`, JSON.stringify(fileObject, null, 2));
-        }
       }
 
       try {
         const uploadRes: any = await uploadFileMutation(fileObject).unwrap();
-
-        // Log immediately after upload resolves on Android
-        if (Platform.OS === "android") {
-          console.log(`[useImageUpload][android] ✅ Upload resolved:`, {
-            platform: Platform.OS,
-            fileObject,
-            rawResponse: uploadRes,
-          });
-        }
 
         const cloudUrl =
           (typeof uploadRes === "string" && uploadRes.startsWith("http") ? uploadRes : null) ||
@@ -118,28 +106,16 @@ export function useImageUpload() {
           uploadRes?.secure_url;
 
         if (cloudUrl) {
-          console.log("✅ [useImageUpload] Image uploaded successfully:", cloudUrl);
           return cloudUrl;
         }
 
         if (allowFallback) {
-          console.log("Upload response did not contain URL, falling back to local URI:", uploadRes);
           return uri;
         }
         throw new Error("Upload response missing cloud URL.");
       } catch (err: any) {
-        // Log first attempt warning on Android (warn instead of error to prevent dev redbox when fallback succeeds)
-        if (Platform.OS === "android") {
-          console.warn(`[useImageUpload][android] ⚠️ First upload attempt rejected:`, {
-            platform: Platform.OS,
-            fileObject,
-            rawError: err?.data || err?.message || err,
-          });
-        }
-
         // Native FileSystem.uploadAsync fallback on Android if JS FormData bridge encountered ENOENT
         if (Platform.OS === "android") {
-          console.log("[useImageUpload][android] Attempting native FileSystem.uploadAsync fallback...");
           try {
             const fsUploadRes = await FileSystem.uploadAsync(
               `${process.env.EXPO_PUBLIC_API_URL}/file/upload?multiSizes=false`,
@@ -153,8 +129,6 @@ export function useImageUpload() {
               }
             );
 
-            console.log(`[useImageUpload][android] FileSystem.uploadAsync resolved with status ${fsUploadRes.status}:`, fsUploadRes.body);
-
             if (fsUploadRes.status >= 200 && fsUploadRes.status < 300) {
               const parsed = JSON.parse(fsUploadRes.body);
               const cloudUrl =
@@ -163,16 +137,15 @@ export function useImageUpload() {
                 (typeof parsed?.data === "string" ? parsed.data : null);
 
               if (cloudUrl) {
-                console.log("✅ [useImageUpload][android] Native FileSystem.uploadAsync succeeded:", cloudUrl);
                 return cloudUrl;
               }
             }
-          } catch (fsErr) {
-            console.error("❌ [useImageUpload][android] FileSystem.uploadAsync fallback failed:", fsErr);
+          } catch {
+            console.error("[useImageUpload][android] FileSystem.uploadAsync fallback failed");
           }
         }
 
-        console.error("❌ [useImageUpload] Image upload failed on all attempts:", err);
+        console.error("[useImageUpload] Image upload failed on all attempts");
         if (allowFallback) {
           console.warn("Falling back to local URI for testing/dev mode.");
           return uri;

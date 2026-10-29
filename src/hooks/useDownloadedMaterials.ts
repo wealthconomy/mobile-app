@@ -93,8 +93,8 @@ export function useDownloadedMaterials() {
         }
         await AsyncStorage.setItem(storageKey, JSON.stringify(toSave));
       }
-    } catch (err) {
-      console.warn("[useDownloadedMaterials] Error loading downloads:", err);
+    } catch {
+      console.warn("[useDownloadedMaterials] Error loading downloads");
       setDownloads({});
     } finally {
       setIsLoaded(true);
@@ -186,8 +186,8 @@ export function useDownloadedMaterials() {
 
       try {
         await AsyncStorage.setItem(storageKey, JSON.stringify(toSave));
-      } catch (err) {
-        console.warn("[useDownloadedMaterials] Error persisting download:", err);
+      } catch {
+        console.warn("[useDownloadedMaterials] Error persisting download");
       }
     },
     [downloads, storageKey]
@@ -213,8 +213,8 @@ export function useDownloadedMaterials() {
 
       try {
         await AsyncStorage.setItem(storageKey, JSON.stringify(toSave));
-      } catch (err) {
-        console.warn("[useDownloadedMaterials] Error removing download:", err);
+      } catch {
+        console.warn("[useDownloadedMaterials] Error removing download");
       }
     },
     [downloads, storageKey]

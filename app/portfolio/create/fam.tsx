@@ -164,9 +164,7 @@ export default function CreateFamScreen() {
     setIsSubmitting(true);
 
     try {
-      console.log("👨‍👩‍👧 [WealthFam Create] Verifying PIN...");
       await verifyPin({ pin: enteredPin }).unwrap();
-      console.log("✅ [WealthFam Create] PIN verified successfully");
 
       const targetAmountKobo = Math.round((parseFloat(targetAmount.replace(/,/g, "")) || 0) * 100);
       const initialDepositKobo = Math.round((parseFloat(initialDeposit.replace(/,/g, "")) || 100) * 100);
@@ -195,17 +193,14 @@ export default function CreateFamScreen() {
         },
       };
 
-      console.log("👨‍👩‍👧 [WealthFam Create Request] POST /api/v1/portfolios/wealthfam with payload:\n", JSON.stringify(payload, null, 2));
-
-      const res = await createPortfolio({
+      await createPortfolio({
         type: "wealthfam",
         body: payload,
       }).unwrap();
 
-      console.log("✅ [WealthFam Create Success] Received response:\n", JSON.stringify(res, null, 2));
       setStep("success");
     } catch (err: any) {
-      console.error("❌ [WealthFam Create Error] Failed to create portfolio:\n", JSON.stringify(err, null, 2));
+      console.error("[WealthFam Create Error] Failed to create portfolio");
       const message =
         err?.data?.message ||
         err?.message ||

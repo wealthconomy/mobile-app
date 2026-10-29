@@ -116,8 +116,8 @@ export async function sniffExtension(
     }
 
     return null;
-  } catch (err) {
-    console.warn("[documentFile] Error sniffing extension:", err);
+  } catch {
+    console.warn("[documentFile] Error sniffing extension");
     return null;
   }
 }
@@ -305,8 +305,8 @@ export async function downloadAndShareDocument(
     if (material.id && options?.onRecordDownload) {
       try {
         options.onRecordDownload(material.id);
-      } catch (err) {
-        console.warn("[documentFile] Failed to record download:", err);
+      } catch {
+        console.warn("[documentFile] Failed to record download");
       }
     }
 
@@ -332,8 +332,8 @@ export async function downloadAndShareDocument(
           UTI: utiFor(detectedExt),
           dialogTitle: `Open ${material.title || "Document"}`,
         });
-      } catch (shareErr) {
-        console.error("[documentFile] Share error:", shareErr);
+      } catch {
+        console.error("[documentFile] Share error");
         Alert.alert(
           "Unable to Open Document",
           "Could not open or share the downloaded file."
@@ -354,8 +354,8 @@ export async function downloadAndShareDocument(
       ext: detectedExt,
       documentUrl: material.documentUrl,
     };
-  } catch (error) {
-    console.error("[documentFile] Download error:", error);
+  } catch {
+    console.error("[documentFile] Download error");
     Alert.alert(
       "Download Failed",
       "Something went wrong while downloading the file. Please check your connection and try again."
@@ -405,8 +405,8 @@ export async function openDownloadedDocument(
           UTI: utiFor(info.ext),
           dialogTitle: `Open ${title || "Document"}`,
         });
-      } catch (shareErr) {
-        console.error("[documentFile] Share error:", shareErr);
+      } catch {
+        console.error("[documentFile] Share error");
         Alert.alert(
           "Unable to Open Document",
           "Could not open or share the downloaded file."
@@ -421,8 +421,8 @@ export async function openDownloadedDocument(
       );
     }
     return true;
-  } catch (error) {
-    console.error("[documentFile] Error opening downloaded document:", error);
+  } catch {
+    console.error("[documentFile] Error opening downloaded document");
     Alert.alert(
       "Unable to Open Document",
       "An error occurred while opening the downloaded file."
@@ -464,8 +464,8 @@ export async function openDocumentInApp(
   try {
     await WebBrowser.openBrowserAsync(targetUrl);
     return true;
-  } catch (error) {
-    console.error("[documentFile] Error opening document in browser:", error);
+  } catch {
+    console.error("[documentFile] Error opening document in browser");
     Alert.alert(
       "Unable to Open Document",
       "Could not open the document preview. Please check your internet connection or verify the link."

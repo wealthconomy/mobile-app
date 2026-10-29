@@ -67,13 +67,6 @@ export default function DepositScreen() {
     },
   );
 
-  useEffect(() => {
-    if (wallet) {
-      console.log("=== WALLET SUMMARY RESPONSE ===");
-      console.log(JSON.stringify(wallet, null, 2));
-    }
-  }, [wallet]);
-
   // Queries & Mutations
   const { data: mandatesResponse, isLoading: loadingMandates } =
     useListMyMandatesQuery();
@@ -128,7 +121,7 @@ export default function DepositScreen() {
         error?.message ||
         "Unable to generate account details. Please try again.";
       setVaError(errMsg);
-      console.error("Failed to generate virtual account:", error);
+      console.error("Failed to generate virtual account");
       Alert.alert("Account Generation Failed", errMsg);
     }
   }, [user, wallet?.accountNumber, createVirtualAccount, refetchWallet]);
@@ -233,10 +226,6 @@ export default function DepositScreen() {
             for (let i = 0; i < 5; i++) {
               try {
                 const verifyRes = await verifyPayment(paymentRef).unwrap();
-                console.log(
-                  `=== VERIFY PAYMENT (attempt ${i + 1}) ===`,
-                  JSON.stringify(verifyRes, null, 2),
-                );
                 const status = verifyRes?.data?.status;
                 if (status === "SUCCESSFUL" || status === "SUCCEEDED") {
                   verified = true;
@@ -245,8 +234,8 @@ export default function DepositScreen() {
                 if (i >= 1 && status === "FAILED") {
                   break;
                 }
-              } catch (e) {
-                console.warn(`Verify attempt ${i + 1} failed:`, e);
+              } catch {
+                console.warn(`Verify attempt ${i + 1} failed`);
               }
               // Wait 3 seconds before retrying
               await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -257,8 +246,8 @@ export default function DepositScreen() {
               try {
                 dispatch(walletApi.util.invalidateTags(["Wallet"]));
                 refetchWallet();
-              } catch (e) {
-                console.warn("Refetch wallet query ignored:", e);
+              } catch {
+                console.warn("Refetch wallet query ignored");
               }
             };
 
@@ -279,7 +268,7 @@ export default function DepositScreen() {
             dispatch(walletApi.util.invalidateTags(["Wallet"]));
             try {
               refetchWallet();
-            } catch (e) {}
+            } catch {}
             setShowSuccess(true);
           }
         } else {
@@ -287,7 +276,7 @@ export default function DepositScreen() {
         }
       }
     } catch (err: any) {
-      console.error("Deposit error:", err);
+      console.error("Deposit error");
       Alert.alert(
         "Error",
         err?.data?.message || err?.message || "Deposit transaction failed.",

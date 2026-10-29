@@ -1169,8 +1169,8 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
         <View style={{ position: "relative" }}>
           <Image
             source={imgError ? fallbackImg : item.image}
-            onError={(e) => {
-              console.warn(`❌ [DiscoveryCard Image Error] [${item.title}]:`, e.nativeEvent?.error, `| URI: "${item.image?.uri}"`);
+            onError={() => {
+              console.warn(`[DiscoveryCard Image Error] [${item.title}]`);
               setImgError(true);
             }}
             style={{ width: 154, height: 60, borderRadius: 6 }}

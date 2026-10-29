@@ -124,9 +124,9 @@ export default function MyReferralsScreen() {
       }
 
       setPendingTotalKobo(sum);
-    } catch (e) {
+    } catch {
       // Don't fail the entire screen if pending calculation encounters a network error
-      console.error("Failed to calculate pending referral total", e);
+      console.error("Failed to calculate pending referral total");
     }
   }, [triggerGetReferrals]);
 
@@ -153,8 +153,8 @@ export default function MyReferralsScreen() {
       setRewards(rewItems);
       setRewardsNextCursor(rewData?.nextCursor || null);
       setRewardsHasNext(Boolean(rewData?.hasNext));
-    } catch (e) {
-      console.error("Error loading referrals data", e);
+    } catch {
+      console.error("Error loading referrals data");
       setHasError(true);
     } finally {
       setInitialLoading(false);
@@ -190,8 +190,8 @@ export default function MyReferralsScreen() {
       setReferrals((prev) => [...prev, ...newItems]);
       setReferralsNextCursor(data?.nextCursor || null);
       setReferralsHasNext(Boolean(data?.hasNext));
-    } catch (e) {
-      console.error("Failed to load more referrals", e);
+    } catch {
+      console.error("Failed to load more referrals");
     } finally {
       setIsLoadingMoreReferrals(false);
     }
@@ -214,8 +214,8 @@ export default function MyReferralsScreen() {
       setRewards((prev) => [...prev, ...newItems]);
       setRewardsNextCursor(data?.nextCursor || null);
       setRewardsHasNext(Boolean(data?.hasNext));
-    } catch (e) {
-      console.error("Failed to load more rewards", e);
+    } catch {
+      console.error("Failed to load more rewards");
     } finally {
       setIsLoadingMoreRewards(false);
     }

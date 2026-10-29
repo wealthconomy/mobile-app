@@ -306,7 +306,7 @@ export default function GoalDetailScreen() {
       setShowTopUpModal(false);
       refetchPortfolios();
     } catch (err: any) {
-      console.error("Top up portfolio failed:", err);
+      console.error("Top up portfolio failed");
       Alert.alert("Failed", err?.data?.message || err?.message || "Top-up request failed.");
     }
   };

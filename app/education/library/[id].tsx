@@ -175,8 +175,8 @@ export default function LibraryMaterialDetailScreen() {
     if (!material?.youtubeUrl) return;
     try {
       await Linking.openURL(material.youtubeUrl);
-    } catch (error) {
-      console.error("Error opening YouTube", error);
+    } catch {
+      console.error("Error opening YouTube");
     }
   };
 

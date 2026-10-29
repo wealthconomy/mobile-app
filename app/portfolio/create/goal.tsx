@@ -368,17 +368,14 @@ export default function CreateGoalScreen() {
         },
       };
 
-      console.log("🎯 [WealthGoal Create Request] Payload:\n", JSON.stringify(body, null, 2));
-
       const res: any = await createPortfolio({ type: "wealthgoal", body }).unwrap();
-      console.log("✅ [WealthGoal Create Success] Response:\n", JSON.stringify(res, null, 2));
 
       if (res?.id) {
         setCreatedGoalId(res.id);
       }
       setStep("success");
     } catch (err: any) {
-      console.error("❌ [WealthGoal Create Error] Full Error:\n", JSON.stringify(err, null, 2));
+      console.error("[WealthGoal Create Error] Failed to create portfolio");
       const rawMsg = err?.data?.message;
       const errorMsg = Array.isArray(rawMsg)
         ? rawMsg.join(", ")

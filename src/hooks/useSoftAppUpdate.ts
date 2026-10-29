@@ -204,8 +204,8 @@ export function useSoftAppUpdate(): SoftAppUpdateState {
     if (snoozeKey) {
       try {
         await AsyncStorage.setItem(snoozeKey, now.toString());
-      } catch (e) {
-        console.warn("Failed to save update prompt snooze:", e);
+      } catch {
+        console.warn("Failed to save update prompt snooze");
       }
     }
   }, [snoozeKey, deadlineMs, getSnoozeDurationMs]);

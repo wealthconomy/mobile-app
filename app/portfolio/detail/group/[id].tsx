@@ -635,8 +635,8 @@ export default function GroupDetailScreen() {
           targetNaira,
         )}\n\nJoin here: wealthconomy://group/join/${id}`,
       });
-    } catch (error: any) {
-      console.error(error.message);
+    } catch {
+      console.error("Failed to share group invite");
     }
   };
 
@@ -652,9 +652,6 @@ export default function GroupDetailScreen() {
     }
     setIsProcessing(true);
     try {
-      console.log(
-        `👥 [WealthGroup Join Request] POST /api/v1/groups/${id}/join`,
-      );
       await joinGroup(id as string).unwrap();
       if (isPublicGroup) {
         setToast({
@@ -670,7 +667,7 @@ export default function GroupDetailScreen() {
       refetchGroup();
       refetchMembers();
     } catch (err: any) {
-      console.error("❌ [WealthGroup Join Error]:", err);
+      console.error("[WealthGroup Join Error] Failed to join group");
       const msg = err?.data?.message || err?.message || "Failed to join group.";
       if (msg.toLowerCase().includes("already")) {
         setJoinRequested(true);
@@ -933,11 +930,9 @@ export default function GroupDetailScreen() {
                     ? group.coverImage.replace("http://", "https://")
                     : group.coverImage,
                 }}
-                onError={(e) => {
+                onError={() => {
                   console.warn(
-                    `❌ [GroupDetail CoverImage Error] [${group?.name || id}]:`,
-                    e.nativeEvent?.error,
-                    `| URI: "${group?.coverImage}"`,
+                    `[GroupDetail CoverImage Error] [${group?.name || id}]`
                   );
                   setCoverImageError(true);
                 }}

@@ -230,10 +230,9 @@ export default function CreateGroupScreen() {
               uploadedCoverUrl = await uploadImage(formData.coverImage, {
                 allowFallback: false,
               });
-            } catch (e) {
+            } catch {
               console.warn(
-                "Cover image upload failed, skipping cloud coverImage in payload:",
-                e,
+                "Cover image upload failed, skipping cloud coverImage in payload"
               );
               uploadedCoverUrl = undefined;
             }
@@ -274,25 +273,14 @@ export default function CreateGroupScreen() {
           allowEmergencyWithdrawal: formData.emergencyWithdrawal,
         };
 
-        console.log(
-          "👥 [WealthGroup Create Request] POST /api/v1/groups with payload:\n",
-          JSON.stringify(payload, null, 2),
-        );
         const res: any = await createGroup(payload).unwrap();
-        console.log(
-          "✅ [WealthGroup Create Success] Response:\n",
-          JSON.stringify(res, null, 2),
-        );
 
         const newId =
           res?.id || res?.data?.id || (typeof res === "string" ? res : "new");
         setCreatedGroupId(newId);
         setStep(6);
       } catch (err: any) {
-        console.error(
-          "❌ [WealthGroup Create Error]:\n",
-          JSON.stringify(err, null, 2),
-        );
+        console.error("[WealthGroup Create Error] Failed to create group");
         const msg =
           err?.data?.message ||
           err?.message ||
@@ -1643,8 +1631,8 @@ function SuccessScreen({ onDone, onView, groupName }: any) {
           groupName,
         )}`,
       });
-    } catch (error: any) {
-      console.error(error.message);
+    } catch {
+      console.error("Failed to share group invite");
     }
   };
 

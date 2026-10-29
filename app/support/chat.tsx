@@ -285,7 +285,6 @@ export default function ChatScreen() {
     // 2. Client-side Image Compression via expo-image-manipulator
     let uploadUri = asset.uri;
     try {
-      console.log("[SupportChat] 🖼️ Optimizing image resolution & compression...");
       const manipResult = await ImageManipulator.manipulateAsync(
         asset.uri,
         [{ resize: { width: 1400 } }],
@@ -293,16 +292,9 @@ export default function ChatScreen() {
       );
       if (manipResult?.uri) {
         uploadUri = manipResult.uri;
-        console.log("[SupportChat] ✅ Image optimized successfully:", {
-          originalUri: asset.uri,
-          optimizedUri: uploadUri,
-        });
       }
-    } catch (compressionErr) {
-      console.warn(
-        "[SupportChat] ⚠️ Image optimization skipped, using original:",
-        compressionErr
-      );
+    } catch {
+      console.warn("[SupportChat] Image optimization skipped, using original");
     }
 
     try {
@@ -322,8 +314,8 @@ export default function ChatScreen() {
         setStagedAttachment(null);
         setSendError("Failed to upload image. Please try again.");
       }
-    } catch (err: any) {
-      console.error("Error uploading image:", err);
+    } catch {
+      console.error("[SupportChat] Error uploading image");
       setStagedAttachment(null);
       setSendError(
         "Unable to upload image. Please check your network connection."
@@ -338,7 +330,6 @@ export default function ChatScreen() {
     setTimeout(async () => {
       suspendAppLock(true);
       try {
-        console.log("[SupportChat] 📸 Requesting camera permissions...");
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== "granted") {
           Alert.alert(
@@ -347,23 +338,17 @@ export default function ChatScreen() {
           );
           return;
         }
-        console.log("[SupportChat] 📸 Launching camera...");
         const result = await ImagePicker.launchCameraAsync({
           mediaTypes: ["images"],
           allowsEditing: false,
           quality: 0.85,
         });
 
-        console.log("[SupportChat] 📸 Camera result:", {
-          canceled: result.canceled,
-          count: result.assets?.length,
-        });
-
         if (!result.canceled && result.assets && result.assets.length > 0) {
           await processSelectedAsset(result.assets[0]);
         }
       } catch (err: any) {
-        console.error("[SupportChat] ❌ Error launching camera:", err);
+        console.error("[SupportChat] Error launching camera");
         setSendError("Unable to access camera: " + (err?.message || "Unknown error"));
       } finally {
         suspendAppLock(false);
@@ -376,23 +361,17 @@ export default function ChatScreen() {
     setTimeout(async () => {
       suspendAppLock(true);
       try {
-        console.log("[SupportChat] 🖼️ Launching photo library...");
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ["images"],
           allowsEditing: false,
           quality: 0.85,
         });
 
-        console.log("[SupportChat] 🖼️ Gallery result:", {
-          canceled: result.canceled,
-          count: result.assets?.length,
-        });
-
         if (!result.canceled && result.assets && result.assets.length > 0) {
           await processSelectedAsset(result.assets[0]);
         }
       } catch (err: any) {
-        console.error("[SupportChat] ❌ Error picking image:", err);
+        console.error("[SupportChat] Error picking image");
         try {
           const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (status !== "granted") {
@@ -433,8 +412,8 @@ export default function ChatScreen() {
       } else {
         await Linking.openURL(previewImageUrl);
       }
-    } catch (err) {
-      console.error("[SupportChat] Error sharing preview image:", err);
+    } catch {
+      console.error("[SupportChat] Error sharing preview image");
       Alert.alert("Unable to share", "Could not share or save this image.");
     } finally {
       setIsSharingImage(false);
@@ -444,33 +423,6 @@ export default function ChatScreen() {
   const handlePickImage = () => {
     setShowAttachmentSheet(true);
   };
-
-  // Log render state for debugging
-  useEffect(() => {
-    console.log("[ChatScreen] 📱 Render State:", {
-      isLoading,
-      hasError: Boolean(error),
-      errorStatus,
-      errorMessage,
-      isChatNotFound,
-      messagesCount: messages.length,
-      isSocketConnected,
-      isAdminOnline,
-      stage,
-      forceNewChat,
-    });
-  }, [
-    isLoading,
-    error,
-    errorStatus,
-    errorMessage,
-    isChatNotFound,
-    messages.length,
-    isSocketConnected,
-    isAdminOnline,
-    stage,
-    forceNewChat,
-  ]);
 
   // Auto-scroll to latest message on messages update
   useEffect(() => {
@@ -483,9 +435,8 @@ export default function ChatScreen() {
   }, [messages.length]);
 
 
-  const handleOpenDocument = async (url?: string | null, fileName?: string | null) => {
+  const handleOpenDocument = async (url?: string | null, _fileName?: string | null) => {
     if (!url) return;
-    console.log("[SupportChat] 📄 Attempting to open document URL:", url, { fileName });
 
     try {
       // 1. Try opening via Expo WebBrowser (In-App Browser Custom Tab)
@@ -493,8 +444,8 @@ export default function ChatScreen() {
         presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
         toolbarColor: "#155D5F",
       });
-    } catch (browserError) {
-      console.warn("[SupportChat] ⚠️ WebBrowser failed, trying fallbacks:", browserError);
+    } catch {
+      console.warn("[SupportChat] WebBrowser failed, trying fallbacks");
       try {
         const canOpen = await Linking.canOpenURL(url);
         if (canOpen) {
@@ -504,8 +455,8 @@ export default function ChatScreen() {
           const docsViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
           await Linking.openURL(docsViewerUrl);
         }
-      } catch (fallbackError) {
-        console.error("[SupportChat] ❌ Failed to open document:", fallbackError);
+      } catch {
+        console.error("[SupportChat] Failed to open document");
         Alert.alert(
           "Unable to open document",
           "Could not open this document. Please check your internet connection or verify the link."

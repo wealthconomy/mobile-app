@@ -30,17 +30,11 @@ export const fileApi = baseApi.injectEndpoints({
           }
 
           const uploadUrl = `${process.env.EXPO_PUBLIC_API_URL}/file/upload?multiSizes=false`;
-          console.log("\n================ [FILE UPLOAD - INITIATING REQUEST] ================");
-          console.log("Upload URL:", uploadUrl);
-          console.log("Platform:", Platform.OS);
-          console.log("File Arg:", typeof arg === "object" ? JSON.stringify(arg, null, 2) : String(arg));
-          console.log("====================================================================\n");
 
           // If on native platform (iOS / Android) and we have a local file URI
           if (Platform.OS !== "web" && typeof arg?.uri === "string" && !arg.uri.startsWith("http")) {
             try {
               if (FileSystem && typeof FileSystem.uploadAsync === "function") {
-                console.log("[FILE UPLOAD] Using native FileSystem.uploadAsync...");
                 const uploadResult = await FileSystem.uploadAsync(uploadUrl, arg.uri, {
                   httpMethod: "POST",
                   uploadType: FileSystem.FileSystemUploadType.MULTIPART,
@@ -48,11 +42,6 @@ export const fileApi = baseApi.injectEndpoints({
                   mimeType: arg.type || "image/jpeg",
                   headers,
                 });
-
-                console.log("\n================ [FILE UPLOAD - NATIVE RESULT] ================");
-                console.log("HTTP Status:", uploadResult.status);
-                console.log("Raw Response Body:", uploadResult.body);
-                console.log("==============================================================\n");
 
                 if (uploadResult.status >= 200 && uploadResult.status < 300) {
                   let parsed: any;
@@ -72,8 +61,8 @@ export const fileApi = baseApi.injectEndpoints({
                   return { error: { status: uploadResult.status, data: errorData } };
                 }
               }
-            } catch (nativeUploadErr) {
-              console.log("Native FileSystem.uploadAsync failed, attempting FormData fallback:", nativeUploadErr);
+            } catch {
+              // Fallback to standard FormData fetch
             }
           }
 
@@ -99,8 +88,8 @@ export const fileApi = baseApi.injectEndpoints({
                 } else {
                   formData.append("file", arg.uri);
                 }
-              } catch (webErr) {
-                console.warn("[fileApi:web] Could not fetch Blob from URI, fallback to raw:", webErr);
+              } catch {
+                console.warn("[fileApi:web] Could not fetch Blob from URI, fallback to raw");
                 formData.append("file", arg.uri);
               }
             } else {
@@ -110,11 +99,6 @@ export const fileApi = baseApi.injectEndpoints({
             return { error: { status: "CUSTOM_ERROR", error: "Invalid upload arguments provided: missing uri or FormData" } };
           }
 
-          console.log("[FILE UPLOAD] Executing standard FormData fetch...");
-          if (Platform.OS === "android") {
-            console.log("[fileApi][ANDROID] Dispatching POST /file/upload. FormData parts:", (formData as any)?._parts || "FormData");
-          }
-
           const response = await fetch(uploadUrl, {
             method: "POST",
             headers,
@@ -122,17 +106,13 @@ export const fileApi = baseApi.injectEndpoints({
           });
           const data = await response.json();
 
-          console.log("\n================ [FILE UPLOAD - FETCH RESULT] ================");
-          console.log("HTTP Status:", response.status);
-          console.log("Response Body:", JSON.stringify(data, null, 2));
-          console.log("=============================================================\n");
           if (!response.ok) {
             return { error: { status: response.status, data } };
           }
           return { data };
         } catch (error: any) {
           if (Platform.OS === "android") {
-            console.error("[fileApi][ANDROID] Network exception during upload:", error?.message || error);
+            console.error("[fileApi][ANDROID] Network exception during upload:", error?.message || "Upload failed");
           }
           return { error: { status: "FETCH_ERROR", error: error?.message || String(error) } };
         }

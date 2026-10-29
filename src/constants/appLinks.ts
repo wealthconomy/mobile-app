@@ -58,8 +58,8 @@ export async function openStore(): Promise<boolean> {
     try {
       await Linking.openURL(IOS_STORE_URL);
       return true;
-    } catch (error) {
-      console.warn("Failed to open App Store:", error);
+    } catch {
+      console.warn("Failed to open App Store");
       alertStoreFailure();
       return false;
     }
@@ -84,8 +84,8 @@ export async function openStore(): Promise<boolean> {
     try {
       await Linking.openURL(ANDROID_WEB_URL);
       return true;
-    } catch (error) {
-      console.warn("Failed to open Play Store via market:// or web:", error);
+    } catch {
+      console.warn("Failed to open Play Store via market:// or web");
       alertStoreFailure();
       return false;
     }

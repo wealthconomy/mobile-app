@@ -27,16 +27,16 @@ export const hydrateBookmarks = createAsyncThunk(
           return blogs;
         }
       }
-    } catch (err) {
-      console.error("Failed to hydrate bookmarks from AsyncStorage:", err);
+    } catch {
+      console.error("Failed to hydrate bookmarks from AsyncStorage");
     }
     return [];
   }
 );
 
 const persistBookmarks = (blogs: Blog[]) => {
-  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(blogs)).catch((err) =>
-    console.error("Failed to persist bookmarks to AsyncStorage:", err)
+  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(blogs)).catch(() =>
+    console.error("Failed to persist bookmarks to AsyncStorage")
   );
 };
 

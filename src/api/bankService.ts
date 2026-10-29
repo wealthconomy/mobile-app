@@ -66,8 +66,8 @@ export const bankService = {
       }
 
       return result.data.sort((a, b) => a.name.localeCompare(b.name));
-    } catch (error) {
-      console.warn("Using fallback banks due to fetch error:", error);
+    } catch {
+      console.warn("Using fallback banks due to fetch error");
       // Sort fallback banks alphabetically too
       return (FALLBACK_BANKS as Bank[]).sort((a, b) =>
         a.name.localeCompare(b.name),

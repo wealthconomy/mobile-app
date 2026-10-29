@@ -303,8 +303,7 @@ export const AppInactivityLockModal: React.FC = () => {
           );
         }
       }
-    } catch (err) {
-      console.log("Biometric unlock error:", err);
+    } catch {
       setErrorMessage(
         "Biometric authentication failed. Please enter your passcode."
       );

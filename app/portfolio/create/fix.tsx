@@ -1203,7 +1203,7 @@ export default function CreateFixScreen() {
       await createPortfolio({ type: "wealthfix", body }).unwrap();
       setStep("success");
     } catch (err: any) {
-      console.error("Failed to create fix portfolio:", err);
+      console.error("Failed to create fix portfolio");
       const rawMsg = err?.data?.message;
       const errorMsg = Array.isArray(rawMsg) ? rawMsg.join(", ") : rawMsg || err?.message || "Verification Failed";
       if (typeof errorMsg === "string" && errorMsg.toLowerCase().includes("not set")) {

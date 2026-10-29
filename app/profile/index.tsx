@@ -138,7 +138,7 @@ export default function ProfileScreen() {
 
       Alert.alert("Success", "Profile photo uploaded and saved successfully!");
     } catch (err: any) {
-      console.error("[ProfileScreen] Image upload error:", err);
+      console.error("[ProfileScreen] Image upload error");
       const errorMsg =
         err?.data?.message ||
         err?.message ||

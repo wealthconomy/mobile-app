@@ -137,10 +137,8 @@ export default function UserFiledReportsScreen() {
   // Submit new group report
   const handleSubmitReport = async () => {
     const targetId = filterGroupId || params.groupId;
-    console.log("🚨 [Group Report] Submit initiated for groupId:", targetId, "reason:", reportReason);
 
     if (!targetId) {
-      console.warn("⚠️ [Group Report] Missing targetId (groupId)");
       setToast({
         type: "warning",
         title: "Group Context Missing",
@@ -149,7 +147,6 @@ export default function UserFiledReportsScreen() {
       return;
     }
     if (!reportReason.trim()) {
-      console.warn("⚠️ [Group Report] Reason empty");
       setToast({
         type: "warning",
         title: "Reason Required",
@@ -159,13 +156,10 @@ export default function UserFiledReportsScreen() {
     }
 
     try {
-      console.log(`📡 [Group Report] POST /groups/${targetId}/report payload:`, { reason: reportReason.trim() });
-      const result = await reportGroup({
+      await reportGroup({
         id: targetId,
         reason: reportReason.trim(),
       }).unwrap();
-
-      console.log("✅ [Group Report] Success response:", result);
 
       setToast({
         type: "success",
@@ -177,12 +171,7 @@ export default function UserFiledReportsScreen() {
       setShowReportForm(false);
       refetchReports();
     } catch (err: any) {
-      console.error(`❌ [Group Report] POST /groups/${targetId}/report FAILED:`, {
-        status: err?.status,
-        data: err?.data,
-        message: err?.message,
-        errorRaw: JSON.stringify(err),
-      });
+      console.error("[Group Report] Failed to submit report");
 
       setToast({
         type: "error",

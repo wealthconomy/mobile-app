@@ -271,8 +271,8 @@ export default function KYCLevel3Screen() {
       const fullAddress = `${addressData.streetAddress.trim()}, ${addressData.city.trim()}, ${addressData.state.trim()}`;
       try {
         await updateMyProfile({ address: fullAddress }).unwrap();
-      } catch (profileErr) {
-        console.warn("Could not sync address to profile:", profileErr);
+      } catch {
+        console.warn("Could not sync address to profile");
       }
 
       // 2. Upload proof of address (PDF or image)
@@ -301,7 +301,6 @@ export default function KYCLevel3Screen() {
 
       setStep(2);
     } catch (err: any) {
-      console.log("KYC 3 Submit Error", err);
       setLocalError(err?.data?.message || err?.message || "Failed to upload documents. Please try again.");
     } finally {
       setIsUploading(false);

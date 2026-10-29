@@ -76,8 +76,8 @@ export const Step5FaceLive: React.FC<Step5FaceLiveProps> = ({
               if (manipulated?.base64) {
                 finalBase64 = manipulated.base64;
               }
-            } catch (manipErr) {
-              console.log("Selfie manipulation error:", manipErr);
+            } catch {
+              // fallback to raw photo uri
             }
 
             if (
@@ -93,8 +93,8 @@ export const Step5FaceLive: React.FC<Step5FaceLiveProps> = ({
               return;
             }
           }
-        } catch (err) {
-          console.log("Selfie capture err:", err);
+        } catch {
+          // selfie capture failed
         }
       }
 

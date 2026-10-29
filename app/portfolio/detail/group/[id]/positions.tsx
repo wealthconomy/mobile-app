@@ -132,7 +132,6 @@ export default function PayoutPositionsScreen() {
         })),
       };
 
-      console.log("🔄 [Payout Positions Request] POST /groups/" + id + "/positions:\n", JSON.stringify(payload, null, 2));
       await setPositions({ id: id as string, body: payload }).unwrap();
 
       setToast({
@@ -146,7 +145,7 @@ export default function PayoutPositionsScreen() {
         router.back();
       }, 1200);
     } catch (err: any) {
-      console.error("❌ [Payout Positions Error]:", err);
+      console.error("[Payout Positions Error] Failed to save payout positions");
       setToast({
         type: "error",
         title: "Save Failed",

@@ -252,7 +252,7 @@ export default function InsertPinScreen() {
       inputRef.current?.blur();
       setShowSuccessModal(true);
     } catch (err: any) {
-      console.error("❌ [Payment Error]:", err);
+      console.error("[Payment Error]: Transaction failed");
       const rawMsg = err?.data?.message;
       const msg = Array.isArray(rawMsg)
         ? rawMsg.join(", ")

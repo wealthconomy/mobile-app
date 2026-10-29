@@ -162,8 +162,8 @@ export default function WithdrawScreen() {
           if (isMounted && res?.accountName) {
             setUserName(res.accountName);
           }
-        } catch (error: any) {
-          console.warn("Verification failed:", error);
+        } catch {
+          console.warn("Verification failed");
           if (isMounted) {
             setUserName("");
           }
@@ -622,7 +622,7 @@ export default function WithdrawScreen() {
 
       setShowSuccess(true);
     } catch (error: any) {
-      console.error("Withdrawal error:", error);
+      console.error("Withdrawal error");
       Alert.alert(
         "Withdrawal Failed",
         error?.data?.message ||

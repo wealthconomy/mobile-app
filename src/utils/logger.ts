@@ -6,16 +6,12 @@
 const isDev = __DEV__;
 
 export const logger = {
-  log: (...args: any[]): void => {
-    if (isDev) console.log(...args);
-  },
+  log: (): void => {},
   warn: (...args: any[]): void => {
     if (isDev) console.warn(...args);
   },
   error: (...args: any[]): void => {
     if (isDev) console.error(...args);
   },
-  info: (...args: any[]): void => {
-    if (isDev) console.info(...args);
-  },
+  info: (): void => {},
 };

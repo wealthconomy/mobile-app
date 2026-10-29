@@ -86,8 +86,8 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
               if (manipulated?.uri) {
                 finalUri = manipulated.uri;
               }
-            } catch (manipErr) {
-              console.log("ID manipulation error:", manipErr);
+            } catch {
+              // Ignore manipulation error and use raw photo
             }
 
             // Must be a non-empty, local file URI (never http/https)
@@ -105,8 +105,8 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
               return;
             }
           }
-        } catch (error) {
-          console.log("Error taking photo:", error);
+        } catch {
+          // Camera capture error handled by failure alert below
         }
       }
 
@@ -162,8 +162,8 @@ export const Step2ScanId: React.FC<Step2ScanIdProps> = ({
           return;
         }
       }
-    } catch (err) {
-      console.log("Error picking ID from gallery:", err);
+    } catch {
+      // Pick gallery cancelled or failed
     } finally {
       suspendAppLock(false);
     }

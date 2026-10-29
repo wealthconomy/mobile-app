@@ -79,8 +79,8 @@ export default function NotificationsScreen() {
     try {
       await markAllRead().unwrap();
       refetch();
-    } catch (error) {
-      console.error("Failed to mark all notifications read:", error);
+    } catch {
+      console.error("Failed to mark all notifications read");
     }
   };
 
@@ -88,8 +88,8 @@ export default function NotificationsScreen() {
     if (!item.isRead) {
       try {
         await markRead({ id: item.id }).unwrap();
-      } catch (error) {
-        console.error("Failed to mark notification read:", error);
+      } catch {
+        console.error("Failed to mark notification read");
       }
     }
     const isReferral =
