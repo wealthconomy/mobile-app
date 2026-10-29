@@ -10,6 +10,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
 import { useGetKycDocumentsQuery, useGetKycStatusQuery } from "@/src/store/api/kycApi";
+import {
+  isLevel2Verified as checkIsLevel2Verified,
+  isLevel2Rejected as checkIsLevel2Rejected,
+  isLevel2Pending as checkIsLevel2Pending,
+  hasLevel3AddressDoc as checkHasLevel3AddressDoc,
+  isLevel3Verified as checkIsLevel3Verified,
+  isLevel3Rejected as checkIsLevel3Rejected,
+  isLevel3Pending as checkIsLevel3Pending,
+} from "@/src/features/kyc/utils/kycState";
 
 const THEME_TEAL = "#155D5F";
 
@@ -25,57 +34,14 @@ export default function KYCLevel3Intro() {
   const currentLevel = kycData?.data?.currentLevel ?? user?.kycLevel ?? 1;
   const kycStatus = kycData?.data?.status ?? user?.kycStatus;
 
-  const ninStatusUpper = (kycDocs?.ninStatus || "").toUpperCase();
-  const faceStatusUpper = (kycDocs?.faceStatus || "").toUpperCase();
-  const utilityStatusUpper = (kycDocs?.utilityStatus || "").toUpperCase();
-  const kycStatusUpper = (kycStatus || "").toUpperCase();
+  const isLevel2Rejected = checkIsLevel2Rejected(kycDocs, user);
+  const isLevel2Verified = checkIsLevel2Verified(kycDocs, user);
+  const isLevel2Pending = checkIsLevel2Pending(kycDocs, user);
 
-  const isLevel2Rejected =
-    ninStatusUpper === "REJECTED" ||
-    faceStatusUpper === "REJECTED" ||
-    kycStatusUpper === "REJECTED";
-
-  // Level 2 is verified ONLY if not rejected, and either both are Approved or user is verified level >= 2
-  const isLevel2Verified =
-    !isLevel2Rejected &&
-    ((ninStatusUpper === "APPROVED" && faceStatusUpper === "APPROVED") ||
-      (kycStatusUpper === "VERIFIED" && currentLevel >= 2));
-
-  const hasLevel3AddressDoc = Boolean(
-    kycDocs?.addressDocUrl ||
-    kycDocs?.proofOfAddressUrl ||
-    kycDocs?.utilityBillUrl
-  );
-
-  const isLevel3Verified =
-    isLevel2Verified &&
-    utilityStatusUpper !== "REJECTED" &&
-    (currentLevel >= 3 || utilityStatusUpper === "APPROVED");
-
-  const hasIdUpload = Boolean(kycDocs?.idImageUrl || user?.idImageUrl);
-  const hasFaceUpload = Boolean(
-    kycDocs?.faceImageUrl ||
-    kycDocs?.selfieUrl ||
-    user?.faceImageUrl ||
-    user?.imageUrl ||
-    kycDocs?.faceVerified
-  );
-  const hasAllLevel2Data = hasIdUpload && hasFaceUpload;
-
-  const isLevel2Pending = !isLevel2Verified && hasAllLevel2Data && (kycStatusUpper === "PENDING" || ninStatusUpper === "PENDING" || faceStatusUpper === "PENDING");
-
-  const isLevel3Rejected =
-    !isLevel3Verified &&
-    isLevel2Verified &&
-    hasLevel3AddressDoc &&
-    utilityStatusUpper === "REJECTED";
-
-  const isLevel3Pending =
-    isLevel2Verified &&
-    !isLevel3Verified &&
-    !isLevel3Rejected &&
-    hasLevel3AddressDoc &&
-    (utilityStatusUpper === "PENDING" || utilityStatusUpper === "IN_REVIEW");
+  const hasLevel3AddressDoc = checkHasLevel3AddressDoc(kycDocs);
+  const isLevel3Verified = checkIsLevel3Verified(kycDocs, user);
+  const isLevel3Rejected = checkIsLevel3Rejected(kycDocs, user);
+  const isLevel3Pending = checkIsLevel3Pending(kycDocs, user);
 
   const rejectionReason =
     (kycDocs?.utilityStatus === "Rejected" && kycDocs?.utilityRejectionReason) ||

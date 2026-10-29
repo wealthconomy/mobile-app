@@ -10,6 +10,13 @@ import { useGetKycDocumentsQuery, useGetKycStatusQuery, useUploadLevel3DocsMutat
 import { useGetMyProfileQuery, useUpdateMyProfileMutation } from "@/src/store/api/userApi";
 import { useImageUpload } from "@/src/hooks/useImageUpload";
 import Header from "@/src/components/common/Header";
+import {
+  isLevel2Verified as checkIsLevel2Verified,
+  isLevel3Verified as checkIsLevel3Verified,
+  isLevel3Rejected as checkIsLevel3Rejected,
+  isLevel3Pending as checkIsLevel3Pending,
+  hasLevel3AddressDoc as checkHasLevel3AddressDoc,
+} from "@/src/features/kyc/utils/kycState";
 
 import { NIGERIA_STATES } from "@/src/constants/nigeriaLocations";
 
@@ -38,27 +45,11 @@ export default function KYCLevel3Screen() {
 
   const currentLevel = kycStatusResponse?.data?.currentLevel ?? user?.kycLevel ?? 1;
 
-  const ninUpper = (kycData?.ninStatus || "").toUpperCase();
-  const faceUpper = (kycData?.faceStatus || "").toUpperCase();
-  const utilityUpper = (kycData?.utilityStatus || "").toUpperCase();
-  const kycStatusUpper = (kycStatusResponse?.data?.status || user?.kycStatus || "").toUpperCase();
-
-  const isLevel2Rejected =
-    ninUpper === "REJECTED" ||
-    faceUpper === "REJECTED" ||
-    kycStatusUpper === "REJECTED";
-
-  // Level 2 is verified ONLY if not rejected, and either both are Approved or user is verified level >= 2
-  const isLevel2Verified =
-    !isLevel2Rejected &&
-    ((ninUpper === "APPROVED" && faceUpper === "APPROVED") ||
-      (kycStatusUpper === "VERIFIED" && currentLevel >= 2));
-
-  const hasLevel3AddressDoc = Boolean(
-    kycData?.addressDocUrl ||
-    kycData?.proofOfAddressUrl ||
-    kycData?.utilityBillUrl
-  );
+  const isLevel2Verified = checkIsLevel2Verified(kycData, user);
+  const hasLevel3AddressDoc = checkHasLevel3AddressDoc(kycData);
+  const isLevel3Verified = checkIsLevel3Verified(kycData, user);
+  const isLevel3Rejected = checkIsLevel3Rejected(kycData, user);
+  const isLevel3Pending = checkIsLevel3Pending(kycData, user);
 
   const [step, setStep] = useState<1 | 2>(1);
 
@@ -69,32 +60,16 @@ export default function KYCLevel3Screen() {
       return;
     }
 
-    const isLevel3Verified =
-      currentLevel >= 3 ||
-      utilityUpper === "APPROVED";
-
     if (isLevel3Verified && step < 2) {
       router.replace("/(tabs)/my-account");
       return;
     }
 
-    const isLevel3Rejected =
-      isLevel2Verified &&
-      hasLevel3AddressDoc &&
-      utilityUpper === "REJECTED";
-
-    const isLevel3Pending =
-      isLevel2Verified &&
-      !isLevel3Verified &&
-      !isLevel3Rejected &&
-      hasLevel3AddressDoc &&
-      (utilityUpper === "PENDING" || utilityUpper === "IN_REVIEW");
-
     if (isLevel3Pending && step < 2) {
       router.replace("/kyc/level3-intro");
       return;
     }
-  }, [kycStatusResponse, kycDocsResponse, isLevel2Verified, currentLevel, kycData, user, step, router, utilityUpper, hasLevel3AddressDoc]);
+  }, [kycStatusResponse, kycDocsResponse, isLevel2Verified, isLevel3Verified, isLevel3Pending, step, router]);
   const [proofOfAddress, setProofOfAddress] = useState<string | null>(null);
   const [proofOfAddressName, setProofOfAddressName] = useState<string | null>(null);
   const [passport, setPassport] = useState<string | null>(null);

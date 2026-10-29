@@ -10,6 +10,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
 import { useGetKycDocumentsQuery, useGetKycStatusQuery } from "@/src/store/api/kycApi";
+import {
+  idDocStatus,
+  faceDocStatus,
+  isLevel2Verified as checkIsLevel2Verified,
+  isLevel2Rejected as checkIsLevel2Rejected,
+  isLevel2Pending as checkIsLevel2Pending,
+  hasLevel2Uploads,
+} from "@/src/features/kyc/utils/kycState";
 
 const THEME_TEAL = "#155D5F";
 
@@ -25,24 +33,13 @@ export default function KYCLevel2Intro() {
   const currentLevel = kycStatusResponse?.data?.currentLevel ?? user?.kycLevel ?? 1;
   const kycStatus = kycStatusResponse?.data?.status ?? user?.kycStatus;
 
-  const ninStatusUpper = (kycDocs?.ninStatus || "").toUpperCase();
-  const faceStatusUpper = (kycDocs?.faceStatus || "").toUpperCase();
-  const kycStatusUpper = (kycStatus || "").toUpperCase();
-
-  const isNinRejected = ninStatusUpper === "REJECTED";
-  const isFaceRejected = faceStatusUpper === "REJECTED";
-  const isKycStatusRejected = kycStatusUpper === "REJECTED";
-
-  const isLevel2Rejected = isNinRejected || isFaceRejected || isKycStatusRejected;
-
-  const isLevel2Approved =
-    (ninStatusUpper === "APPROVED" && faceStatusUpper === "APPROVED") ||
-    kycStatusUpper === "VERIFIED";
-
-  const isLevel2Complete = !isLevel2Rejected && isLevel2Approved && currentLevel >= 2;
+  const isIdRejected = idDocStatus(kycDocs) === "REJECTED";
+  const isFaceRejected = faceDocStatus(kycDocs) === "REJECTED";
+  const isLevel2Rejected = checkIsLevel2Rejected(kycDocs, user);
+  const isLevel2Complete = checkIsLevel2Verified(kycDocs, user);
 
   // Extract specific rejection reasons
-  const idReason = isNinRejected ? (kycDocs?.ninRejectionReason || kycDocs?.rejectionReason) : null;
+  const idReason = isIdRejected ? (kycDocs?.ninRejectionReason || kycDocs?.rejectionReason) : null;
   const faceReason = isFaceRejected ? (kycDocs?.faceRejectionReason || kycDocs?.rejectionReason) : null;
   const generalReason =
     kycDocs?.rejectionReason ||
@@ -55,14 +52,14 @@ export default function KYCLevel2Intro() {
     (user as any)?.reason;
 
   const specificRejectionReason =
-    isNinRejected && isFaceRejected && idReason && faceReason && idReason !== faceReason
+    isIdRejected && isFaceRejected && idReason && faceReason && idReason !== faceReason
       ? `ID: ${idReason} | Face: ${faceReason}`
       : idReason || faceReason || generalReason;
 
   const rejectionDetail =
-    isNinRejected && isFaceRejected
+    isIdRejected && isFaceRejected
       ? "ID Document & Face Selfie were both rejected"
-      : isNinRejected
+      : isIdRejected
       ? "Government ID was rejected"
       : isFaceRejected
       ? "Live Face Selfie was rejected"
@@ -76,14 +73,10 @@ export default function KYCLevel2Intro() {
     user?.imageUrl ||
     kycDocs?.faceVerified
   );
-  const hasAllLevel2Data = hasIdUpload && hasFaceUpload;
+  const hasAllLevel2Data = hasLevel2Uploads(kycDocs, user);
 
   // It is ONLY truly in review if the user has actually uploaded BOTH required documents!
-  const isLevel2Pending =
-    !isLevel2Complete &&
-    !isLevel2Rejected &&
-    hasAllLevel2Data &&
-    (kycStatus === "PENDING" || kycStatus === "pending" || kycDocs?.ninStatus === "Pending" || kycDocs?.faceStatus === "Pending");
+  const isLevel2Pending = checkIsLevel2Pending(kycDocs, user);
 
   const isLevel2Incomplete = !isLevel2Complete && !isLevel2Rejected && !hasAllLevel2Data;
 

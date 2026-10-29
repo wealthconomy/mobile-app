@@ -4,7 +4,19 @@ import { router } from "expo-router";
 import React from "react";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useSelector } from "react-redux";
-import { useGetKycDocumentsQuery } from "@/src/store/api/kycApi";
+import { useKycAutoRefresh } from "@/src/hooks/useKycAutoRefresh";
+import {
+  isLevel2Verified,
+  isLevel2Rejected,
+  isLevel2Pending,
+  hasLevel2Uploads,
+  isLevel3Verified,
+  isLevel3Rejected,
+  isLevel3Pending,
+  hasLevel3AddressDoc,
+  idDocStatus,
+  faceDocStatus,
+} from "@/src/features/kyc/utils/kycState";
 
 interface TodoCardProps {
   title: string;
@@ -61,10 +73,17 @@ const TodoCard = ({
 
 export const TodoSection = () => {
   const user = useSelector((state: RootState) => state.auth.user);
-  const { data: kycDocsResponse } = useGetKycDocumentsQuery(undefined, { refetchOnMountOrArgChange: true });
+  const { kycDocs } = useKycAutoRefresh();
 
-  const kycDocsPayload: any = kycDocsResponse?.data;
-  const kycDocs: any = kycDocsPayload?.data || kycDocsPayload;
+  const l2Verified = isLevel2Verified(kycDocs, user);
+  const l2Rejected = isLevel2Rejected(kycDocs, user);
+  const l2Pending = isLevel2Pending(kycDocs, user);
+  const l2Uploads = hasLevel2Uploads(kycDocs, user);
+
+  const l3Verified = isLevel3Verified(kycDocs, user);
+  const l3Rejected = isLevel3Rejected(kycDocs, user);
+  const l3Pending = isLevel3Pending(kycDocs, user);
+  const l3HasDoc = hasLevel3AddressDoc(kycDocs);
 
   const hasIdUpload = Boolean(kycDocs?.idImageUrl || user?.idImageUrl);
   const hasFaceUpload = Boolean(
@@ -74,29 +93,8 @@ export const TodoSection = () => {
     user?.imageUrl ||
     kycDocs?.faceVerified
   );
-  const hasAllLevel2Data = hasIdUpload && hasFaceUpload;
 
-  const ninStatusUpper = (kycDocs?.ninStatus || "").toUpperCase();
-  const faceStatusUpper = (kycDocs?.faceStatus || "").toUpperCase();
-  const kycStatusUpper = (user?.kycStatus || kycDocs?.kycStatus || kycDocs?.status || "").toUpperCase();
-
-  const isNinRejected = ninStatusUpper === "REJECTED";
-  const isFaceRejected = faceStatusUpper === "REJECTED";
-  const isKycRejected = isNinRejected || isFaceRejected || kycStatusUpper === "REJECTED";
-
-  const isKycVerified =
-    !isKycRejected &&
-    (kycStatusUpper === "VERIFIED" ||
-      user?.kycVerified === true ||
-      (ninStatusUpper === "APPROVED" && faceStatusUpper === "APPROVED"));
-
-  const isLevel2Complete =
-    !isKycRejected &&
-    ((ninStatusUpper === "APPROVED" && faceStatusUpper === "APPROVED") ||
-      (isKycVerified && (user?.kycLevel || 1) >= 2));
-
-  // If rejected, level is strictly 1. If not complete, level is strictly 1.
-  const currentKycLevel = isKycRejected ? 1 : isLevel2Complete ? Math.max(user?.kycLevel || 2, 2) : 1;
+  const currentKycLevel = l3Verified ? 3 : l2Verified ? 2 : 1;
 
   const userState = {
     kycLevel: currentKycLevel,
@@ -110,78 +108,98 @@ export const TodoSection = () => {
   const onboardingTasks = [];
 
   // 1. KYC Sequential Logic
-  // ONLY truly under review if user has actually provided ALL required Level 2 documents!
-  const isKycPending =
-    !isKycVerified &&
-    !isKycRejected &&
-    hasAllLevel2Data &&
-    (kycStatusUpper === "PENDING" || ninStatusUpper === "PENDING" || faceStatusUpper === "PENDING");
+  if (!l2Verified) {
+    if (l2Rejected) {
+      const isIdRejected = idDocStatus(kycDocs) === "REJECTED";
+      const isFaceRejected = faceDocStatus(kycDocs) === "REJECTED";
+      const idReason = isIdRejected ? (kycDocs?.ninRejectionReason || kycDocs?.rejectionReason) : null;
+      const faceReason = isFaceRejected ? (kycDocs?.faceRejectionReason || kycDocs?.rejectionReason) : null;
+      const generalReason =
+        kycDocs?.rejectionReason ||
+        kycDocs?.ninRejectionReason ||
+        kycDocs?.faceRejectionReason ||
+        user?.kycRejectionReason;
 
-  const isKycIncomplete = !isLevel2Complete && !isKycRejected && !hasAllLevel2Data;
+      const specificReason =
+        isIdRejected && isFaceRejected && idReason && faceReason && idReason !== faceReason
+          ? `ID: ${idReason} | Face: ${faceReason}`
+          : idReason || faceReason || generalReason || "Please review and resubmit your KYC documents";
 
-  if (isKycRejected) {
-    const idReason = isNinRejected ? (kycDocs?.ninRejectionReason || kycDocs?.rejectionReason) : null;
-    const faceReason = isFaceRejected ? (kycDocs?.faceRejectionReason || kycDocs?.rejectionReason) : null;
-    const generalReason =
-      kycDocs?.rejectionReason ||
-      kycDocs?.ninRejectionReason ||
-      kycDocs?.faceRejectionReason ||
-      user?.kycRejectionReason;
-
-    const specificReason =
-      isNinRejected && isFaceRejected && idReason && faceReason && idReason !== faceReason
-        ? `ID: ${idReason} | Face: ${faceReason}`
-        : idReason || faceReason || generalReason || "Please review and resubmit your KYC documents";
-
-    onboardingTasks.push({
-      id: "kyc-rejected",
-      title: "KYC Needs Attention",
-      description: specificReason,
-      icon: <Ionicons name="alert-circle-outline" size={18} color="#DC2626" />,
-      onPress: () => router.push("/kyc/level2-intro"),
-      isComplete: false,
-    });
-  } else if (isKycIncomplete && (user?.kycStatus === "PENDING" || user?.kycStatus === "pending" || hasIdUpload || hasFaceUpload)) {
-    // Incomplete submission: Documents missing, let user click to continue and add full info!
-    onboardingTasks.push({
-      id: "kyc-incomplete",
-      title: "Complete KYC Level 2",
-      description: !hasIdUpload
-        ? "Upload your Government ID to complete verification"
-        : "Complete your live face scan to finish verification",
-      icon: <Ionicons name="alert-circle-outline" size={18} color="#D97706" />,
-      onPress: () => router.push("/kyc/level2-intro"),
-      isComplete: false,
-    });
-  } else if (isKycPending) {
-    onboardingTasks.push({
-      id: "kyc-pending",
-      title: "KYC Under Review",
-      description: "Your documents are currently being verified by compliance",
-      icon: <Ionicons name="time-outline" size={18} color="#D97706" />,
-      onPress: () => router.push("/kyc/level2-intro"),
-      isComplete: false,
-    });
-  } else if (userState.kycLevel === 1 || !isLevel2Complete) {
-    onboardingTasks.push({
-      id: "kyc2",
-      title: "Proceed to level 2",
-      description: "Complete your KYC registration to enable withdrawal",
-      icon: <Ionicons name="id-card-outline" size={18} color="#1A1A1A" />,
-      onPress: () => router.push("/kyc/level2-intro"),
-      isComplete: false,
-    });
-  } else if (userState.kycLevel === 2) {
-    onboardingTasks.push({
-      id: "kyc3",
-      title: "Proceed to level 3",
-      description: "Upgrade your account for higher limits and features",
-      icon: (
-        <Ionicons name="shield-checkmark-outline" size={18} color="#1A1A1A" />
-      ),
-      onPress: () => router.push("/kyc/level3-intro"),
-      isComplete: false,
-    });
+      onboardingTasks.push({
+        id: "kyc-rejected",
+        title: "KYC Needs Attention",
+        description: specificReason,
+        icon: <Ionicons name="alert-circle-outline" size={18} color="#DC2626" />,
+        onPress: () => router.push("/kyc/level2-intro"),
+        isComplete: false,
+      });
+    } else if (l2Pending) {
+      onboardingTasks.push({
+        id: "kyc-pending",
+        title: "KYC Under Review",
+        description: "Your documents are currently being verified by compliance",
+        icon: <Ionicons name="time-outline" size={18} color="#D97706" />,
+        onPress: () => router.push("/kyc/level2-intro"),
+        isComplete: false,
+      });
+    } else if (!l2Uploads && (user?.kycStatus === "PENDING" || user?.kycStatus === "pending" || hasIdUpload || hasFaceUpload)) {
+      onboardingTasks.push({
+        id: "kyc-incomplete",
+        title: "Complete KYC Level 2",
+        description: !hasIdUpload
+          ? "Upload your Government ID to complete verification"
+          : "Complete your live face scan to finish verification",
+        icon: <Ionicons name="alert-circle-outline" size={18} color="#D97706" />,
+        onPress: () => router.push("/kyc/level2-intro"),
+        isComplete: false,
+      });
+    } else {
+      onboardingTasks.push({
+        id: "kyc2",
+        title: "Proceed to level 2",
+        description: "Complete your KYC registration to enable withdrawal",
+        icon: <Ionicons name="id-card-outline" size={18} color="#1A1A1A" />,
+        onPress: () => router.push("/kyc/level2-intro"),
+        isComplete: false,
+      });
+    }
+  } else {
+    // Level 2 is verified -> Level 3 cards
+    if (l3Verified) {
+      // Level 3 verified -> no KYC card
+    } else if (l3Rejected) {
+      onboardingTasks.push({
+        id: "kyc3-rejected",
+        title: "Address Needs Attention",
+        description:
+          kycDocs?.utilityRejectionReason ||
+          user?.kycRejectionReason ||
+          "Please review and resubmit your address document",
+        icon: <Ionicons name="alert-circle-outline" size={18} color="#DC2626" />,
+        onPress: () => router.push("/kyc/level3-intro"),
+        isComplete: false,
+      });
+    } else if (l3Pending) {
+      onboardingTasks.push({
+        id: "kyc3-pending",
+        title: "Address Under Review",
+        description: "Your Level 3 address documents are being verified",
+        icon: <Ionicons name="time-outline" size={18} color="#D97706" />,
+        onPress: () => router.push("/kyc/level2-intro"),
+        isComplete: false,
+      });
+    } else if (!l3HasDoc) {
+      onboardingTasks.push({
+        id: "kyc3",
+        title: "Proceed to level 3",
+        description: "Upgrade your account for higher limits and features",
+        icon: (
+          <Ionicons name="shield-checkmark-outline" size={18} color="#1A1A1A" />
+        ),
+        onPress: () => router.push("/kyc/level3-intro"),
+        isComplete: false,
+      });
+    }
   }
 
   // 2. Security

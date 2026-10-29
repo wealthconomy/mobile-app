@@ -11,6 +11,7 @@ import { useInitiateWithdrawalMutation } from "@/src/store/api/withdrawalApi";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { useGetKycStatusQuery, useGetKycDocumentsQuery } from "@/src/store/api/kycApi";
 import { updateKycLevel } from "@/src/store/slices/authSlice";
+import { isLevel2Verified, faceDocStatus } from "@/src/features/kyc/utils/kycState";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { PayoutAccount, PayoutBank } from "@/src/types/wallet";
 import { useDispatch, useSelector } from "react-redux";
@@ -117,10 +118,10 @@ export default function WithdrawScreen() {
   const kycStatus = String(kycData?.data?.status || user?.kycStatus || "").toUpperCase();
 
   const hasDocsVerified =
-    (kycDocs?.ninStatus === "Approved" && kycDocs?.faceStatus === "Approved") ||
+    isLevel2Verified(kycDocs, user) ||
     (kycDocs?.faceVerified && (kycDocs?.ninProviderVerified || Boolean(kycDocs?.idNumber) || Boolean(kycDocs?.bvn))) ||
     kycDocs?.faceVerified === true ||
-    kycDocs?.faceStatus === "Approved";
+    faceDocStatus(kycDocs) === "APPROVED";
 
   const isKycVerified =
     currentKycLevel >= 2 ||

@@ -1,5 +1,6 @@
 import { updateKycLevel, updateKycStatus, updateKycInfo } from "../slices/authSlice";
 import { baseApi, ApiResponse } from "./baseApi";
+import { isLevel2Verified, isLevel2Rejected, idDocStatus, faceDocStatus } from "../../features/kyc/utils/kycState";
 
 export interface KycStatusResponse {
   currentLevel: number;
@@ -104,7 +105,6 @@ export const kycApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Kyc", "User"],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
@@ -131,7 +131,6 @@ export const kycApi = baseApi.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Kyc", "User"],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
@@ -213,7 +212,7 @@ export const kycApi = baseApi.injectEndpoints({
     getKycDocuments: builder.query<ApiResponse<KycDocumentsResponse>, void>({
       query: () => "/kyc/documents",
       providesTags: ["Kyc"],
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+      async onQueryStarted(_, { dispatch, getState, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
           console.log("\n================ [APP: GET /kyc/documents RESPONSE] ================");
@@ -221,34 +220,45 @@ export const kycApi = baseApi.injectEndpoints({
           console.log("===================================================================\n");
           const kycPayload: any = (data as any)?.data || data;
           if (kycPayload) {
-            const ninUpper = (kycPayload.ninStatus || "").toUpperCase();
-            const faceUpper = (kycPayload.faceStatus || "").toUpperCase();
-            const kycStatusUpper = (kycPayload.kycStatus || "").toUpperCase();
-            const isRejected = ninUpper === "REJECTED" || faceUpper === "REJECTED" || kycStatusUpper === "REJECTED";
-            const isLevel2Approved = ninUpper === "APPROVED" && faceUpper === "APPROVED";
+            const state = getState() as any;
+            const currentUser = state?.auth?.user;
+            const prevLevel = currentUser?.kycLevel;
+            const prevStatus = currentUser?.kycStatus;
+            const prevReason = currentUser?.kycRejectionReason ?? currentUser?.rejectionReason ?? null;
 
-            if (isRejected) {
-              const idReason = ninUpper === "REJECTED" ? (kycPayload.ninRejectionReason || kycPayload.rejectionReason) : null;
-              const faceReason = faceUpper === "REJECTED" ? (kycPayload.faceRejectionReason || kycPayload.rejectionReason) : null;
-              const reason = (idReason && faceReason && idReason !== faceReason)
+            let newStatus = kycPayload.kycStatus || prevStatus;
+            let newLevel = kycPayload.kycLevel !== undefined ? kycPayload.kycLevel : prevLevel;
+            let newReason = kycPayload.kycRejectionReason ?? null;
+
+            if (isLevel2Rejected(kycPayload, currentUser)) {
+              newStatus = "REJECTED";
+              const idReason = idDocStatus(kycPayload) === "REJECTED" ? (kycPayload.ninRejectionReason || kycPayload.rejectionReason) : null;
+              const faceReason = faceDocStatus(kycPayload) === "REJECTED" ? (kycPayload.faceRejectionReason || kycPayload.rejectionReason) : null;
+              newReason = (idReason && faceReason && idReason !== faceReason)
                 ? `ID: ${idReason} | Face: ${faceReason}`
-                : idReason || faceReason || kycPayload.kycRejectionReason || kycPayload.rejectionReason;
+                : idReason || faceReason || kycPayload.kycRejectionReason || kycPayload.rejectionReason || prevReason;
+            } else if (isLevel2Verified(kycPayload, currentUser)) {
+              newStatus = "VERIFIED";
+              newLevel = Math.max(newLevel ?? 0, 2);
+              newReason = null;
+            }
 
+            const hasLevelChanged = newLevel !== undefined && newLevel !== prevLevel;
+            const hasStatusChanged = newStatus !== undefined && newStatus !== prevStatus;
+            const hasReasonChanged = (newReason || null) !== (prevReason || null);
+
+            if (hasLevelChanged || hasStatusChanged || hasReasonChanged) {
               dispatch(
                 updateKycInfo({
-                  level: 1,
-                  status: "REJECTED",
-                  rejectionReason: reason,
+                  level: newLevel,
+                  status: newStatus,
+                  rejectionReason: newReason,
                 })
               );
-            } else if (isLevel2Approved) {
-              dispatch(
-                updateKycInfo({
-                  level: 2,
-                  status: "VERIFIED",
-                  rejectionReason: null,
-                })
-              );
+
+              if (hasStatusChanged && (newStatus === "VERIFIED" || newStatus === "REJECTED")) {
+                dispatch(baseApi.util.invalidateTags(["User", "Notification"]));
+              }
             }
           }
         } catch (err: any) {
