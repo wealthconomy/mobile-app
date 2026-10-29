@@ -5,6 +5,7 @@ import React from "react";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useSelector } from "react-redux";
 import { useKycAutoRefresh } from "@/src/hooks/useKycAutoRefresh";
+import { useIsAuthenticated } from "@/src/hooks/useIsAuthenticated";
 import {
   isLevel2Verified,
   isLevel2Rejected,
@@ -74,8 +75,11 @@ const TodoCard = ({
 );
 
 export const TodoSection = () => {
+  const isAuth = useIsAuthenticated();
   const user = useSelector((state: RootState) => state.auth.user);
   const { kycDocs } = useKycAutoRefresh();
+
+  if (!isAuth) return null;
 
   const l2Verified = isLevel2Verified(kycDocs, user);
   const l2Rejected = isLevel2Rejected(kycDocs, user);

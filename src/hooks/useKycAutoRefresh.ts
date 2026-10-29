@@ -5,6 +5,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
 import { useGetKycDocumentsQuery } from "@/src/store/api/kycApi";
 import { isLevel2Pending, isLevel3Pending } from "@/src/features/kyc/utils/kycState";
+import { useIsAuthenticated } from "@/src/hooks/useIsAuthenticated";
 
 /**
  * Hook to auto-refresh KYC documents query.
@@ -15,10 +16,12 @@ import { isLevel2Pending, isLevel3Pending } from "@/src/features/kyc/utils/kycSt
  */
 export function useKycAutoRefresh() {
   const user = useSelector((state: RootState) => state.auth.user);
+  const isAuth = useIsAuthenticated();
 
   // Initial query with refetch on mount or arg change
   const queryResult = useGetKycDocumentsQuery(undefined, {
     refetchOnMountOrArgChange: true,
+    skip: !isAuth,
   });
 
   const { data: kycDocsResponse, refetch } = queryResult;
@@ -27,7 +30,7 @@ export function useKycAutoRefresh() {
 
   const l2Pending = isLevel2Pending(kycDocs, user);
   const l3Pending = isLevel3Pending(kycDocs, user);
-  const shouldPoll = l2Pending || l3Pending;
+  const shouldPoll = isAuth && (l2Pending || l3Pending);
 
   // Polling every 12 seconds only while pending
   useEffect(() => {
@@ -43,21 +46,23 @@ export function useKycAutoRefresh() {
   // Refetch when screen gains focus
   useFocusEffect(
     useCallback(() => {
-      refetch();
-    }, [refetch])
+      if (isAuth) {
+        refetch();
+      }
+    }, [refetch, isAuth])
   );
 
   // Refetch when app transitions to active foreground
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (nextAppState === "active") {
+      if (nextAppState === "active" && isAuth) {
         refetch();
       }
     };
 
     const sub = AppState.addEventListener("change", handleAppStateChange);
     return () => sub.remove();
-  }, [refetch]);
+  }, [refetch, isAuth]);
 
   return {
     ...queryResult,

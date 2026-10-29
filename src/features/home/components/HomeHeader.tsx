@@ -5,6 +5,7 @@ import Svg, { Path } from "react-native-svg";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../store";
 import { useListNotificationsQuery } from "../../../store/api/notificationApi";
+import { useIsAuthenticated } from "../../../hooks/useIsAuthenticated";
 
 export const NotificationIcon = () => (
   <Svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -27,6 +28,7 @@ export const CustomerSupportIcon = () => (
 export const HomeHeader = () => {
   const router = useRouter();
   const { user } = useSelector((state: RootState) => state.auth);
+  const isAuth = useIsAuthenticated();
 
   const {
     data: notificationsData,
@@ -34,16 +36,19 @@ export const HomeHeader = () => {
   } = useListNotificationsQuery(
     { limit: 50 },
     {
-      pollingInterval: 10000,
+      pollingInterval: isAuth ? 10000 : 0,
       refetchOnFocus: true,
       refetchOnMountOrArgChange: true,
+      skip: !isAuth,
     }
   );
 
   useFocusEffect(
     useCallback(() => {
-      refetchNotifications();
-    }, [refetchNotifications])
+      if (isAuth) {
+        refetchNotifications();
+      }
+    }, [refetchNotifications, isAuth])
   );
 
   const notificationCount = useMemo(() => {

@@ -90,9 +90,6 @@ export const kycApi = baseApi.injectEndpoints({
       async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          console.log("\n================ [APP: GET /kyc/status RESPONSE] ================");
-          console.log(JSON.stringify(data, null, 2));
-          console.log("=================================================================\n");
           const kycData = (data as any)?.data || data;
           if (kycData) {
             dispatch(
@@ -103,8 +100,8 @@ export const kycApi = baseApi.injectEndpoints({
               })
             );
           }
-        } catch (err: any) {
-          console.log("❌ [APP: GET /kyc/status FAILED]:", err?.error || err);
+        } catch {
+          // Ignore AbortError and query cancellations
         }
       },
     }),
@@ -117,9 +114,6 @@ export const kycApi = baseApi.injectEndpoints({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          console.log("\n================ [APP: POST /kyc/level-2/submit-info RESPONSE] ================");
-          console.log(JSON.stringify(data, null, 2));
-          console.log("===============================================================================\n");
           const kycData = (data as any)?.data || data;
           if (kycData) {
             dispatch(
@@ -129,8 +123,8 @@ export const kycApi = baseApi.injectEndpoints({
               })
             );
           }
-        } catch (err: any) {
-          console.log("❌ [APP: POST /kyc/level-2/submit-info FAILED]:", err?.error || err);
+        } catch {
+          // Ignore AbortError and mutation cancellations
         }
       },
     }),
@@ -143,9 +137,6 @@ export const kycApi = baseApi.injectEndpoints({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          console.log("\n================ [APP: POST /kyc/level-2/scan-id RESPONSE] ================");
-          console.log(JSON.stringify(data, null, 2));
-          console.log("===========================================================================\n");
           const kycData = (data as any)?.data || data;
           if (kycData) {
             dispatch(
@@ -155,8 +146,8 @@ export const kycApi = baseApi.injectEndpoints({
               })
             );
           }
-        } catch (err: any) {
-          console.log("❌ [APP: POST /kyc/level-2/scan-id FAILED]:", err?.error || err);
+        } catch {
+          // Ignore AbortError and mutation cancellations
         }
       },
     }),
@@ -170,9 +161,6 @@ export const kycApi = baseApi.injectEndpoints({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          console.log("\n================ [APP: POST /kyc/level-2/face-verify RESPONSE] ================");
-          console.log(JSON.stringify(data, null, 2));
-          console.log("==============================================================================\n");
           const kycData = (data as any)?.data || data;
           if (kycData) {
             dispatch(
@@ -182,8 +170,8 @@ export const kycApi = baseApi.injectEndpoints({
               })
             );
           }
-        } catch (err: any) {
-          console.log("❌ [APP: POST /kyc/level-2/face-verify FAILED]:", err?.error || err);
+        } catch {
+          // Ignore AbortError and mutation cancellations
         }
       },
     }),
@@ -201,9 +189,6 @@ export const kycApi = baseApi.injectEndpoints({
       async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          console.log("\n================ [APP: POST /kyc/level-3/upload-docs RESPONSE] ================");
-          console.log(JSON.stringify(data, null, 2));
-          console.log("==============================================================================\n");
           const kycData = (data as any)?.data || data;
           if (kycData) {
             dispatch(
@@ -213,8 +198,8 @@ export const kycApi = baseApi.injectEndpoints({
               })
             );
           }
-        } catch (err: any) {
-          console.log("❌ [APP: POST /kyc/level-3/upload-docs FAILED]:", err?.error || err);
+        } catch {
+          // Ignore AbortError and mutation cancellations
         }
       },
     }),
@@ -224,9 +209,6 @@ export const kycApi = baseApi.injectEndpoints({
       async onQueryStarted(_, { dispatch, getState, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          console.log("\n================ [APP: GET /kyc/documents RESPONSE] ================");
-          console.log(JSON.stringify(data, null, 2));
-          console.log("===================================================================\n");
           const kycPayload: any = (data as any)?.data || data;
           if (kycPayload) {
             const state = getState() as any;
@@ -270,8 +252,8 @@ export const kycApi = baseApi.injectEndpoints({
               }
             }
           }
-        } catch (err: any) {
-          console.log("❌ [APP: GET /kyc/documents FAILED]:", err?.error || err);
+        } catch {
+          // Ignore AbortError and query cancellations
         }
       },
     }),

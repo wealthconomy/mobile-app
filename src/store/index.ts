@@ -12,11 +12,24 @@ import completedPortfolioReducer from "./slices/completedPortfolioSlice";
 let lastStoredUserId: string | number | null = null;
 
 export const authResetListenerMiddleware: Middleware = (storeApi) => (next) => (action: any) => {
-  // 1. On logout, immediately purge all cached API data
+  // 1. On logout, check if previously authenticated before forwarding action
   if (action?.type === logout.type) {
     lastStoredUserId = null;
-    storeApi.dispatch(baseApi.util.resetApiState());
-    return next(action);
+    const currentState = storeApi.getState();
+    const wasAuthenticated = Boolean(
+      currentState?.auth?.isAuthenticated ||
+      currentState?.auth?.token ||
+      currentState?.auth?.user
+    );
+
+    const result = next(action);
+
+    // Only reset cache if the session was authenticated, and after Redux auth state is cleared
+    if (wasAuthenticated) {
+      storeApi.dispatch(baseApi.util.resetApiState());
+    }
+
+    return result;
   }
 
   // 2. On setCredentials, check if the login stores a different user id from the one previously stored
