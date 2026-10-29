@@ -17,6 +17,7 @@ import {
 import { useUpdateMyProfileMutation, useGetMyProfileQuery } from "@/src/store/api/userApi";
 import { useImageUpload } from "@/src/hooks/useImageUpload";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import { idDocStatus, faceDocStatus } from "@/src/features/kyc/utils/kycState";
 
 import {
   Step1PersonalData,
@@ -56,13 +57,11 @@ export default function KYCLevel2Screen() {
   const kycPayload: any = kycDocsResponse?.data;
   const kycData = kycPayload?.data || kycPayload;
 
-  const ninStatusUpper = (kycData?.ninStatus || "").toUpperCase();
-  const faceStatusUpper = (kycData?.faceStatus || "").toUpperCase();
+  const isIdRejected = idDocStatus(kycData) === "REJECTED";
+  const isNinRejected = isIdRejected;
+  const isFaceRejected = faceDocStatus(kycData) === "REJECTED";
   const kycStatusUpper = (kycStatusResponse?.data?.status || user?.kycStatus || "").toUpperCase();
-
-  const isNinRejected = ninStatusUpper === "REJECTED";
-  const isFaceRejected = faceStatusUpper === "REJECTED";
-  const isLevel2Rejected = isNinRejected || isFaceRejected || kycStatusUpper === "REJECTED";
+  const isLevel2Rejected = isIdRejected || isFaceRejected || kycStatusUpper === "REJECTED";
 
   const idReason = isNinRejected ? (kycData?.ninRejectionReason || kycData?.rejectionReason) : null;
   const faceReason = isFaceRejected ? (kycData?.faceRejectionReason || kycData?.rejectionReason) : null;

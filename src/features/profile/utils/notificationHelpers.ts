@@ -15,7 +15,55 @@ export const MONTHS = [
   "December",
 ];
 
+export const isKycNotification = (item: NotificationItem): boolean => {
+  const dataType = typeof item.data?.type === "string" ? item.data.type.toUpperCase() : "";
+  if (dataType.startsWith("KYC")) return true;
+
+  if (item.data?.route === "/profile/security") return true;
+
+  const dataIsNull = item.data === null || item.data === undefined;
+  const title = (item.title || "").trim();
+  if (dataIsNull && /^kyc/i.test(title)) return true;
+
+  return false;
+};
+
 export const getNotificationVisuals = (item: NotificationItem) => {
+  // KYC specific mappings
+  if (isKycNotification(item)) {
+    const text = `${item.data?.type || ""} ${item.title || ""}`.toLowerCase();
+    if (text.includes("verified") || text.includes("approved")) {
+      return {
+        iconName: "shield-checkmark",
+        iconFamily: "Ionicons" as const,
+        iconColor: "#FFFFFF",
+        circleColor: "#16A34A",
+      };
+    }
+    if (text.includes("rejected") || text.includes("failed")) {
+      return {
+        iconName: "alert-circle",
+        iconFamily: "Ionicons" as const,
+        iconColor: "#FFFFFF",
+        circleColor: "#EF4444",
+      };
+    }
+    if (text.includes("review") || text.includes("pending")) {
+      return {
+        iconName: "time",
+        iconFamily: "Ionicons" as const,
+        iconColor: "#FFFFFF",
+        circleColor: "#D97706",
+      };
+    }
+    return {
+      iconName: "shield-outline",
+      iconFamily: "Ionicons" as const,
+      iconColor: "#FFFFFF",
+      circleColor: "#155D5F",
+    };
+  }
+
   const kind = (item.kind || item.data?.type || "").toLowerCase();
   const title = (item.title || "").toLowerCase();
 

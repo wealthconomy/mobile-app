@@ -11,6 +11,7 @@ import {
   useMarkNotificationReadMutation,
 } from "@/src/store/api/notificationApi";
 import { Ionicons } from "@expo/vector-icons";
+import { isKycNotification } from "@/src/features/profile/utils/notificationHelpers";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
@@ -101,7 +102,9 @@ export default function NotificationsScreen() {
       (typeof item.data?.type === "string" &&
         item.data.type.toLowerCase().includes("referral"));
 
-    if (isReferral) {
+    if (isKycNotification(item)) {
+      router.push("/profile/security" as any);
+    } else if (isReferral) {
       router.push("/profile/my-referrals" as any);
     } else if (item.data?.route) {
       router.push(item.data.route as any);

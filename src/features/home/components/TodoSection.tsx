@@ -185,7 +185,7 @@ export const TodoSection = () => {
         title: "Address Under Review",
         description: "Your Level 3 address documents are being verified",
         icon: <Ionicons name="time-outline" size={18} color="#D97706" />,
-        onPress: () => router.push("/kyc/level2-intro"),
+        onPress: () => router.push("/kyc/level3-intro"),
         isComplete: false,
       });
     } else if (!l3HasDoc) {

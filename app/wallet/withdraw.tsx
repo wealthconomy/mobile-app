@@ -11,7 +11,7 @@ import { useInitiateWithdrawalMutation } from "@/src/store/api/withdrawalApi";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { useGetKycStatusQuery, useGetKycDocumentsQuery } from "@/src/store/api/kycApi";
 import { updateKycLevel } from "@/src/store/slices/authSlice";
-import { isLevel2Verified, faceDocStatus } from "@/src/features/kyc/utils/kycState";
+import { isLevel2Verified } from "@/src/features/kyc/utils/kycState";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { PayoutAccount, PayoutBank } from "@/src/types/wallet";
 import { useDispatch, useSelector } from "react-redux";
@@ -117,19 +117,9 @@ export default function WithdrawScreen() {
   const currentKycLevel = kycData?.data?.currentLevel ?? user?.kycLevel ?? 1;
   const kycStatus = String(kycData?.data?.status || user?.kycStatus || "").toUpperCase();
 
-  const hasDocsVerified =
-    isLevel2Verified(kycDocs, user) ||
-    (kycDocs?.faceVerified && (kycDocs?.ninProviderVerified || Boolean(kycDocs?.idNumber) || Boolean(kycDocs?.bvn))) ||
-    kycDocs?.faceVerified === true ||
-    faceDocStatus(kycDocs) === "APPROVED";
-
   const isKycVerified =
-    currentKycLevel >= 2 ||
-    localKyc2Completed ||
-    Boolean(user?.isVerified) ||
-    kycStatus === "VERIFIED" ||
-    kycStatus === "APPROVED" ||
-    hasDocsVerified;
+    isLevel2Verified(kycDocs, user) ||
+    (currentKycLevel >= 2 && (kycStatus === "VERIFIED" || kycStatus === "APPROVED"));
 
   useEffect(() => {
     if (isKycVerified && (user?.kycLevel || 1) < 2) {
@@ -747,7 +737,7 @@ export default function WithdrawScreen() {
       </Modal>
 
       {/* KYC Level 2 Verification Gate Modal */}
-      <Modal visible={!isKycVerified && !isCheckingStorage && !isLoadingKycStatus && !isLoadingKycDocs} transparent animationType="fade">
+      <Modal visible={!isKycVerified && !isLoadingKycStatus && !isLoadingKycDocs} transparent animationType="fade">
         <View className="flex-1 bg-black/60 justify-center items-center px-6">
           <View className="bg-white rounded-[28px] p-7 items-center w-full max-w-[340px]">
             <View className="w-16 h-16 rounded-full bg-[#155D5F]/10 items-center justify-center mb-4">
