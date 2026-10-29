@@ -18,6 +18,7 @@ import {
   isLevel3Verified as checkIsLevel3Verified,
   isLevel3Rejected as checkIsLevel3Rejected,
   isLevel3Pending as checkIsLevel3Pending,
+  utilityRejectionText,
 } from "@/src/features/kyc/utils/kycState";
 
 const THEME_TEAL = "#155D5F";
@@ -44,7 +45,7 @@ export default function KYCLevel3Intro() {
   const isLevel3Pending = checkIsLevel3Pending(kycDocs, user);
 
   const rejectionReason =
-    (kycDocs?.utilityStatus === "Rejected" && kycDocs?.utilityRejectionReason) ||
+    utilityRejectionText(kycDocs) ||
     (kycStatus === "REJECTED" ? (kycData?.data?.kycRejectionReason || user?.kycRejectionReason) : null) ||
     "Document verification was not approved. Please review and re-upload your proof of address.";
 

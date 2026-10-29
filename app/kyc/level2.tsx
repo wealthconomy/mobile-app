@@ -17,7 +17,12 @@ import {
 import { useUpdateMyProfileMutation, useGetMyProfileQuery } from "@/src/store/api/userApi";
 import { useImageUpload } from "@/src/hooks/useImageUpload";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
-import { idDocStatus, faceDocStatus } from "@/src/features/kyc/utils/kycState";
+import {
+  idDocStatus,
+  faceDocStatus,
+  idRejectionText,
+  faceRejectionText,
+} from "@/src/features/kyc/utils/kycState";
 
 import {
   Step1PersonalData,
@@ -63,12 +68,13 @@ export default function KYCLevel2Screen() {
   const kycStatusUpper = (kycStatusResponse?.data?.status || user?.kycStatus || "").toUpperCase();
   const isLevel2Rejected = isIdRejected || isFaceRejected || kycStatusUpper === "REJECTED";
 
-  const idReason = isNinRejected ? (kycData?.ninRejectionReason || kycData?.rejectionReason) : null;
-  const faceReason = isFaceRejected ? (kycData?.faceRejectionReason || kycData?.rejectionReason) : null;
+  const idReason = isIdRejected ? idRejectionText(kycData) : null;
+  const faceReason = isFaceRejected ? faceRejectionText(kycData) : null;
   const generalReason =
+    idReason ||
+    faceReason ||
+    kycData?.kycRejectionReason ||
     kycData?.rejectionReason ||
-    kycData?.ninRejectionReason ||
-    kycData?.faceRejectionReason ||
     kycStatusResponse?.data?.kycRejectionReason ||
     (kycStatusResponse?.data as any)?.reason ||
     user?.kycRejectionReason;

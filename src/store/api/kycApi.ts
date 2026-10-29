@@ -1,6 +1,13 @@
 import { updateKycLevel, updateKycStatus, updateKycInfo } from "../slices/authSlice";
 import { baseApi, ApiResponse } from "./baseApi";
-import { isLevel2Verified, isLevel2Rejected, idDocStatus, faceDocStatus } from "../../features/kyc/utils/kycState";
+import {
+  isLevel2Verified,
+  isLevel2Rejected,
+  idDocStatus,
+  faceDocStatus,
+  idRejectionText,
+  faceRejectionText,
+} from "../../features/kyc/utils/kycState";
 
 export interface KycStatusResponse {
   currentLevel: number;
@@ -45,6 +52,8 @@ export interface KycDocumentsResponse {
   idType?: string;
   idNumber?: string;
   idImageUrl?: string;
+  idStatus?: "Pending" | "Approved" | "Rejected" | string;
+  idRejectionReason?: string;
   ninProviderVerified?: boolean;
   ninExtracted?: { extractedName?: string; [key: string]: any };
   faceVerified?: boolean;
@@ -232,8 +241,8 @@ export const kycApi = baseApi.injectEndpoints({
 
             if (isLevel2Rejected(kycPayload, currentUser)) {
               newStatus = "REJECTED";
-              const idReason = idDocStatus(kycPayload) === "REJECTED" ? (kycPayload.ninRejectionReason || kycPayload.rejectionReason) : null;
-              const faceReason = faceDocStatus(kycPayload) === "REJECTED" ? (kycPayload.faceRejectionReason || kycPayload.rejectionReason) : null;
+              const idReason = idDocStatus(kycPayload) === "REJECTED" ? idRejectionText(kycPayload) : null;
+              const faceReason = faceDocStatus(kycPayload) === "REJECTED" ? faceRejectionText(kycPayload) : null;
               newReason = (idReason && faceReason && idReason !== faceReason)
                 ? `ID: ${idReason} | Face: ${faceReason}`
                 : idReason || faceReason || kycPayload.kycRejectionReason || kycPayload.rejectionReason || prevReason;

@@ -23,6 +23,8 @@ import { logout } from "@/src/store/slices/authSlice";
 import {
   idDocStatus,
   faceDocStatus,
+  idRejectionText,
+  faceRejectionText,
   isLevel2Verified as checkIsLevel2Verified,
   isLevel2Rejected as checkIsLevel2Rejected,
   isLevel2Pending as checkIsLevel2Pending,
@@ -78,12 +80,13 @@ export default function SecurityScreen() {
 
   const isIdRejected = idDocStatus(kycDocs) === "REJECTED";
   const isFaceRejected = faceDocStatus(kycDocs) === "REJECTED";
-  const idReason = isIdRejected ? (kycDocs?.ninRejectionReason || kycDocs?.rejectionReason) : null;
-  const faceReason = isFaceRejected ? (kycDocs?.faceRejectionReason || kycDocs?.rejectionReason) : null;
+  const idReason = isIdRejected ? idRejectionText(kycDocs) : null;
+  const faceReason = isFaceRejected ? faceRejectionText(kycDocs) : null;
   const generalReason =
+    idReason ||
+    faceReason ||
+    kycDocs?.kycRejectionReason ||
     kycDocs?.rejectionReason ||
-    kycDocs?.ninRejectionReason ||
-    kycDocs?.faceRejectionReason ||
     user?.kycRejectionReason;
 
   const specificRejectionReason =

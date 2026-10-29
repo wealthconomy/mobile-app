@@ -1,9 +1,11 @@
 import React from "react";
 import {
   Pressable,
+  StyleProp,
   StyleSheet,
   Text,
   View,
+  ViewStyle,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,6 +17,9 @@ export interface PasscodeKeypadProps {
   onClear?: () => void;
   disabled?: boolean;
   leftSlot?: React.ReactNode;
+  disableBottomInset?: boolean;
+  compact?: boolean;
+  style?: StyleProp<ViewStyle>;
 }
 
 const DIGIT_ROWS = [
@@ -29,12 +34,15 @@ export const PasscodeKeypad: React.FC<PasscodeKeypadProps> = ({
   onClear,
   disabled = false,
   leftSlot,
+  disableBottomInset = false,
+  compact,
+  style,
 }) => {
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const isCompact = windowHeight <= 700;
-  const keyHeight = isCompact ? 44 : 52;
-  const bottomInset = Math.max(insets.bottom, 0);
+  const isCompact = compact ?? windowHeight <= 700;
+  const keyHeight = isCompact ? 42 : 52;
+  const bottomInset = disableBottomInset ? 0 : Math.max(insets.bottom, 0);
 
   return (
     <View
@@ -43,6 +51,7 @@ export const PasscodeKeypad: React.FC<PasscodeKeypadProps> = ({
         {
           paddingBottom: bottomInset + 8,
         },
+        style,
       ]}
       accessible={false}
     >

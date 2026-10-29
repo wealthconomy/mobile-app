@@ -16,6 +16,8 @@ import {
   hasLevel3AddressDoc,
   idDocStatus,
   faceDocStatus,
+  idRejectionText,
+  faceRejectionText,
 } from "@/src/features/kyc/utils/kycState";
 
 interface TodoCardProps {
@@ -112,12 +114,13 @@ export const TodoSection = () => {
     if (l2Rejected) {
       const isIdRejected = idDocStatus(kycDocs) === "REJECTED";
       const isFaceRejected = faceDocStatus(kycDocs) === "REJECTED";
-      const idReason = isIdRejected ? (kycDocs?.ninRejectionReason || kycDocs?.rejectionReason) : null;
-      const faceReason = isFaceRejected ? (kycDocs?.faceRejectionReason || kycDocs?.rejectionReason) : null;
+      const idReason = isIdRejected ? idRejectionText(kycDocs) : null;
+      const faceReason = isFaceRejected ? faceRejectionText(kycDocs) : null;
       const generalReason =
+        idReason ||
+        faceReason ||
+        kycDocs?.kycRejectionReason ||
         kycDocs?.rejectionReason ||
-        kycDocs?.ninRejectionReason ||
-        kycDocs?.faceRejectionReason ||
         user?.kycRejectionReason;
 
       const specificReason =

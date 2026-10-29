@@ -12,6 +12,7 @@ import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { useGetKycStatusQuery, useGetKycDocumentsQuery } from "@/src/store/api/kycApi";
 import { updateKycLevel } from "@/src/store/slices/authSlice";
 import { isLevel2Verified } from "@/src/features/kyc/utils/kycState";
+import { PasscodeKeypad } from "@/src/components/common/PasscodeKeypad";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { PayoutAccount, PayoutBank } from "@/src/types/wallet";
 import { useDispatch, useSelector } from "react-redux";
@@ -25,6 +26,7 @@ import {
   Alert,
   Image,
   Modal,
+  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -39,6 +41,8 @@ type Step =
   | "recipient-details"
   | "select-bank"
   | "preview";
+
+const USE_CUSTOM_KEYPAD = Platform.OS === "android";
 
 export default function WithdrawScreen() {
   const { plan } = useLocalSearchParams<{ plan: string }>();
@@ -544,7 +548,32 @@ export default function WithdrawScreen() {
     setPinValue("");
     setPinError("");
     setShowPinModal(true);
-    setTimeout(() => pinInputRef.current?.focus(), 300);
+    if (!USE_CUSTOM_KEYPAD) {
+      setTimeout(() => pinInputRef.current?.focus(), 300);
+    }
+  };
+
+  const handleKeypadDigit = (digit: string) => {
+    if (isVerifyingPin || isSubmittingWithdrawal) return;
+    if (pinValue.length >= 4) return;
+    const nextPin = (pinValue + digit).slice(0, 4);
+    setPinValue(nextPin);
+    setPinError("");
+    if (nextPin.length === 4) {
+      handleVerifyAndSubmitWithdrawal(nextPin);
+    }
+  };
+
+  const handleKeypadBackspace = () => {
+    if (isVerifyingPin || isSubmittingWithdrawal) return;
+    setPinValue((prev) => prev.slice(0, -1));
+    setPinError("");
+  };
+
+  const handleKeypadClear = () => {
+    if (isVerifyingPin || isSubmittingWithdrawal) return;
+    setPinValue("");
+    setPinError("");
   };
 
   const handleVerifyAndSubmitWithdrawal = async (enteredPin: string) => {
@@ -770,23 +799,32 @@ export default function WithdrawScreen() {
 
       {/* 4-Digit Transaction PIN Authorization Modal */}
       <Modal visible={showPinModal} transparent animationType="fade">
-        <View className="flex-1 bg-black/60 justify-center items-center px-6">
-          <View className="bg-white rounded-[28px] p-6 items-center w-full max-w-[340px]">
-            <View className="w-14 h-14 rounded-full bg-[#E6F4F4] items-center justify-center mb-3">
-              <Ionicons name="keypad-outline" size={28} color="#155D5F" />
+        <View className="flex-1 bg-black/60 justify-center items-center px-4">
+          <View
+            className="bg-white rounded-[28px] p-5 items-center w-full max-w-[340px]"
+            style={{ maxHeight: "96%" }}
+          >
+            <View className="w-12 h-12 rounded-full bg-[#E6F4F4] items-center justify-center mb-2">
+              <Ionicons name="keypad-outline" size={24} color="#155D5F" />
             </View>
-            <Text className="text-[#1A1A1A] font-extrabold text-[19px] text-center mb-1">
+            <Text className="text-[#1A1A1A] font-extrabold text-[18px] text-center mb-1">
               Enter Transaction PIN
             </Text>
-            <Text className="text-[#6B7280] text-[12px] text-center mb-6">
+            <Text className="text-[#6B7280] text-[12px] text-center mb-3">
               Authorize withdrawal of ₦{formatAmount(amount)} to {userName || "recipient"}
             </Text>
 
             {/* Masked PIN Dots */}
             <TouchableOpacity
               activeOpacity={1}
-              onPress={() => pinInputRef.current?.focus()}
-              className="flex-row justify-center gap-3 mb-4"
+              onPress={() => {
+                if (!USE_CUSTOM_KEYPAD) {
+                  pinInputRef.current?.focus();
+                }
+              }}
+              accessibilityLabel={`Transaction PIN, ${pinValue.length} of 4 digits entered`}
+              accessible={true}
+              className="flex-row justify-center gap-3 mb-3"
             >
               {Array.from({ length: 4 }).map((_, index) => {
                 const isFilled = index < pinValue.length;
@@ -794,8 +832,8 @@ export default function WithdrawScreen() {
                   <View
                     key={index}
                     style={{
-                      width: 52,
-                      height: 56,
+                      width: USE_CUSTOM_KEYPAD ? 48 : 52,
+                      height: USE_CUSTOM_KEYPAD ? 50 : 56,
                       borderRadius: 14,
                       borderWidth: 2,
                       borderColor: isFilled ? "#155D5F" : "#E5E7EB",
@@ -819,56 +857,104 @@ export default function WithdrawScreen() {
               })}
             </TouchableOpacity>
 
-            <TextInput
-              ref={pinInputRef}
-              value={pinValue}
-              onChangeText={(val) => {
-                const cleaned = val.replace(/[^0-9]/g, "").slice(0, 4);
-                setPinValue(cleaned);
-                setPinError("");
-                if (cleaned.length === 4) {
-                  handleVerifyAndSubmitWithdrawal(cleaned);
-                }
-              }}
-              keyboardType="numeric"
-              maxLength={4}
-              style={{ position: "absolute", opacity: 0, width: 1, height: 1 }}
-              autoFocus
-            />
+            {!USE_CUSTOM_KEYPAD && (
+              <TextInput
+                ref={pinInputRef}
+                value={pinValue}
+                onChangeText={(val) => {
+                  const cleaned = val.replace(/[^0-9]/g, "").slice(0, 4);
+                  setPinValue(cleaned);
+                  setPinError("");
+                  if (cleaned.length === 4) {
+                    handleVerifyAndSubmitWithdrawal(cleaned);
+                  }
+                }}
+                keyboardType="numeric"
+                maxLength={4}
+                style={{ position: "absolute", opacity: 0, width: 1, height: 1 }}
+                autoFocus
+              />
+            )}
 
             {!!pinError && (
-              <Text className="text-[#DC2626] font-semibold text-[12px] text-center mb-3">
+              <Text className="text-[#DC2626] font-semibold text-[12px] text-center mb-2">
                 {pinError}
               </Text>
             )}
 
             {isVerifyingPin || isSubmittingWithdrawal ? (
-              <View className="py-3 items-center">
+              <View className="py-2 items-center">
                 <ActivityIndicator size="small" color="#155D5F" />
-                <Text className="text-[#6B7280] text-[11px] mt-1.5">
+                <Text className="text-[#6B7280] text-[11px] mt-1">
                   Verifying PIN & initiating transfer...
                 </Text>
               </View>
             ) : null}
 
-            <TouchableOpacity
-              onPress={() => {
-                setShowPinModal(false);
-                router.push("/profile/security/change-pin" as any);
-              }}
-              className="mt-2 py-1.5"
-            >
-              <Text className="text-[#155D5F] font-bold text-[13px]">
-                Forgot PIN?
-              </Text>
-            </TouchableOpacity>
+            {USE_CUSTOM_KEYPAD ? (
+              <>
+                <View style={{ width: "100%", marginVertical: 4 }}>
+                  <PasscodeKeypad
+                    onDigit={handleKeypadDigit}
+                    onBackspace={handleKeypadBackspace}
+                    onClear={handleKeypadClear}
+                    disabled={isVerifyingPin || isSubmittingWithdrawal}
+                    disableBottomInset={true}
+                    compact={true}
+                    style={{
+                      backgroundColor: "#F3F4F6",
+                      borderRadius: 16,
+                      paddingHorizontal: 6,
+                      paddingTop: 6,
+                      paddingBottom: 6,
+                      gap: 6,
+                    }}
+                  />
+                </View>
 
-            <TouchableOpacity
-              onPress={() => setShowPinModal(false)}
-              className="mt-2 py-2"
-            >
-              <Text className="text-[#6B7280] font-semibold text-[13px]">Cancel</Text>
-            </TouchableOpacity>
+                <View className="flex-row items-center justify-between w-full px-2 mt-2">
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowPinModal(false);
+                      router.push("/profile/security/change-pin" as any);
+                    }}
+                    className="py-1.5"
+                  >
+                    <Text className="text-[#155D5F] font-bold text-[13px]">
+                      Forgot PIN?
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setShowPinModal(false)}
+                    className="py-1.5"
+                  >
+                    <Text className="text-[#6B7280] font-semibold text-[13px]">Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowPinModal(false);
+                    router.push("/profile/security/change-pin" as any);
+                  }}
+                  className="mt-2 py-1.5"
+                >
+                  <Text className="text-[#155D5F] font-bold text-[13px]">
+                    Forgot PIN?
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setShowPinModal(false)}
+                  className="mt-2 py-2"
+                >
+                  <Text className="text-[#6B7280] font-semibold text-[13px]">Cancel</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       </Modal>

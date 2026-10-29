@@ -13,6 +13,8 @@ import { useGetKycDocumentsQuery, useGetKycStatusQuery } from "@/src/store/api/k
 import {
   idDocStatus,
   faceDocStatus,
+  idRejectionText,
+  faceRejectionText,
   isLevel2Verified as checkIsLevel2Verified,
   isLevel2Rejected as checkIsLevel2Rejected,
   isLevel2Pending as checkIsLevel2Pending,
@@ -39,12 +41,13 @@ export default function KYCLevel2Intro() {
   const isLevel2Complete = checkIsLevel2Verified(kycDocs, user);
 
   // Extract specific rejection reasons
-  const idReason = isIdRejected ? (kycDocs?.ninRejectionReason || kycDocs?.rejectionReason) : null;
-  const faceReason = isFaceRejected ? (kycDocs?.faceRejectionReason || kycDocs?.rejectionReason) : null;
+  const idReason = isIdRejected ? idRejectionText(kycDocs) : null;
+  const faceReason = isFaceRejected ? faceRejectionText(kycDocs) : null;
   const generalReason =
+    idReason ||
+    faceReason ||
+    kycDocs?.kycRejectionReason ||
     kycDocs?.rejectionReason ||
-    kycDocs?.ninRejectionReason ||
-    kycDocs?.faceRejectionReason ||
     kycStatusResponse?.data?.kycRejectionReason ||
     (kycStatusResponse?.data as any)?.reason ||
     user?.kycRejectionReason ||

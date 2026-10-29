@@ -27,9 +27,11 @@ export interface KycDocsLike {
   addressDocUrl?: string;
   proofOfAddressUrl?: string;
   utilityBillUrl?: string;
+  idRejectionReason?: string;
   ninRejectionReason?: string;
   faceRejectionReason?: string;
   utilityRejectionReason?: string;
+  passportRejectionReason?: string;
   rejectionReason?: string;
   kycRejectionReason?: string;
   [key: string]: any;
@@ -233,3 +235,89 @@ export function isLevel3Pending(
   const utility = utilityDocStatus(docs);
   return utility === "PENDING" || utility === "IN_REVIEW";
 }
+
+/**
+ * Returns the rejection reason for ID document.
+ * Picks the first non-empty of idRejectionReason, ninRejectionReason, rejectionReason.
+ * When ID is REJECTED and all are empty, falls back to docs.kycRejectionReason.
+ */
+export function idRejectionText(docs?: KycDocsLike | null): string | null {
+  if (!docs) return null;
+
+  const candidates = [
+    docs.idRejectionReason,
+    docs.ninRejectionReason,
+    docs.rejectionReason,
+  ];
+
+  for (const reason of candidates) {
+    if (typeof reason === "string" && reason.trim().length > 0) {
+      return reason.trim();
+    }
+  }
+
+  if (idDocStatus(docs) === "REJECTED") {
+    if (typeof docs.kycRejectionReason === "string" && docs.kycRejectionReason.trim().length > 0) {
+      return docs.kycRejectionReason.trim();
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Returns the rejection reason for Face/Selfie document.
+ * Picks the first non-empty of faceRejectionReason, rejectionReason.
+ * When Face is REJECTED and both are empty, falls back to docs.kycRejectionReason.
+ */
+export function faceRejectionText(docs?: KycDocsLike | null): string | null {
+  if (!docs) return null;
+
+  const candidates = [
+    docs.faceRejectionReason,
+    docs.rejectionReason,
+  ];
+
+  for (const reason of candidates) {
+    if (typeof reason === "string" && reason.trim().length > 0) {
+      return reason.trim();
+    }
+  }
+
+  if (faceDocStatus(docs) === "REJECTED") {
+    if (typeof docs.kycRejectionReason === "string" && docs.kycRejectionReason.trim().length > 0) {
+      return docs.kycRejectionReason.trim();
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Returns the rejection reason for Utility/Proof of Address document.
+ * Picks the first non-empty of utilityRejectionReason, rejectionReason.
+ * When Utility is REJECTED and both are empty, falls back to docs.kycRejectionReason.
+ */
+export function utilityRejectionText(docs?: KycDocsLike | null): string | null {
+  if (!docs) return null;
+
+  const candidates = [
+    docs.utilityRejectionReason,
+    docs.rejectionReason,
+  ];
+
+  for (const reason of candidates) {
+    if (typeof reason === "string" && reason.trim().length > 0) {
+      return reason.trim();
+    }
+  }
+
+  if (utilityDocStatus(docs) === "REJECTED") {
+    if (typeof docs.kycRejectionReason === "string" && docs.kycRejectionReason.trim().length > 0) {
+      return docs.kycRejectionReason.trim();
+    }
+  }
+
+  return null;
+}
+

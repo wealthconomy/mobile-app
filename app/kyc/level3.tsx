@@ -16,6 +16,7 @@ import {
   isLevel3Rejected as checkIsLevel3Rejected,
   isLevel3Pending as checkIsLevel3Pending,
   hasLevel3AddressDoc as checkHasLevel3AddressDoc,
+  utilityRejectionText,
 } from "@/src/features/kyc/utils/kycState";
 
 import { NIGERIA_STATES } from "@/src/constants/nigeriaLocations";
@@ -82,9 +83,11 @@ export default function KYCLevel3Screen() {
   const passportStatus = kycData?.passportStatus;
   const passportRejectionReason = kycData?.passportRejectionReason;
   const utilityStatus = kycData?.utilityStatus;
-  const utilityRejectionReason = kycData?.utilityRejectionReason;
+  const utilityRejectionReason = utilityRejectionText(kycData);
   const overallRejectionReason =
+    utilityRejectionReason ||
     kycData?.kycRejectionReason ||
+    kycData?.rejectionReason ||
     kycStatusResponse?.data?.kycRejectionReason ||
     user?.kycRejectionReason;
 
