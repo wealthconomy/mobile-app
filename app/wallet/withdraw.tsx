@@ -35,6 +35,7 @@ import {
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 
 type Step =
   | "select-recipient"
@@ -84,6 +85,7 @@ export default function WithdrawScreen() {
   const [pinValue, setPinValue] = useState("");
   const [pinError, setPinError] = useState("");
   const pinInputRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   const savedPayouts = savedPayoutsData?.items || [];
   const banks = banksData?.items || [];
@@ -730,12 +732,19 @@ export default function WithdrawScreen() {
       <StatusBar style="dark" />
       <Header title={getTitle()} onBack={handleBack} />
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {step === "select-recipient" && renderSelectRecipient()}
-        {step === "recipient-details" && renderRecipientDetails()}
-        {step === "select-bank" && renderSelectBank()}
-        {step === "preview" && renderPreview()}
-      </ScrollView>
+      <KeyboardAwareScreen style={{ flex: 1 }} scrollRef={scrollRef}>
+        <ScrollView
+          ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
+          className="flex-1"
+          showsVerticalScrollIndicator={false}
+        >
+          {step === "select-recipient" && renderSelectRecipient()}
+          {step === "recipient-details" && renderRecipientDetails()}
+          {step === "select-bank" && renderSelectBank()}
+          {step === "preview" && renderPreview()}
+        </ScrollView>
+      </KeyboardAwareScreen>
 
       <Modal visible={showSuccess} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-10">

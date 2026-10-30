@@ -1,10 +1,9 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, Eye, EyeOff, Lock } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Alert,
   Image,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StatusBar,
@@ -15,6 +14,7 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "../../src/components/common/KeyboardAwareScreen";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useResetPasswordMutation } from "../../src/store/api/authApi";
 
@@ -41,6 +41,7 @@ const STRENGTH_RULES: StrengthRule[] = [
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
+  const scrollRef = useRef<ScrollView>(null);
   const params = useLocalSearchParams<{ email: string; resetToken?: string }>();
   const email = params.email ?? "";
   const [resetToken, setResetToken] = useState(params.resetToken ?? "");
@@ -163,11 +164,13 @@ export default function ResetPasswordScreen() {
         </Text>
       </TouchableOpacity>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      <KeyboardAwareScreen
         style={{ flex: 1 }}
+        scrollRef={scrollRef}
       >
         <ScrollView
+          ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 24,
@@ -384,7 +387,7 @@ export default function ResetPasswordScreen() {
           </TouchableOpacity>
           </Animated.View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
     </SafeAreaView>
   );
 }

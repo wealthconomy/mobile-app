@@ -27,6 +27,7 @@ import {
 } from "react-native";
 import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -43,6 +44,7 @@ const CATEGORY_DETAILS: Record<string, { subtitle: string; emoji: string }> = {
 };
 
 export default function CreateGoalScreen() {
+  const formScrollRef = useRef<ScrollView>(null);
   const { category: initialCategory } = useLocalSearchParams<{
     category: string;
   }>();
@@ -1306,17 +1308,16 @@ export default function CreateGoalScreen() {
           }}
         />
       )}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          className="flex-1"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 40 }}
-        >
-          <View className="py-2">
-            {step === "form" && (
+      {step === "form" ? (
+        <KeyboardAwareScreen style={{ flex: 1 }} scrollRef={formScrollRef}>
+          <ScrollView
+            ref={formScrollRef}
+            keyboardShouldPersistTaps="handled"
+            className="flex-1"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
+            <View className="py-2">
               <View>
                 <Text className="px-5 text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mb-4">
                   Start aiming towards your goal
@@ -1349,14 +1350,28 @@ export default function CreateGoalScreen() {
                   </View>
                 )}
               </View>
-            )}
-            {step === "form" && renderForm()}
-            {step === "preview" && renderPreview()}
-            {step === "pin" && renderPin()}
-            {step === "success" && renderSuccess()}
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+              {renderForm()}
+            </View>
+          </ScrollView>
+        </KeyboardAwareScreen>
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <ScrollView
+            className="flex-1"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
+            <View className="py-2">
+              {step === "preview" && renderPreview()}
+              {step === "pin" && renderPin()}
+              {step === "success" && renderSuccess()}
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }

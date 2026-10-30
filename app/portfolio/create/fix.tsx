@@ -28,6 +28,7 @@ import {
 } from "react-native";
 import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 
 const TEAL = "#0B575B";
 
@@ -45,6 +46,7 @@ const DURATION_PRESETS = [
 ];
 
 export default function CreateFixScreen() {
+  const formScrollRef = useRef<ScrollView>(null);
   const params = useLocalSearchParams<{
     amount: string;
     duration: string;
@@ -327,7 +329,12 @@ export default function CreateFixScreen() {
 
   // ─── FORM STEP ───────────────────────────────────────────────────────────────
   const renderFormStep = () => (
-    <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-5">
+    <ScrollView
+      ref={formScrollRef}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      className="flex-1 px-5"
+    >
       {/* Header text */}
       <View className="mb-6 mt-2">
         <View className="flex-row items-center justify-between">
@@ -1448,29 +1455,34 @@ export default function CreateFixScreen() {
         }}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        {step === "form" && renderFormStep()}
-        {step === "preview" && renderPreviewStep()}
-        {step === "pin" && (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 40 }}
-          >
-            {renderPinStep()}
-          </ScrollView>
-        )}
-        {step === "success" && (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 40 }}
-          >
-            {renderSuccessStep()}
-          </ScrollView>
-        )}
-      </KeyboardAvoidingView>
+      {step === "form" ? (
+        <KeyboardAwareScreen style={{ flex: 1 }} scrollRef={formScrollRef}>
+          {renderFormStep()}
+        </KeyboardAwareScreen>
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          {step === "preview" && renderPreviewStep()}
+          {step === "pin" && (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              {renderPinStep()}
+            </ScrollView>
+          )}
+          {step === "success" && (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              {renderSuccessStep()}
+            </ScrollView>
+          )}
+        </KeyboardAvoidingView>
+      )}
 
       {/* Custom Calendar Modal */}
       <Modal

@@ -1,9 +1,8 @@
 import { Link, useRouter } from "expo-router";
 import { AlertCircle, Eye, EyeOff, Lock, Mail } from "lucide-react-native";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Image,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StatusBar,
@@ -14,6 +13,7 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "../../src/components/common/KeyboardAwareScreen";
 import { useDispatch } from "react-redux";
 import { setCredentials } from "../../src/store/slices/authSlice";
 import { useLoginMutation } from "../../src/store/api/authApi";
@@ -36,6 +36,7 @@ export default function LoginScreen() {
 
   const router = useRouter();
   const dispatch = useDispatch();
+  const scrollRef = useRef<ScrollView>(null);
   const [loginMutation] = useLoginMutation();
 
   const clearErrors = () => {
@@ -114,7 +115,8 @@ export default function LoginScreen() {
     borderColor: hasError ? ERROR : BORDER,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: Platform.OS === "android" ? 8 : 14,
+    minHeight: Platform.OS === "android" ? 48 : undefined,
     backgroundColor: MUTED,
     gap: 10,
   });
@@ -122,11 +124,13 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      <KeyboardAwareScreen
         style={{ flex: 1 }}
+        scrollRef={scrollRef}
       >
         <ScrollView
+          ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 24,
@@ -216,7 +220,12 @@ export default function LoginScreen() {
               <TextInput
                 placeholder="Email or Mobile"
                 placeholderTextColor="#9CA3AF"
-                style={{ flex: 1, fontSize: 15, color: DARK }}
+                style={{
+                  flex: 1,
+                  fontSize: 15,
+                  color: DARK,
+                  paddingVertical: Platform.OS === "android" ? 0 : undefined,
+                }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
@@ -251,7 +260,12 @@ export default function LoginScreen() {
               <TextInput
                 placeholder="Password"
                 placeholderTextColor="#9CA3AF"
-                style={{ flex: 1, fontSize: 15, color: DARK }}
+                style={{
+                  flex: 1,
+                  fontSize: 15,
+                  color: DARK,
+                  paddingVertical: Platform.OS === "android" ? 0 : undefined,
+                }}
                 secureTextEntry={!showPassword}
                 value={password}
                 onChangeText={(v) => {
@@ -351,7 +365,7 @@ export default function LoginScreen() {
           </Link>
           </Animated.View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
     </SafeAreaView>
   );
 }

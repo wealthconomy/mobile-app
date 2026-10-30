@@ -1,7 +1,7 @@
 import Header from "@/src/components/common/Header";
 import { CardAddedModal } from "@/src/features/payment/components/PaymentModals";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ScrollView,
   StatusBar,
@@ -19,9 +19,11 @@ import { useLinkMandateMutation, useLazyVerifyPaymentQuery, useListMyMandatesQue
 import * as WebBrowser from "expo-web-browser";
 import { PAYMENT_RETURN_URL, PAYMENT_RETURN_SCHEME_URL } from "@/src/constants/payment";
 import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 
 export default function UseCardScreen() {
   const router = useRouter();
+  const scrollRef = useRef<ScrollView>(null);
   const user = useSelector((state: RootState) => state.auth.user);
   const [email, setEmail] = useState(user?.email || "");
   const [showSuccess, setShowSuccess] = useState(false);
@@ -117,54 +119,58 @@ export default function UseCardScreen() {
       <StatusBar barStyle="dark-content" />
       <Header title="Add Card / Bank Link" />
 
-      <ScrollView
-        className="flex-1 px-5 pt-4"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
-      >
-        <View style={{ marginTop: 20, marginBottom: 30 }}>
-          <Text className="text-[15px] font-bold text-[#155D5F] mb-3">
-            Secure Payment Method Linking
-          </Text>
-          <Text className="text-[13px] text-[#4B5563] leading-[20px]">
-            To link your bank card or authorization mandate, you will be redirected to our secure payment gateway (Paga) to complete a verification step.
-          </Text>
-        </View>
-
-        <View className="gap-y-6">
-          <View>
-            <Text className="text-[14px] font-semibold text-[#323232] mb-2">
-              Billing Email Address
+      <KeyboardAwareScreen style={{ flex: 1 }} scrollRef={scrollRef}>
+        <ScrollView
+          ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
+          className="flex-1 px-5 pt-4"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 40 }}
+        >
+          <View style={{ marginTop: 20, marginBottom: 30 }}>
+            <Text className="text-[15px] font-bold text-[#155D5F] mb-3">
+              Secure Payment Method Linking
             </Text>
-            <View className="h-16 bg-[#F9FAFB] border border-[#F3F4F6] rounded-2xl px-4 justify-center">
-              <TextInput
-                placeholder="email@example.com"
-                placeholderTextColor="#9CA3AF"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                className="text-[15px] font-semibold text-[#111827]"
-              />
+            <Text className="text-[13px] text-[#4B5563] leading-[20px]">
+              To link your bank card or authorization mandate, you will be redirected to our secure payment gateway (Paga) to complete a verification step.
+            </Text>
+          </View>
+
+          <View className="gap-y-6">
+            <View>
+              <Text className="text-[14px] font-semibold text-[#323232] mb-2">
+                Billing Email Address
+              </Text>
+              <View className="h-16 bg-[#F9FAFB] border border-[#F3F4F6] rounded-2xl px-4 justify-center">
+                <TextInput
+                  placeholder="email@example.com"
+                  placeholderTextColor="#9CA3AF"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  className="text-[15px] font-semibold text-[#111827]"
+                />
+              </View>
             </View>
           </View>
-        </View>
 
-        <TouchableOpacity
-          onPress={handleConfirm}
-          disabled={isLoading || verifying || !email}
-          className={`mt-10 h-16 rounded-2xl items-center justify-center shadow-sm ${email && !isLoading && !verifying ? "bg-[#155D5F]" : "bg-[#155D5F]/50"}`}
-        >
-          {isLoading || verifying ? (
-            <View className="flex-row items-center justify-center">
-              <ActivityIndicator size="small" color="white" className="mr-2" />
-              {verifying && <Text className="text-white font-semibold ml-2">Verifying card...</Text>}
-            </View>
-          ) : (
-            <Text className="text-white text-base font-bold">Link Payment Method</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
+          <TouchableOpacity
+            onPress={handleConfirm}
+            disabled={isLoading || verifying || !email}
+            className={`mt-10 h-16 rounded-2xl items-center justify-center shadow-sm ${email && !isLoading && !verifying ? "bg-[#155D5F]" : "bg-[#155D5F]/50"}`}
+          >
+            {isLoading || verifying ? (
+              <View className="flex-row items-center justify-center">
+                <ActivityIndicator size="small" color="white" className="mr-2" />
+                {verifying && <Text className="text-white font-semibold ml-2">Verifying card...</Text>}
+              </View>
+            ) : (
+              <Text className="text-white text-base font-bold">Link Payment Method</Text>
+            )}
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAwareScreen>
 
       <CardAddedModal
         visible={showSuccess}

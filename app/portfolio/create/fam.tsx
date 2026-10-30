@@ -23,6 +23,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const TEAL = "#0B575B";
@@ -33,6 +34,7 @@ const FAMILY_CATEGORIES = ["Kids", "Spouse", "Parent", "Siblings"];
 const FREQUENCIES = ["Daily", "Weekly", "Monthly"];
 
 export default function CreateFamScreen() {
+  const formScrollRef = useRef<ScrollView>(null);
   const params = useLocalSearchParams<{
     category: string;
     amount: string;
@@ -214,7 +216,12 @@ export default function CreateFamScreen() {
 
   // ─── FORM ─────────────────────────────────────────────────────────────────
   const renderForm = () => (
-    <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-5">
+    <ScrollView
+      ref={formScrollRef}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      className="flex-1 px-5"
+    >
       {/* What's on WealthFam? */}
       {showInfoCard && (
         <View
@@ -1047,15 +1054,20 @@ export default function CreateFamScreen() {
         }}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        {step === "form" && renderForm()}
-        {step === "preview" && renderPreview()}
-        {step === "pin" && renderPin()}
-        {step === "success" && renderSuccess()}
-      </KeyboardAvoidingView>
+      {step === "form" ? (
+        <KeyboardAwareScreen style={{ flex: 1 }} scrollRef={formScrollRef}>
+          {renderForm()}
+        </KeyboardAwareScreen>
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          {step === "preview" && renderPreview()}
+          {step === "pin" && renderPin()}
+          {step === "success" && renderSuccess()}
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }

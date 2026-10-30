@@ -246,7 +246,8 @@ export default function SignupScreen() {
     borderColor: hasError ? ERROR : BORDER,
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: Platform.OS === "android" ? 8 : 14,
+    minHeight: Platform.OS === "android" ? 48 : undefined,
     backgroundColor: MUTED,
   });
 
@@ -339,7 +340,12 @@ export default function SignupScreen() {
               <TextInput
                 placeholder="First Name"
                 placeholderTextColor="#9CA3AF"
-                style={{ flex: 1, fontSize: 15, color: DARK }}
+                style={{
+                  flex: 1,
+                  fontSize: 15,
+                  color: DARK,
+                  paddingVertical: Platform.OS === "android" ? 0 : undefined,
+                }}
                 autoCapitalize="words"
                 value={firstName}
                 onChangeText={(v) => {
@@ -357,7 +363,12 @@ export default function SignupScreen() {
               <TextInput
                 placeholder="Last Name"
                 placeholderTextColor="#9CA3AF"
-                style={{ flex: 1, fontSize: 15, color: DARK }}
+                style={{
+                  flex: 1,
+                  fontSize: 15,
+                  color: DARK,
+                  paddingVertical: Platform.OS === "android" ? 0 : undefined,
+                }}
                 autoCapitalize="words"
                 value={lastName}
                 onChangeText={(v) => {
@@ -399,7 +410,12 @@ export default function SignupScreen() {
               <TextInput
                 placeholder="801 234 5678"
                 placeholderTextColor="#9CA3AF"
-                style={{ flex: 1, fontSize: 15, color: DARK }}
+                style={{
+                  flex: 1,
+                  fontSize: 15,
+                  color: DARK,
+                  paddingVertical: Platform.OS === "android" ? 0 : undefined,
+                }}
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={(v) => {
@@ -423,7 +439,12 @@ export default function SignupScreen() {
               <TextInput
                 placeholder="e.g user@gmail.com"
                 placeholderTextColor="#9CA3AF"
-                style={{ flex: 1, fontSize: 15, color: DARK }}
+                style={{
+                  flex: 1,
+                  fontSize: 15,
+                  color: DARK,
+                  paddingVertical: Platform.OS === "android" ? 0 : undefined,
+                }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
@@ -538,7 +559,12 @@ export default function SignupScreen() {
               <TextInput
                 placeholder="Password"
                 placeholderTextColor="#9CA3AF"
-                style={{ flex: 1, fontSize: 15, color: DARK }}
+                style={{
+                  flex: 1,
+                  fontSize: 15,
+                  color: DARK,
+                  paddingVertical: Platform.OS === "android" ? 0 : undefined,
+                }}
                 secureTextEntry={!showPassword}
                 value={password}
                 onChangeText={(v) => {
@@ -564,7 +590,12 @@ export default function SignupScreen() {
               <TextInput
                 placeholder="Confirm Password"
                 placeholderTextColor="#9CA3AF"
-                style={{ flex: 1, fontSize: 15, color: DARK }}
+                style={{
+                  flex: 1,
+                  fontSize: 15,
+                  color: DARK,
+                  paddingVertical: Platform.OS === "android" ? 0 : undefined,
+                }}
                 secureTextEntry={!showConfirmPassword}
                 value={confirmPassword}
                 onChangeText={(v) => {
@@ -638,7 +669,12 @@ export default function SignupScreen() {
                   <TextInput
                     placeholder="Referral Code"
                     placeholderTextColor="#6B7280"
-                    style={{ flex: 1, fontSize: 15, color: DARK }}
+                    style={{
+                      flex: 1,
+                      fontSize: 15,
+                      color: DARK,
+                      paddingVertical: Platform.OS === "android" ? 0 : undefined,
+                    }}
                     autoCapitalize="characters"
                     maxLength={16}
                     value={referralCode}

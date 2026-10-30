@@ -18,6 +18,7 @@ import { StatusBar } from "expo-status-bar";
 import * as WebBrowser from "expo-web-browser";
 import { PAYMENT_RETURN_URL, PAYMENT_RETURN_SCHEME_URL } from "@/src/constants/payment";
 import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -57,6 +58,7 @@ export default function DepositScreen() {
   const [vaLoading, setVaLoading] = useState(false);
   const [vaError, setVaError] = useState<string | null>(null);
   const timeoutRef = useRef<any>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
@@ -759,11 +761,9 @@ export default function DepositScreen() {
       <StatusBar style="dark" />
       <Header title={getTitle()} onBack={handleBack} />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
+      <KeyboardAwareScreen style={{ flex: 1 }} scrollRef={scrollRef}>
         <ScrollView
+          ref={scrollRef}
           className="flex-1"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 40 }}
@@ -773,7 +773,7 @@ export default function DepositScreen() {
           {step === "use-card" && renderUseCard()}
           {step === "preview" && renderPreview()}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
 
       <Modal visible={showSuccess} transparent animationType="fade">
         <View className="flex-1 justify-center items-center px-10">

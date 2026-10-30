@@ -24,6 +24,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 
 const TEAL = "#0B575B";
 const TEAL_LIGHT = "#E0F2F1";
@@ -32,6 +33,7 @@ const TEXT_DARK = "#1A1A1A";
 const FREQUENCIES = ["Daily", "Weekly", "Monthly"];
 
 export default function CreateFlowScreen() {
+  const formScrollRef = useRef<ScrollView>(null);
   const params = useLocalSearchParams<{
     category: string;
     amount: string;
@@ -207,7 +209,12 @@ export default function CreateFlowScreen() {
 
   // ─── FORM ─────────────────────────────────────────────────────────────────
   const renderForm = () => (
-    <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-5">
+    <ScrollView
+      ref={formScrollRef}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      className="flex-1 px-5"
+    >
       {/* What's on WealthFlow? */}
       {showInfoCard && (
         <View
@@ -1037,15 +1044,20 @@ export default function CreateFlowScreen() {
         }}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        {step === "form" && renderForm()}
-        {step === "preview" && renderPreview()}
-        {step === "pin" && renderPin()}
-        {step === "success" && renderSuccess()}
-      </KeyboardAvoidingView>
+      {step === "form" ? (
+        <KeyboardAwareScreen style={{ flex: 1 }} scrollRef={formScrollRef}>
+          {renderForm()}
+        </KeyboardAwareScreen>
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          {step === "preview" && renderPreview()}
+          {step === "pin" && renderPin()}
+          {step === "success" && renderSuccess()}
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }

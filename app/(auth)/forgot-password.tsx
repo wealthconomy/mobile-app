@@ -3,7 +3,6 @@ import { ChevronLeft, Mail } from "lucide-react-native";
 import { useState } from "react";
 import {
   Image,
-  KeyboardAvoidingView,
   Platform,
   StatusBar,
   Text,
@@ -13,6 +12,7 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "../../src/components/common/KeyboardAwareScreen";
 import { useSelector } from "react-redux";
 import { RootState } from "../../src/store";
 import { useForgotPasswordMutation } from "../../src/store/api/authApi";
@@ -88,8 +88,7 @@ export default function ForgotPasswordScreen() {
         </Text>
       </TouchableOpacity>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      <KeyboardAwareScreen
         style={{ flex: 1 }}
       >
         <View style={{ flex: 1, paddingHorizontal: 24 }}>
@@ -199,7 +198,7 @@ export default function ForgotPasswordScreen() {
           </Text>
           </Animated.View>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
     </SafeAreaView>
   );
 }
