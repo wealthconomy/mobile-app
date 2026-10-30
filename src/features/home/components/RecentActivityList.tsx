@@ -57,7 +57,7 @@ export const RecentActivityList = () => {
   const router = useRouter();
   const { data: response, isLoading, refetch } = useGetMyActivitiesQuery(
     { limit: 5 },
-    { refetchOnMountOrArgChange: true }
+    { refetchOnMountOrArgChange: 30 }
   );
 
   useFocusEffect(

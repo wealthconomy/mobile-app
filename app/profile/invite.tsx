@@ -30,7 +30,7 @@ const REFERRAL_REWARD_STORAGE_KEY = "@wealth_referral_reward_kobo";
 
 export default function InviteScreen() {
   const isReferralEnabled = useReferralEnabled({ refreshOnFocus: true });
-  const { user: authUser } = useSelector((state: RootState) => state.auth);
+  const authUser = useSelector((state: RootState) => state.auth.user);
   const {
     data: profileResponse,
     isLoading: profileLoading,
@@ -82,7 +82,7 @@ export default function InviteScreen() {
 
   const { data: summaryResp, refetch: refetchSummary } =
     useGetMyReferralSummaryQuery(undefined, {
-      refetchOnMountOrArgChange: true,
+      refetchOnMountOrArgChange: 30,
     });
   const summary = summaryResp?.data as any;
 

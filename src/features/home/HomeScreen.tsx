@@ -32,7 +32,9 @@ export default function HomeScreen() {
     (state: RootState) => state.portfolioPreference,
   );
 
-  const { isLoading: isWalletLoading, refetch: refetchWallet } = useGetWalletSummaryQuery();
+  const { isLoading: isWalletLoading, refetch: refetchWallet } = useGetWalletSummaryQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
   const { refetch: refetchActivities } = useGetMyActivitiesQuery({ limit: 5 });
   const {
     data: configData,

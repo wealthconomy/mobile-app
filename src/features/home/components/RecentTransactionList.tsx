@@ -112,7 +112,7 @@ export const RecentTransactionList = () => {
   const router = useRouter();
   const { data, isLoading, refetch } = useGetWalletTransactionsQuery(
     { limit: 5 },
-    { refetchOnMountOrArgChange: true }
+    { refetchOnMountOrArgChange: 30 }
   );
 
   useFocusEffect(

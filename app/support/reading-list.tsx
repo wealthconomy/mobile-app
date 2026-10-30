@@ -28,7 +28,7 @@ export default function ReadingListScreen() {
     refetch,
   } = useGetBookmarkedBlogsQuery(undefined, {
     refetchOnFocus: true,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 30,
   });
 
   useFocusEffect(

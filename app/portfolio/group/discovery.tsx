@@ -49,7 +49,7 @@ export default function GroupDiscoveryScreen() {
 
   const { data: groupsData, isLoading, refetch } = useListGroupsQuery(undefined, {
     refetchOnFocus: true,
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 30,
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");

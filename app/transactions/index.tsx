@@ -63,7 +63,7 @@ export default function TransactionsScreen() {
       from,
       to,
     },
-    { refetchOnMountOrArgChange: true }
+    { refetchOnMountOrArgChange: 30 }
   );
 
   useFocusEffect(

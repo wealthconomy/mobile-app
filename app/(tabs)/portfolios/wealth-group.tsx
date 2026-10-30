@@ -270,7 +270,7 @@ export default function WealthGroupScreen() {
     {
       pollingInterval: 10000,
       refetchOnFocus: true,
-      refetchOnMountOrArgChange: true,
+      refetchOnMountOrArgChange: 30,
     }
   );
   const portfolioPreference = useSelector(

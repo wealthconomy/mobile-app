@@ -104,7 +104,7 @@ export default function FamilyGoalDetailScreen() {
   };
   const { data: txnsData, isLoading: txnsLoading, refetch: refetchTxns } = useGetPortfolioTransactionsQuery(
     { id: id as string },
-    { skip: !id, refetchOnMountOrArgChange: true }
+    { skip: !id, refetchOnMountOrArgChange: 30 }
   );
 
   useFocusEffect(

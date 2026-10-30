@@ -71,7 +71,7 @@ export default function ActivitiesScreen() {
       to,
       _append: !!after,
     },
-    { refetchOnMountOrArgChange: true }
+    { refetchOnMountOrArgChange: 30 }
   );
 
   useFocusEffect(

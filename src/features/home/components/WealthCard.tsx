@@ -12,11 +12,9 @@ import { useFocusEffect } from "@react-navigation/native";
 export const WealthCard = ({ style }: { style?: any } = {}) => {
   const router = useRouter();
   const [showBalance, setShowBalance] = useState(true);
-  const { user } = useSelector((state: RootState) => state.auth);
+  const user = useSelector((state: RootState) => state.auth.user);
   
-  const { data: walletData, isLoading, refetch } = useGetWalletSummaryQuery(undefined, {
-    refetchOnMountOrArgChange: true,
-  });
+  const { data: walletData, isLoading, refetch } = useGetWalletSummaryQuery();
 
   useFocusEffect(
     useCallback(() => {

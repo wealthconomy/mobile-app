@@ -27,7 +27,7 @@ export const CustomerSupportIcon = () => (
 
 export const HomeHeader = () => {
   const router = useRouter();
-  const { user } = useSelector((state: RootState) => state.auth);
+  const user = useSelector((state: RootState) => state.auth.user);
   const isAuth = useIsAuthenticated();
 
   const {

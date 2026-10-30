@@ -62,7 +62,7 @@ export default function MyReferralsScreen() {
     data: summaryResp,
     isLoading: summaryLoading,
     refetch: refetchSummary,
-  } = useGetMyReferralSummaryQuery(undefined, { refetchOnMountOrArgChange: true });
+  } = useGetMyReferralSummaryQuery(undefined, { refetchOnMountOrArgChange: 30 });
 
   // Lazy query triggers for cursor pagination
   const [triggerGetReferrals] = useLazyGetMyReferralsQuery();

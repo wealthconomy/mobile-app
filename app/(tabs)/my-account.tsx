@@ -30,8 +30,9 @@ export default function MyAccountScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Auth Redux state for instant cached rendering
-  const { user: authUser, refreshToken } = useSelector(
-    (state: RootState) => state.auth
+  const authUser = useSelector((state: RootState) => state.auth.user);
+  const refreshToken = useSelector(
+    (state: RootState) => state.auth.refreshToken
   );
 
   // RTK Query API Integrations

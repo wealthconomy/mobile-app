@@ -50,7 +50,7 @@ export default function UserFiledReportsScreen() {
     isLoading,
     refetch: refetchReports,
   } = useGetMyGroupReportsQuery(undefined, {
-    refetchOnMountOrArgChange: true,
+    refetchOnMountOrArgChange: 30,
   });
 
   const [reportGroup, { isLoading: isSubmittingReport }] =

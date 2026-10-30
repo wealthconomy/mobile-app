@@ -82,7 +82,7 @@ export default function CreateGroupScreen() {
 
   const { data: systemConfigData, refetch: refetchSystemConfig } =
     useGetSystemConfigsQuery(undefined, {
-      refetchOnMountOrArgChange: true,
+      refetchOnMountOrArgChange: 30,
     });
 
   useFocusEffect(

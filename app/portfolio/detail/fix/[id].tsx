@@ -77,7 +77,7 @@ export default function FixDetailScreen() {
   const rates = configData?.rates || (configData as any)?.data?.rates;
   const { data: txnsData, isLoading: txnsLoading, refetch: refetchTxns } = useGetPortfolioTransactionsQuery(
     { id: id as string },
-    { skip: !id, refetchOnMountOrArgChange: true }
+    { skip: !id, refetchOnMountOrArgChange: 30 }
   );
   const { data: walletSummary, refetch: refetchWallet } = useGetWalletSummaryQuery();
   const walletBalance = (parseFloat(walletSummary?.currentBalance || "0")) / 100;
