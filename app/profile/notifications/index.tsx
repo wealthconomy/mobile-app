@@ -11,7 +11,11 @@ import {
   useMarkNotificationReadMutation,
 } from "@/src/store/api/notificationApi";
 import { Ionicons } from "@expo/vector-icons";
-import { isKycNotification } from "@/src/features/profile/utils/notificationHelpers";
+import {
+  isKycNotification,
+  isSupportNotification,
+  isValidAppRoute,
+} from "@/src/features/profile/utils/notificationHelpers";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
@@ -102,14 +106,27 @@ export default function NotificationsScreen() {
       (typeof item.data?.type === "string" &&
         item.data.type.toLowerCase().includes("referral"));
 
+    const safePush = (targetRoute: string) => {
+      try {
+        router.push(targetRoute as any);
+      } catch {
+        // If route is invalid or navigation fails, stay on the list, never crash
+      }
+    };
+
     if (isKycNotification(item)) {
-      router.push("/profile/security" as any);
+      safePush("/profile/security");
     } else if (isReferral) {
-      router.push("/profile/my-referrals" as any);
-    } else if (item.data?.route) {
-      router.push(item.data.route as any);
+      safePush("/profile/my-referrals");
+    } else if (isSupportNotification(item)) {
+      const targetRoute = isValidAppRoute(item.data?.route)
+        ? item.data.route.trim()
+        : "/support/chat";
+      safePush(targetRoute);
+    } else if (isValidAppRoute(item.data?.route)) {
+      safePush(item.data.route.trim());
     } else if (item.kind === "group" && item.data?.groupId) {
-      router.push(`/portfolio/detail/group/${item.data.groupId}` as any);
+      safePush(`/portfolio/detail/group/${item.data.groupId}`);
     }
   };
 

@@ -28,7 +28,38 @@ export const isKycNotification = (item: NotificationItem): boolean => {
   return false;
 };
 
+export const isSupportNotification = (item: NotificationItem): boolean => {
+  const dataType = typeof item.data?.type === "string" ? item.data.type.trim() : "";
+  const title = typeof item.title === "string" ? item.title.trim() : "";
+  return (
+    dataType === "SUPPORT_CHAT" ||
+    dataType.toUpperCase() === "SUPPORT_CHAT" ||
+    title === "Customer Support" ||
+    title.toLowerCase() === "customer support"
+  );
+};
+
+export const isValidAppRoute = (route: unknown): route is string => {
+  if (typeof route !== "string") return false;
+  const trimmed = route.trim();
+  return (
+    trimmed.startsWith("/") &&
+    !trimmed.startsWith("//") &&
+    !trimmed.includes("://")
+  );
+};
+
 export const getNotificationVisuals = (item: NotificationItem) => {
+  // Support specific mappings
+  if (isSupportNotification(item)) {
+    return {
+      iconName: "headset",
+      iconFamily: "Ionicons" as const,
+      iconColor: "#FFFFFF",
+      circleColor: "#155D5F",
+    };
+  }
+
   // KYC specific mappings
   if (isKycNotification(item)) {
     const text = `${item.data?.type || ""} ${item.title || ""}`.toLowerCase();
