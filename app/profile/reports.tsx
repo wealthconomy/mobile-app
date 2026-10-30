@@ -11,11 +11,10 @@ import { UserGroupReportItem } from "@/src/types/group";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
   Platform,
   RefreshControl,
   ScrollView,
@@ -26,9 +25,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 
 export default function UserFiledReportsScreen() {
   const router = useRouter();
+  const scrollRef = useRef<ScrollView>(null);
   const params = useLocalSearchParams<{
     groupId?: string;
     groupName?: string;
@@ -297,11 +298,13 @@ export default function UserFiledReportsScreen() {
 
       <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
 
-      <KeyboardAvoidingView
+      <KeyboardAwareScreen
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        scrollRef={scrollRef}
       >
         <ScrollView
+          ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ padding: 20, paddingBottom: 50 }}
           refreshControl={
@@ -555,7 +558,7 @@ export default function UserFiledReportsScreen() {
 
           {/* Footer Notice when in Group Context */}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
 
       <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </SafeAreaView>

@@ -3,8 +3,10 @@ import {
   KeyboardAvoidingView,
   KeyboardAvoidingViewProps,
   Platform,
+  ScrollView,
   StyleProp,
   StyleSheet,
+  TextInput,
   View,
   ViewStyle,
 } from "react-native";
@@ -17,24 +19,16 @@ export interface KeyboardAwareScreenProps
   contentStyle?: StyleProp<ViewStyle>;
   enabled?: boolean;
   extraOffset?: number;
+  scrollRef?: React.RefObject<ScrollView | null> | React.RefObject<ScrollView>;
 }
 
 /**
- * Universal keyboard-avoiding wrapper.
- *
- * - iOS: Passes through directly to `KeyboardAvoidingView` with `behavior="padding"`
- *   by default and preserves identical props and styling, guaranteeing iPhone behavior
- *   and appearance remain exactly as they are today.
- * - Android: Renders a `View` (`{ flex: 1 }` by default or passes custom `style`).
- *   When the soft keyboard appears (especially under Android 15 / API 36 Edge-to-Edge
- *   where window resizing is no longer enforced by the OS), it measures the container
- *   in screen coordinates after a short 65ms settle. If the container bottom overlaps
- *   the keyboard top edge, `paddingBottom` is dynamically applied. If the window has
- *   already resized or the container is fully visible, overlap evaluates to 0.
- *   On keyboard hide, padding immediately resets to 0.
- *   Works reliably even inside native `Modal` components.
+ * iOS-specific wrapper.
+ * Passes through directly to `KeyboardAvoidingView` with `behavior="padding"`
+ * by default and preserves identical props and styling, guaranteeing iPhone behavior
+ * and appearance remain exactly as they are today.
  */
-export function KeyboardAwareScreen(props: KeyboardAwareScreenProps) {
+function KeyboardAwareScreenIOS(props: KeyboardAwareScreenProps) {
   const {
     children,
     style,
@@ -44,32 +38,52 @@ export function KeyboardAwareScreen(props: KeyboardAwareScreenProps) {
     extraOffset = 0,
     behavior = "padding",
     keyboardVerticalOffset = 0,
+    scrollRef,
     ...rest
   } = props;
 
-  // iOS: Preserve 100% identical KeyboardAvoidingView implementation
-  if (Platform.OS === "ios") {
-    return (
-      <KeyboardAvoidingView
-        behavior={behavior}
-        enabled={enabled}
-        keyboardVerticalOffset={keyboardVerticalOffset}
-        style={style}
-        contentContainerStyle={contentContainerStyle}
-        {...rest}
-      >
-        {contentStyle ? <View style={contentStyle}>{children}</View> : children}
-      </KeyboardAvoidingView>
-    );
-  }
+  return (
+    <KeyboardAvoidingView
+      behavior={behavior}
+      enabled={enabled}
+      keyboardVerticalOffset={keyboardVerticalOffset}
+      style={style}
+      contentContainerStyle={contentContainerStyle}
+      {...rest}
+    >
+      {contentStyle ? <View style={contentStyle}>{children}</View> : children}
+    </KeyboardAvoidingView>
+  );
+}
 
-  // Android: Window coordinate measurement & dynamic lift
+/**
+ * Android-specific wrapper.
+ * Measures container in screen coordinates upon keyboard show and calculates
+ * paddingBottom = max(0, containerBottomY - keyboardTopY + extraOffset).
+ * If a scrollRef is provided and a TextInput is currently focused, measures
+ * that input relative to the scroll content and scrolls it so the field ends
+ * up about 24dp above the visible bottom edge.
+ */
+function KeyboardAwareScreenAndroid(props: KeyboardAwareScreenProps) {
+  const {
+    children,
+    style,
+    contentStyle,
+    contentContainerStyle,
+    enabled = true,
+    extraOffset = 0,
+    behavior = "padding",
+    keyboardVerticalOffset = 0,
+    scrollRef,
+    ...rest
+  } = props;
+
   const { keyboardTopY, isKeyboardVisible } = useKeyboardOverlap();
   const [paddingBottom, setPaddingBottom] = useState(0);
   const containerRef = useRef<View>(null);
 
   useEffect(() => {
-    if (Platform.OS !== "android" || !enabled) {
+    if (!enabled) {
       return;
     }
 
@@ -82,12 +96,46 @@ export function KeyboardAwareScreen(props: KeyboardAwareScreenProps) {
     // Settle 65ms (~2-3 animation frames) to ensure keyboard layout has stabilized
     const timer = setTimeout(() => {
       if (!isMounted) return;
-      containerRef.current?.measureInWindow((x, y, width, height) => {
+      containerRef.current?.measureInWindow((containerX, containerY, width, height) => {
         if (!isMounted) return;
-        const containerBottomY = y + height;
+        const containerBottomY = containerY + height;
         const overlap = Math.max(0, containerBottomY - keyboardTopY);
         const finalPadding = overlap > 0 ? overlap + (extraOffset || 0) : 0;
         setPaddingBottom(finalPadding);
+
+        // STEP 1: scroll the focused field into view if scrollRef is provided
+        if (scrollRef?.current) {
+          try {
+            const focusedInput = TextInput.State?.currentlyFocusedInput
+              ? TextInput.State.currentlyFocusedInput()
+              : null;
+
+            if (focusedInput) {
+              const innerView = (scrollRef.current as any).getInnerViewRef
+                ? (scrollRef.current as any).getInnerViewRef()
+                : scrollRef.current;
+
+              if (innerView && typeof (focusedInput as any).measureLayout === "function") {
+                (focusedInput as any).measureLayout(
+                  innerView,
+                  (left: number, top: number, inputWidth: number, inputHeight: number) => {
+                    if (!isMounted) return;
+                    // Visible height of the container above the keyboard
+                    const visibleHeight = Math.max(0, keyboardTopY - containerY);
+                    // Field ends up about 24dp above the visible bottom edge
+                    const targetScrollY = Math.max(0, top + inputHeight + 24 - visibleHeight);
+                    scrollRef.current?.scrollTo({ y: targetScrollY, animated: true });
+                  },
+                  () => {
+                    // Fail silently
+                  }
+                );
+              }
+            }
+          } catch {
+            // Ignore if API unavailable
+          }
+        }
       });
     }, 65);
 
@@ -95,7 +143,7 @@ export function KeyboardAwareScreen(props: KeyboardAwareScreenProps) {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [isKeyboardVisible, keyboardTopY, enabled, extraOffset]);
+  }, [isKeyboardVisible, keyboardTopY, enabled, extraOffset, scrollRef]);
 
   const resolvedStyle = style !== undefined ? style : styles.defaultContainer;
 
@@ -112,6 +160,17 @@ export function KeyboardAwareScreen(props: KeyboardAwareScreenProps) {
       {contentStyle ? <View style={contentStyle}>{children}</View> : children}
     </View>
   );
+}
+
+/**
+ * Universal keyboard-avoiding wrapper.
+ * Splits into iOS and Android implementations to avoid conditional hook calls.
+ */
+export function KeyboardAwareScreen(props: KeyboardAwareScreenProps) {
+  if (Platform.OS === "ios") {
+    return <KeyboardAwareScreenIOS {...props} />;
+  }
+  return <KeyboardAwareScreenAndroid {...props} />;
 }
 
 const styles = StyleSheet.create({

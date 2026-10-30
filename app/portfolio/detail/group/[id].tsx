@@ -42,7 +42,6 @@ import {
   ActivityIndicator,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   RefreshControl,
@@ -56,6 +55,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 import { useSelector } from "react-redux";
 
 const THEME = "#155D5F";
@@ -2001,8 +2001,7 @@ export default function GroupDetailScreen() {
       {/* ─── STEP 1: CLEAN AMOUNT MODAL ─────────────────────────────── */}
       <Modal visible={isDepositModalVisible} transparent animationType="slide">
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          <KeyboardAwareScreen
             style={styles.modalOverlay}
           >
             <BlurView
@@ -2278,7 +2277,7 @@ export default function GroupDetailScreen() {
                 })()}
               </View>
             </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
+          </KeyboardAwareScreen>
         </TouchableWithoutFeedback>
         <KeyboardDoneAccessory />
       </Modal>
@@ -2481,8 +2480,7 @@ export default function GroupDetailScreen() {
 
       {/* ─── WITHDRAW MODAL ────────────────────────────────────────────── */}
       <Modal visible={isWithdrawModalVisible} transparent animationType="slide">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        <KeyboardAwareScreen
           style={styles.modalOverlay}
         >
           <BlurView
@@ -2732,7 +2730,7 @@ export default function GroupDetailScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardAwareScreen>
       </Modal>
 
       {/* Withdraw Pre-PIN Confirmation Modal */}
@@ -2881,8 +2879,7 @@ export default function GroupDetailScreen() {
       {/* ─── EXIT TRIBE MODAL ─────────────────────────────────────────── */}
       <Modal visible={isExitModalVisible} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          <KeyboardAwareScreen
             style={styles.modalOverlay}
           >
             <BlurView
@@ -3385,15 +3382,14 @@ export default function GroupDetailScreen() {
                 })()}
               </View>
             </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
+          </KeyboardAwareScreen>
         </TouchableWithoutFeedback>
       </Modal>
 
       {/* ─── TERMINATE GROUP MODAL ──────────────────────────────────────── */}
       <Modal visible={isTerminateModalVisible} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          <KeyboardAwareScreen
             style={styles.modalOverlay}
           >
             <BlurView
@@ -3524,7 +3520,7 @@ export default function GroupDetailScreen() {
                 </View>
               </View>
             </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
+          </KeyboardAwareScreen>
         </TouchableWithoutFeedback>
       </Modal>
 

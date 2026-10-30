@@ -12,7 +12,8 @@ import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Check } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 import {
   ActivityIndicator,
   Image,
@@ -31,6 +32,7 @@ const VISIBILITY_OPTIONS = [
 
 export default function GeneralSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const scrollRef = useRef<ScrollView>(null);
   const { data: group, isLoading } = useGetGroupDetailsQuery(id as string, {
     skip: !id,
   });
@@ -139,8 +141,13 @@ export default function GeneralSettingsScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <Header title="General" onBack={() => router.back()} />
 
-      <View className="flex-1">
-        <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+      <KeyboardAwareScreen style={{ flex: 1 }} scrollRef={scrollRef}>
+        <ScrollView
+          ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          className="flex-1"
+        >
           <View className="px-5 py-6">
             <View className="mb-6">
               <Text className="text-[14px] font-medium text-[#155D5F] mb-3">
@@ -261,7 +268,7 @@ export default function GeneralSettingsScreen() {
             style={{ backgroundColor: "#155D5F", borderRadius: 16, height: 60 }}
           />
         </View>
-      </View>
+      </KeyboardAwareScreen>
       <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </SafeAreaView>
   );

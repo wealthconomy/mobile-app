@@ -7,10 +7,9 @@ import {
   EyeOff,
   Mail,
 } from "lucide-react-native";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Image,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StatusBar,
@@ -21,6 +20,7 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "../../src/components/common/KeyboardAwareScreen";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { AppToast, ToastState } from "../../src/components/common/AppToast";
@@ -58,6 +58,7 @@ const WEALTH_PREFERENCES = [
 
 export default function SignupScreen() {
   const isReferralEnabled = useReferralEnabled();
+  const scrollRef = useRef<ScrollView>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -271,11 +272,13 @@ export default function SignupScreen() {
         </Text>
       </TouchableOpacity>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      <KeyboardAwareScreen
         style={{ flex: 1 }}
+        scrollRef={scrollRef}
       >
         <ScrollView
+          ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 24,
@@ -777,7 +780,7 @@ export default function SignupScreen() {
           </Link>
           </Animated.View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
 
       <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </SafeAreaView>

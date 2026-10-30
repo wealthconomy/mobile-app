@@ -35,7 +35,6 @@ import {
   Alert,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   RefreshControl,
@@ -48,6 +47,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import ManageFundsSheet from "@/src/components/portfolio/ManageFundsSheet";
 import { BlurView } from "expo-blur";
@@ -790,8 +790,7 @@ export default function FixDetailScreen() {
       {/* TopUp Amount Input Modal */}
       <Modal visible={showTopUpModal} transparent animationType="slide">
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          <KeyboardAwareScreen
             style={styles.modalOverlay}
           >
             <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
@@ -926,7 +925,7 @@ export default function FixDetailScreen() {
                 })()}
               </View>
             </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
+          </KeyboardAwareScreen>
         </TouchableWithoutFeedback>
         <KeyboardDoneAccessory />
       </Modal>

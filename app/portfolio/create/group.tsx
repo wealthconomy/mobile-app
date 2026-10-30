@@ -14,12 +14,11 @@ import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Check, Share2, Upload, X } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   Share,
@@ -29,6 +28,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 
 const THEME = "#155D5F";
 const THEME_BG = "#F2FFFF";
@@ -62,6 +62,7 @@ type GroupData = {
 export default function CreateGroupScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ groupType?: string }>();
+  const formScrollRef = useRef<ScrollView>(null);
 
   const paramGroupType = useMemo(() => {
     if (!params.groupType) return null;
@@ -375,12 +376,17 @@ export default function CreateGroupScreen() {
         onBack={step > 1 ? prevStep : () => router.back()}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      <KeyboardAwareScreen
         style={{ flex: 1 }}
+        scrollRef={formScrollRef}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+        <ScrollView
+          ref={formScrollRef}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          className="flex-1"
+        >
           <View className="px-5 py-6 pb-20">
             <Text className="text-[#155D5F] text-[18px] font-bold mb-1">
               Step {step}:
@@ -473,7 +479,7 @@ export default function CreateGroupScreen() {
             </View>
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
     </SafeAreaView>
   );
 }

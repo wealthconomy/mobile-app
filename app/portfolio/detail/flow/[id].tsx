@@ -39,7 +39,6 @@ import {
   Alert,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   RefreshControl,
@@ -52,6 +51,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import ManageFundsSheet from "@/src/components/portfolio/ManageFundsSheet";
 import { BlurView } from "expo-blur";
@@ -783,8 +783,7 @@ export default function FlowDetailScreen() {
       {/* ─── STEP 1: CLEAN TOP-UP AMOUNT MODAL ───────────────────────── */}
       <Modal visible={showTopUpModal} transparent animationType="slide">
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          <KeyboardAwareScreen
             style={styles.modalOverlay}
           >
             <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
@@ -919,7 +918,7 @@ export default function FlowDetailScreen() {
                 })()}
               </View>
             </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
+          </KeyboardAwareScreen>
         </TouchableWithoutFeedback>
         <KeyboardDoneAccessory />
       </Modal>
@@ -1020,8 +1019,7 @@ export default function FlowDetailScreen() {
       {/* ─── TERMINATE MODAL ───────────────────────────────────────────── */}
       {showTerminateModal && (
         <Modal visible={showTerminateModal} transparent animationType="fade">
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          <KeyboardAwareScreen
             style={styles.modalOverlay}
           >
             <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
@@ -1187,7 +1185,7 @@ export default function FlowDetailScreen() {
                 </View>
               </ScrollView>
             </View>
-          </KeyboardAvoidingView>
+          </KeyboardAwareScreen>
         </Modal>
       )}
       {/* Overflow Action Sheet */}
