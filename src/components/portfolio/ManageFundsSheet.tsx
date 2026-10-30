@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
   ActivityIndicator,
   StyleSheet,
   Alert,
 } from "react-native";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import ThemedButton from "@/src/components/ThemedButton";
@@ -249,8 +249,7 @@ export default function ManageFundsSheet({
           <TouchableWithoutFeedback onPress={onClose}>
             <View style={StyleSheet.absoluteFill} />
           </TouchableWithoutFeedback>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          <KeyboardAwareScreen
             style={styles.sheetContainer}
           >
             {/* Drag Handle */}
@@ -501,7 +500,7 @@ export default function ManageFundsSheet({
                   (!isValidAmount || isNavigating) && styles.submitBtnDisabled,
                 ]}
               />
-            </KeyboardAvoidingView>
+            </KeyboardAwareScreen>
         </View>
       </Modal>
 

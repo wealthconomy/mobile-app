@@ -7,7 +7,7 @@ import { BookmarkIcon } from "@/src/components/icons/BookmarkIcon";
 import { Audio } from "expo-av";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,10 +18,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 
 export default function BlogDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -34,12 +35,20 @@ export default function BlogDetailScreen() {
   const blog = response?.data;
 
   const [commentText, setCommentText] = useState("");
+  const scrollViewRef = useRef<ScrollView>(null);
   
   const [localIsLiked, setLocalIsLiked] = useState(false);
   const [localLikesCount, setLocalLikesCount] = useState(0);
   const [localIsBookmarked, setLocalIsBookmarked] = useState(false);
   const [localBookmarks, setLocalBookmarks] = useState(0);
   const [localSharesCount, setLocalSharesCount] = useState(0);
+
+  useEffect(() => {
+    const sub = Keyboard.addListener("keyboardDidShow", () => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (blog) {
@@ -167,14 +176,13 @@ export default function BlogDetailScreen() {
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
       <StatusBar style="light" />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-      >
+      <KeyboardAwareScreen style={{ flex: 1 }}>
         <ScrollView
+          ref={scrollViewRef}
           className="flex-1"
           showsVerticalScrollIndicator={false}
           bounces={false}
+          keyboardShouldPersistTaps="handled"
         >
         <View className="relative h-80">
           <Image
@@ -399,6 +407,11 @@ export default function BlogDetailScreen() {
               placeholderTextColor="#6B7280"
               value={commentText}
               onChangeText={setCommentText}
+              onFocus={() => {
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollToEnd({ animated: true });
+                }, 150);
+              }}
               multiline
             />
           </View>
@@ -414,7 +427,7 @@ export default function BlogDetailScreen() {
             )}
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
     </SafeAreaView>
   );
 }

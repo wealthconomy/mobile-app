@@ -13,7 +13,7 @@ import {
   Alert,
   FlatList,
   Image,
-  KeyboardAvoidingView,
+  Keyboard,
   Linking,
   Modal,
   Platform,
@@ -25,6 +25,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 import { useSupportChat } from "@/src/features/support/hooks/useSupportChat";
 import { useImageUpload } from "@/src/hooks/useImageUpload";
 import { SupportMessage } from "@/src/types/support";
@@ -235,6 +236,13 @@ export default function ChatScreen() {
   const [csatRating, setCsatRating] = useState<number | null>(null);
   const [hasSubmittedFeedback, setHasSubmittedFeedback] = useState(false);
   const flatListRef = useRef<FlatList<SupportMessage>>(null);
+
+  useEffect(() => {
+    const sub = Keyboard.addListener("keyboardDidShow", () => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => sub.remove();
+  }, []);
 
   // Staged Attachment State
   const [stagedAttachment, setStagedAttachment] = useState<{
@@ -1063,8 +1071,8 @@ export default function ChatScreen() {
       )}
 
       {/* Input Bar & Attachment Preview */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      <KeyboardAwareScreen
+        style={null}
         keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
         {/* Staged Attachment Preview Strip */}
@@ -1185,7 +1193,7 @@ export default function ChatScreen() {
             );
           })()}
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
 
       {/* Attachment Options Action Sheet (In-page overlay to avoid native modal dismissal collision with ImagePicker) */}
       {showAttachmentSheet && (
