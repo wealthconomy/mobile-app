@@ -14,7 +14,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.wealthconomy.app",
-      "buildNumber": "7",
+      "buildNumber": "8",
       "icon": "./assets/images/icon-ios.png",
       "supportsTablet": false,
       "config": {
@@ -28,7 +28,7 @@
     },
     "android": {
       "package": "com.wealthconomy.app",
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#FFFFFF",
