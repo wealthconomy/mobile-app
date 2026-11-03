@@ -22,6 +22,7 @@ interface ListGroupsArgs {
   before?: string;
   groupType?: GroupType;
   isVetted?: boolean;
+  myGroupsOnly?: boolean;
   sortBy?: "createdAt" | "name" | string;
   sortDir?: "asc" | "desc";
   populate?: string[];

@@ -88,6 +88,7 @@ export const portfolioApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: (result, error, { type }) => [
         { type: "Portfolio", id: type },
+        { type: "Portfolio", id: "SUMMARY" },
       ],
       transformResponse: (response: { data: { id: string } }) => response.data,
     }),

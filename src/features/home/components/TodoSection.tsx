@@ -1,11 +1,19 @@
 import { RootState } from "@/src/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React from "react";
-import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useSelector } from "react-redux";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as LocalAuthentication from "expo-local-authentication";
 import { useKycAutoRefresh } from "@/src/hooks/useKycAutoRefresh";
 import { useIsAuthenticated } from "@/src/hooks/useIsAuthenticated";
+import { useGetWalletTransactionsQuery } from "@/src/store/api/walletApi";
+import {
+  useGetPortfoliosQuery,
+  useGetPortfolioSummaryQuery,
+} from "@/src/store/api/portfolioApi";
+import { useListGroupsQuery } from "@/src/store/api/groupApi";
 import {
   isLevel2Verified,
   isLevel2Rejected,
@@ -79,6 +87,157 @@ export const TodoSection = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const { kycDocs } = useKycAutoRefresh();
 
+  const [persistedDone, setPersistedDone] = useState<{
+    biometrics: boolean;
+    deposit: boolean;
+    portfolio: boolean;
+    group: boolean;
+  }>({
+    biometrics: false,
+    deposit: false,
+    portfolio: false,
+    group: false,
+  });
+  const [isStorageLoaded, setIsStorageLoaded] = useState(false);
+  const [hasBiometricHardware, setHasBiometricHardware] = useState<boolean | null>(null);
+
+  const markTaskDone = (taskKey: "biometrics" | "deposit" | "portfolio" | "group") => {
+    if (!user?.id) return;
+    setPersistedDone((prev) => {
+      if (prev[taskKey]) return prev;
+      return { ...prev, [taskKey]: true };
+    });
+    AsyncStorage.setItem(`@wealth_todo_done_${user.id}_${taskKey}`, "true").catch(() => {});
+  };
+
+  useEffect(() => {
+    if (!user?.id) {
+      setIsStorageLoaded(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsStorageLoaded(false);
+
+    const keys = [
+      `@wealth_todo_done_${user.id}_biometrics`,
+      `@wealth_todo_done_${user.id}_deposit`,
+      `@wealth_todo_done_${user.id}_portfolio`,
+      `@wealth_todo_done_${user.id}_group`,
+      "@wealth_biometrics_enabled",
+    ];
+
+    Promise.all([
+      AsyncStorage.multiGet(keys),
+      LocalAuthentication.hasHardwareAsync()
+        .then(async (hasHw) => {
+          if (!hasHw) return false;
+          return await LocalAuthentication.isEnrolledAsync();
+        })
+        .catch(() => false),
+    ]).then(([stores, bioSupported]) => {
+      if (!isMounted) return;
+      const storeMap = Object.fromEntries(stores);
+      const isBioStored =
+        storeMap[keys[0]] === "true" ||
+        storeMap[keys[4]] === "true" ||
+        Boolean(user?.biometricsEnabled);
+
+      setPersistedDone({
+        biometrics: isBioStored,
+        deposit: storeMap[keys[1]] === "true",
+        portfolio: storeMap[keys[2]] === "true",
+        group: storeMap[keys[3]] === "true",
+      });
+      setHasBiometricHardware(bioSupported);
+      setIsStorageLoaded(true);
+
+      if (isBioStored && storeMap[keys[0]] !== "true") {
+        AsyncStorage.setItem(`@wealth_todo_done_${user.id}_biometrics`, "true").catch(() => {});
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, user?.biometricsEnabled]);
+
+  const isAuthAndLoaded = Boolean(isAuth && user?.id && isStorageLoaded);
+
+  // 1. First deposit query
+  const {
+    data: depositTxns,
+    isLoading: isDepositLoading,
+    isError: isDepositError,
+  } = useGetWalletTransactionsQuery(
+    { limit: 1, type: "CREDIT", reason: "WALLET_TOPUP" },
+    { skip: !isAuthAndLoaded || persistedDone.deposit }
+  );
+
+  // 2. Goal / Portfolio queries
+  const {
+    data: goalPortfolios,
+    isLoading: isGoalLoading,
+    isError: isGoalError,
+  } = useGetPortfoliosQuery(
+    { type: "wealthgoal", limit: 1 },
+    { skip: !isAuthAndLoaded || persistedDone.portfolio }
+  );
+
+  const {
+    data: portfolioSummary,
+    isLoading: isSummaryLoading,
+    isError: isSummaryError,
+  } = useGetPortfolioSummaryQuery(
+    undefined,
+    { skip: !isAuthAndLoaded || persistedDone.portfolio }
+  );
+
+  // 3. Group query
+  const {
+    data: myGroups,
+    isLoading: isGroupLoading,
+    isError: isGroupError,
+  } = useListGroupsQuery(
+    { myGroupsOnly: true, limit: 1 },
+    { skip: !isAuthAndLoaded || persistedDone.group }
+  );
+
+  // Sync discovered completions
+  useEffect(() => {
+    if (user?.id && user?.biometricsEnabled && !persistedDone.biometrics) {
+      markTaskDone("biometrics");
+    }
+  }, [user?.id, user?.biometricsEnabled, persistedDone.biometrics]);
+
+  useEffect(() => {
+    if (persistedDone.deposit) return;
+    if (depositTxns?.items && depositTxns.items.length > 0) {
+      markTaskDone("deposit");
+    }
+  }, [depositTxns, persistedDone.deposit]);
+
+  useEffect(() => {
+    if (persistedDone.portfolio) return;
+    const hasGoal = Boolean(goalPortfolios?.items && goalPortfolios.items.length > 0);
+    const hasSummaryBalance = Boolean(
+      portfolioSummary?.some((item) => {
+        const bal = Number(item.totalBalance || 0);
+        return !isNaN(bal) && bal > 0;
+      })
+    );
+    if (hasGoal || hasSummaryBalance) {
+      markTaskDone("portfolio");
+    }
+  }, [goalPortfolios, portfolioSummary, persistedDone.portfolio]);
+
+  useEffect(() => {
+    if (persistedDone.group) return;
+    if (myGroups?.items && myGroups.items.length > 0) {
+      markTaskDone("group");
+    }
+  }, [myGroups, persistedDone.group]);
+
   if (!isAuth) return null;
 
   const l2Verified = isLevel2Verified(kycDocs, user);
@@ -99,17 +258,6 @@ export const TodoSection = () => {
     user?.imageUrl ||
     kycDocs?.faceVerified
   );
-
-  const currentKycLevel = l3Verified ? 3 : l2Verified ? 2 : 1;
-
-  const userState = {
-    kycLevel: currentKycLevel,
-    isEmailVerified: true,
-    hasFirstGoal: false,
-    hasJoinedTribe: false,
-    hasEnabledSecurity: false,
-    hasFundedWallet: false,
-  };
 
   const onboardingTasks = [];
 
@@ -210,7 +358,13 @@ export const TodoSection = () => {
   }
 
   // 2. Security
-  if (!userState.hasEnabledSecurity) {
+  const isBiometricsDone = Boolean(persistedDone.biometrics || user?.biometricsEnabled);
+  const showSecurityCard =
+    isStorageLoaded &&
+    hasBiometricHardware === true &&
+    !isBiometricsDone;
+
+  if (showSecurityCard) {
     onboardingTasks.push({
       id: "security",
       title: "Secure Your Account",
@@ -222,7 +376,15 @@ export const TodoSection = () => {
   }
 
   // 4. Wallet Funding
-  if (!userState.hasFundedWallet) {
+  const showDepositCard =
+    isStorageLoaded &&
+    !persistedDone.deposit &&
+    !isDepositLoading &&
+    !isDepositError &&
+    Boolean(depositTxns) &&
+    (!depositTxns?.items || depositTxns.items.length === 0);
+
+  if (showDepositCard) {
     onboardingTasks.push({
       id: "fund",
       title: "Fund Your Wallet",
@@ -234,7 +396,27 @@ export const TodoSection = () => {
   }
 
   // 5. First Goal
-  if (!userState.hasFirstGoal) {
+  const hasFundedGoalOrPortfolio =
+    Boolean(goalPortfolios?.items && goalPortfolios.items.length > 0) ||
+    Boolean(
+      portfolioSummary?.some((item) => {
+        const bal = Number(item.totalBalance || 0);
+        return !isNaN(bal) && bal > 0;
+      })
+    );
+
+  const showGoalCard =
+    isStorageLoaded &&
+    !persistedDone.portfolio &&
+    !isGoalLoading &&
+    !isGoalError &&
+    !isSummaryLoading &&
+    !isSummaryError &&
+    Boolean(goalPortfolios) &&
+    Boolean(portfolioSummary) &&
+    !hasFundedGoalOrPortfolio;
+
+  if (showGoalCard) {
     onboardingTasks.push({
       id: "first-goal",
       title: "Set your first Goal",
@@ -246,7 +428,15 @@ export const TodoSection = () => {
   }
 
   // 6. Join a Tribe
-  if (!userState.hasJoinedTribe) {
+  const showGroupCard =
+    isStorageLoaded &&
+    !persistedDone.group &&
+    !isGroupLoading &&
+    !isGroupError &&
+    Boolean(myGroups) &&
+    (!myGroups?.items || myGroups.items.length === 0);
+
+  if (showGroupCard) {
     onboardingTasks.push({
       id: "join-tribe",
       title: "Join a Tribe",
