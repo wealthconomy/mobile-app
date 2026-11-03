@@ -84,6 +84,7 @@ function KeyboardAwareScreenAndroid(props: KeyboardAwareScreenProps) {
 
   useEffect(() => {
     if (!enabled) {
+      setPaddingBottom(0);
       return;
     }
 
@@ -93,8 +94,11 @@ function KeyboardAwareScreenAndroid(props: KeyboardAwareScreenProps) {
     }
 
     let isMounted = true;
-    // Settle 65ms (~2-3 animation frames) to ensure keyboard layout has stabilized
-    const timer = setTimeout(() => {
+    let raf1Id: number | null = null;
+    let raf2Id: number | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const measureAndAdjust = () => {
       if (!isMounted) return;
       containerRef.current?.measureInWindow((containerX, containerY, width, height) => {
         if (!isMounted) return;
@@ -103,7 +107,7 @@ function KeyboardAwareScreenAndroid(props: KeyboardAwareScreenProps) {
         const finalPadding = overlap > 0 ? overlap + (extraOffset || 0) : 0;
         setPaddingBottom(finalPadding);
 
-        // STEP 1: scroll the focused field into view if scrollRef is provided
+        // Scroll the focused field into view if scrollRef is provided
         if (scrollRef?.current) {
           try {
             const focusedInput = TextInput.State?.currentlyFocusedInput
@@ -137,11 +141,25 @@ function KeyboardAwareScreenAndroid(props: KeyboardAwareScreenProps) {
           }
         }
       });
-    }, 65);
+    };
+
+    // Pass 1: two requestAnimationFrame passes to measure as soon as layout updates
+    raf1Id = requestAnimationFrame(() => {
+      raf2Id = requestAnimationFrame(() => {
+        measureAndAdjust();
+      });
+    });
+
+    // Pass 2: one additional measurement after about 150 ms in case layout shifted or overlap changed
+    timeoutId = setTimeout(() => {
+      measureAndAdjust();
+    }, 150);
 
     return () => {
       isMounted = false;
-      clearTimeout(timer);
+      if (raf1Id !== null) cancelAnimationFrame(raf1Id);
+      if (raf2Id !== null) cancelAnimationFrame(raf2Id);
+      if (timeoutId !== null) clearTimeout(timeoutId);
     };
   }, [isKeyboardVisible, keyboardTopY, enabled, extraOffset, scrollRef]);
 
