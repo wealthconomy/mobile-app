@@ -1,9 +1,6 @@
 import { RootState } from "@/src/store";
 import { useListGroupsQuery } from "@/src/store/api/groupApi";
-import {
-  useGetPortfoliosQuery,
-  useGetPortfolioConfigQuery,
-} from "@/src/store/api/portfolioApi";
+import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef } from "react";
@@ -63,41 +60,6 @@ export const TransferToPortfolioSheet = ({
   const { data: famData } = useGetPortfoliosQuery({ type: "wealthfam" });
   const { data: flowData } = useGetPortfoliosQuery({ type: "wealthflow" });
   const { data: groupsData } = useListGroupsQuery();
-  const { data: configData } = useGetPortfolioConfigQuery();
-  const rates = configData?.rates || (configData as any)?.data?.rates;
-
-  const getRateLabel = (type: string) => {
-    if ((preferences as any)?.[type] === "Impact Wealth") return undefined;
-    const keyMap: Record<string, string> = {
-      flex: "wealthflex",
-      fix: "wealthfix",
-      goal: "wealthgoal",
-      fam: "wealthfam",
-      flow: "wealthflow",
-      group: "wealthgroup",
-    };
-    const rateKey = keyMap[type] || `wealth${type}`;
-    return rates?.[rateKey]?.label;
-  };
-
-  const getBadgeColor = (type: string) => {
-    switch (type) {
-      case "flex":
-        return "#F44336";
-      case "goal":
-        return "#F3007A";
-      case "fix":
-        return "#D97706";
-      case "fam":
-        return "#6366F1";
-      case "flow":
-        return "#0EA5E9";
-      case "group":
-        return "#4B5563";
-      default:
-        return "#155D5F";
-    }
-  };
 
   const flexItems = (flexData?.items || []).filter(
     (p) => p.status === "ACTIVE",
@@ -545,27 +507,6 @@ export const TransferToPortfolioSheet = ({
                         marginTop: -35,
                       }}
                     >
-                      {getRateLabel(portfolio.type) && (
-                        <View
-                          style={{
-                            backgroundColor: getBadgeColor(portfolio.type),
-                            paddingHorizontal: 8,
-                            paddingVertical: 3,
-                            borderRadius: 20,
-                          }}
-                        >
-                          <Text
-                            maxFontSizeMultiplier={1.35}
-                            style={{
-                              color: "#FFFFFF",
-                              fontWeight: "700",
-                              fontSize: 12,
-                            }}
-                          >
-                            {getRateLabel(portfolio.type)}
-                          </Text>
-                        </View>
-                      )}
 
                       <View
                         style={{

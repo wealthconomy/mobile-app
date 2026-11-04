@@ -1,4 +1,6 @@
 import {
+  CalculateInterestRequest,
+  CalculateInterestResponse,
   CreatePortfolioRequest,
   Portfolio,
   PortfolioSummaryItem,
@@ -297,6 +299,20 @@ export const portfolioApi = baseApi.injectEndpoints({
       transformResponse: (response: { data: { items: PortfolioSummaryItem[] } }) =>
         response.data?.items || [],
     }),
+
+    // Calculate interest for tiered interest rates
+    calculateInterest: builder.query<
+      CalculateInterestResponse,
+      CalculateInterestRequest
+    >({
+      query: (body) => ({
+        url: "/portfolios/calculate-interest",
+        method: "POST",
+        body,
+      }),
+      transformResponse: (response: { data: CalculateInterestResponse }) =>
+        response.data || response,
+    }),
   }),
   overrideExisting: true,
 });
@@ -313,5 +329,6 @@ export const {
   useGetPortfolioByIdQuery,
   useUpdateAutoSaveMutation,
   useGetPortfolioSummaryQuery,
+  useCalculateInterestQuery,
 } = portfolioApi;
 

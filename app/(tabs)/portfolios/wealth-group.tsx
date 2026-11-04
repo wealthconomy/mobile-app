@@ -21,7 +21,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
-import { getDynamicInterestRateLabel } from "@/src/utils/formatters";
 import { useListGroupsQuery, useGetGroupMembersQuery, useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
 import { useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
 import { WealthGroupModel } from "@/src/types/group";
@@ -280,7 +279,6 @@ export default function WealthGroupScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const groupRateLabel = getDynamicInterestRateLabel("group", systemConfigData, rates, 15);
 
   const groupConfig = rates?.wealthgroup || (rates as any)?.group;
   const groupMinMembers = groupConfig?.membersLimitRange?.[0] ?? 2;
@@ -655,23 +653,7 @@ export default function WealthGroupScreen() {
                   <Text className="text-[#4B5563] text-[14px] font-extrabold">
                     Total Savings
                   </Text>
-                  {showInterest && groupRateLabel && (
-                    <View
-                      style={{
-                        backgroundColor: "#4B5563",
-                        paddingHorizontal: 8,
-                        paddingVertical: 2.5,
-                        borderRadius: 20,
-                      }}
-                    >
-                      <Text
-                        maxFontSizeMultiplier={1.35}
-                        style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 12 }}
-                      >
-                        {groupRateLabel}
-                      </Text>
-                    </View>
-                  )}
+
                 </View>
                 <TouchableOpacity
                   onPress={() => setShowBalance(!showBalance)}
@@ -799,7 +781,7 @@ export default function WealthGroupScreen() {
                 className="text-[13px] leading-[18px] mb-4 font-kumbh-semibold pr-6"
                 style={{ color: "#155D5F" }}
               >
-                A community-powered savings feature ({groupRateLabel}) for collective financial goals. Groups support between <Text className="font-bold">{groupMinMembers} to {groupMaxMembers} members</Text>.
+                A community-powered savings feature for collective financial goals. Your interest rate depends on how much you save and for how long. Groups support between <Text className="font-bold">{groupMinMembers} to {groupMaxMembers} members</Text>.
               </Text>
               <View style={{ gap: 10 }}>
                 <TipRow

@@ -3,7 +3,9 @@ import { AppCalendarModal, AppDatePickerField } from "@/src/components/common";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { useCreatePortfolioMutation, useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
 import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
-import { getDynamicInterestRateLabel, getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { useInterestQuote } from "@/src/hooks/useInterestQuote";
+import { getTierBounds } from "@/src/utils/interestTiers";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { CreatePortfolioRequest } from "@/src/types/portfolio";
 import { Ionicons } from "@expo/vector-icons";
@@ -83,18 +85,43 @@ export default function CreateFlowScreen() {
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
   const flowConfig = rates?.wealthflow || rates?.flow;
-  const minFlowKobo = flowConfig?.minTargetAmount ?? flowConfig?.minimumAmount ?? 50000;
-  const minFlowNaira = minFlowKobo / 100;
-  const minFlowNairaFormatted = minFlowNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const minFlowDuration = flowConfig?.minDurationDays ?? flowConfig?.minimumTenureDays ?? 30;
-  const maxFlowDuration = flowConfig?.maxDurationDays ?? flowConfig?.maximumTenureDays ?? 730;
-
-  const flowInterestRateLabel = getDynamicInterestRateLabel(
-    "flow",
-    systemConfigData,
-    rates,
-    10
+  const flowTierBounds = getTierBounds(
+    (configData?.tiers || (configData as any)?.data?.tiers) as any,
+    "WEALTH_FLOW"
   );
+  const rawMinFlowNaira = (flowTierBounds as any)?.minAmountNaira ?? ((flowTierBounds as any)?.minAmountKobo != null ? (flowTierBounds as any).minAmountKobo / 100 : (flowConfig?.minTargetAmount ? flowConfig.minTargetAmount / 100 : 1000));
+  const minFlowNaira = Math.min(rawMinFlowNaira > 0 ? rawMinFlowNaira : 1000, 1000);
+  const minFlowNairaFormatted = minFlowNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const minFlowDuration = flowTierBounds.minDurationDays ?? flowConfig?.minDurationDays ?? flowConfig?.minimumTenureDays ?? 30;
+  const maxFlowDuration = flowTierBounds.maxDurationDays ?? flowConfig?.maxDurationDays ?? flowConfig?.maximumTenureDays ?? 730;
+
+  const initialDepositNaira = parseFloat(initialDeposit.replace(/,/g, "")) || 0;
+  const targetAmountNaira = parseFloat(targetAmount.replace(/,/g, "")) || 0;
+  const effectiveFlowAmountNaira = targetAmountNaira > 0 ? targetAmountNaira : initialDepositNaira;
+  let flowDurationDays = 0;
+  if (selectedEndDate) {
+    const todayZero = new Date();
+    todayZero.setHours(0, 0, 0, 0);
+    const selZero = new Date(selectedEndDate);
+    selZero.setHours(0, 0, 0, 0);
+    flowDurationDays = Math.max(1, Math.ceil((selZero.getTime() - todayZero.getTime()) / (1000 * 3600 * 24)));
+  }
+  const isFlowDurationValid = flowDurationDays >= minFlowDuration && (maxFlowDuration == null || flowDurationDays <= maxFlowDuration);
+  const isFlowAmountValid = effectiveFlowAmountNaira >= minFlowNaira || initialDepositNaira >= 100;
+
+  const {
+    rate: quotedRate,
+    projectedInterestNaira,
+    isLoading: isQuoteLoading,
+    isError: isQuoteError,
+    isReady: isQuoteReady,
+  } = useInterestQuote({
+    type: "flow",
+    amountNaira: Math.max(effectiveFlowAmountNaira, 100),
+    durationDays: isFlowDurationValid ? flowDurationDays : undefined,
+    enabled: wealthPreference === "Interest Based" && isFlowAmountValid && isFlowDurationValid,
+  });
+
   const { penaltyRate: flowPenaltyRate } = getDynamicPenaltyRate(
     "flow",
     systemConfigData,
@@ -133,10 +160,7 @@ export default function CreateFlowScreen() {
     return new Date(Date.now() + 365 * 86400000).toISOString();
   };
 
-  const calculateGrowth = () => {
-    const amt = parseFloat(targetAmount.replace(/,/g, "")) || 0;
-    return ((amt * 0.12 * 365) / 365).toFixed(2);
-  };
+
 
   const isFormValid = () => {
     const targetAmt = parseFloat(targetAmount.replace(/,/g, "")) || 0;
@@ -257,7 +281,7 @@ export default function CreateFlowScreen() {
             {
               icon: "🛡️",
               bold: "Secured Interest:",
-              text: ` Earn up to ${flowInterestRateLabel} interest on your funds until maturity or activate Anytime Withdrawal as needed.`,
+              text: " Your interest rate depends on how much you save and for how long until maturity or activate Anytime Withdrawal as needed.",
             },
             {
               icon: "⚠️",
@@ -501,6 +525,62 @@ export default function CreateFlowScreen() {
           </View>
         );
       })()}
+
+      {/* Tiered Interest Quote Card */}
+      {wealthPreference === "Interest Based" && (
+        <View style={{ marginBottom: 20 }}>
+          {isQuoteLoading ? (
+            <View
+              style={{
+                backgroundColor: "#F8FAFC",
+                borderRadius: 12,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+              }}
+            >
+              <Text style={{ color: "#64748B", fontSize: 13, fontWeight: "600" }}>
+                Calculating...
+              </Text>
+            </View>
+          ) : isQuoteReady && quotedRate != null ? (
+            <View
+              style={{
+                backgroundColor: "#F0FDF4",
+                borderRadius: 12,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: "#BBF7D0",
+              }}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ color: "#166534", fontSize: 13, fontWeight: "700" }}>
+                  Your rate: {quotedRate}% P.A.
+                </Text>
+                {projectedInterestNaira != null && (
+                  <Text style={{ color: "#15803D", fontSize: 13, fontWeight: "700" }}>
+                    Estimated earnings: +₦{formatAmount(projectedInterestNaira.toFixed(2))}
+                  </Text>
+                )}
+              </View>
+            </View>
+          ) : isFlowAmountValid && isFlowDurationValid && (isQuoteError || !isQuoteReady) ? (
+            <View
+              style={{
+                backgroundColor: "#F8FAFC",
+                borderRadius: 12,
+                padding: 12,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+              }}
+            >
+              <Text style={{ color: "#64748B", fontSize: 12, fontWeight: "600" }}>
+                Your rate is confirmed when you create the plan
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      )}
 
       <AppCalendarModal
         visible={showDatePicker}
@@ -788,14 +868,39 @@ export default function CreateFlowScreen() {
           style={{
             flexDirection: "row",
             justifyContent: "space-between",
-            marginBottom: 8,
+            marginBottom: 24,
           }}
         >
           <View>
             <Text style={styles.previewLabel}>Interest Rate</Text>
-            <Text style={styles.previewValue}>{flowInterestRateLabel}</Text>
+            <Text style={styles.previewValue}>
+              {wealthPreference === "Interest Based"
+                ? isQuoteReady && quotedRate != null
+                  ? `${quotedRate}% P.A.`
+                  : "Rate confirmed on creation"
+                : "Impact Wealth"}
+            </Text>
           </View>
         </View>
+
+        {wealthPreference === "Interest Based" && (
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              marginBottom: 8,
+            }}
+          >
+            <View>
+              <Text style={styles.previewLabel}>Estimated Return</Text>
+              <Text style={[styles.previewValue, { color: TEAL }]}>
+                {isQuoteReady && projectedInterestNaira != null
+                  ? `+₦${formatAmount(projectedInterestNaira.toFixed(2))}`
+                  : "Rate confirmed on creation"}
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Decorative receipt zig-zag */}

@@ -3,7 +3,9 @@ import { AppCalendarModal, AppDatePickerField } from "@/src/components/common";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { useCreatePortfolioMutation, useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
 import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
-import { getDynamicInterestRateLabel, getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { useInterestQuote } from "@/src/hooks/useInterestQuote";
+import { getTierBounds } from "@/src/utils/interestTiers";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { CreatePortfolioRequest } from "@/src/types/portfolio";
 import { Ionicons } from "@expo/vector-icons";
@@ -83,18 +85,43 @@ export default function CreateFamScreen() {
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
   const famConfig = rates?.wealthfam || rates?.fam;
-  const minFamKobo = famConfig?.minTargetAmount ?? famConfig?.minimumAmount ?? 50000;
-  const minFamNaira = minFamKobo / 100;
-  const minFamNairaFormatted = minFamNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const minFamDuration = famConfig?.minDurationDays ?? famConfig?.minimumTenureDays ?? 30;
-  const maxFamDuration = famConfig?.maxDurationDays ?? famConfig?.maximumTenureDays ?? 730;
-
-  const famInterestRateLabel = getDynamicInterestRateLabel(
-    "fam",
-    systemConfigData,
-    rates,
-    10
+  const famTierBounds = getTierBounds(
+    (configData?.tiers || (configData as any)?.data?.tiers) as any,
+    "WEALTH_FAM"
   );
+  const rawMinFamNaira = (famTierBounds as any)?.minAmountNaira ?? ((famTierBounds as any)?.minAmountKobo != null ? (famTierBounds as any).minAmountKobo / 100 : (famConfig?.minTargetAmount ? famConfig.minTargetAmount / 100 : 1000));
+  const minFamNaira = Math.min(rawMinFamNaira > 0 ? rawMinFamNaira : 1000, 1000);
+  const minFamNairaFormatted = minFamNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const minFamDuration = famTierBounds.minDurationDays ?? famConfig?.minDurationDays ?? famConfig?.minimumTenureDays ?? 30;
+  const maxFamDuration = famTierBounds.maxDurationDays ?? famConfig?.maxDurationDays ?? famConfig?.maximumTenureDays ?? 730;
+
+  const initialDepositNaira = parseFloat(initialDeposit.replace(/,/g, "")) || 0;
+  const targetAmountNaira = parseFloat(targetAmount.replace(/,/g, "")) || 0;
+  const effectiveFamAmountNaira = targetAmountNaira > 0 ? targetAmountNaira : initialDepositNaira;
+  let famDurationDays = 0;
+  if (selectedEndDate) {
+    const todayZero = new Date();
+    todayZero.setHours(0, 0, 0, 0);
+    const selZero = new Date(selectedEndDate);
+    selZero.setHours(0, 0, 0, 0);
+    famDurationDays = Math.max(1, Math.ceil((selZero.getTime() - todayZero.getTime()) / (1000 * 3600 * 24)));
+  }
+  const isFamDurationValid = famDurationDays >= minFamDuration && (maxFamDuration == null || famDurationDays <= maxFamDuration);
+  const isFamAmountValid = effectiveFamAmountNaira >= minFamNaira || initialDepositNaira >= 100;
+
+  const {
+    rate: quotedRate,
+    projectedInterestNaira,
+    isLoading: isQuoteLoading,
+    isError: isQuoteError,
+    isReady: isQuoteReady,
+  } = useInterestQuote({
+    type: "fam",
+    amountNaira: Math.max(effectiveFamAmountNaira, 100),
+    durationDays: isFamDurationValid ? famDurationDays : undefined,
+    enabled: wealthPreference === "Interest Based" && isFamAmountValid && isFamDurationValid,
+  });
+
   const { penaltyRate: famPenaltyRate } = getDynamicPenaltyRate(
     "fam",
     systemConfigData,
@@ -133,10 +160,7 @@ export default function CreateFamScreen() {
     return new Date(Date.now() + 365 * 86400000).toISOString();
   };
 
-  const calculateGrowth = () => {
-    const amt = parseFloat(targetAmount.replace(/,/g, "")) || 0;
-    return ((amt * 0.12 * 365) / 365).toFixed(2);
-  };
+
 
   const isFormValid = () => {
     const targetAmt = parseFloat(targetAmount.replace(/,/g, "")) || 0;
@@ -264,7 +288,7 @@ export default function CreateFamScreen() {
             {
               icon: "🛡️",
               bold: "Secured Interest:",
-              text: ` Earn up to ${famInterestRateLabel} interest on family funds until maturity or activate Anytime Withdrawal as needed.`,
+              text: " Your interest rate depends on how much you save and for how long on family funds until maturity or activate Anytime Withdrawal as needed.",
             },
             {
               icon: "⚠️",
@@ -562,6 +586,62 @@ export default function CreateFamScreen() {
         );
       })()}
 
+      {/* Tiered Interest Quote Card */}
+      {wealthPreference === "Interest Based" && (
+        <View style={{ marginBottom: 20 }}>
+          {isQuoteLoading ? (
+            <View
+              style={{
+                backgroundColor: "#F8FAFC",
+                borderRadius: 12,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+              }}
+            >
+              <Text style={{ color: "#64748B", fontSize: 13, fontWeight: "600" }}>
+                Calculating...
+              </Text>
+            </View>
+          ) : isQuoteReady && quotedRate != null ? (
+            <View
+              style={{
+                backgroundColor: "#F0FDF4",
+                borderRadius: 12,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: "#BBF7D0",
+              }}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ color: "#166534", fontSize: 13, fontWeight: "700" }}>
+                  Your rate: {quotedRate}% P.A.
+                </Text>
+                {projectedInterestNaira != null && (
+                  <Text style={{ color: "#15803D", fontSize: 13, fontWeight: "700" }}>
+                    Estimated earnings: +₦{formatAmount(projectedInterestNaira.toFixed(2))}
+                  </Text>
+                )}
+              </View>
+            </View>
+          ) : isFamAmountValid && isFamDurationValid && (isQuoteError || !isQuoteReady) ? (
+            <View
+              style={{
+                backgroundColor: "#F8FAFC",
+                borderRadius: 12,
+                padding: 12,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+              }}
+            >
+              <Text style={{ color: "#64748B", fontSize: 12, fontWeight: "600" }}>
+                Your rate is confirmed when you create the plan
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      )}
+
       <AppCalendarModal
         visible={showDatePicker}
         onClose={() => setShowDatePicker(false)}
@@ -798,14 +878,39 @@ export default function CreateFamScreen() {
           style={{
             flexDirection: "row",
             justifyContent: "space-between",
-            marginBottom: 8,
+            marginBottom: 24,
           }}
         >
           <View>
             <Text style={styles.previewLabel}>Interest Rate</Text>
-            <Text style={styles.previewValue}>{famInterestRateLabel}</Text>
+            <Text style={styles.previewValue}>
+              {wealthPreference === "Interest Based"
+                ? isQuoteReady && quotedRate != null
+                  ? `${quotedRate}% P.A.`
+                  : "Rate confirmed on creation"
+                : "Impact Wealth"}
+            </Text>
           </View>
         </View>
+
+        {wealthPreference === "Interest Based" && (
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              marginBottom: 8,
+            }}
+          >
+            <View>
+              <Text style={styles.previewLabel}>Estimated Return</Text>
+              <Text style={[styles.previewValue, { color: TEAL }]}>
+                {isQuoteReady && projectedInterestNaira != null
+                  ? `+₦${formatAmount(projectedInterestNaira.toFixed(2))}`
+                  : "Rate confirmed on creation"}
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Decorative receipt zig-zag */}

@@ -24,7 +24,8 @@ import {
   hydrateCompletedPortfolios,
   removeCompletedPortfolio,
 } from "@/src/store/slices/completedPortfolioSlice";
-import { isPortfolioCompleted, getDynamicInterestRateLabel } from "@/src/utils/formatters";
+import { isPortfolioCompleted } from "@/src/utils/formatters";
+import { getGroupedSubscribedRate, getSubscribedPortfolioRate } from "@/src/utils/interestTiers";
 
 const UnlockedPadlock = () => (
   <Svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -90,7 +91,6 @@ export default function WealthFixScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const fixRateLabel = getDynamicInterestRateLabel("fix", systemConfigData, rates, 15);
 
   const fixConfig = rates?.wealthfix || (rates as any)?.fix;
   const minTargetKobo = fixConfig?.minTargetAmount ?? fixConfig?.minimumAmount ?? 100000;
@@ -228,6 +228,9 @@ export default function WealthFixScreen() {
   };
 
   const totalBalance = allGoals.reduce((sum, g) => sum + parseFloat(g.balance || "0"), 0);
+  const tiers = (configData?.tiers || (configData as any)?.data?.tiers) as any;
+  const activeFixRate = getGroupedSubscribedRate(lockedGoals, tiers);
+  const fixRateLabel = activeFixRate != null ? `${activeFixRate}% P.A.` : undefined;
   const dailyGrowthFormatted = (
     allGoals.reduce((sum, g) => sum + (parseFloat(g.dailyGrowth?.toString() || "0") || 0), 0) / 100
   ).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -329,23 +332,13 @@ export default function WealthFixScreen() {
                   >
                     Total Savings
                   </Text>
-                  {showInterest && (
-                    <View
-                      style={{
-                        backgroundColor: THEME_COLOR,
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        borderRadius: 20,
-                      }}
-                    >
-                      <Text
-                        maxFontSizeMultiplier={1.35}
-                        style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 12 }}
-                      >
+                  {showInterest && fixRateLabel ? (
+                    <View className="bg-[#FFF4E5] px-2 py-0.5 rounded-full">
+                      <Text className="text-[#D48E00] text-[10px] font-kumbh-bold">
                         {fixRateLabel}
                       </Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
                 <TouchableOpacity
                   onPress={() => setShowBalance(!showBalance)}
@@ -438,8 +431,8 @@ export default function WealthFixScreen() {
               <View>
                 {[
                   {
-                    title: `Guaranteed Returns (${fixRateLabel}):`,
-                    text: `Lock your funds and earn dynamic returns up to ${fixRateLabel}.`,
+                    title: "Guaranteed Returns:",
+                    text: "Your interest rate depends on how much you save and for how long.",
                   },
                   {
                     title: "Fixed Terms & Rules:",
@@ -614,7 +607,7 @@ export default function WealthFixScreen() {
                 </View>
               ) : lockedGoals.map((goal, index) => (
                   <View key={goal.id}>
-                    <FixListItem goal={goal} themeColor={THEME_COLOR} />
+                    <FixListItem goal={goal} themeColor={THEME_COLOR} tiers={tiers} />
                     {index < lockedGoals.length - 1 && (
                       <View
                         style={{
@@ -636,6 +629,7 @@ export default function WealthFixScreen() {
                       goal={goal}
                       themeColor={THEME_COLOR}
                       isUnlocked
+                      tiers={tiers}
                     />
                     {index < unlockedGoals.length - 1 && (
                       <View
@@ -655,9 +649,10 @@ export default function WealthFixScreen() {
   );
 }
 
-function FixListItem({ goal, themeColor, isUnlocked }: { goal: Portfolio, themeColor: string, isUnlocked?: boolean }) {
+function FixListItem({ goal, themeColor, isUnlocked, tiers }: { goal: Portfolio, themeColor: string, isUnlocked?: boolean, tiers?: any[] }) {
   const initial = (goal.name || "W")[0].toUpperCase();
   const unlocked = Boolean(isUnlocked || isPortfolioCompleted(goal));
+  const itemRate = getSubscribedPortfolioRate(goal, tiers);
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
@@ -736,13 +731,22 @@ function FixListItem({ goal, themeColor, isUnlocked }: { goal: Portfolio, themeC
             alignItems: "center",
           }}
         >
-          <Text
-            maxFontSizeMultiplier={1.35}
-            style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A", flex: 1, marginRight: 8 }}
-            numberOfLines={1}
-          >
-            {goal.name}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 8 }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A" }}
+              numberOfLines={1}
+            >
+              {goal.name}
+            </Text>
+            {itemRate != null ? (
+              <View className="bg-[#FFF4E5] px-1.5 py-0.5 rounded-full ml-2">
+                <Text style={{ color: "#D48E00", fontSize: 9, fontWeight: "700" }}>
+                  {itemRate}% P.A.
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             {isUnlocked && (
               <View style={{ marginRight: 4 }}>

@@ -23,7 +23,8 @@ import {
   hydrateCompletedPortfolios,
   removeCompletedPortfolio,
 } from "@/src/store/slices/completedPortfolioSlice";
-import { isPortfolioCompleted, getDynamicInterestRateLabel } from "@/src/utils/formatters";
+import { isPortfolioCompleted } from "@/src/utils/formatters";
+import { getGroupedSubscribedRate, getSubscribedPortfolioRate } from "@/src/utils/interestTiers";
 
 const CATEGORIES = [
   { id: "1", title: "Emergency", subtitle: "Save for life's rainy days" },
@@ -52,7 +53,6 @@ export default function WealthGoalScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const goalRateLabel = getDynamicInterestRateLabel("goal", systemConfigData, rates, 12);
 
   const goalConfig = rates?.wealthgoal || (rates as any)?.goal;
   const minGoalKobo = goalConfig?.minTargetAmount ?? goalConfig?.minimumAmount ?? 50000;
@@ -148,6 +148,9 @@ export default function WealthGoalScreen() {
   };
 
   const totalBalance = allGoals.reduce((sum, g) => sum + parseFloat(g.balance || "0"), 0);
+  const tiers = (configData?.tiers || (configData as any)?.data?.tiers) as any;
+  const activeGoalRate = getGroupedSubscribedRate(activeGoals, tiers);
+  const goalRateLabel = activeGoalRate != null ? `${activeGoalRate}% P.A.` : undefined;
   const dailyGrowthFormatted = (
     allGoals.reduce((sum, g) => sum + (parseFloat(g.dailyGrowth?.toString() || "0") || 0), 0) / 100
   ).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -245,23 +248,13 @@ export default function WealthGoalScreen() {
                   >
                     Total Savings
                   </Text>
-                  {showInterest && (
-                    <View
-                      style={{
-                        backgroundColor: "#F3007A",
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        borderRadius: 20,
-                      }}
-                    >
-                      <Text
-                        maxFontSizeMultiplier={1.35}
-                        style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 12 }}
-                      >
+                  {showInterest && goalRateLabel ? (
+                    <View className="bg-[#FCE4EC] px-2 py-0.5 rounded-full">
+                      <Text className="text-[#F3007A] text-[10px] font-kumbh-bold">
                         {goalRateLabel}
                       </Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
                 <TouchableOpacity
                   onPress={() => setShowBalance(!showBalance)}
@@ -350,8 +343,8 @@ export default function WealthGoalScreen() {
               <View>
                 {[
                   {
-                    title: `Targeted Discipline (${goalRateLabel}):`,
-                    text: `Smash every goal while earning up to ${goalRateLabel} growth on your savings.`,
+                    title: "Targeted Discipline:",
+                    text: "Your interest rate depends on how much you save and for how long.",
                   },
                   {
                     title: "Goal Limits & Rules:",
@@ -529,7 +522,7 @@ export default function WealthGoalScreen() {
                 </View>
               ) : (
                 activeGoals.map((goal) => (
-                  <GoalListItem key={goal.id} goal={goal} />
+                  <GoalListItem key={goal.id} goal={goal} tiers={tiers} />
                 ))
               )
             ) : completedGoals.length === 0 ? (
@@ -540,7 +533,7 @@ export default function WealthGoalScreen() {
               </View>
             ) : (
               completedGoals.map((goal) => (
-                <GoalListItem key={goal.id} goal={goal} />
+                <GoalListItem key={goal.id} goal={goal} tiers={tiers} />
               ))
             )}
           </View>
@@ -550,8 +543,9 @@ export default function WealthGoalScreen() {
   );
 }
 
-function GoalListItem({ goal }: { goal: Portfolio }) {
+function GoalListItem({ goal, tiers }: { goal: Portfolio, tiers?: any[] }) {
   const isCompleted = isPortfolioCompleted(goal);
+  const itemRate = getSubscribedPortfolioRate(goal, tiers);
 
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
@@ -627,13 +621,22 @@ function GoalListItem({ goal }: { goal: Portfolio }) {
             alignItems: "center",
           }}
         >
-          <Text
-            maxFontSizeMultiplier={1.35}
-            style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A", flex: 1, marginRight: 8 }}
-            numberOfLines={1}
-          >
-            {goal.name}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 8 }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A" }}
+              numberOfLines={1}
+            >
+              {goal.name}
+            </Text>
+            {itemRate != null ? (
+              <View className="bg-[#FCE4EC] px-1.5 py-0.5 rounded-full ml-2">
+                <Text style={{ color: "#F3007A", fontSize: 9, fontWeight: "700" }}>
+                  {itemRate}% P.A.
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Text style={{ fontSize: 12, marginRight: 2 }}>
               {isCompleted ? "🏆" : "🎯"}

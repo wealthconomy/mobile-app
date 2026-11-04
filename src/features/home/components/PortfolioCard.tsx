@@ -244,59 +244,22 @@ export const PortfolioCard = ({
         )}
 
         {/* Interest Rate Badge */}
-        {!hideInterest ? (
-          isLoadingRate || (!interestRate && !isRateError && type !== "group") ? (
-            <View
-              style={{
-                backgroundColor: styles.badgeBg,
-                paddingHorizontal: 8,
-                paddingVertical: 3,
-                borderRadius: 20,
-                minWidth: 44,
-                height: 20,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+        {!hideInterest && interestRate ? (
+          <View
+            style={{
+              backgroundColor: styles.badgeBg,
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 20,
+            }}
+          >
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ color: styles.badgeText, fontWeight: "700", fontSize: 12 }}
             >
-              <ActivityIndicator
-                size="small"
-                color={styles.badgeText}
-                style={{ transform: [{ scale: 0.55 }] }}
-              />
-            </View>
-          ) : interestRate ? (
-            <View
-              style={{
-                backgroundColor: styles.badgeBg,
-                paddingHorizontal: 8,
-                paddingVertical: 3,
-                borderRadius: 20,
-              }}
-            >
-              <Text
-                maxFontSizeMultiplier={1.35}
-                style={{ color: styles.badgeText, fontWeight: "700", fontSize: 12 }}
-              >
-                {interestRate}
-              </Text>
-            </View>
-          ) : isRateError ? (
-            <View
-              style={{
-                backgroundColor: styles.badgeBg,
-                paddingHorizontal: 8,
-                paddingVertical: 3,
-                borderRadius: 20,
-              }}
-            >
-              <Text
-                maxFontSizeMultiplier={1.35}
-                style={{ color: styles.badgeText, fontWeight: "700", fontSize: 12 }}
-              >
-                --
-              </Text>
-            </View>
-          ) : null
+              {interestRate}
+            </Text>
+          </View>
         ) : null}
       </View>
 

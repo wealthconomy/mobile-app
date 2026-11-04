@@ -70,9 +70,9 @@ import {
   useGetWalletTransactionsQuery,
 } from "@/src/store/api/walletApi";
 import { WalletTransaction } from "@/src/types/wallet";
+import { useInterestQuote } from "@/src/hooks/useInterestQuote";
 import {
   getCleanTransactionTitle,
-  getDynamicInterestRateLabel,
 } from "@/src/utils/formatters";
 
 export default function WealthFlexScreen() {
@@ -90,12 +90,6 @@ export default function WealthFlexScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const flexRateLabel = getDynamicInterestRateLabel(
-    "flex",
-    systemConfigData,
-    rates,
-    5,
-  );
   const flexConfig = rates?.wealthflex || (rates as any)?.flex;
   const minDepositKobo =
     flexConfig?.minDeposit ?? flexConfig?.minimumAmount ?? 10000;
@@ -145,7 +139,18 @@ export default function WealthFlexScreen() {
   };
 
   const balanceValue = flexPortfolio?.balance ?? walletData?.currentBalance;
+  const balanceNaira = parseFloat(balanceValue || "0") / 100;
   const amount = `₦${formatAmount(balanceValue)}`;
+
+  const {
+    rate: flexRate,
+    tierName: flexTierName,
+  } = useInterestQuote({
+    type: "flex",
+    amountNaira: balanceNaira,
+    enabled: balanceNaira > 0,
+  });
+  const flexRateLabel = flexRate != null ? `${flexRate}% P.A.` : undefined;
   const dailyGrowthFormatted = (
     flexPortfolio?.dailyGrowth
       ? parseFloat(flexPortfolio.dailyGrowth.toString()) / 100
@@ -263,27 +268,13 @@ export default function WealthFlexScreen() {
                 >
                   Total Savings
                 </Text>
-                {showInterest && (
-                  <View
-                    style={{
-                      backgroundColor: "#F44336",
-                      paddingHorizontal: 8,
-                      paddingVertical: 3,
-                      borderRadius: 20,
-                    }}
-                  >
-                    <Text
-                      maxFontSizeMultiplier={1.35}
-                      style={{
-                        color: "#FFFFFF",
-                        fontWeight: "700",
-                        fontSize: 12,
-                      }}
-                    >
+                {showInterest && flexRateLabel ? (
+                  <View className="bg-[#E8F5E9] px-2 py-0.5 rounded-full">
+                    <Text className="text-[#2E7D32] text-[10px] font-kumbh-bold">
                       {flexRateLabel}
                     </Text>
                   </View>
-                )}
+                ) : null}
               </View>
               <TouchableOpacity
                 onPress={() => setShowBalance(!showBalance)}
@@ -395,8 +386,7 @@ export default function WealthFlexScreen() {
                   style={{ color: "#991B1B" }}
                 >
                   <Text className="font-bold">Instant Impact:</Text> Watch your
-                  funds reflect in seconds and start growing immediately at{" "}
-                  <Text className="font-bold">{flexRateLabel}</Text>.
+                  funds reflect in seconds. {flexRateLabel ? `Currently earning ${flexRateLabel}${flexTierName ? ` (${flexTierName})` : ""}, based on your wallet balance.` : "Your interest rate depends on your balance."}
                 </Text>
               </View>
 

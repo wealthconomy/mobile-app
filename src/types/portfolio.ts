@@ -110,7 +110,52 @@ export interface PortfolioRateConfig {
   [key: string]: any;
 }
 
+export interface InterestTier {
+  id: string;
+  name: string;
+  portfolioType: BackendPortfolioProductType | null;
+  minAmountKobo: string | number;
+  minAmountNaira?: number;
+  maxAmountKobo: string | number | null;
+  maxAmountNaira?: number | null;
+  minDurationDays: number | null;
+  maxDurationDays: number | null;
+  annualRatePct: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface PortfolioConfigData {
   rates?: Record<string, PortfolioRateConfig>;
+  tiers?: InterestTier[];
   [key: string]: any;
+}
+
+export type BackendPortfolioProductType =
+  | "WEALTH_FIX"
+  | "WEALTH_FLEX"
+  | "WEALTH_GOAL"
+  | "WEALTH_FAM"
+  | "WEALTH_FLOW"
+  | "WEALTH_GROUP";
+
+export interface CalculateInterestRequest {
+  portfolioType: BackendPortfolioProductType;
+  amountKobo: number;
+  durationDays?: number;
+}
+
+export interface CalculateInterestResponse {
+  portfolioType: BackendPortfolioProductType;
+  amountKobo: number;
+  amountNaira: number;
+  durationDays?: number;
+  annualRatePct: number;
+  tierId?: string;
+  tierName?: string;
+  projectedInterestKobo: number;
+  projectedInterestNaira: number;
+  estimatedPayoutKobo: number;
+  estimatedPayoutNaira: number;
 }

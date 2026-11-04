@@ -2,7 +2,9 @@ import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { useCreatePortfolioMutation, useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
 import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
-import { getDynamicInterestRateLabel, getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { useInterestQuote } from "@/src/hooks/useInterestQuote";
+import { getTierBounds } from "@/src/utils/interestTiers";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 import { useFocusEffect } from "@react-navigation/native";
@@ -73,12 +75,6 @@ export default function CreateFixScreen() {
   const loading = isCreating || isVerifyingPin;
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
-  const fixInterestRateLabel = getDynamicInterestRateLabel(
-    "fix",
-    systemConfigData,
-    configData?.rates || (configData as any)?.data?.rates,
-    15
-  );
   const { penaltyRate } = getDynamicPenaltyRate(
     "fix",
     systemConfigData,
@@ -98,10 +94,14 @@ export default function CreateFixScreen() {
   );
 
   const fixConfig = configData?.rates?.wealthfix || (configData as any)?.data?.rates?.wealthfix;
-  const minFixKobo = fixConfig?.minTargetAmount ?? fixConfig?.minimumAmount ?? 100000;
-  const minFixDuration = fixConfig?.minDurationDays ?? fixConfig?.minimumTenureDays ?? 30;
-  const maxFixDuration = fixConfig?.maxDurationDays ?? fixConfig?.maximumTenureDays ?? 730;
-  const minFixNaira = minFixKobo / 100;
+  const fixTierBounds = getTierBounds(
+    (configData?.tiers || (configData as any)?.data?.tiers) as any,
+    "WEALTH_FIX"
+  );
+  const rawMinFixNaira = (fixTierBounds as any)?.minAmountNaira ?? ((fixTierBounds as any)?.minAmountKobo != null ? (fixTierBounds as any).minAmountKobo / 100 : (fixConfig?.minTargetAmount ? fixConfig.minTargetAmount / 100 : 1000));
+  const minFixNaira = Math.min(rawMinFixNaira > 0 ? rawMinFixNaira : 1000, 1000);
+  const minFixDuration = fixTierBounds.minDurationDays ?? fixConfig?.minDurationDays ?? fixConfig?.minimumTenureDays ?? 30;
+  const maxFixDuration = fixTierBounds.maxDurationDays ?? fixConfig?.maxDurationDays ?? fixConfig?.maximumTenureDays ?? 730;
   const minFixNairaFormatted = minFixNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const walletBalanceNaira = (parseFloat(walletData?.currentBalance || "0") / 100);
@@ -111,7 +111,22 @@ export default function CreateFixScreen() {
 
   const durationNum = parseInt(duration, 10) || 0;
   const isBelowMinDuration = duration.length > 0 && durationNum < minFixDuration;
-  const isAboveMaxDuration = duration.length > 0 && durationNum > maxFixDuration;
+  const isAboveMaxDuration = duration.length > 0 && maxFixDuration != null && durationNum > maxFixDuration;
+  const isFixDurationValid = durationNum >= minFixDuration && (maxFixDuration == null || durationNum <= maxFixDuration);
+  const isFixAmountValid = enteredAmountNum >= minFixNaira;
+
+  const {
+    rate: quotedRate,
+    projectedInterestNaira,
+    isLoading: isQuoteLoading,
+    isError: isQuoteError,
+    isReady: isQuoteReady,
+  } = useInterestQuote({
+    type: "fix",
+    amountNaira: enteredAmountNum,
+    durationDays: isFixDurationValid ? durationNum : undefined,
+    enabled: wealthPreference === "Interest Based" && isFixAmountValid && isFixDurationValid,
+  });
 
   // Date picker state
   const [endDate, setEndDate] = useState<Date>(() => {
@@ -140,12 +155,6 @@ export default function CreateFixScreen() {
     if (!val) return "0.00";
     const num = val.replace(/,/g, "");
     return num.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  };
-
-  const calculateInterest = () => {
-    const amt = parseFloat(initialAmount.replace(/,/g, "")) || 0;
-    const dur = parseInt(duration) || 0;
-    return ((amt * 0.1 * dur) / 365).toFixed(2);
   };
 
   const selectDurationDays = (days: number) => {
@@ -354,7 +363,11 @@ export default function CreateFixScreen() {
                 maxFontSizeMultiplier={1.35}
                 style={{ color: "#92400E", fontSize: 12, fontWeight: "700" }}
               >
-                Earn ₦{formatAmount(calculateInterest())}
+                {isQuoteLoading
+                  ? "Calculating..."
+                  : isQuoteReady && projectedInterestNaira != null
+                  ? `Earn ₦${formatAmount(projectedInterestNaira.toFixed(2))}`
+                  : "Earn upfront interest"}
               </Text>
             </View>
           )}
@@ -406,12 +419,8 @@ export default function CreateFixScreen() {
             }}
           >
             Wealth Fix is unique because the interest is paid upfront.{"\n\n"}
-            <Text style={{ fontWeight: "700" }}>Calculation:</Text> The interest
-            is calculated based on how long you lock the funds (rates up to {fixInterestRateLabel}).{"\n"}•{" "}
-            <Text style={{ fontWeight: "700" }}>Short term (10–90 days):</Text>{" "}
-            Standard competitive rates.{"\n"}•{" "}
-            <Text style={{ fontWeight: "700" }}>Long term (1–3 years):</Text>{" "}
-            Maximum yield rates (up to {fixInterestRateLabel}).{"\n\n"}
+            <Text style={{ fontWeight: "700" }}>Calculation:</Text> Your interest rate
+            depends on how much you save and for how long.{"\n\n"}
             <Text style={{ fontWeight: "700" }}>Payment:</Text> As soon as you
             create the Wealth Fix, the interest is immediately credited to your
             Wealthconomy wallet, while the "capital" remains locked until the
@@ -715,6 +724,66 @@ export default function CreateFixScreen() {
         )}
       </View>
 
+      {/* Tiered Interest Quote Card under duration selector */}
+      {wealthPreference === "Interest Based" && (
+        <View style={{ marginBottom: 18 }}>
+          {isQuoteLoading ? (
+            <View
+              style={{
+                backgroundColor: "#F8FAFC",
+                borderRadius: 12,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <Text style={{ color: "#64748B", fontSize: 13, fontWeight: "600" }}>
+                Calculating...
+              </Text>
+              <ActivityIndicator size="small" color={TEAL} />
+            </View>
+          ) : isQuoteReady && quotedRate != null ? (
+            <View
+              style={{
+                backgroundColor: "#F0FDF4",
+                borderRadius: 12,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: "#BBF7D0",
+              }}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ color: "#166534", fontSize: 13, fontWeight: "700" }}>
+                  Your rate: {quotedRate}% P.A.
+                </Text>
+                {projectedInterestNaira != null && (
+                  <Text style={{ color: "#15803D", fontSize: 13, fontWeight: "700" }}>
+                    Estimated earnings: +₦{formatAmount(projectedInterestNaira.toFixed(2))}
+                  </Text>
+                )}
+              </View>
+            </View>
+          ) : isFixAmountValid && isFixDurationValid && (isQuoteError || !isQuoteReady) ? (
+            <View
+              style={{
+                backgroundColor: "#F8FAFC",
+                borderRadius: 12,
+                padding: 12,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+              }}
+            >
+              <Text style={{ color: "#64748B", fontSize: 12, fontWeight: "600" }}>
+                Your rate is confirmed when you create the plan
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      )}
+
       {/* Funding Source (Read-only) */}
       <View style={{ marginBottom: 18 }}>
         <Text
@@ -988,7 +1057,11 @@ export default function CreateFixScreen() {
               {wealthPreference === "Interest Based" ? "Interest Rate" : "Preference"}
             </Text>
             <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
-              {wealthPreference === "Interest Based" ? fixInterestRateLabel : "Impact Wealth"}
+              {wealthPreference === "Interest Based"
+                ? isQuoteReady && quotedRate != null
+                  ? `${quotedRate}% P.A.`
+                  : "Rate confirmed on creation"
+                : "Impact Wealth"}
             </Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
@@ -1053,7 +1126,9 @@ export default function CreateFixScreen() {
                 Estimated Return
               </Text>
               <Text style={{ color: TEAL, fontWeight: "700", fontSize: 16 }}>
-                +₦{formatAmount(calculateInterest())}
+                {isQuoteReady && projectedInterestNaira != null
+                  ? `+₦${formatAmount(projectedInterestNaira.toFixed(2))}`
+                  : "Rate confirmed on creation"}
               </Text>
             </View>
           )}
@@ -1413,14 +1488,16 @@ export default function CreateFixScreen() {
         </Text>{" "}
         until{" "}
         <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-          [24th Dec 2026]
+          {endDate.toLocaleDateString("en-US", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}
         </Text>
         .{"\n\n"}You've successfully blocked temptation and set your money on a
-        path to grow by{" "}
-        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-          (₦{formatAmount(calculateInterest())})
-        </Text>
-        . It's a win for your future self!
+        path to grow{isQuoteReady && projectedInterestNaira != null
+          ? ` by an estimated (₦${formatAmount(projectedInterestNaira.toFixed(2))})`
+          : ""}. It's a win for your future self!
       </Text>
 
       <TouchableOpacity

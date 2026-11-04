@@ -10,7 +10,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
-import { useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
+import { useGetPortfolioConfigQuery, useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
+import { useInterestQuote } from "@/src/hooks/useInterestQuote";
+import { getGroupedSubscribedRate } from "@/src/utils/interestTiers";
+import { InterestTier, Portfolio } from "@/src/types/portfolio";
 import { Skeleton } from "@/src/components/common/skeletons";
 import { PortfolioCardSkeleton } from "@/src/features/home/components/DashboardSkeletons";
 
@@ -61,39 +64,48 @@ export default function WealthPortfolioScreen() {
   );
 
   const { data: walletData, isLoading, refetch: refetchWallet } = useGetWalletSummaryQuery();
-  const {
-    data: configData,
-    isLoading: isConfigLoading,
-    isFetching: isConfigFetching,
-    isError: isConfigError,
-    refetch: refetchConfig,
-  } = useGetPortfolioConfigQuery();
-  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: fixData, refetch: refetchFix } = useGetPortfoliosQuery({ type: "wealthfix" });
+  const { data: famData, refetch: refetchFam } = useGetPortfoliosQuery({ type: "wealthfam" });
+  const { data: goalData, refetch: refetchGoal } = useGetPortfoliosQuery({ type: "wealthgoal" });
+  const { data: flowData, refetch: refetchFlow } = useGetPortfoliosQuery({ type: "wealthflow" });
+
+  const tiers = (configData?.tiers || (configData as any)?.data?.tiers) as InterestTier[];
+
+  const flexBalanceNaira = parseFloat(walletData?.currentBalance || "0") / 100;
+  const { rate: flexRate } = useInterestQuote({
+    type: "flex",
+    amountNaira: flexBalanceNaira,
+    enabled: flexBalanceNaira > 0,
+  });
+  const flexRateLabel = flexRate != null ? `${flexRate}% P.A.` : undefined;
+
+  const getSubscribedRateForType = (type: string) => {
+    if (type === "flex") return flexRateLabel;
+    let typePortfolios: Portfolio[] = [];
+    if (type === "fix") typePortfolios = fixData?.items || [];
+    else if (type === "fam") typePortfolios = famData?.items || [];
+    else if (type === "goal") typePortfolios = goalData?.items || [];
+    else if (type === "flow") typePortfolios = flowData?.items || [];
+    else return undefined;
+
+    const rate = getGroupedSubscribedRate(typePortfolios, tiers);
+    return rate != null ? `${rate}% P.A.` : undefined;
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
       await Promise.allSettled([
         refetchWallet(),
-        refetchConfig(),
+        refetchFix(),
+        refetchFam(),
+        refetchGoal(),
+        refetchFlow(),
       ]);
     } finally {
       setRefreshing(false);
     }
-  };
-
-  const getRateLabel = (type: string) => {
-    if (isConfigError) return "--";
-    const keyMap: Record<string, string> = {
-      flex: "wealthflex",
-      fix: "wealthfix",
-      goal: "wealthgoal",
-      fam: "wealthfam",
-      flow: "wealthflow",
-      group: "wealthgroup",
-    };
-    const rateKey = keyMap[type] || `wealth${type}`;
-    return rates?.[rateKey]?.label;
   };
 
   const formatAmount = (val?: string) => {
@@ -115,12 +127,10 @@ export default function WealthPortfolioScreen() {
           type={item.type}
           title={item.title}
           description={item.description}
+          interestRate={getSubscribedRateForType(item.type)}
           showEarnTag={false}
           hideInterest={preferences[item.type] === "Impact Wealth"}
           hasNotification={false}
-          interestRate={getRateLabel(item.type)}
-          isLoadingRate={refreshing || isConfigFetching}
-          isRateError={isConfigError}
         />
       )}
     </View>
@@ -134,7 +144,7 @@ export default function WealthPortfolioScreen() {
       <AppRefreshIndicator refreshing={refreshing} topOffset={65} />
 
       <FlatList
-        data={isLoading || isConfigLoading ? ([1, 2, 3, 4, 5, 6] as any[]) : PORTFOLIOS}
+        data={isLoading ? ([1, 2, 3, 4, 5, 6] as any[]) : PORTFOLIOS}
         keyExtractor={(item, index) =>
           typeof item === "number" ? index.toString() : item.id
         }

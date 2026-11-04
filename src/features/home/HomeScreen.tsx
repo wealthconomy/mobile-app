@@ -1,8 +1,11 @@
 import { AppRefreshIndicator } from "@/src/components/common";
 import { RootState } from "@/src/store";
 import { useGetMyActivitiesQuery } from "@/src/store/api/activityApi";
-import { useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
+import { useGetPortfolioConfigQuery, useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
+import { useInterestQuote } from "@/src/hooks/useInterestQuote";
+import { getGroupedSubscribedRate } from "@/src/utils/interestTiers";
+import { InterestTier } from "@/src/types/portfolio";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
@@ -32,7 +35,7 @@ export default function HomeScreen() {
     (state: RootState) => state.portfolioPreference,
   );
 
-  const { isLoading: isWalletLoading, refetch: refetchWallet } = useGetWalletSummaryQuery(undefined, {
+  const { data: walletData, isLoading: isWalletLoading, refetch: refetchWallet } = useGetWalletSummaryQuery(undefined, {
     refetchOnMountOrArgChange: true,
   });
   const { refetch: refetchActivities } = useGetMyActivitiesQuery({ limit: 5 });
@@ -45,6 +48,37 @@ export default function HomeScreen() {
   } = useGetPortfolioConfigQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
 
+  const { data: fixData, refetch: refetchFix } = useGetPortfoliosQuery({ type: "wealthfix" });
+  const { data: famData, refetch: refetchFam } = useGetPortfoliosQuery({ type: "wealthfam" });
+  const { data: goalData, refetch: refetchGoal } = useGetPortfoliosQuery({ type: "wealthgoal" });
+  const { data: flowData, refetch: refetchFlow } = useGetPortfoliosQuery({ type: "wealthflow" });
+
+  const fixPortfolios = fixData?.items || [];
+  const famPortfolios = famData?.items || [];
+  const goalPortfolios = goalData?.items || [];
+  const flowPortfolios = flowData?.items || [];
+
+  const tiers = (configData?.tiers || (configData as any)?.data?.tiers) as InterestTier[];
+
+  const fixRate = getGroupedSubscribedRate(fixPortfolios, tiers);
+  const famRate = getGroupedSubscribedRate(famPortfolios, tiers);
+  const goalRate = getGroupedSubscribedRate(goalPortfolios, tiers);
+  const flowRate = getGroupedSubscribedRate(flowPortfolios, tiers);
+
+  const fixRateLabel = fixRate != null ? `${fixRate}% P.A.` : undefined;
+  const famRateLabel = famRate != null ? `${famRate}% P.A.` : undefined;
+  const goalRateLabel = goalRate != null ? `${goalRate}% P.A.` : undefined;
+  const flowRateLabel = flowRate != null ? `${flowRate}% P.A.` : undefined;
+  const groupRateLabel = undefined;
+
+  const flexBalanceNaira = parseFloat(walletData?.currentBalance || "0") / 100;
+  const { rate: flexRate } = useInterestQuote({
+    type: "flex",
+    amountNaira: flexBalanceNaira,
+    enabled: flexBalanceNaira > 0,
+  });
+  const flexRateLabel = flexRate != null ? `${flexRate}% P.A.` : undefined;
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -52,27 +86,16 @@ export default function HomeScreen() {
         refetchWallet(),
         refetchActivities(),
         refetchConfig(),
+        refetchFix(),
+        refetchFam(),
+        refetchGoal(),
+        refetchFlow(),
       ]);
     } finally {
       setRefreshing(false);
     }
   };
 
-  const getRateLabel = (type: string) => {
-    if (isConfigError) return "--";
-    const keyMap: Record<string, string> = {
-      flex: "wealthflex",
-      fix: "wealthfix",
-      goal: "wealthgoal",
-      fam: "wealthfam",
-      flow: "wealthflow",
-      group: "wealthgroup",
-    };
-    const rateKey = keyMap[type] || `wealth${type}`;
-    return rates?.[rateKey]?.label;
-  };
-
-  const isRateLoading = refreshing || isConfigFetching;
   const isPageLoading = loading || isConfigLoading || isWalletLoading;
 
   useEffect(() => {
@@ -141,9 +164,7 @@ export default function HomeScreen() {
                     type="flex"
                     title="WealthFlex"
                     description="Smart flexible savings; earn interest, access anytime."
-                    interestRate={getRateLabel("flex")}
-                    isLoadingRate={isRateLoading}
-                    isRateError={isConfigError}
+                    interestRate={flexRate != null ? `${flexRate}% P.A.` : undefined}
                     hideInterest={preferences["flex"] === "Impact Wealth"}
                   />
                 </View>
@@ -153,9 +174,7 @@ export default function HomeScreen() {
                     type="fam"
                     title="WealthFam"
                     description="Build a wealthy family; save for kids, spouse, and loved ones."
-                    interestRate={getRateLabel("fam")}
-                    isLoadingRate={isRateLoading}
-                    isRateError={isConfigError}
+                    interestRate={famRateLabel}
                     hideInterest={preferences["fam"] === "Impact Wealth"}
                   />
                 </View>
@@ -165,9 +184,7 @@ export default function HomeScreen() {
                     type="goal"
                     title="WealthGoal"
                     description="Save with focus and smash every target."
-                    interestRate={getRateLabel("goal")}
-                    isLoadingRate={isRateLoading}
-                    isRateError={isConfigError}
+                    interestRate={goalRateLabel}
                     hideInterest={preferences["goal"] === "Impact Wealth"}
                   />
                 </View>
@@ -178,9 +195,7 @@ export default function HomeScreen() {
                     type="fix"
                     title="WealthFix"
                     description="Lock it in, block temptation, and watch your money grow."
-                    interestRate={getRateLabel("fix")}
-                    isLoadingRate={isRateLoading}
-                    isRateError={isConfigError}
+                    interestRate={fixRateLabel}
                     hideInterest={preferences["fix"] === "Impact Wealth"}
                   />
                 </View>
@@ -190,9 +205,7 @@ export default function HomeScreen() {
                     type="flow"
                     title="WealthFlow"
                     description="Automated savings for a continuous wealth flow."
-                    interestRate={getRateLabel("flow")}
-                    isLoadingRate={isRateLoading}
-                    isRateError={isConfigError}
+                    interestRate={flowRateLabel}
                     hideInterest={preferences["flow"] === "Impact Wealth"}
                   />
                 </View>
@@ -202,9 +215,7 @@ export default function HomeScreen() {
                     type="group"
                     title="WealthGroup"
                     description="Save together, grow together and win together."
-                    interestRate={getRateLabel("group")}
-                    isLoadingRate={isRateLoading}
-                    isRateError={isConfigError}
+                    interestRate={groupRateLabel}
                     hideInterest={preferences["group"] === "Impact Wealth"}
                   />
                 </View>

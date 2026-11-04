@@ -23,7 +23,8 @@ import {
   hydrateCompletedPortfolios,
   removeCompletedPortfolio,
 } from "@/src/store/slices/completedPortfolioSlice";
-import { isPortfolioCompleted, getDynamicInterestRateLabel } from "@/src/utils/formatters";
+import { isPortfolioCompleted } from "@/src/utils/formatters";
+import { getGroupedSubscribedRate, getSubscribedPortfolioRate } from "@/src/utils/interestTiers";
 
 const THEME = "#005F61"; // Dark teal for text/buttons
 const THEME_BG = "#D5EDFF"; // Theme light blue
@@ -107,7 +108,6 @@ export default function WealthFlowScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const flowRateLabel = getDynamicInterestRateLabel("flow", systemConfigData, rates, 10);
 
   const flowConfig = rates?.wealthflow || (rates as any)?.flow;
   const minFlowKobo = flowConfig?.minTargetAmount ?? flowConfig?.minimumAmount ?? 50000;
@@ -190,6 +190,9 @@ export default function WealthFlowScreen() {
   };
 
   const totalBalance = allGoals.reduce((sum, g) => sum + parseFloat(g.balance || "0"), 0);
+  const tiers = (configData?.tiers || (configData as any)?.data?.tiers) as any;
+  const activeFlowRate = getGroupedSubscribedRate(ongoingPlans, tiers);
+  const flowRateLabel = activeFlowRate != null ? `${activeFlowRate}% P.A.` : undefined;
 
   if (loading) {
     return (
@@ -284,23 +287,13 @@ export default function WealthFlowScreen() {
                   >
                     Total Savings
                   </Text>
-                  {showInterest && (
-                    <View
-                      style={{
-                        backgroundColor: "#0EA5E9",
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        borderRadius: 20,
-                      }}
-                    >
-                      <Text
-                        maxFontSizeMultiplier={1.35}
-                        style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 12 }}
-                      >
+                  {showInterest && flowRateLabel ? (
+                    <View className="bg-[#E0F2F1] px-2 py-0.5 rounded-full">
+                      <Text className="text-[#005F61] text-[10px] font-kumbh-bold">
                         {flowRateLabel}
                       </Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
                 <TouchableOpacity
                   onPress={() => setShowBalance(!showBalance)}
@@ -388,8 +381,8 @@ export default function WealthFlowScreen() {
               <View>
                 {[
                   {
-                    title: `Autopilot Wealth (${flowRateLabel}):`,
-                    text: `Put your wealth-building on autopilot and earn up to ${flowRateLabel} interest.`,
+                    title: "Autopilot Wealth:",
+                    text: "Your interest rate depends on how much you save and for how long.",
                   },
                   {
                     title: "Flow Limits & Rules:",
@@ -555,7 +548,7 @@ export default function WealthFlowScreen() {
                 />
               ) : (
                 ongoingPlans.map((plan) => (
-                  <AutoListItem key={plan.id} plan={plan} />
+                  <AutoListItem key={plan.id} plan={plan} tiers={tiers} />
                 ))
               )
             ) : completedPlans.length === 0 ? (
@@ -566,7 +559,7 @@ export default function WealthFlowScreen() {
               />
             ) : (
               completedPlans.map((plan) => (
-                <AutoListItem key={plan.id} plan={plan} isCompleted />
+                <AutoListItem key={plan.id} plan={plan} isCompleted tiers={tiers} />
               ))
             )}
           </View>
@@ -621,12 +614,15 @@ function EmptyState({
 function AutoListItem({
   plan,
   isCompleted,
+  tiers,
 }: {
   plan: Portfolio;
   isCompleted?: boolean;
+  tiers?: any[];
 }) {
   const THEME_BG = "#D5EDFF";
   const completed = Boolean(isCompleted || isPortfolioCompleted(plan));
+  const itemRate = getSubscribedPortfolioRate(plan, tiers);
   
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
@@ -690,9 +686,18 @@ function AutoListItem({
 
       <View className="flex-1">
         <View className="flex-row justify-between items-center mb-1">
-          <Text className="text-[14px] font-bold text-[#1A1A1A] flex-1 mr-2" numberOfLines={1}>
-            {plan.name}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 8 }}>
+            <Text className="text-[14px] font-bold text-[#1A1A1A]" numberOfLines={1}>
+              {plan.name}
+            </Text>
+            {itemRate != null ? (
+              <View className="bg-[#E0F2F1] px-1.5 py-0.5 rounded-full ml-2">
+                <Text style={{ color: "#005F61", fontSize: 9, fontWeight: "700" }}>
+                  {itemRate}% P.A.
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <Text className="text-[14px] font-bold text-[#1A1A1A]">
             ₦{formatAmount(plan.targetAmount)}
           </Text>

@@ -23,7 +23,8 @@ import {
   hydrateCompletedPortfolios,
   removeCompletedPortfolio,
 } from "@/src/store/slices/completedPortfolioSlice";
-import { isPortfolioCompleted, getDynamicInterestRateLabel } from "@/src/utils/formatters";
+import { isPortfolioCompleted } from "@/src/utils/formatters";
+import { getGroupedSubscribedRate, getSubscribedPortfolioRate } from "@/src/utils/interestTiers";
 
 const THEME = "#560FF1";
 const THEME_BG = "#F3EEFF";
@@ -91,7 +92,6 @@ export default function WealthFamScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const famRateLabel = getDynamicInterestRateLabel("fam", systemConfigData, rates, 10);
 
   const famConfig = rates?.wealthfam || (rates as any)?.fam;
   const minFamKobo = famConfig?.minTargetAmount ?? famConfig?.minimumAmount ?? 50000;
@@ -187,6 +187,9 @@ export default function WealthFamScreen() {
   };
 
   const totalBalance = allGoals.reduce((sum, g) => sum + parseFloat(g.balance || "0"), 0);
+  const tiers = (configData?.tiers || (configData as any)?.data?.tiers) as any;
+  const activeFamRate = getGroupedSubscribedRate(ongoingPlans, tiers);
+  const famRateLabel = activeFamRate != null ? `${activeFamRate}% P.A.` : undefined;
 
   if (loading) {
     return (
@@ -281,23 +284,13 @@ export default function WealthFamScreen() {
                   >
                     Total Savings
                   </Text>
-                  {showInterest && (
-                    <View
-                      style={{
-                        backgroundColor: THEME,
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        borderRadius: 20,
-                      }}
-                    >
-                      <Text
-                        maxFontSizeMultiplier={1.35}
-                        style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 12 }}
-                      >
+                  {showInterest && famRateLabel ? (
+                    <View className="bg-[#EDE7F6] px-2 py-0.5 rounded-full">
+                      <Text className="text-[#560FF1] text-[10px] font-kumbh-bold">
                         {famRateLabel}
                       </Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
                 <TouchableOpacity
                   onPress={() => setShowBalance(!showBalance)}
@@ -385,8 +378,8 @@ export default function WealthFamScreen() {
               <View>
                 {[
                   {
-                    title: `Family Wealth Growth (${famRateLabel}):`,
-                    text: `Build long-term family wealth while earning up to ${famRateLabel} interest.`,
+                    title: "Family Wealth Growth:",
+                    text: "Your interest rate depends on how much you save and for how long.",
                   },
                   {
                     title: "Contribution & Duration Rules:",
@@ -564,7 +557,7 @@ export default function WealthFamScreen() {
                 </View>
               ) : (
                 ongoingPlans.map((plan) => (
-                  <FamListItem key={plan.id} plan={plan} isCompleted={false} />
+                  <FamListItem key={plan.id} plan={plan} isCompleted={false} tiers={tiers} />
                 ))
               )
             ) : completedPlans.length === 0 ? (
@@ -575,7 +568,7 @@ export default function WealthFamScreen() {
               </View>
             ) : (
               completedPlans.map((plan) => (
-                <FamListItem key={plan.id} plan={plan} isCompleted={true} />
+                <FamListItem key={plan.id} plan={plan} isCompleted={true} tiers={tiers} />
               ))
             )}
           </View>
@@ -588,11 +581,14 @@ export default function WealthFamScreen() {
 function FamListItem({
   plan,
   isCompleted,
+  tiers,
 }: {
   plan: Portfolio;
   isCompleted?: boolean;
+  tiers?: any[];
 }) {
   const completed = Boolean(isCompleted || isPortfolioCompleted(plan));
+  const itemRate = getSubscribedPortfolioRate(plan, tiers);
   const icon = (plan.name || "").includes("Kids")
     ? "👨‍👩‍👧‍👦"
     : (plan.name || "").includes("Spouse")
@@ -623,7 +619,7 @@ function FamListItem({
   const formattedDate = new Date(plan.maturityDate).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric",
+    year: "numeric"
   });
 
   const getDaysLeft = () => {
@@ -680,13 +676,22 @@ function FamListItem({
             alignItems: "center",
           }}
         >
-          <Text
-            maxFontSizeMultiplier={1.35}
-            style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A", flex: 1, marginRight: 8 }}
-            numberOfLines={1}
-          >
-            {plan.name}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 8 }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A" }}
+              numberOfLines={1}
+            >
+              {plan.name}
+            </Text>
+            {itemRate != null ? (
+              <View className="bg-[#EDE7F6] px-1.5 py-0.5 rounded-full ml-2">
+                <Text style={{ color: "#560FF1", fontSize: 9, fontWeight: "700" }}>
+                  {itemRate}% P.A.
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Text style={{ fontSize: 12, marginRight: 2 }}>
               {isCompleted ? "🏆" : "🏡"}

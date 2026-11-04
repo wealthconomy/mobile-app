@@ -5,7 +5,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCreatePortfolioMutation, useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
 import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
-import { getDynamicInterestRateLabel, getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { useInterestQuote } from "@/src/hooks/useInterestQuote";
+import { getTierBounds } from "@/src/utils/interestTiers";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 import { useFocusEffect } from "@react-navigation/native";
@@ -63,18 +65,16 @@ export default function CreateGoalScreen() {
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
   const goalConfig = rates?.wealthgoal || (rates as any)?.goal;
-  const minGoalKobo = goalConfig?.minTargetAmount ?? goalConfig?.minimumAmount ?? 50000;
-  const minGoalDuration = goalConfig?.minDurationDays ?? goalConfig?.minimumTenureDays ?? 30;
-  const maxGoalDuration = goalConfig?.maxDurationDays ?? goalConfig?.maximumTenureDays ?? 730;
-  const minGoalNaira = minGoalKobo / 100;
+  const goalTierBounds = getTierBounds(
+    (configData?.tiers || (configData as any)?.data?.tiers) as any,
+    "WEALTH_GOAL"
+  );
+  const rawMinGoalNaira = (goalTierBounds as any)?.minAmountNaira ?? ((goalTierBounds as any)?.minAmountKobo != null ? (goalTierBounds as any).minAmountKobo / 100 : (goalConfig?.minTargetAmount ? goalConfig.minTargetAmount / 100 : 1000));
+  const minGoalNaira = Math.min(rawMinGoalNaira > 0 ? rawMinGoalNaira : 1000, 1000);
+  const minGoalDuration = goalTierBounds.minDurationDays ?? goalConfig?.minDurationDays ?? goalConfig?.minimumTenureDays ?? 30;
+  const maxGoalDuration = goalTierBounds.maxDurationDays ?? goalConfig?.maxDurationDays ?? goalConfig?.maximumTenureDays ?? 730;
   const minGoalNairaFormatted = minGoalNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const goalInterestRateLabel = getDynamicInterestRateLabel(
-    "goal",
-    systemConfigData,
-    rates,
-    12
-  );
   const { penaltyRate } = getDynamicPenaltyRate(
     "goal",
     systemConfigData,
@@ -119,6 +119,35 @@ export default function CreateGoalScreen() {
   const [isNavigating, setIsNavigating] = useState(false);
   const pinInputRef = useRef<TextInput>(null);
 
+  const targetAmountVal = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
+  const autoSaveAmountVal = parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) || 0;
+  const manualDepositVal = parseFloat(manualDepositAmount.replace(/[^\d.]/g, "")) || 0;
+  const goalInitialAmountNaira = isManual ? manualDepositVal : autoSaveAmountVal;
+  // Dynamic rate and earnings match the selected target amount (or initial saving if target not yet entered)
+  const effectiveGoalAmountNaira = targetAmountVal > 0 ? targetAmountVal : goalInitialAmountNaira;
+
+  const nowZero = new Date();
+  nowZero.setHours(0, 0, 0, 0);
+  const endZero = new Date(endDate);
+  endZero.setHours(0, 0, 0, 0);
+  const goalDurationDays = Math.max(1, Math.ceil((endZero.getTime() - nowZero.getTime()) / (1000 * 3600 * 24)));
+  const isGoalDurationValid = goalDurationDays >= minGoalDuration && (maxGoalDuration == null || goalDurationDays <= maxGoalDuration);
+  const isGoalAmountValid = effectiveGoalAmountNaira >= minGoalNaira;
+
+  const {
+    rate: quotedRate,
+    projectedInterestNaira,
+    isLoading: isQuoteLoading,
+    isError: isQuoteError,
+    isReady: isQuoteReady,
+    matchedTier,
+  } = useInterestQuote({
+    type: "goal",
+    amountNaira: effectiveGoalAmountNaira,
+    durationDays: isGoalDurationValid ? goalDurationDays : undefined,
+    enabled: wealthPreference === "Interest Based" && isGoalAmountValid && isGoalDurationValid,
+  });
+
   const [showFreqDropdown, setShowFreqDropdown] = useState(false);
 
   const FREQUENCIES = ["Daily", "Weekly", "Monthly"];
@@ -154,16 +183,7 @@ export default function CreateGoalScreen() {
     }
   };
 
-  const calculateEstimatedInterest = () => {
-    if (wealthPreference === "Impact Wealth") return "0.00";
-    const target = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
-    const now = new Date().getTime();
-    const end = endDate.getTime();
-    const days = Math.max(1, Math.ceil((end - now) / (1000 * 3600 * 24)));
-    // Estimated ~12% per annum on average progressive balance
-    const interest = ((target * 0.12 * days) / 365) * 0.5;
-    return interest.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+
 
   const getDaysInMonth = (month: number, year: number) =>
     new Date(year, month + 1, 0).getDate();
@@ -459,7 +479,7 @@ export default function CreateGoalScreen() {
                 >
                   Interest Rate:
                 </Text>{" "}
-                Currently, Target Savings offers around {goalInterestRateLabel}, paid daily
+                Your interest rate depends on how much you save and for how long, paid daily
                 into your Flex account.
               </Text>
             )}
@@ -880,6 +900,62 @@ export default function CreateGoalScreen() {
             </View>
           );
         })()}
+
+        {/* Tiered Interest Quote Card */}
+        {wealthPreference === "Interest Based" && (
+          <View style={{ marginTop: -8 }}>
+            {isQuoteLoading ? (
+              <View
+                style={{
+                  backgroundColor: "#F8FAFC",
+                  borderRadius: 12,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                }}
+              >
+                <Text style={{ color: "#64748B", fontSize: 13, fontWeight: "600" }}>
+                  Calculating...
+                </Text>
+              </View>
+            ) : isQuoteReady && quotedRate != null ? (
+              <View
+                style={{
+                  backgroundColor: "#F0FDF4",
+                  borderRadius: 12,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: "#BBF7D0",
+                }}
+              >
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ color: "#166534", fontSize: 13, fontWeight: "700" }}>
+                    Your rate: {quotedRate}% P.A.
+                  </Text>
+                  {projectedInterestNaira != null && (
+                    <Text style={{ color: "#15803D", fontSize: 13, fontWeight: "700" }}>
+                      Estimated earnings: +₦{formatAmount(projectedInterestNaira.toFixed(2))}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            ) : isGoalAmountValid && isGoalDurationValid && (isQuoteError || !isQuoteReady) ? (
+              <View
+                style={{
+                  backgroundColor: "#F8FAFC",
+                  borderRadius: 12,
+                  padding: 12,
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                }}
+              >
+                <Text style={{ color: "#64748B", fontSize: 12, fontWeight: "600" }}>
+                  Your rate is confirmed when you create the plan
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        )}
       </View>
 
       {/* Custom Calendar Modal */}
@@ -1089,7 +1165,11 @@ export default function CreateGoalScreen() {
                 {wealthPreference === "Interest Based" ? "Interest Rate" : "Preference"}
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
-                {wealthPreference === "Interest Based" ? goalInterestRateLabel : "Impact Wealth"}
+                {wealthPreference === "Interest Based"
+                  ? isQuoteReady && quotedRate != null
+                    ? `${quotedRate}% P.A.`
+                    : "Rate confirmed on creation"
+                  : "Impact Wealth"}
               </Text>
             </View>
             <View className="items-end">
@@ -1101,6 +1181,22 @@ export default function CreateGoalScreen() {
               </Text>
             </View>
           </View>
+
+          {/* Row 3.5: Estimated Return */}
+          {wealthPreference === "Interest Based" && (
+            <View className="flex-row justify-between mb-8">
+              <View>
+                <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
+                  Estimated Return
+                </Text>
+                <Text style={{ color: "#155D5F", fontWeight: "700", fontSize: 16 }}>
+                  {isQuoteReady && projectedInterestNaira != null
+                    ? `+₦${formatAmount(projectedInterestNaira.toFixed(2))}`
+                    : "Rate confirmed on creation"}
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Row 4: Debit Today */}
           <View className="flex-row justify-between mb-2">
