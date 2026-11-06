@@ -710,7 +710,7 @@ export default function GroupDetailScreen() {
   const handleReportGroup = () => {
     setIsMenuVisible(false);
     router.push({
-      pathname: "/profile/reports",
+      pathname: "/profile/reports" as any,
       params: { groupId: id as string, groupName },
     });
   };

@@ -281,7 +281,7 @@ function RootLayoutNav() {
 
     const inAuthGroup = segments[0] === "(auth)";
     const inOnboarding = segments[0] === "onboarding";
-    const inSetupPin = inAuthGroup && segments[1] === "setup-pin";
+    const inSetupPin = inAuthGroup && (segments[1] as string) === "setup-pin";
     const inPasswordResetFlow =
       inAuthGroup &&
       (segments[1] === "forgot-password" ||
