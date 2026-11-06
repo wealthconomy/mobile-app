@@ -7,6 +7,9 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "ios": {
+        "image": "latest"
+      },
       "env": {
         "APP_VARIANT": "development",
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
@@ -19,7 +22,8 @@
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       },
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "image": "latest"
       }
     },
     "production": {
@@ -27,6 +31,9 @@
       "env": {
         "APP_VARIANT": "production",
         "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
+      },
+      "ios": {
+        "image": "latest"
       },
       "android": {
         "buildType": "app-bundle"
