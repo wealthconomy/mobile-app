@@ -49,7 +49,7 @@ export default function NotificationSettingsScreen() {
               activeOpacity={1}
               className="bg-[#F3F4F6] rounded-2xl h-16 px-5 flex-row items-center justify-between"
             >
-              <Text className="text-[#94A3B8] text-base">{nudgeFrequency}</Text>
+              <Text className="text-[#4B5563] text-base font-medium">{nudgeFrequency}</Text>
               <Ionicons
                 name={isNudgeOpen ? "chevron-up" : "chevron-down"}
                 size={24}
@@ -71,7 +71,7 @@ export default function NotificationSettingsScreen() {
                       className={`text-base ${
                         nudgeFrequency === opt
                           ? "text-[#155D5F] font-bold"
-                          : "text-[#64748B]"
+                          : "text-[#4B5563] font-medium"
                       }`}
                     >
                       {opt}
@@ -83,7 +83,10 @@ export default function NotificationSettingsScreen() {
                 ))}
               </View>
             )}
-            <Text className="text-[10px] text-[#64748B] mt-2">
+            <Text
+              maxFontSizeMultiplier={1.35}
+              className="text-[12px] text-[#4B5563] font-semibold font-kumbh-semibold mt-2"
+            >
               Remind your members ahead
             </Text>
           </View>
@@ -97,7 +100,7 @@ export default function NotificationSettingsScreen() {
               value={reminderInterval}
               onChangeText={setReminderInterval}
               placeholder="3 hours reminder interval"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor="#6B7280"
             />
           </View>
 

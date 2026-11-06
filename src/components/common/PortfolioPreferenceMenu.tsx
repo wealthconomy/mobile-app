@@ -126,10 +126,12 @@ export const PortfolioPreferenceMenu = ({
         >
           {/* Label */}
           <Text
+            maxFontSizeMultiplier={1.35}
             style={{
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: "600",
-              color: "#9CA3AF",
+              fontFamily: "KumbhSans_600SemiBold",
+              color: "#4B5563",
               paddingHorizontal: 16,
               paddingTop: 8,
               paddingBottom: 4,
@@ -163,6 +165,7 @@ export const PortfolioPreferenceMenu = ({
                     {option === "Interest Based" ? "📈" : option === "Impact Wealth" ? "🌱" : "⚖️"}
                   </Text>
                   <Text
+                    maxFontSizeMultiplier={1.35}
                     style={{
                       fontSize: 14,
                       fontWeight: isActive ? "700" : "500",
@@ -190,7 +193,16 @@ export const PortfolioPreferenceMenu = ({
               padding: 8,
             }}
           >
-            <Text style={{ fontSize: 10, color: "#6B7280", textAlign: "center" }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{
+                fontSize: 12,
+                color: "#4B5563",
+                fontFamily: "KumbhSans_600SemiBold",
+                fontWeight: "600",
+                textAlign: "center",
+              }}
+            >
               Currently:{" "}
               <Text style={{ fontWeight: "700", color: "#155D5F" }}>
                 {current}

@@ -23,11 +23,12 @@ import {
   hydrateCompletedPortfolios,
   removeCompletedPortfolio,
 } from "@/src/store/slices/completedPortfolioSlice";
-import { isPortfolioCompleted, getDynamicInterestRateLabel } from "@/src/utils/formatters";
+import { isPortfolioCompleted } from "@/src/utils/formatters";
+import { getGroupedSubscribedRate, getSubscribedPortfolioRate } from "@/src/utils/interestTiers";
 
 const THEME = "#560FF1";
 const THEME_BG = "#F3EEFF";
-const THEME_CARD_BG = "#9C6EFF66";
+const THEME_CARD_BG = "#F3EEFF";
 
 const SUGGESTIONS = [
   {
@@ -91,7 +92,18 @@ export default function WealthFamScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const famRateLabel = getDynamicInterestRateLabel("fam", systemConfigData, rates, 10);
+
+  const famConfig = rates?.wealthfam || (rates as any)?.fam;
+  const minFamKobo = famConfig?.minTargetAmount ?? famConfig?.minimumAmount ?? 50000;
+  const minFamDuration = famConfig?.minDurationDays ?? famConfig?.minimumTenureDays ?? 30;
+  const maxFamDuration = famConfig?.maxDurationDays ?? famConfig?.maximumTenureDays ?? 365;
+  const famPenaltyRate = famConfig?.earlyLiquidationPenaltyRate ?? famConfig?.earlyWithdrawalPenaltyPercentage ?? 2;
+  const minFamNairaFormatted = (minFamKobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const handleBack = () => {
+    router.replace("/(tabs)/portfolios" as any);
+  };
+
   const allGoals = data?.items || [];
 
   const handleRefresh = async () => {
@@ -175,12 +187,15 @@ export default function WealthFamScreen() {
   };
 
   const totalBalance = allGoals.reduce((sum, g) => sum + parseFloat(g.balance || "0"), 0);
+  const tiers = (configData?.tiers || (configData as any)?.data?.tiers) as any;
+  const activeFamRate = getGroupedSubscribedRate(ongoingPlans, tiers);
+  const famRateLabel = activeFamRate != null ? `${activeFamRate}% P.A.` : undefined;
 
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1 }} className="bg-white" edges={["top"]}>
         <StatusBar style="dark" />
-        <Header title="WealthFam" onBack={() => router.back()} />
+        <Header title="WealthFam" onBack={handleBack} />
         <PortfolioDetailSkeleton />
       </SafeAreaView>
     );
@@ -191,7 +206,7 @@ export default function WealthFamScreen() {
       <StatusBar style="dark" />
       <Header
         title="WealthFam"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="fam" />}
       />
 
@@ -217,7 +232,7 @@ export default function WealthFamScreen() {
             style={{
               width: "100%",
               maxWidth: 365,
-              height: 170,
+              height: 190,
               borderTopLeftRadius: 50,
               borderTopRightRadius: 20,
               borderBottomRightRadius: 50,
@@ -255,7 +270,7 @@ export default function WealthFamScreen() {
             <View
               style={{
                 position: "absolute",
-                top: 28,
+                top: 22,
                 left: 20,
                 right: 20,
                 zIndex: 10,
@@ -263,23 +278,19 @@ export default function WealthFamScreen() {
             >
               <View className="flex-row items-center justify-between mb-1">
                 <View className="flex-row items-center gap-2">
-                  <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-90">
+                  <Text
+                    maxFontSizeMultiplier={1.35}
+                    className="text-[#1A1A1A] text-[13px] font-kumbh-semibold"
+                  >
                     Total Savings
                   </Text>
-                  {showInterest && (
-                    <View
-                      style={{
-                        backgroundColor: "#6366F1",
-                        paddingHorizontal: 8,
-                        paddingVertical: 2.5,
-                        borderRadius: 20,
-                      }}
-                    >
-                      <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                  {showInterest && famRateLabel ? (
+                    <View className="bg-[#EDE7F6] px-2 py-0.5 rounded-full">
+                      <Text className="text-[#560FF1] text-[10px] font-kumbh-bold">
                         {famRateLabel}
                       </Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
                 <TouchableOpacity
                   onPress={() => setShowBalance(!showBalance)}
@@ -293,7 +304,11 @@ export default function WealthFamScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View className="flex-row items-baseline mb-1">
+              <TouchableOpacity
+                onPress={() => router.push("/education/win-up" as any)}
+                activeOpacity={0.8}
+                className="flex-row items-baseline mb-1"
+              >
                 {showBalance ? (
                   <BalanceText
                     amount={`₦${formatAmount(totalBalance.toString())}`}
@@ -305,14 +320,20 @@ export default function WealthFamScreen() {
                     ***
                   </Text>
                 )}
-              </View>
+                <Text className="text-[#1A1A1A] text-[34px] font-light ml-4 mb-1">
+                  ›
+                </Text>
+              </TouchableOpacity>
 
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
-                  <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-80">
+                  <Text
+                    maxFontSizeMultiplier={1.35}
+                    className="text-[#1A1A1A] text-[12px] font-kumbh-semibold"
+                  >
                     Your wealth grew to ₦0.00 today
                   </Text>
-                  <ArrowUp size={14} color="#4CAF50" />
+                  <ArrowUp size={14} color="#4CAF50" style={{ marginLeft: 4 }} />
                 </View>
               )}
             </View>
@@ -323,7 +344,7 @@ export default function WealthFamScreen() {
                 width: 200,
                 height: 40,
                 borderRadius: 18,
-                bottom: 15,
+                bottom: 16,
                 right: 20,
                 elevation: 3,
                 zIndex: 20,
@@ -349,7 +370,7 @@ export default function WealthFamScreen() {
                 <Ionicons name="close" size={20} color={THEME} />
               </TouchableOpacity>
               <Text
-                className="font-extrabold text-[12px] mb-4"
+                className="font-extrabold text-[13px] mb-4"
                 style={{ color: THEME }}
               >
                 What's on WealthFam? 🏡✨
@@ -357,22 +378,22 @@ export default function WealthFamScreen() {
               <View>
                 {[
                   {
-                    title: "Automated Contributions:",
-                    text: "Use the Wealth Auto feature to set daily, weekly, or monthly deposits into your family pots effortlessly.",
+                    title: "Family Wealth Growth:",
+                    text: "Your interest rate depends on how much you save and for how long.",
                   },
                   {
-                    title: "Goal-Based Discipline:",
-                    text: "Set specific amounts and timelines for family needs, like school fees or a family home.",
+                    title: "Contribution & Duration Rules:",
+                    text: `Minimum target amount is ₦${minFamNairaFormatted}. Target duration ranges from ${minFamDuration} to ${maxFamDuration} days.`,
                   },
                   {
-                    title: "Community-Driven Growth:",
-                    text: "Leverage group saving options to reach family targets faster through collective discipline.",
+                    title: "Early Liquidation Rule:",
+                    text: `Breaking a family wealth plan early incurs a penalty of ${famPenaltyRate}%.`,
                   },
                 ].map((tip, i) => (
                   <View key={i} className="flex-row mb-3 items-start">
-                    <Text className="mr-2 text-[10px]">✅</Text>
+                    <Text className="mr-2 text-[12px]">✅</Text>
                     <Text
-                      className="text-[10px] flex-1 leading-[15px]"
+                      className="text-[12px] flex-1 leading-[17px] font-kumbh-semibold"
                       style={{ color: THEME }}
                     >
                       <Text className="font-bold">{tip.title}</Text> {tip.text}
@@ -398,7 +419,7 @@ export default function WealthFamScreen() {
                   key={cat.id}
                   style={{
                     width: 160,
-                    height: 114,
+                    height: 124,
                     backgroundColor: THEME_BG,
                     borderRadius: 15,
                     padding: 12,
@@ -421,14 +442,16 @@ export default function WealthFamScreen() {
                     <Text className="text-[24px]">{cat.icon}</Text>
                   </View>
                   <Text
+                    maxFontSizeMultiplier={1.35}
                     className="font-bold text-[14px] mb-0.5"
                     style={{ color: THEME }}
                   >
                     {cat.title}
                   </Text>
                   <Text
-                    className="text-[9px] opacity-70"
+                    className="text-[13px] leading-[18px] font-kumbh-semibold"
                     style={{ color: THEME }}
+                    numberOfLines={2}
                   >
                     {cat.subtitle}
                   </Text>
@@ -463,7 +486,7 @@ export default function WealthFamScreen() {
               onPress={() => setActiveTab("ongoing")}
               activeOpacity={1}
               style={{
-                width: 182,
+                width: "49%",
                 height: 40,
                 justifyContent: "center",
                 alignItems: "center",
@@ -489,7 +512,7 @@ export default function WealthFamScreen() {
               onPress={() => setActiveTab("completed")}
               activeOpacity={1}
               style={{
-                width: 182,
+                width: "49%",
                 height: 40,
                 justifyContent: "center",
                 alignItems: "center",
@@ -514,7 +537,7 @@ export default function WealthFamScreen() {
           </View>
 
           {/* ── Plan List (same structure as GoalListItem) ─────────── */}
-          <View style={{ width: 355, alignSelf: "center" }}>
+          <View style={{ width: "100%" }}>
             {activeTab === "ongoing" ? (
               ongoingPlans.length === 0 ? (
                 <View className="items-center justify-center py-20 px-10">
@@ -526,7 +549,7 @@ export default function WealthFamScreen() {
                     You haven't created a WealthFam yet!
                   </Text>
                   <Text
-                    className="text-[11px] text-center opacity-60"
+                    className="text-[13px] leading-[18px] font-kumbh-semibold text-center"
                     style={{ color: THEME }}
                   >
                     Start saving goals for the people you love.
@@ -534,18 +557,18 @@ export default function WealthFamScreen() {
                 </View>
               ) : (
                 ongoingPlans.map((plan) => (
-                  <FamListItem key={plan.id} plan={plan} isCompleted={false} />
+                  <FamListItem key={plan.id} plan={plan} isCompleted={false} tiers={tiers} />
                 ))
               )
             ) : completedPlans.length === 0 ? (
               <View className="items-center justify-center py-20 px-10">
-                <Text className="text-[#6B7280] italic">
+                <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold italic text-center">
                   No completed plans yet
                 </Text>
               </View>
             ) : (
               completedPlans.map((plan) => (
-                <FamListItem key={plan.id} plan={plan} isCompleted={true} />
+                <FamListItem key={plan.id} plan={plan} isCompleted={true} tiers={tiers} />
               ))
             )}
           </View>
@@ -558,11 +581,14 @@ export default function WealthFamScreen() {
 function FamListItem({
   plan,
   isCompleted,
+  tiers,
 }: {
   plan: Portfolio;
   isCompleted?: boolean;
+  tiers?: any[];
 }) {
   const completed = Boolean(isCompleted || isPortfolioCompleted(plan));
+  const itemRate = getSubscribedPortfolioRate(plan, tiers);
   const icon = (plan.name || "").includes("Kids")
     ? "👨‍👩‍👧‍👦"
     : (plan.name || "").includes("Spouse")
@@ -593,7 +619,7 @@ function FamListItem({
   const formattedDate = new Date(plan.maturityDate).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric",
+    year: "numeric"
   });
 
   const getDaysLeft = () => {
@@ -614,8 +640,8 @@ function FamListItem({
         })
       }
       style={{
-        width: 355,
-        height: 51,
+        width: "100%",
+        minHeight: 51,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
@@ -641,7 +667,7 @@ function FamListItem({
       </View>
 
       {/* Text Area */}
-      <View style={{ width: 292, height: 51, justifyContent: "space-between" }}>
+      <View style={{ flex: 1, marginLeft: 12, minHeight: 51, justifyContent: "space-between" }}>
         {/* Row 1: Title & Amount */}
         <View
           style={{
@@ -650,14 +676,30 @@ function FamListItem({
             alignItems: "center",
           }}
         >
-          <Text style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A" }}>
-            {plan.name}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 8 }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 13, fontWeight: "700", color: "#1A1A1A" }}
+              numberOfLines={1}
+            >
+              {plan.name}
+            </Text>
+            {itemRate != null ? (
+              <View className="bg-[#EDE7F6] px-1.5 py-0.5 rounded-full ml-2">
+                <Text style={{ color: "#560FF1", fontSize: 9, fontWeight: "700" }}>
+                  {itemRate}% P.A.
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Text style={{ fontSize: 12, marginRight: 2 }}>
               {isCompleted ? "🏆" : "🏡"}
             </Text>
-            <Text style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}
+            >
               ₦{formatAmount(plan.targetAmount)}
             </Text>
           </View>
@@ -672,11 +714,17 @@ function FamListItem({
           }}
         >
           <View style={{ flex: 1, marginRight: 8 }}>
-            <Text style={{ fontSize: 10, color: "#9CA3AF" }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 12, lineHeight: 16, color: "#4B5563", fontWeight: "600" }}
+            >
               {plan.metadata?.category || "Fam"}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
+              <Text
+                maxFontSizeMultiplier={1.35}
+                style={{ fontSize: 12, color: "#166534", fontWeight: "700" }}
+              >
                 Wealth growth ₦{formatAmount(growthVal.toString())}{" "}
               </Text>
               <ArrowUp size={12} color="#4CAF50" />
@@ -710,25 +758,32 @@ function FamListItem({
             alignItems: "center",
           }}
         >
-          <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
+          <Text
+            maxFontSizeMultiplier={1.35}
+            style={{ fontSize: 12, lineHeight: 16, color: "#4B5563", fontWeight: "600" }}
+          >
             End Date: {formattedDate}
           </Text>
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
-              width: 80,
+              width: 95,
               justifyContent: "space-between",
             }}
           >
-            <Text style={{ fontSize: 9, color: "#9CA3AF" }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 12, color: "#4B5563", fontWeight: "600" }}
+            >
               {Math.round(Math.min(progress * 100, 100))}%
             </Text>
             <Text
+              maxFontSizeMultiplier={1.35}
               style={{
-                fontSize: 9,
-                color: isCompleted ? "#4CAF50" : "#9CA3AF",
-                fontWeight: isCompleted ? "700" : "normal",
+                fontSize: 12,
+                color: isCompleted ? "#166534" : "#4B5563",
+                fontWeight: isCompleted ? "700" : "600",
               }}
             >
               {isCompleted ? "Plan Achieved" : `${getDaysLeft()} days Left`}

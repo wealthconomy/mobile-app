@@ -31,8 +31,8 @@ const saveAuthToStorage = async (state: AuthState) => {
       hasCompletedOnboarding: state.hasCompletedOnboarding,
     };
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
-  } catch (error) {
-    console.error("Error saving auth to storage:", error);
+  } catch {
+    console.error("Error saving auth to storage");
   }
 };
 
@@ -41,11 +41,30 @@ export const loadAuthFromStorage = createAsyncThunk(
   async () => {
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      const kyc2Done = await AsyncStorage.getItem("@wealth_kyc_level_2_completed");
+      const storedPasscodeFlag = await AsyncStorage.getItem("@wealth_has_app_passcode");
+      const storedPasscode = await AsyncStorage.getItem("@wealth_app_passcode");
+      const storedBio = await AsyncStorage.getItem("@wealth_biometrics_enabled");
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (kyc2Done === "true" && parsed.user) {
+          parsed.user.kycLevel = Math.max(parsed.user.kycLevel || 1, 2);
+        }
+        if (
+          parsed.user &&
+          (parsed.user.hasAppPasscode ||
+            storedPasscodeFlag === "true" ||
+            Boolean(storedPasscode && storedPasscode.length === 6))
+        ) {
+          parsed.user.hasAppPasscode = true;
+        }
+        if (parsed.user && storedBio !== null) {
+          parsed.user.biometricsEnabled = storedBio === "true";
+        }
+        return parsed;
       }
-    } catch (error) {
-      console.error("Error loading auth from storage:", error);
+    } catch {
+      console.error("Error loading auth from storage");
     }
     return null;
   }
@@ -59,7 +78,27 @@ const authSlice = createSlice({
       state,
       action: PayloadAction<{ user: any; token: string; refreshToken?: string }>
     ) => {
-      state.user = action.payload.user;
+      const u = action.payload.user ? { ...action.payload.user } : null;
+      if (u && !u.firstName && u.name) {
+        const parts = String(u.name).trim().split(" ");
+        u.firstName = parts[0];
+        u.lastName = parts.slice(1).join(" ");
+      }
+      // Preserve existing security onboarding flags if backend /user/me does not return them
+      if (state.user?.hasAppPasscode && u && u.hasAppPasscode === undefined) {
+        u.hasAppPasscode = true;
+      }
+      if (state.user?.hasTransactionPin && u && u.hasTransactionPin === undefined) {
+        u.hasTransactionPin = true;
+      }
+      if (state.user?.biometricsEnabled !== undefined && u && u.biometricsEnabled === undefined) {
+        u.biometricsEnabled = state.user.biometricsEnabled;
+      }
+      // Preserve verified KYC level if local state is already Level 2 or higher
+      if (state.user?.kycLevel && state.user.kycLevel >= 2 && u && (!u.kycLevel || u.kycLevel < 2)) {
+        u.kycLevel = state.user.kycLevel;
+      }
+      state.user = u;
       if (state.user?.kycStatus === "VERIFIED" || state.user?.kycVerified) {
         state.user.kycRejectionReason = null;
         state.user.rejectionReason = null;
@@ -73,12 +112,21 @@ const authSlice = createSlice({
       saveAuthToStorage(state);
     },
     logout: (state) => {
+      const userId = state.user?.id;
       state.user = null;
       state.token = null;
       state.refreshToken = null;
       state.isAuthenticated = false;
       state.isLoading = false;
       AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+      AsyncStorage.removeItem("@wealth_has_app_passcode").catch(() => {});
+      AsyncStorage.removeItem("@wealth_app_passcode").catch(() => {});
+      AsyncStorage.removeItem("@wealth_kyc_level_2_completed").catch(() => {});
+      AsyncStorage.removeItem("@wealth_biometrics_enabled").catch(() => {});
+      if (userId) {
+        AsyncStorage.removeItem(`@wealth_waitlist_joined_${userId}`).catch(() => {});
+        AsyncStorage.removeItem(`@wealth_waitlist_pos_${userId}`).catch(() => {});
+      }
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
@@ -89,8 +137,12 @@ const authSlice = createSlice({
     },
     updateKycLevel: (state, action: PayloadAction<number>) => {
       if (state.user) {
-        state.user.kycLevel = action.payload;
+        const current = state.user.kycLevel || 1;
+        state.user.kycLevel = Math.max(current, action.payload);
         saveAuthToStorage(state);
+      }
+      if (action.payload >= 2) {
+        AsyncStorage.setItem("@wealth_kyc_level_2_completed", "true").catch(() => {});
       }
     },
     updateKycStatus: (state, action: PayloadAction<string>) => {
@@ -136,6 +188,28 @@ const authSlice = createSlice({
         state.user.kycLevel = 1;
         saveAuthToStorage(state);
       }
+      AsyncStorage.removeItem("@wealth_kyc_level_2_completed").catch(() => {});
+    },
+    setHasTransactionPin: (state, action: PayloadAction<boolean>) => {
+      if (state.user) {
+        state.user.hasTransactionPin = action.payload;
+        saveAuthToStorage(state);
+      }
+      AsyncStorage.setItem("@wealth_has_transaction_pin", action.payload ? "true" : "false").catch(() => {});
+    },
+    setHasAppPasscode: (state, action: PayloadAction<boolean>) => {
+      if (state.user) {
+        state.user.hasAppPasscode = action.payload;
+        saveAuthToStorage(state);
+      }
+      AsyncStorage.setItem("@wealth_has_app_passcode", action.payload ? "true" : "false").catch(() => {});
+    },
+    setBiometricsEnabled: (state, action: PayloadAction<boolean>) => {
+      if (state.user) {
+        state.user.biometricsEnabled = action.payload;
+        saveAuthToStorage(state);
+      }
+      AsyncStorage.setItem("@wealth_biometrics_enabled", action.payload ? "true" : "false").catch(() => {});
     },
   },
   extraReducers: (builder) => {
@@ -180,5 +254,8 @@ export const {
   updateKycStatus,
   updateKycInfo,
   resetKycLevel,
+  setHasTransactionPin,
+  setHasAppPasscode,
+  setBiometricsEnabled,
 } = authSlice.actions;
 export default authSlice.reducer;

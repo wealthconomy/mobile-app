@@ -5,6 +5,7 @@ import Svg, { Path } from "react-native-svg";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../store";
 import { useListNotificationsQuery } from "../../../store/api/notificationApi";
+import { useIsAuthenticated } from "../../../hooks/useIsAuthenticated";
 
 export const NotificationIcon = () => (
   <Svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -26,7 +27,8 @@ export const CustomerSupportIcon = () => (
 
 export const HomeHeader = () => {
   const router = useRouter();
-  const { user } = useSelector((state: RootState) => state.auth);
+  const user = useSelector((state: RootState) => state.auth.user);
+  const isAuth = useIsAuthenticated();
 
   const {
     data: notificationsData,
@@ -34,16 +36,19 @@ export const HomeHeader = () => {
   } = useListNotificationsQuery(
     { limit: 50 },
     {
-      pollingInterval: 10000,
+      pollingInterval: isAuth ? 10000 : 0,
       refetchOnFocus: true,
       refetchOnMountOrArgChange: true,
+      skip: !isAuth,
     }
   );
 
   useFocusEffect(
     useCallback(() => {
-      refetchNotifications();
-    }, [refetchNotifications])
+      if (isAuth) {
+        refetchNotifications();
+      }
+    }, [refetchNotifications, isAuth])
   );
 
   const notificationCount = useMemo(() => {
@@ -59,15 +64,30 @@ export const HomeHeader = () => {
     }).length;
   }, [notificationsData]);
 
+  const displayName =
+    user?.firstName
+      ? `${user.firstName} ${user.lastName || ""}`.trim()
+      : user?.name
+      ? user.name
+      : user?.email
+      ? user.email.split("@")[0]
+      : "Wealth Builder";
+
   return (
     <View className="flex-row justify-between items-center mb-5 ml-[10px]">
       {/* Left: Greeting */}
       <View>
-        <Text className="text-[#6B7280] text-[13px] font-medium">
+        <Text
+          className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold"
+          maxFontSizeMultiplier={1.35}
+        >
           Hello, WealthBuilder!
         </Text>
-        <Text className="text-[#323232] text-[20px] font-extrabold tracking-[-0.5px]">
-          {user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : "Wealth Builder"}
+        <Text
+          className="text-[#323232] text-[20px] font-extrabold tracking-[-0.5px]"
+          maxFontSizeMultiplier={1.35}
+        >
+          {displayName}
         </Text>
       </View>
 
@@ -85,10 +105,10 @@ export const HomeHeader = () => {
                 position: "absolute",
                 top: -5,
                 right: -4,
-                minWidth: 18,
-                height: 18,
+                minWidth: 20,
+                height: 20,
                 paddingHorizontal: 4,
-                borderRadius: 9,
+                borderRadius: 10,
                 backgroundColor: "#EF4444",
                 borderWidth: 1.5,
                 borderColor: "white",
@@ -96,7 +116,16 @@ export const HomeHeader = () => {
                 justifyContent: "center",
               }}
             >
-              <Text style={{ color: "white", fontSize: 9, fontWeight: "800" }}>
+              <Text
+                maxFontSizeMultiplier={1.35}
+                style={{
+                  color: "white",
+                  fontSize: 12,
+                  lineHeight: 14,
+                  fontWeight: "800",
+                  fontFamily: "KumbhSans_700Bold",
+                }}
+              >
                 {notificationCount > 99 ? "99+" : notificationCount}
               </Text>
             </View>

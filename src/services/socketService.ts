@@ -31,24 +31,16 @@ class SocketService {
    */
   public connect(token: string): Socket {
     if (this.socket && this.currentToken === token && this.socket.connected) {
-      console.log("[SupportSocket] Already connected with active socket ID:", this.socket.id);
       return this.socket;
     }
 
     if (this.socket) {
-      console.log("[SupportSocket] Existing socket detected, recycling connection...");
       this.disconnect();
     }
 
     this.currentToken = token;
     this.isConnecting = true;
     const socketUrl = getSocketUrl();
-
-    console.log(
-      `[SupportSocket] 🔌 Connecting to ${socketUrl} (Token present: ${Boolean(
-        token
-      )}, length: ${token?.length ?? 0})`
-    );
 
     this.socket = io(socketUrl, {
       auth: { token },
@@ -64,19 +56,17 @@ class SocketService {
 
     this.socket.on("connect", () => {
       this.isConnecting = false;
-      console.log(`[SupportSocket] 🟢 CONNECTED! Socket ID: ${this.socket?.id}`);
       this.notifyConnectionState(true);
     });
 
-    this.socket.on("disconnect", (reason: any) => {
+    this.socket.on("disconnect", () => {
       this.isConnecting = false;
-      console.log(`[SupportSocket] 🔴 DISCONNECTED. Reason: ${reason}`);
       this.notifyConnectionState(false);
     });
 
     this.socket.on("connect_error", (error: any) => {
       this.isConnecting = false;
-      console.warn(`[SupportSocket] ⚠️ Connection error: ${error.message}`);
+      console.warn(`[SupportSocket] Connection error: ${error?.message || "Connection failed"}`);
       this.notifyConnectionState(false);
     });
 
@@ -88,7 +78,6 @@ class SocketService {
    */
   public disconnect(): void {
     if (this.socket) {
-      console.log("[SupportSocket] 🔌 Disconnecting socket explicitly...");
       this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
@@ -114,16 +103,14 @@ class SocketService {
   ): Promise<SocketSendMessageAck> {
     return new Promise((resolve) => {
       if (!this.socket || !this.socket.connected) {
-        console.warn("[SupportSocket] ⚠️ Cannot emit support:send_message - socket is not connected");
+        console.warn("[SupportSocket] Cannot emit support:send_message - socket is not connected");
         resolve({ ok: false, error: "Socket is not connected" });
         return;
       }
 
-      console.log("[SupportSocket] 📤 Emitting support:send_message ->", payload);
-
       // Timeout safety fallback
       const timer = setTimeout(() => {
-        console.warn("[SupportSocket] ⏱️ Timeout waiting for support:send_message ack");
+        console.warn("[SupportSocket] Timeout waiting for support:send_message ack");
         resolve({ ok: false, error: "Message send timeout" });
       }, 7000);
 
@@ -132,7 +119,6 @@ class SocketService {
         payload,
         (response: SocketSendMessageAck) => {
           clearTimeout(timer);
-          console.log("[SupportSocket] 📥 Ack received for support:send_message ->", response);
           resolve(response || { ok: true });
         }
       );
@@ -153,9 +139,7 @@ class SocketService {
       }
 
       const payload: SocketMarkReadPayload = { chatId, direction };
-      console.log("[SupportSocket] 👀 Emitting chat:mark_as_read ->", payload);
       this.socket.emit("chat:mark_as_read", payload, (response: { ok: boolean }) => {
-        console.log("[SupportSocket] 📥 Ack received for chat:mark_as_read ->", response);
         resolve(response || { ok: true });
       });
     });
@@ -168,13 +152,9 @@ class SocketService {
     callback: (data: SocketNewMessageEvent) => void
   ): () => void {
     if (!this.socket) return () => {};
-    const wrapped = (data: SocketNewMessageEvent) => {
-      console.log("[SupportSocket] 📩 INCOMING MESSAGE EVENT (support:new_message):", data);
-      callback(data);
-    };
-    this.socket.on("support:new_message", wrapped);
+    this.socket.on("support:new_message", callback);
     return () => {
-      this.socket?.off("support:new_message", wrapped);
+      this.socket?.off("support:new_message", callback);
     };
   }
 
@@ -185,13 +165,9 @@ class SocketService {
     callback: (data: SocketUnreadCountUpdateEvent) => void
   ): () => void {
     if (!this.socket) return () => {};
-    const wrapped = (data: SocketUnreadCountUpdateEvent) => {
-      console.log("[SupportSocket] 🔔 UNREAD COUNT UPDATE (chat:unread_count_update):", data);
-      callback(data);
-    };
-    this.socket.on("chat:unread_count_update", wrapped);
+    this.socket.on("chat:unread_count_update", callback);
     return () => {
-      this.socket?.off("chat:unread_count_update", wrapped);
+      this.socket?.off("chat:unread_count_update", callback);
     };
   }
 
@@ -202,13 +178,9 @@ class SocketService {
     callback: (data: SocketUserStatusChangeEvent) => void
   ): () => void {
     if (!this.socket) return () => {};
-    const wrapped = (data: SocketUserStatusChangeEvent) => {
-      console.log("[SupportSocket] 👤 ADMIN STATUS CHANGE (user:status_change):", data);
-      callback(data);
-    };
-    this.socket.on("user:status_change", wrapped);
+    this.socket.on("user:status_change", callback);
     return () => {
-      this.socket?.off("user:status_change", wrapped);
+      this.socket?.off("user:status_change", callback);
     };
   }
 
@@ -227,8 +199,8 @@ class SocketService {
     this.connectionListeners.forEach((listener) => {
       try {
         listener(connected);
-      } catch (err) {
-        console.warn("Error in socket connection listener:", err);
+      } catch {
+        console.warn("Error in socket connection listener");
       }
     });
   }

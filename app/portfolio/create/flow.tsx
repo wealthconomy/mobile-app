@@ -3,7 +3,9 @@ import { AppCalendarModal, AppDatePickerField } from "@/src/components/common";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { useCreatePortfolioMutation, useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
 import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
-import { getDynamicInterestRateLabel, getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { useInterestQuote } from "@/src/hooks/useInterestQuote";
+import { getTierBounds } from "@/src/utils/interestTiers";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { CreatePortfolioRequest } from "@/src/types/portfolio";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,6 +26,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 
 const TEAL = "#0B575B";
 const TEAL_LIGHT = "#E0F2F1";
@@ -32,6 +35,7 @@ const TEXT_DARK = "#1A1A1A";
 const FREQUENCIES = ["Daily", "Weekly", "Monthly"];
 
 export default function CreateFlowScreen() {
+  const formScrollRef = useRef<ScrollView>(null);
   const params = useLocalSearchParams<{
     category: string;
     amount: string;
@@ -57,10 +61,6 @@ export default function CreateFlowScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(null);
 
-  const minTargetDate = new Date();
-  minTargetDate.setDate(minTargetDate.getDate() + 1);
-  minTargetDate.setHours(0, 0, 0, 0);
-
   const handleSelectDate = (date: Date) => {
     setSelectedEndDate(date);
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -83,18 +83,55 @@ export default function CreateFlowScreen() {
   const [verifyPin] = useVerifyPinMutation();
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
-  const flowInterestRateLabel = getDynamicInterestRateLabel(
-    "flow",
-    systemConfigData,
-    configData?.rates || (configData as any)?.data?.rates,
-    10
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const flowConfig = rates?.wealthflow || rates?.flow;
+  const flowTierBounds = getTierBounds(
+    (configData?.tiers || (configData as any)?.data?.tiers) as any,
+    "WEALTH_FLOW"
   );
+  const rawMinFlowNaira = (flowTierBounds as any)?.minAmountNaira ?? ((flowTierBounds as any)?.minAmountKobo != null ? (flowTierBounds as any).minAmountKobo / 100 : (flowConfig?.minTargetAmount ? flowConfig.minTargetAmount / 100 : 1000));
+  const minFlowNaira = Math.min(rawMinFlowNaira > 0 ? rawMinFlowNaira : 1000, 1000);
+  const minFlowNairaFormatted = minFlowNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const minFlowDuration = flowTierBounds.minDurationDays ?? flowConfig?.minDurationDays ?? flowConfig?.minimumTenureDays ?? 30;
+  const maxFlowDuration = flowTierBounds.maxDurationDays ?? flowConfig?.maxDurationDays ?? flowConfig?.maximumTenureDays ?? 730;
+
+  const initialDepositNaira = parseFloat(initialDeposit.replace(/,/g, "")) || 0;
+  const targetAmountNaira = parseFloat(targetAmount.replace(/,/g, "")) || 0;
+  const effectiveFlowAmountNaira = targetAmountNaira > 0 ? targetAmountNaira : initialDepositNaira;
+  let flowDurationDays = 0;
+  if (selectedEndDate) {
+    const todayZero = new Date();
+    todayZero.setHours(0, 0, 0, 0);
+    const selZero = new Date(selectedEndDate);
+    selZero.setHours(0, 0, 0, 0);
+    flowDurationDays = Math.max(1, Math.ceil((selZero.getTime() - todayZero.getTime()) / (1000 * 3600 * 24)));
+  }
+  const isFlowDurationValid = flowDurationDays >= minFlowDuration && (maxFlowDuration == null || flowDurationDays <= maxFlowDuration);
+  const isFlowAmountValid = effectiveFlowAmountNaira >= minFlowNaira || initialDepositNaira >= 100;
+
+  const {
+    rate: quotedRate,
+    projectedInterestNaira,
+    isLoading: isQuoteLoading,
+    isError: isQuoteError,
+    isReady: isQuoteReady,
+  } = useInterestQuote({
+    type: "flow",
+    amountNaira: Math.max(effectiveFlowAmountNaira, 100),
+    durationDays: isFlowDurationValid ? flowDurationDays : undefined,
+    enabled: wealthPreference === "Interest Based" && isFlowAmountValid && isFlowDurationValid,
+  });
+
   const { penaltyRate: flowPenaltyRate } = getDynamicPenaltyRate(
     "flow",
     systemConfigData,
-    configData?.rates || (configData as any)?.data?.rates,
+    rates,
     "2.5%"
   );
+
+  const minTargetDate = new Date();
+  minTargetDate.setDate(minTargetDate.getDate() + minFlowDuration);
+  minTargetDate.setHours(0, 0, 0, 0);
 
   const formatAmount = (val: string) => {
     const n = val.replace(/\D/g, "");
@@ -123,20 +160,27 @@ export default function CreateFlowScreen() {
     return new Date(Date.now() + 365 * 86400000).toISOString();
   };
 
-  const calculateGrowth = () => {
-    const amt = parseFloat(targetAmount.replace(/,/g, "")) || 0;
-    return ((amt * 0.12 * 365) / 365).toFixed(2);
-  };
+
 
   const isFormValid = () => {
     const targetAmt = parseFloat(targetAmount.replace(/,/g, "")) || 0;
     const initialAmt = parseFloat(initialDeposit.replace(/,/g, "")) || 0;
+    let durationDays = 0;
+    if (selectedEndDate) {
+      const todayZero = new Date();
+      todayZero.setHours(0, 0, 0, 0);
+      const selZero = new Date(selectedEndDate);
+      selZero.setHours(0, 0, 0, 0);
+      durationDays = Math.max(1, Math.ceil((selZero.getTime() - todayZero.getTime()) / (1000 * 3600 * 24)));
+    }
+    const isDurationValid = selectedEndDate ? (durationDays >= minFlowDuration && durationDays <= maxFlowDuration) : endDateText.length >= 10;
     return (
       wealthTitle.trim().length > 0 &&
-      targetAmt > 0 &&
+      targetAmt >= minFlowNaira &&
       initialAmt >= 100 &&
       frequency.length > 0 &&
-      endDateText.length >= 10
+      endDateText.length >= 10 &&
+      isDurationValid
     );
   };
 
@@ -145,9 +189,7 @@ export default function CreateFlowScreen() {
     setIsSubmitting(true);
 
     try {
-      console.log("🏎️ [WealthFlow Create] Verifying PIN...");
       await verifyPin({ pin: enteredPin }).unwrap();
-      console.log("✅ [WealthFlow Create] PIN verified successfully");
 
       const targetAmountKobo = Math.round((parseFloat(targetAmount.replace(/,/g, "")) || 0) * 100);
       const initialDepositKobo = Math.round((parseFloat(initialDeposit.replace(/,/g, "")) || 100) * 100);
@@ -170,17 +212,14 @@ export default function CreateFlowScreen() {
         },
       };
 
-      console.log("🏎️ [WealthFlow Create Request] POST /api/v1/portfolios/wealthflow with payload:\n", JSON.stringify(payload, null, 2));
-
-      const res = await createPortfolio({
+      await createPortfolio({
         type: "wealthflow",
         body: payload,
       }).unwrap();
 
-      console.log("✅ [WealthFlow Create Success] Received response:\n", JSON.stringify(res, null, 2));
       setStep("success");
     } catch (err: any) {
-      console.error("❌ [WealthFlow Create Error] Failed to create portfolio:\n", JSON.stringify(err, null, 2));
+      console.error("[WealthFlow Create Error] Failed to create portfolio");
       const message =
         err?.data?.message ||
         err?.message ||
@@ -194,7 +233,12 @@ export default function CreateFlowScreen() {
 
   // ─── FORM ─────────────────────────────────────────────────────────────────
   const renderForm = () => (
-    <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-5">
+    <ScrollView
+      ref={formScrollRef}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      className="flex-1 px-5"
+    >
       {/* What's on WealthFlow? */}
       {showInfoCard && (
         <View
@@ -213,6 +257,7 @@ export default function CreateFlowScreen() {
             <Ionicons name="close" size={18} color="#005F61" />
           </TouchableOpacity>
           <Text
+            maxFontSizeMultiplier={1.35}
             style={{
               color: "#005F61",
               fontWeight: "700",
@@ -236,7 +281,7 @@ export default function CreateFlowScreen() {
             {
               icon: "🛡️",
               bold: "Secured Interest:",
-              text: ` Earn up to ${flowInterestRateLabel} interest on your funds until maturity or activate Anytime Withdrawal as needed.`,
+              text: " Your interest rate depends on how much you save and for how long until maturity or activate Anytime Withdrawal as needed.",
             },
             {
               icon: "⚠️",
@@ -256,8 +301,10 @@ export default function CreateFlowScreen() {
               <Text
                 style={{
                   color: "#005F61",
-                  fontSize: 12,
+                  fontSize: 13,
                   lineHeight: 18,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
                   flex: 1,
                 }}
               >
@@ -274,7 +321,7 @@ export default function CreateFlowScreen() {
         <Text style={styles.inputLabel}>Wealth Title</Text>
         <TextInput
           placeholder="e.g. My Emergency automated fund"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#6B7280"
           value={wealthTitle}
           onChangeText={setWealthTitle}
           style={styles.textInput}
@@ -282,33 +329,76 @@ export default function CreateFlowScreen() {
       </View>
 
       {/* Target Amount */}
-      <View style={{ marginBottom: 20 }}>
-        <Text style={styles.inputLabel}>Target Goal Amount (₦)</Text>
-        <TextInput
-          placeholder="e.g. 500,000"
-          placeholderTextColor="#9CA3AF"
-          value={targetAmount}
-          onChangeText={(v) => setTargetAmount(formatAmount(v))}
-          keyboardType="numeric"
-          style={styles.textInput}
-        />
-        <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>
-          The final target milestone you want to reach
-        </Text>
-      </View>
+      {(() => {
+        const targetAmtNum = parseFloat(targetAmount.replace(/,/g, "")) || 0;
+        const isBelowMinTarget = targetAmtNum > 0 && targetAmtNum < minFlowNaira;
+
+        return (
+          <View style={{ marginBottom: 20 }}>
+            <Text style={styles.inputLabel}>Target Goal Amount (₦)</Text>
+            <TextInput
+              placeholder="e.g. 500,000"
+              placeholderTextColor="#6B7280"
+              value={targetAmount}
+              onChangeText={(v) => setTargetAmount(formatAmount(v))}
+              keyboardType="numeric"
+              style={[
+                styles.textInput,
+                isBelowMinTarget && { borderWidth: 1, borderColor: "#EF4444" },
+              ]}
+            />
+            {isBelowMinTarget ? (
+              <Text
+                style={{
+                  color: "#EF4444",
+                  fontSize: 12,
+                  lineHeight: 16,
+                  marginTop: 4,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                }}
+              >
+                Minimum target goal amount is ₦{minFlowNairaFormatted}
+              </Text>
+            ) : (
+              <Text
+                style={{
+                  fontSize: 13,
+                  lineHeight: 18,
+                  color: "#4B5563",
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                  marginTop: 4,
+                }}
+              >
+                The final target milestone you want to reach
+              </Text>
+            )}
+          </View>
+        );
+      })()}
 
       {/* Starting / Initial Deposit */}
       <View style={{ marginBottom: 20 }}>
         <Text style={styles.inputLabel}>Starting Contribution (₦)</Text>
         <TextInput
           placeholder="e.g. 1,000 (Min ₦100)"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#6B7280"
           value={initialDeposit}
           onChangeText={(v) => setInitialDeposit(formatAmount(v))}
           keyboardType="numeric"
           style={styles.textInput}
         />
-        <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>
+        <Text
+          style={{
+            fontSize: 13,
+            lineHeight: 18,
+            color: "#4B5563",
+            fontWeight: "600",
+            fontFamily: "KumbhSans_600SemiBold",
+            marginTop: 4,
+          }}
+        >
           Amount deducted from funding source to open and activate this pot
         </Text>
       </View>
@@ -322,7 +412,7 @@ export default function CreateFlowScreen() {
         >
           <Text
             style={{
-              color: frequency ? "#1A1A1A" : "#9CA3AF",
+              color: frequency ? "#1A1A1A" : "#6B7280",
               fontSize: 15,
               fontWeight: frequency ? "600" : "400",
             }}
@@ -377,13 +467,120 @@ export default function CreateFlowScreen() {
       </View>
 
       {/* End Date (Target Date) */}
-      <AppDatePickerField
-        label="Target End Date"
-        placeholder="Select Target End Date"
-        value={endDateText}
-        onPress={() => setShowDatePicker(true)}
-        helperText="Target maturity date (must be in the future)"
-      />
+      {(() => {
+        let durationDays = 0;
+        if (selectedEndDate) {
+          const todayZero = new Date();
+          todayZero.setHours(0, 0, 0, 0);
+          const selZero = new Date(selectedEndDate);
+          selZero.setHours(0, 0, 0, 0);
+          durationDays = Math.max(1, Math.ceil((selZero.getTime() - todayZero.getTime()) / (1000 * 3600 * 24)));
+        }
+        const isBelowMinDuration = selectedEndDate && durationDays < minFlowDuration;
+        const isAboveMaxDuration = selectedEndDate && durationDays > maxFlowDuration;
+
+        return (
+          <View style={{ marginBottom: 20 }}>
+            <AppDatePickerField
+              label="Target End Date"
+              placeholder="Select Target End Date"
+              value={selectedEndDate ? `${endDateText} (${durationDays} days)` : endDateText}
+              onPress={() => setShowDatePicker(true)}
+              helperText={
+                isBelowMinDuration
+                  ? `Minimum lock duration is ${minFlowDuration} days`
+                  : isAboveMaxDuration
+                  ? `Maximum lock duration is ${maxFlowDuration} days`
+                  : "Target maturity date (must be in the future)"
+              }
+            />
+            {isBelowMinDuration && (
+              <Text
+                style={{
+                  color: "#EF4444",
+                  fontSize: 12,
+                  lineHeight: 16,
+                  marginTop: 4,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                }}
+              >
+                Minimum lock duration is {minFlowDuration} days
+              </Text>
+            )}
+            {isAboveMaxDuration && (
+              <Text
+                style={{
+                  color: "#EF4444",
+                  fontSize: 12,
+                  lineHeight: 16,
+                  marginTop: 4,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                }}
+              >
+                Maximum lock duration is {maxFlowDuration} days
+              </Text>
+            )}
+          </View>
+        );
+      })()}
+
+      {/* Tiered Interest Quote Card */}
+      {wealthPreference === "Interest Based" && (
+        <View style={{ marginBottom: 20 }}>
+          {isQuoteLoading ? (
+            <View
+              style={{
+                backgroundColor: "#F8FAFC",
+                borderRadius: 12,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+              }}
+            >
+              <Text style={{ color: "#64748B", fontSize: 13, fontWeight: "600" }}>
+                Calculating...
+              </Text>
+            </View>
+          ) : isQuoteReady && quotedRate != null ? (
+            <View
+              style={{
+                backgroundColor: "#F0FDF4",
+                borderRadius: 12,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: "#BBF7D0",
+              }}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ color: "#166534", fontSize: 13, fontWeight: "700" }}>
+                  Your rate: {quotedRate}% P.A.
+                </Text>
+                {projectedInterestNaira != null && (
+                  <Text style={{ color: "#15803D", fontSize: 13, fontWeight: "700" }}>
+                    Estimated earnings: +₦{formatAmount(projectedInterestNaira.toFixed(2))}
+                  </Text>
+                )}
+              </View>
+            </View>
+          ) : isFlowAmountValid && isFlowDurationValid && (isQuoteError || !isQuoteReady) ? (
+            <View
+              style={{
+                backgroundColor: "#F8FAFC",
+                borderRadius: 12,
+                padding: 12,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+              }}
+            >
+              <Text style={{ color: "#64748B", fontSize: 12, fontWeight: "600" }}>
+                Your rate is confirmed when you create the plan
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      )}
 
       <AppCalendarModal
         visible={showDatePicker}
@@ -476,7 +673,16 @@ export default function CreateFlowScreen() {
           <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 14 }}>
             Anytime Withdrawal
           </Text>
-          <Text style={{ color: "#6B7280", fontSize: 12, marginTop: 2 }}>
+          <Text
+            style={{
+              color: "#4B5563",
+              fontSize: 13,
+              lineHeight: 18,
+              fontWeight: "600",
+              fontFamily: "KumbhSans_600SemiBold",
+              marginTop: 2,
+            }}
+          >
             Switch on to withdraw funds before maturity date.
           </Text>
         </View>
@@ -517,7 +723,16 @@ export default function CreateFlowScreen() {
           <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 14 }}>
             Manual Mode
           </Text>
-          <Text style={{ color: "#6B7280", fontSize: 12, marginTop: 2 }}>
+          <Text
+            style={{
+              color: "#4B5563",
+              fontSize: 13,
+              lineHeight: 18,
+              fontWeight: "600",
+              fontFamily: "KumbhSans_600SemiBold",
+              marginTop: 2,
+            }}
+          >
             Switch on to deposit manually whenever you choose.
           </Text>
         </View>
@@ -584,7 +799,7 @@ export default function CreateFlowScreen() {
         >
           {wealthTitle}
         </Text>
-        <Text style={{ color: "#6B7280", fontSize: 13, marginTop: 4 }}>
+        <Text style={{ color: "#4B5563", fontSize: 13, lineHeight: 18, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginTop: 4 }}>
           Target: ₦{targetAmount || "0.00"}
         </Text>
       </View>
@@ -653,14 +868,39 @@ export default function CreateFlowScreen() {
           style={{
             flexDirection: "row",
             justifyContent: "space-between",
-            marginBottom: 8,
+            marginBottom: 24,
           }}
         >
           <View>
             <Text style={styles.previewLabel}>Interest Rate</Text>
-            <Text style={styles.previewValue}>{flowInterestRateLabel}</Text>
+            <Text style={styles.previewValue}>
+              {wealthPreference === "Interest Based"
+                ? isQuoteReady && quotedRate != null
+                  ? `${quotedRate}% P.A.`
+                  : "Rate confirmed on creation"
+                : "Impact Wealth"}
+            </Text>
           </View>
         </View>
+
+        {wealthPreference === "Interest Based" && (
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              marginBottom: 8,
+            }}
+          >
+            <View>
+              <Text style={styles.previewLabel}>Estimated Return</Text>
+              <Text style={[styles.previewValue, { color: TEAL }]}>
+                {isQuoteReady && projectedInterestNaira != null
+                  ? `+₦${formatAmount(projectedInterestNaira.toFixed(2))}`
+                  : "Rate confirmed on creation"}
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Decorative receipt zig-zag */}
@@ -740,8 +980,10 @@ export default function CreateFlowScreen() {
       </Text>
       <Text
         style={{
-          color: "#6B7280",
+          color: "#4B5563",
           fontSize: 13,
+          fontFamily: "KumbhSans_600SemiBold",
+          fontWeight: "600",
           textAlign: "center",
           marginBottom: 32,
           lineHeight: 20,
@@ -845,8 +1087,10 @@ export default function CreateFlowScreen() {
 
       <Text
         style={{
-          color: "#6B7280",
+          color: "#4B5563",
           fontSize: 14,
+          fontFamily: "KumbhSans_600SemiBold",
+          fontWeight: "600",
           textAlign: "center",
           lineHeight: 22,
           marginBottom: 40,
@@ -905,23 +1149,29 @@ export default function CreateFlowScreen() {
         }}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        {step === "form" && renderForm()}
-        {step === "preview" && renderPreview()}
-        {step === "pin" && renderPin()}
-        {step === "success" && renderSuccess()}
-      </KeyboardAvoidingView>
+      {step === "form" ? (
+        <KeyboardAwareScreen style={{ flex: 1 }} scrollRef={formScrollRef}>
+          {renderForm()}
+        </KeyboardAwareScreen>
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          {step === "preview" && renderPreview()}
+          {step === "pin" && renderPin()}
+          {step === "success" && renderSuccess()}
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   inputLabel: {
-    color: "#6B7280",
+    color: "#4B5563",
     fontSize: 13,
+    fontFamily: "KumbhSans_600SemiBold",
     fontWeight: "700",
     marginBottom: 8,
   },
@@ -969,9 +1219,11 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F3F4F6",
   },
   previewLabel: {
-    color: "#6B7280",
+    color: "#4B5563",
     fontSize: 12,
-    fontWeight: "500",
+    lineHeight: 16,
+    fontFamily: "KumbhSans_600SemiBold",
+    fontWeight: "600",
     marginBottom: 4,
   },
   previewValue: {

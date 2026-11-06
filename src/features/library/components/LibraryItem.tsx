@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Image, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Image, Text, TouchableOpacity, View } from "react-native";
 import { LibraryMaterial } from "../../../types/library";
+import { isPdf } from "../../../utils/documentFile";
 
 function formatDate(raw?: string): string {
   if (!raw) return "";
@@ -19,6 +20,8 @@ interface LibraryItemProps {
   onWatchOnYouTube: () => void;
   viewMode?: "list" | "grid";
   showSeparator?: boolean;
+  isDownloaded?: boolean;
+  isDownloading?: boolean;
 }
 
 export const LibraryItem: React.FC<LibraryItemProps> = ({
@@ -29,6 +32,8 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
   onWatchOnYouTube,
   viewMode = "list",
   showSeparator = false,
+  isDownloaded = false,
+  isDownloading = false,
 }) => {
 
 
@@ -62,12 +67,12 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
           >
             {material.title}
           </Text>
-          <Text className="text-gray-500 text-[10px] mb-2" numberOfLines={2}>
+          <Text className="text-[#4B5563] text-[12px] leading-[16px] font-kumbh-semibold mb-2" numberOfLines={2}>
             {material.description}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
           <View style={{ flex: 1, marginRight: 6 }}>
-              <Text className="text-gray-400 text-xs font-medium" numberOfLines={1}>
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] font-kumbh-semibold" numberOfLines={1}>
                 {formatDate(material.createdAt || material.timePosted || material.timeAgo)}
                 {material.readingDuration ? ` • ${material.readingDuration}` : ""}
               </Text>
@@ -75,11 +80,11 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
                 <View className="flex-row items-center mt-1">
                   <View className="flex-row items-center">
                     <Ionicons name="heart" size={12} color="#EF4444" />
-                    <Text className="text-gray-400 text-xs ml-1">{material.likesCount}</Text>
+                    <Text className="text-[#4B5563] text-[12px] font-kumbh-semibold ml-1">{material.likesCount}</Text>
                   </View>
                   <View className="flex-row items-center ml-3">
-                    <Ionicons name="chatbubble-outline" size={12} color="#9CA3AF" />
-                    <Text className="text-gray-400 text-xs ml-1">{material.commentsCount}</Text>
+                    <Ionicons name="chatbubble-outline" size={12} color="#6B7280" />
+                    <Text className="text-[#4B5563] text-[12px] font-kumbh-semibold ml-1">{material.commentsCount}</Text>
                   </View>
                 </View>
               )}
@@ -92,12 +97,34 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
                 </TouchableOpacity>
               ) : (
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <TouchableOpacity onPress={onReadInApp} style={{ backgroundColor: "#F9FAFB", padding: 6, borderRadius: 999, marginRight: 4 }}>
-                    <Ionicons name="book-outline" size={16} color="#155D5F" />
-                  </TouchableOpacity>
+                  {isPdf(material) && (
+                    <TouchableOpacity
+                      onPress={onReadInApp}
+                      style={{
+                        backgroundColor: "#F9FAFB",
+                        padding: 6,
+                        borderRadius: 999,
+                        marginRight: material.isDownloadable ? 4 : 0,
+                      }}
+                    >
+                      <Ionicons name="book-outline" size={16} color="#155D5F" />
+                    </TouchableOpacity>
+                  )}
                   {material.isDownloadable && (
-                    <TouchableOpacity onPress={onDownload} style={{ backgroundColor: "#F9FAFB", padding: 6, borderRadius: 999 }}>
-                      <Ionicons name="download-outline" size={16} color="#155D5F" />
+                    <TouchableOpacity
+                      onPress={onDownload}
+                      disabled={isDownloading}
+                      style={{ backgroundColor: "#F9FAFB", padding: 6, borderRadius: 999 }}
+                    >
+                      {isDownloading ? (
+                        <ActivityIndicator size="small" color="#155D5F" style={{ transform: [{ scale: 0.75 }] }} />
+                      ) : (
+                        <Ionicons
+                          name={isDownloaded ? "checkmark-circle-outline" : "download-outline"}
+                          size={16}
+                          color="#155D5F"
+                        />
+                      )}
                     </TouchableOpacity>
                   )}
                 </View>
@@ -143,7 +170,7 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
               >
                 {material.title}
               </Text>
-              <Text className="text-gray-500 text-[10px] mt-0.5 mr-2" numberOfLines={2}>
+              <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-0.5 mr-2" numberOfLines={2}>
                 {material.description}
               </Text>
             </View>
@@ -158,20 +185,31 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
               </TouchableOpacity>
             ) : (
               <View className="flex-row items-center">
-                <TouchableOpacity
-                  onPress={onReadInApp}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  className="mt-1 mr-2"
-                >
-                  <Ionicons name="book-outline" size={20} color="#155D5F" />
-                </TouchableOpacity>
+                {isPdf(material) && (
+                  <TouchableOpacity
+                    onPress={onReadInApp}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    className={`mt-1 ${material.isDownloadable ? "mr-2" : ""}`}
+                  >
+                    <Ionicons name="book-outline" size={20} color="#155D5F" />
+                  </TouchableOpacity>
+                )}
                 {material.isDownloadable && (
                   <TouchableOpacity
                     onPress={onDownload}
+                    disabled={isDownloading}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     className="mt-1"
                   >
-                    <Ionicons name="download-outline" size={20} color="#155D5F" />
+                    {isDownloading ? (
+                      <ActivityIndicator size="small" color="#155D5F" style={{ transform: [{ scale: 0.85 }] }} />
+                    ) : (
+                      <Ionicons
+                        name={isDownloaded ? "checkmark-circle-outline" : "download-outline"}
+                        size={20}
+                        color="#155D5F"
+                      />
+                    )}
                   </TouchableOpacity>
                 )}
               </View>
@@ -181,7 +219,7 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center">
               <View>
-                <Text className="text-gray-400 text-xs font-medium" numberOfLines={1}>
+                <Text className="text-[#4B5563] text-[12px] leading-[16px] font-kumbh-semibold" numberOfLines={1}>
                   {formatDate((material as any).createdAt || material.timePosted || material.timeAgo)}
                   {material.readingDuration ? ` • ${material.readingDuration}` : ""}
                 </Text>
@@ -189,11 +227,11 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
                   <View className="flex-row items-center mt-1">
                     <View className="flex-row items-center mr-3">
                       <Ionicons name="heart" size={12} color="#EF4444" />
-                      <Text className="text-gray-400 text-xs ml-1">{material.likesCount}</Text>
+                      <Text className="text-[#4B5563] text-[12px] font-kumbh-semibold ml-1">{material.likesCount}</Text>
                     </View>
                     <View className="flex-row items-center">
-                      <Ionicons name="chatbubble-outline" size={12} color="#9CA3AF" />
-                      <Text className="text-gray-400 text-xs ml-1">{material.commentsCount}</Text>
+                      <Ionicons name="chatbubble-outline" size={12} color="#6B7280" />
+                      <Text className="text-[#4B5563] text-[12px] font-kumbh-semibold ml-1">{material.commentsCount}</Text>
                     </View>
                   </View>
                 )}

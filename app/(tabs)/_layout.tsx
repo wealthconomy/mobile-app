@@ -5,9 +5,12 @@ import {
   WealthVestIcon,
 } from "@/src/components/TabIcons";
 import { Tabs } from "expo-router";
-import { Platform } from "react-native";
+import { Platform, Text } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -18,10 +21,26 @@ export default function TabLayout() {
           borderTopWidth: 1,
           borderTopColor: "#E5E5E5",
           backgroundColor: "#fff",
-          height: Platform.OS === "ios" ? 88 : 70,
-          paddingBottom: Platform.OS === "ios" ? 28 : 12,
+          height: Platform.OS === "ios" ? 88 : 70 + insets.bottom,
+          paddingBottom:
+            Platform.OS === "ios" ? 28 : Math.max(8, 12 + insets.bottom),
           paddingTop: 12,
         },
+        tabBarLabel: ({ children, color }) => (
+          <Text
+            maxFontSizeMultiplier={1.2}
+            numberOfLines={1}
+            style={{
+              fontSize: 12,
+              marginTop: 4,
+              fontWeight: "500",
+              color,
+              textAlign: "center",
+            }}
+          >
+            {children}
+          </Text>
+        ),
         tabBarLabelStyle: {
           fontSize: 12,
           marginTop: 4,

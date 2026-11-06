@@ -1,9 +1,17 @@
 import Header from "@/src/components/common/Header";
+import { AppToast, ToastState } from "@/src/components/common/AppToast";
+import { REFERRAL_BASE_URL } from "@/src/constants/referral";
+import { useReferralEnabled } from "@/src/hooks/useReferralEnabled";
+import { useGetPublicConfigQuery } from "@/src/store/api/configApi";
+import { formatNairaWhole } from "@/src/utils/formatters";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import { FileText, MailCheck, Wallet } from "lucide-react-native";
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Image,
+  RefreshControl,
   ScrollView,
   Share,
   StatusBar,
@@ -16,31 +24,151 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/src/store";
 import { useGetMyProfileQuery } from "@/src/store/api/userApi";
 import { useGetMyReferralSummaryQuery } from "@/src/store/api/referralApi";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+
+const REFERRAL_REWARD_STORAGE_KEY = "@wealth_referral_reward_kobo";
 
 export default function InviteScreen() {
-  const { user: authUser } = useSelector((state: RootState) => state.auth);
-  const { data: profileResponse } = useGetMyProfileQuery();
+  const isReferralEnabled = useReferralEnabled({ refreshOnFocus: true });
+  const authUser = useSelector((state: RootState) => state.auth.user);
+  const {
+    data: profileResponse,
+    isLoading: profileLoading,
+    isError: profileError,
+    refetch: refetchProfile,
+  } = useGetMyProfileQuery();
   const activeUser = profileResponse?.data || authUser;
 
-  const { data: summaryResp } = useGetMyReferralSummaryQuery(undefined, { refetchOnMountOrArgChange: true });
+  const { data: configResponse, refetch: refetchConfig } =
+    useGetPublicConfigQuery();
+
+  const [storedRewardKobo, setStoredRewardKobo] = useState<string | null>(null);
+
+  // Load last valid cached reward amount on mount
+  useEffect(() => {
+    AsyncStorage.getItem(REFERRAL_REWARD_STORAGE_KEY)
+      .then((val) => {
+        if (val) setStoredRewardKobo(val);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Refetch config when screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      refetchConfig();
+    }, [refetchConfig])
+  );
+
+  const rawConfigKobo =
+    configResponse?.data?.referralRewardKobo ??
+    (configResponse as any)?.referralRewardKobo;
+
+  // Whenever config returns a valid amount, update state and persist to AsyncStorage
+  useEffect(() => {
+    if (rawConfigKobo !== undefined && rawConfigKobo !== null) {
+      const formatted = formatNairaWhole(rawConfigKobo);
+      if (formatted) {
+        const koboStr = String(rawConfigKobo);
+        setStoredRewardKobo(koboStr);
+        AsyncStorage.setItem(REFERRAL_REWARD_STORAGE_KEY, koboStr).catch(() => {});
+      }
+    }
+  }, [rawConfigKobo]);
+
+  const liveFormatted = formatNairaWhole(rawConfigKobo);
+  const fallbackFormatted = formatNairaWhole(storedRewardKobo);
+  const rewardDisplayText = liveFormatted ?? fallbackFormatted ?? "Rewards";
+
+  const { data: summaryResp, refetch: refetchSummary } =
+    useGetMyReferralSummaryQuery(undefined, {
+      refetchOnMountOrArgChange: 30,
+    });
   const summary = summaryResp?.data as any;
 
-  const referralCode =
-    activeUser?.referralCode ||
-    activeUser?.id?.slice(0, 8)?.toUpperCase() ||
-    "—";
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        Promise.resolve(refetchProfile()).catch(() => {}),
+        Promise.resolve(refetchConfig()).catch(() => {}),
+        Promise.resolve(refetchSummary()).catch(() => {}),
+      ]);
+    } catch {
+      // ignore
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchProfile, refetchConfig, refetchSummary]);
+
+  const [toast, setToast] = useState<ToastState | null>(null);
+
+  const rawCode = activeUser?.referralCode?.trim() || "";
+  const hasValidCode = Boolean(rawCode);
+  const referralCode = hasValidCode ? rawCode : "—";
+  const showError = !profileLoading && (profileError || !hasValidCode);
 
   const onShare = async () => {
+    if (!hasValidCode) return;
     try {
-      const referralLink = `https://wealthconomy.org/invite/${referralCode}`;
+      const referralLink = `${REFERRAL_BASE_URL}${rawCode}`;
       await Share.share({
-        message: `Join me on Wealthconomy and get rewards! Use my referral link: ${referralLink}`,
+        message:
+          "Join me on Wealthconomy and get rewarded! Use my referral code " +
+          rawCode +
+          " when you sign up, or open: " +
+          referralLink,
       });
     } catch (error: any) {
       // ignore cancelled share
     }
   };
+
+  const onCopyAndShare = async () => {
+    if (!hasValidCode) return;
+    try {
+      await Clipboard.setStringAsync(rawCode);
+      setToast({
+        type: "success",
+        title: "Referral code copied",
+      });
+      await onShare();
+    } catch (error: any) {
+      // ignore
+    }
+  };
+
+  if (!isReferralEnabled) {
+    return (
+      <SafeAreaView style={{ flex: 1 }} className="bg-white">
+        <StatusBar barStyle="dark-content" />
+        <Header title="Invite a friend" />
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 24,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 15,
+              color: "#4B5563",
+              fontWeight: "600",
+              fontFamily: "KumbhSans_600SemiBold",
+              textAlign: "center",
+              lineHeight: 22,
+            }}
+          >
+            Referrals are not available right now.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
@@ -70,6 +198,14 @@ export default function InviteScreen() {
         className="flex-1"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#155D5F"
+            colors={["#155D5F"]}
+          />
+        }
       >
         <View className="px-5">
           {/* Illustration Section */}
@@ -101,9 +237,17 @@ export default function InviteScreen() {
                   style={{ width: 270, height: 120 }}
                   resizeMode="contain"
                 />
-                <View className="absolute z-20 pb-5">
-                  <Text className="text-[36px] font-extrabold text-[#155D5F]">
-                    ₦5,000
+                <View
+                  className="absolute z-20 pb-5 items-center justify-center"
+                  style={{ width: 220 }}
+                >
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.6}
+                    className="text-[36px] font-extrabold text-[#155D5F] text-center"
+                  >
+                    {rewardDisplayText}
                   </Text>
                 </View>
               </View>
@@ -121,7 +265,7 @@ export default function InviteScreen() {
             />
             <StepIcon
               Icon={FileText}
-              text="They sign up and complete their first transaction."
+              text="They sign up, verify their identity (KYC Level 2) and make a deposit."
             />
             <StepIcon
               Icon={Wallet}
@@ -129,44 +273,107 @@ export default function InviteScreen() {
             />
           </View>
 
-          {/* Referral Code Pill */}
-          <View
-            style={{
-              backgroundColor: "#EEF7F8",
-              borderRadius: 14,
-              padding: 14,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 12,
-              borderWidth: 1,
-              borderColor: "#C8E6E8",
-            }}
-          >
-            <View>
-              <Text style={{ fontSize: 10, color: "#6B7280", fontWeight: "500", marginBottom: 2 }}>
-                Your Referral Code
-              </Text>
-              <Text style={{ fontSize: 18, fontWeight: "800", color: "#155D5F", letterSpacing: 2 }}>
-                {referralCode}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={onShare}
+          {/* Referral Code Box or Error State */}
+          {showError ? (
+            <View
               style={{
-                backgroundColor: "#155D5F",
-                paddingHorizontal: 14,
-                paddingVertical: 8,
-                borderRadius: 10,
-                flexDirection: "row",
+                backgroundColor: "#EEF7F8",
+                borderRadius: 14,
+                padding: 16,
                 alignItems: "center",
-                gap: 6,
+                justifyContent: "center",
+                marginBottom: 12,
+                borderWidth: 1,
+                borderColor: "#C8E6E8",
               }}
             >
-              <Ionicons name="copy-outline" size={14} color="white" />
-              <Text style={{ color: "white", fontWeight: "700", fontSize: 12 }}>Copy & Share</Text>
-            </TouchableOpacity>
-          </View>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: "#4B5563",
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                  textAlign: "center",
+                  marginBottom: 10,
+                }}
+              >
+                We couldn't load your referral code.
+              </Text>
+              <TouchableOpacity
+                onPress={() => refetchProfile()}
+                style={{
+                  backgroundColor: "#155D5F",
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: 8,
+                }}
+              >
+                <Text
+                  style={{ color: "white", fontWeight: "700", fontSize: 13 }}
+                >
+                  Retry
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View
+              style={{
+                backgroundColor: "#EEF7F8",
+                borderRadius: 14,
+                padding: 14,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 12,
+                borderWidth: 1,
+                borderColor: "#C8E6E8",
+              }}
+            >
+              <View>
+                <Text
+                  style={{
+                    fontSize: 10,
+                    color: "#6B7280",
+                    fontWeight: "500",
+                    marginBottom: 2,
+                  }}
+                >
+                  Your Referral Code
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 18,
+                    fontWeight: "800",
+                    color: "#155D5F",
+                    letterSpacing: 2,
+                  }}
+                >
+                  {referralCode}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={onCopyAndShare}
+                disabled={!hasValidCode}
+                style={{
+                  backgroundColor: hasValidCode ? "#155D5F" : "#9CA3AF",
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: 10,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  opacity: hasValidCode ? 1 : 0.6,
+                }}
+              >
+                <Ionicons name="copy-outline" size={14} color="white" />
+                <Text
+                  style={{ color: "white", fontWeight: "700", fontSize: 12 }}
+                >
+                  Copy & Share
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Live Summary Strip */}
           <View
@@ -182,27 +389,41 @@ export default function InviteScreen() {
             }}
           >
             <View style={{ flex: 1, alignItems: "center" }}>
-              <Text style={{ fontSize: 20, fontWeight: "800", color: "#155D5F" }}>
+              <Text
+                style={{ fontSize: 20, fontWeight: "800", color: "#155D5F" }}
+              >
                 {summary?.totalReferrals ?? "—"}
               </Text>
-              <Text style={{ fontSize: 10, color: "#9CA3AF", marginTop: 2 }}>Friends Invited</Text>
+              <Text style={{ fontSize: 10, color: "#9CA3AF", marginTop: 2 }}>
+                Friends Invited
+              </Text>
             </View>
             <View style={{ width: 1, backgroundColor: "#E5E7EB" }} />
             <View style={{ flex: 1, alignItems: "center" }}>
-              <Text style={{ fontSize: 20, fontWeight: "800", color: "#D48E00" }}>
+              <Text
+                style={{ fontSize: 20, fontWeight: "800", color: "#D48E00" }}
+              >
                 {summary?.totalEarnedKobo
-                  ? `₦${(parseFloat(summary.totalEarnedKobo) / 100).toLocaleString("en-NG", { minimumFractionDigits: 0 })}`
+                  ? `₦${(parseFloat(summary.totalEarnedKobo) / 100).toLocaleString(
+                      "en-NG",
+                      { minimumFractionDigits: 0 }
+                    )}`
                   : "₦0"}
               </Text>
-              <Text style={{ fontSize: 10, color: "#9CA3AF", marginTop: 2 }}>Total Earned</Text>
+              <Text style={{ fontSize: 10, color: "#9CA3AF", marginTop: 2 }}>
+                Total Earned
+              </Text>
             </View>
           </View>
 
           {/* Invite Button */}
           <TouchableOpacity
             onPress={onShare}
-            className="bg-[#155D5F] h-16 rounded-2xl flex-row items-center justify-center gap-x-3 active:opacity-90"
-            style={{ marginBottom: 12 }}
+            disabled={!hasValidCode}
+            className={`h-16 rounded-2xl flex-row items-center justify-center gap-x-3 active:opacity-90 ${
+              hasValidCode ? "bg-[#155D5F]" : "bg-[#9CA3AF]"
+            }`}
+            style={{ marginBottom: 12, opacity: hasValidCode ? 1 : 0.6 }}
           >
             <Ionicons name="share-outline" size={24} color="white" />
             <Text className="text-white text-lg font-bold">Invite Friend</Text>
@@ -225,12 +446,16 @@ export default function InviteScreen() {
             activeOpacity={0.8}
           >
             <Ionicons name="people-outline" size={20} color="#155D5F" />
-            <Text style={{ color: "#155D5F", fontWeight: "700", fontSize: 15 }}>
+            <Text
+              style={{ color: "#155D5F", fontWeight: "700", fontSize: 15 }}
+            >
               Check My Referrals
             </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </SafeAreaView>
   );
 }

@@ -21,7 +21,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
-import { getDynamicInterestRateLabel } from "@/src/utils/formatters";
 import { useListGroupsQuery, useGetGroupMembersQuery, useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
 import { useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
 import { WealthGroupModel } from "@/src/types/group";
@@ -131,48 +130,64 @@ export const isGroupCompleted = (g: WealthGroupModel) => {
   return (s === "COMPLETED" && dateEnded) || isGroupTerminated(g);
 };
 
-// Client-side date check: true when the group's endDate has passed, regardless of backend status
+// Client-side date check: true when the group's endDate has passed,
+// treating endDate as inclusive of the whole end day (ends at 23:59:59 UTC).
 export const isGroupDateEnded = (g: WealthGroupModel) => {
   if (!g.endDate) return false;
   const trimmed = g.endDate.toString().trim();
   // Handle DD/MM/YYYY format
-  if (trimmed.includes("/")) {
+  if (trimmed.includes("/") && !trimmed.includes("T")) {
     const parts = trimmed.split("/").map((p) => parseInt(p.trim(), 10));
     if (parts.length === 3) {
       const [day, month, year] = parts;
       if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-        return new Date(year, month - 1, day, 23, 59, 59).getTime() < Date.now();
+        // End of that day in UTC
+        return new Date(Date.UTC(year, month - 1, day, 23, 59, 59)).getTime() < Date.now();
       }
     }
   }
   const d = new Date(trimmed);
-  return !isNaN(d.getTime()) && d.getTime() < Date.now();
+  if (isNaN(d.getTime())) return false;
+  // If the stored date is already end-of-day (23:59:59) use as-is.
+  // If it's midnight (00:00:00) treat the whole day as still active.
+  const isStartOfDay = d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+  if (isStartOfDay) {
+    // The group is active through the end of that UTC day
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59)).getTime() < Date.now();
+  }
+  return d.getTime() < Date.now();
 };
 
-// Extract the total savings in kobo for a group, with fallback to populated members
+// Extract the display active savings in kobo for a group.
+// For ROTATIONAL: active vault balance is ONLY currentCycleSavings during active cycles.
+//   Once closed, completed, date-ended, or cycles finished, active balance is strictly 0
+//   because payouts were already distributed to members. Never fall back to cumulative totalSavings.
+// For FIXED/FLEX: use totalSavings.
 export const getGroupTotalSavingsKobo = (g: WealthGroupModel): number => {
-  const rawVal = g.totalSavings ?? g.currentBalance ?? 0;
-  const num = typeof rawVal === "string" ? parseFloat(rawVal) : Number(rawVal);
-  if (!isNaN(num) && num > 0) return num;
-
-  const membersList =
-    (g as any).members ||
-    (g as any).groupMembers ||
-    (g as any).membersList;
-  if (Array.isArray(membersList) && membersList.length > 0) {
-    const sum = membersList.reduce((acc: number, m: any) => {
-      const c = parseFloat(m?.totalContributed?.toString() || "0");
-      return acc + (isNaN(c) ? 0 : c);
-    }, 0);
-    if (!isNaN(sum) && sum > 0) return sum;
+  const isRotational = (g.groupType ?? (g as any).type) === "ROTATIONAL";
+  if (isRotational) {
+    if (isGroupCompleted(g) || isGroupTerminated(g) || isGroupDateEnded(g)) {
+      return 0;
+    }
+    const rawCycle = (g as any).currentCycleSavings;
+    if (rawCycle !== undefined && rawCycle !== null) {
+      const n = typeof rawCycle === "string" ? parseFloat(rawCycle) : Number(rawCycle);
+      return isNaN(n) ? 0 : n;
+    }
+    if (g.currentCycle && g.totalCycles && g.currentCycle >= g.totalCycles) {
+      return 0;
+    }
+    return 0;
   }
-  return 0;
+  const rawVal = g.totalSavings ?? g.currentBalance ?? 0;
+  return typeof rawVal === "string" ? parseFloat(rawVal) : Number(rawVal);
 };
 
 // Check if a user has already fully withdrawn their funds from a completed group
 export const isUserFullySettledInGroup = (g: WealthGroupModel, uid?: string): boolean => {
   if (!uid) return false;
   if (isGroupTerminated(g)) return true;
+  if ((g.groupType ?? (g as any).type) === "ROTATIONAL") return true;
 
   const membersList =
     (g as any).members ||
@@ -254,7 +269,7 @@ export default function WealthGroupScreen() {
     {
       pollingInterval: 10000,
       refetchOnFocus: true,
-      refetchOnMountOrArgChange: true,
+      refetchOnMountOrArgChange: 30,
     }
   );
   const portfolioPreference = useSelector(
@@ -264,7 +279,14 @@ export default function WealthGroupScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const groupRateLabel = getDynamicInterestRateLabel("group", systemConfigData, rates, 15);
+
+  const groupConfig = rates?.wealthgroup || (rates as any)?.group;
+  const groupMinMembers = groupConfig?.membersLimitRange?.[0] ?? 2;
+  const groupMaxMembers = groupConfig?.membersLimitRange?.[1] ?? 50;
+
+  const handleBack = () => {
+    router.replace("/(tabs)/portfolios" as any);
+  };
 
   const [refreshing, setRefreshing] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
@@ -425,11 +447,11 @@ export default function WealthGroupScreen() {
     const contribNaira = rawContrib > 0 ? (rawContrib / 100).toLocaleString() : null;
 
     const formattedEnd = g.endDate
-      ? new Date(g.endDate).toLocaleDateString("en-US", {
-          month: "numeric",
-          day: "numeric",
-          year: "2-digit",
-        })
+      ? (() => {
+          const d = new Date(g.endDate);
+          if (isNaN(d.getTime())) return "Flexible";
+          return `${d.getUTCMonth() + 1}/${d.getUTCDate()}/${String(d.getUTCFullYear()).slice(-2)}`;
+        })()
       : "Flexible";
 
     return {
@@ -445,7 +467,7 @@ export default function WealthGroupScreen() {
       members: memberCount,
       image: g.coverImage
         ? { uri: sanitizeImageUrl(g.coverImage) }
-        : require("../../../assets/images/group_trending_1.png"),
+        : require("../../../assets/images/group1.png"),
     };
   });
 
@@ -515,6 +537,7 @@ export default function WealthGroupScreen() {
   // 2. Completed groups savings: include ONLY if NOT terminated and current user has NOT withdrawn
   const unwithdrawnCompletedSavingsKobo = completedGroups.reduce((acc, g) => {
     if (isGroupTerminated(g)) return acc;
+    if ((g.groupType ?? (g as any).type) === "ROTATIONAL") return acc;
 
     const status = completedStatusMap[g.id];
     if (status) {
@@ -541,7 +564,7 @@ export default function WealthGroupScreen() {
         <StatusBar style="dark" />
       <Header
         title="WealthGroup"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="group" />}
       />
         <PortfolioDetailSkeleton />
@@ -554,7 +577,7 @@ export default function WealthGroupScreen() {
       <StatusBar style="dark" />
       <Header
         title="WealthGroup"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="group" />}
       />
 
@@ -630,20 +653,7 @@ export default function WealthGroupScreen() {
                   <Text className="text-[#4B5563] text-[14px] font-extrabold">
                     Total Savings
                   </Text>
-                  {showInterest && groupRateLabel && (
-                    <View
-                      style={{
-                        backgroundColor: "#4B5563",
-                        paddingHorizontal: 8,
-                        paddingVertical: 2.5,
-                        borderRadius: 20,
-                      }}
-                    >
-                      <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
-                        {groupRateLabel}
-                      </Text>
-                    </View>
-                  )}
+
                 </View>
                 <TouchableOpacity
                   onPress={() => setShowBalance(!showBalance)}
@@ -657,23 +667,33 @@ export default function WealthGroupScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View className="flex-row items-baseline mb-2">
+              <TouchableOpacity
+                onPress={() => router.push("/education/win-up" as any)}
+                activeOpacity={0.8}
+                className="flex-row items-baseline mb-2"
+              >
                 {showBalance ? (
                   <BalanceText
                     amount={`₦${(totalSavingsKobo / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                    fontSize={34}
+                    fontSize={31}
                     color="#1A1A1A"
                   />
                 ) : (
-                  <Text className="text-[#1A1A1A] text-[34px] font-black tracking-tight">
+                  <Text className="text-[#1A1A1A] text-[31px] font-black tracking-tight">
                     ***
                   </Text>
                 )}
-              </View>
+                <Text className="text-[#1A1A1A] text-[34px] font-light ml-4 mb-1">
+                  ›
+                </Text>
+              </TouchableOpacity>
 
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
-                  <Text className="text-[#4B5563] text-[13px] font-extrabold">
+                  <Text
+                    maxFontSizeMultiplier={1.35}
+                    className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold"
+                  >
                     Your wealth grew by ₦{(ongoingGroups.reduce((acc, g) => acc + (parseFloat(g.dailyWealthGrowth?.toString() || "0")), 0) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} today
                   </Text>
                   <ArrowUp size={14} color="#4CAF50" />
@@ -721,7 +741,10 @@ export default function WealthGroupScreen() {
                   <View className="mb-2">
                     <Ionicons name={cat.icon as any} size={24} color={THEME} />
                   </View>
-                  <Text className="text-[9px] font-bold text-[#1A1A1A] text-center leading-[11px]">
+                  <Text
+                    maxFontSizeMultiplier={1.35}
+                    className="text-[12px] font-kumbh-semibold text-[#1A1A1A] text-center leading-[15px]"
+                  >
                     {cat.title}
                   </Text>
                 </TouchableOpacity>
@@ -732,37 +755,35 @@ export default function WealthGroupScreen() {
           {/* ── Tips Card ─────────────────────────────────────────── */}
           {showTips && (
             <View
-              className="relative p-6 mb-10"
+              className="relative p-5 mb-8"
               style={{
                 width: "100%",
-                minHeight: 226,
                 backgroundColor: THEME_BG,
-                borderRadius: 15,
+                borderRadius: 16,
                 borderWidth: 1,
                 borderColor: BORDER_COLOR,
               }}
             >
               <TouchableOpacity
-                className="absolute right-4 top-4 z-10"
+                className="absolute right-3 top-3 z-10 p-1"
                 onPress={() => setShowTips(false)}
               >
                 <Ionicons name="close" size={20} color={THEME} />
               </TouchableOpacity>
               <Text
-                className="font-extrabold text-[14px] mb-4"
+                className="font-extrabold text-[14px] mb-2 pr-8"
                 style={{ color: "#155D5F" }}
               >
                 What's on Wealth Group?
               </Text>
               <Text
-                className="text-[11px] leading-[16px] mb-4 font-medium"
-                style={{ color: "#155D5F", opacity: 0.8 }}
+                maxFontSizeMultiplier={1.35}
+                className="text-[13px] leading-[18px] mb-4 font-kumbh-semibold pr-6"
+                style={{ color: "#155D5F" }}
               >
-                A community-powered savings feature that enables users to create
-                or join structured group savings models for collective financial
-                goals.
+                A community-powered savings feature for collective financial goals. Your interest rate depends on how much you save and for how long. Groups support between <Text className="font-bold">{groupMinMembers} to {groupMaxMembers} members</Text>.
               </Text>
-              <View className="space-y-3">
+              <View style={{ gap: 10 }}>
                 <TipRow
                   label="Fixed Contribution Groups"
                   text="All members save the same amount at the same frequency (e.g., ₦20,000 monthly for 12 months)."
@@ -793,11 +814,11 @@ export default function WealthGroupScreen() {
               paddingRight: 96,
             }}
           >
-            <Search size={18} color="#94A3B8" />
+            <Search size={18} color="#6B7280" />
             <TextInput
               placeholder="Search"
-              placeholderTextColor="#94A3B8"
-              className="flex-1 ml-3 text-[13px] font-medium"
+              placeholderTextColor="#6B7280"
+              className="flex-1 ml-3 text-[14px] font-kumbh-semibold text-[#1A1A1A]"
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
@@ -854,10 +875,12 @@ export default function WealthGroupScreen() {
               }}
             >
               <Text
+                maxFontSizeMultiplier={1.35}
                 style={{
-                  color: activeTab === "ongoing" ? THEME : "#64748B",
+                  color: activeTab === "ongoing" ? THEME : "#4B5563",
                   fontSize: 14,
-                  fontWeight: activeTab === "ongoing" ? "900" : "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                  fontWeight: activeTab === "ongoing" ? "700" : "600",
                 }}
               >
                 Progress Tracking
@@ -879,10 +902,12 @@ export default function WealthGroupScreen() {
               }}
             >
               <Text
+                maxFontSizeMultiplier={1.35}
                 style={{
-                  color: activeTab === "completed" ? THEME : "#64748B",
+                  color: activeTab === "completed" ? THEME : "#4B5563",
                   fontSize: 14,
-                  fontWeight: activeTab === "completed" ? "900" : "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                  fontWeight: activeTab === "completed" ? "700" : "600",
                 }}
               >
                 Completed Goals
@@ -896,8 +921,14 @@ export default function WealthGroupScreen() {
               <View className="space-y-6 mb-10">
                 {ongoingGroups.map((g: WealthGroupModel) => {
                   const targetNum = (parseFloat(g.targetAmount?.toString() || "10000000")) / 100;
-                  const rawSavings = g.totalSavings ?? g.currentBalance ?? 0;
-                  const currentNum = (typeof rawSavings === "string" ? parseFloat(rawSavings) : Number(rawSavings)) / 100;
+
+                  // For ROTATIONAL: show active cycle savings via getGroupTotalSavingsKobo(g).
+                  // For FIXED/FLEX: show totalSavings.
+                  const displayKobo = getGroupTotalSavingsKobo(g);
+
+                  const currentNum = displayKobo / 100;
+
+                  // Progress bar: always against targetAmount (lifetime for all types)
                   const progressRatio = targetNum > 0 ? (currentNum / targetNum) * 100 : 0;
                   const formattedPct = progressRatio >= 100 ? "100%" : `${progressRatio.toFixed(1)}%`;
                   const barWidth = Math.min(Math.max(progressRatio, 2), 100);
@@ -942,7 +973,10 @@ export default function WealthGroupScreen() {
                             <Text className="text-[#155D5F] font-black">
                               ₦{currentNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </Text>
-                            <Text className="text-[11px] text-[#6B7280] font-medium">
+                            <Text
+                              maxFontSizeMultiplier={1.35}
+                              className="text-[12px] leading-[16px] text-[#4B5563] font-kumbh-semibold"
+                            >
                               {" "}({formattedPct})
                             </Text>
                           </Text>
@@ -980,7 +1014,10 @@ export default function WealthGroupScreen() {
                 <Text className="text-[18px] font-black text-[#155D5F] mb-4">
                   Create or Join a group
                 </Text>
-                <Text className="text-[11px] text-center text-[#155D5F] opacity-70 px-10 leading-[18px]">
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  className="text-[13px] text-center text-[#155D5F] px-10 leading-[18px] font-kumbh-semibold"
+                >
                   For users who want to start a new savings circle (leads to
                   choosing Fixed, Flex, or Rotational). {"\n"}
                   For users with an invite code or those looking for "Open"
@@ -1000,7 +1037,12 @@ export default function WealthGroupScreen() {
             </View>
           ) : (
             <View className="items-center justify-center py-10 mb-10">
-              <Text className="text-gray-400">No completed groups yet</Text>
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold"
+              >
+                No completed groups yet
+              </Text>
             </View>
           )}
         </View>
@@ -1011,18 +1053,17 @@ export default function WealthGroupScreen() {
 
 function TipRow({ label, text }: { label: string; text: string }) {
   return (
-    <View className="flex-row items-start space-x-2">
+    <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
       <Text
-        style={{ color: "#155D5F" }}
-        className="text-[11px] font-black mt-0.5"
+        style={{ color: "#155D5F", marginRight: 6, fontSize: 12, fontWeight: "900", lineHeight: 17 }}
       >
         •
       </Text>
       <Text
-        className="flex-1 text-[10.5px] leading-[15px]"
-        style={{ color: "#155D5F" }}
+        maxFontSizeMultiplier={1.35}
+        style={{ color: "#155D5F", flex: 1, flexShrink: 1, fontSize: 13, lineHeight: 18, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}
       >
-        <Text className="font-extrabold">{label}:</Text> {text}
+        <Text style={{ fontWeight: "800" }}>{label}:</Text> {text}
       </Text>
     </View>
   );
@@ -1079,7 +1120,7 @@ function DiscoverySection({
 
 function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
   const [imgError, setImgError] = useState(false);
-  const fallbackImg = require("../../../assets/images/group_trending_1.png");
+  const fallbackImg = require("../../../assets/images/group1.png");
 
   return (
     <TouchableOpacity
@@ -1093,7 +1134,7 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
       className="bg-white rounded-[12px] border border-[#E8E8E8] overflow-hidden"
       style={{
         width: 170,
-        height: 196,
+        height: 228,
         marginRight: 10,
         padding: 8,
         paddingBottom: 8,
@@ -1110,8 +1151,8 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
         <View style={{ position: "relative" }}>
           <Image
             source={imgError ? fallbackImg : item.image}
-            onError={(e) => {
-              console.warn(`❌ [DiscoveryCard Image Error] [${item.title}]:`, e.nativeEvent?.error, `| URI: "${item.image?.uri}"`);
+            onError={() => {
+              console.warn(`[DiscoveryCard Image Error] [${item.title}]`);
               setImgError(true);
             }}
             style={{ width: 154, height: 60, borderRadius: 6 }}
@@ -1124,27 +1165,32 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
               top: 4,
               left: 4,
               backgroundColor: "rgba(21, 93, 95, 0.9)",
-              paddingHorizontal: 5,
-              paddingVertical: 1.5,
+              paddingHorizontal: 6,
+              paddingVertical: 2,
               borderRadius: 4,
             }}
           >
-            <Text style={{ fontSize: 8, fontWeight: "800", color: "#FFFFFF" }}>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              style={{ fontSize: 12, fontWeight: "700", color: "#FFFFFF" }}
+            >
               {item.groupTypeLabel}
             </Text>
           </View>
         </View>
 
-        <View className="mt-1">
+        <View className="mt-1.5">
           <Text
             numberOfLines={1}
-            className="text-[11px] font-black text-[#1A1A1A] mb-0.5 font-bold"
+            maxFontSizeMultiplier={1.35}
+            className="text-[14px] leading-[18px] font-bold text-[#1A1A1A] mb-0.5 font-kumbh-bold"
           >
             {item.title}
           </Text>
           <Text
             numberOfLines={1}
-            className="text-[9px] text-[#64748B] font-extrabold mb-0.5"
+            maxFontSizeMultiplier={1.35}
+            className="text-[12px] leading-[16px] text-[#4B5563] font-kumbh-semibold mb-0.5"
           >
             {item.category}
           </Text>
@@ -1153,7 +1199,8 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
           <View className="mb-0.5">
             <Text
               numberOfLines={1}
-              className="text-[10px] text-[#155D5F] font-black font-bold"
+              maxFontSizeMultiplier={1.35}
+              className="text-[13px] leading-[18px] text-[#155D5F] font-bold font-kumbh-bold"
             >
               {item.targetAmountText}
             </Text>
@@ -1163,25 +1210,38 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
           <View className="flex-row justify-between items-center mb-0.5">
             <Text
               numberOfLines={1}
-              className="text-[9px] text-[#4B5563] font-semibold flex-1 mr-1"
+              maxFontSizeMultiplier={1.35}
+              className="text-[12px] leading-[16px] text-[#4B5563] font-kumbh-semibold flex-1 mr-1"
             >
               {item.contributionText}
             </Text>
-            <Text className="text-[9px] text-[#64748B] font-bold">
+            <Text
+              maxFontSizeMultiplier={1.35}
+              className="text-[12px] leading-[16px] text-[#4B5563] font-kumbh-semibold"
+            >
               Ends: {item.endDate}
             </Text>
           </View>
 
           <View className="flex-row justify-between items-center">
             <View className="flex-row items-baseline space-x-0.5">
-              <Text className="text-[8px] text-[#4CAF50] font-bold">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[12px] leading-[16px] text-[#166534] font-kumbh-semibold"
+              >
                 Wealth Growth
               </Text>
-              <Text className="text-[9px] text-[#4CAF50] font-black font-bold">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[12px] leading-[16px] text-[#166534] font-bold font-kumbh-bold ml-1"
+              >
                 {item.growth}
               </Text>
             </View>
-            <Text className="text-[9px] text-[#155D5F] font-black">
+            <Text
+              maxFontSizeMultiplier={1.35}
+              className="text-[12px] leading-[16px] text-[#4B5563] font-kumbh-semibold"
+            >
               {item.members} {item.members === 1 ? "Member" : "Members"}
             </Text>
           </View>
@@ -1189,7 +1249,7 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
       </View>
 
       <TouchableOpacity
-        className="w-full h-[28px] rounded-[7px] items-center justify-center p-1 mt-1"
+        className="w-full h-[32px] rounded-[7px] items-center justify-center p-1 mt-1.5"
         style={{ backgroundColor: THEME }}
         onPress={() =>
           router.push({
@@ -1198,7 +1258,12 @@ function DiscoveryCard({ item }: { item: DiscoveryGroup }) {
           })
         }
       >
-        <Text className="text-white text-[10px] font-black">View Group</Text>
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-white text-[12px] font-bold font-kumbh-bold"
+        >
+          View Group
+        </Text>
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -1339,7 +1404,10 @@ function CompletedGroupCard({
           }}
         >
           <Ionicons name={badgeIcon} size={12} color={badgeColor} style={{ marginRight: 4 }} />
-          <Text style={{ fontSize: 11, fontWeight: "800", color: badgeColor }}>
+          <Text
+            maxFontSizeMultiplier={1.35}
+            style={{ fontSize: 12, fontWeight: "700", color: badgeColor }}
+          >
             {badgeLabel}
           </Text>
         </View>
@@ -1347,7 +1415,8 @@ function CompletedGroupCard({
         {/* Secondary info line */}
         <Text
           numberOfLines={1}
-          style={{ fontSize: 11, fontWeight: "600", color: infoColor, opacity: 0.9 }}
+          maxFontSizeMultiplier={1.35}
+          style={{ fontSize: 12, fontWeight: "600", color: infoColor, fontFamily: "KumbhSans_600SemiBold" }}
         >
           {infoText}
         </Text>

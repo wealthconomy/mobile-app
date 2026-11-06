@@ -13,8 +13,8 @@ const variantStyles: Record<TextVariant, string> = {
   h2: "text-xl font-kumbh-bold text-[#323232]",
   h3: "text-lg font-kumbh-semibold text-[#323232]",
   body: "text-base font-kumbh text-[#323232]",
-  caption: "text-sm font-kumbh text-[#6B7280]", // Usually slightly muted
-  small: "text-xs font-kumbh text-[#6B7280]",
+  caption: "text-[13px] leading-[18px] font-kumbh-semibold text-[#4B5563]",
+  small: "text-[12px] leading-[16px] font-kumbh-semibold text-[#4B5563]",
 };
 
 export const Text = ({

@@ -37,8 +37,8 @@ export function useBookmarks() {
       // Optimistic update local & async storage
       dispatch(toggleBookmarkLocal(blog));
       // Fire backend API
-      toggleBookmarkApi(blog.id).catch((err) => {
-        console.warn("Backend toggle bookmark sync warning:", err);
+      toggleBookmarkApi(blog.id).catch(() => {
+        console.warn("Backend toggle bookmark sync warning");
       });
     },
     [dispatch, toggleBookmarkApi]
@@ -48,8 +48,8 @@ export function useBookmarks() {
     (id: string) => {
       if (!id) return;
       dispatch(removeBookmarkLocal(id));
-      toggleBookmarkApi(id).catch((err) => {
-        console.warn("Backend remove bookmark sync warning:", err);
+      toggleBookmarkApi(id).catch(() => {
+        console.warn("Backend remove bookmark sync warning");
       });
     },
     [dispatch, toggleBookmarkApi]

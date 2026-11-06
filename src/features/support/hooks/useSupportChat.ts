@@ -63,44 +63,11 @@ export function useSupportChat() {
       "Unable to connect to support server."
     : null;
 
-  // Log authentication & token state
   useEffect(() => {
-    console.log("[SupportChat] 🔑 Auth Status:", {
-      hasToken: Boolean(token),
-      tokenLength: token?.length,
-      tokenSnippet: token ? `${token.substring(0, 15)}...` : null,
-      userId: currentUser?.id,
-      userName: currentUser?.name || currentUser?.firstName,
-      email: (currentUser as any)?.email,
-    });
-  }, [token, currentUser]);
-
-  // Log query loading & error states
-  useEffect(() => {
-    if (isLoading) {
-      console.log("[SupportChat] ⏳ Fetching conversation from /support/chat...");
+    if (rawError && !isChatNotFound) {
+      console.error("[SupportChat] GET /support/chat error:", errorMessage || "Request failed");
     }
-  }, [isLoading]);
-
-  useEffect(() => {
-    if (rawError) {
-      if (isChatNotFound) {
-        console.log(
-          `[SupportChat] ℹ️ User has no existing support chat session (HTTP 404: "${errorMessage}"). Initializing empty conversation mode.`
-        );
-      } else {
-        console.error("[SupportChat] ❌ GET /support/chat returned error:", {
-          status: errorStatus,
-          message: errorMessage,
-          rawError,
-        });
-      }
-    } else if (chat === null && !isLoading) {
-      console.log(
-        "[SupportChat] ℹ️ GET /support/chat returned 200 OK with data: null (No active chat). Initializing empty conversation mode."
-      );
-    }
-  }, [rawError, isChatNotFound, errorStatus, errorMessage, chat, isLoading]);
+  }, [rawError, isChatNotFound, errorMessage]);
 
   const [sendSupportMessageApi] = useSendSupportMessageMutation();
   const [markChatClientReadApi] = useMarkChatClientReadMutation();
@@ -110,17 +77,7 @@ export function useSupportChat() {
     chatIdRef.current = chat?.id;
   }, [chat?.id]);
 
-  // Log active chat data on arrival
-  useEffect(() => {
-    if (chat) {
-      console.log("[SupportChat] 📥 Active chat session loaded:", {
-        chatId: chat.id,
-        stage: chat.stage,
-        status: chat.status,
-        messagesCount: chat.messages?.length ?? 0,
-      });
-    }
-  }, [chat]);
+
 
   // Sync admin status from initial chat response
   useEffect(() => {
@@ -132,16 +89,13 @@ export function useSupportChat() {
   // 2. Setup Socket.IO connection & listeners
   useEffect(() => {
     if (!token) {
-      console.log("[SupportChat] ⚠️ No auth token found; skipping socket connection.");
       return;
     }
 
-    console.log("[SupportChat] 🚀 Initializing Support Socket with auth token...");
     socketService.connect(token);
 
     const unsubConnection = socketService.onConnectionChange((connected) => {
       setIsSocketConnected(connected);
-      console.log(`[SupportChat] 🔌 Socket connection status updated: ${connected ? "CONNECTED 🟢" : "DISCONNECTED 🔴"}`);
     });
 
     // Listen for new messages incoming via socket
@@ -150,7 +104,6 @@ export function useSupportChat() {
         if (!data?.message) return;
 
         const incoming = data.message;
-        console.log("[SupportChat] 📨 Adding incoming message to state:", incoming);
 
         dispatch(
           supportApi.util.updateQueryData(
@@ -228,7 +181,6 @@ export function useSupportChat() {
             )
           );
           if (chatIdRef.current) {
-            console.log("[SupportChat] 📥 Auto-marking incoming agent message as read");
             socketService.markAsRead(chatIdRef.current, "client");
           }
         }
@@ -239,7 +191,6 @@ export function useSupportChat() {
     const unsubStatus = socketService.onUserStatusChange(
       (data: SocketUserStatusChangeEvent) => {
         if (data?.status) {
-          console.log("[SupportChat] 👤 Support admin online status:", data.status);
           setIsAdminOnline(data.status === "online");
         }
       }
@@ -247,8 +198,7 @@ export function useSupportChat() {
 
     // Listen for real-time ticket stage / session updates
     const activeSocket = socketService.getSocket();
-    const handleStageUpdate = (data: any) => {
-      console.log("[SupportChat] 🔄 Real-time stage update received:", data);
+    const handleStageUpdate = () => {
       refetch();
     };
 
@@ -277,7 +227,6 @@ export function useSupportChat() {
   // 3. Mark messages as read when chat is loaded
   useEffect(() => {
     if (chat?.id) {
-      console.log("[SupportChat] 👀 Marking active chat messages as read on mount...");
       socketService.markAsRead(chat.id, "client");
       if ((chat.clientUnreadCount ?? 0) > 0) {
         markChatClientReadApi({ chatId: chat.id }).catch(() => {});
@@ -334,10 +283,6 @@ export function useSupportChat() {
           ? "📎 Attachment"
           : "");
 
-      console.log(
-        `[SupportChat] 📤 Sending message: "${trimmedText}" (hasAttachment: ${hasAttachment}, tempId: ${tempId})`
-      );
-
       // Optimistically push into local cache
       dispatch(
         supportApi.util.updateQueryData(
@@ -380,14 +325,9 @@ export function useSupportChat() {
 
         // Try Socket.IO if connected and we have a valid chatId
         if (socketService.isConnected() && chat?.id) {
-          console.log("[SupportChat] ⚡ Trying Socket.IO message delivery...", requestBody);
           const res = await socketService.sendMessage(requestBody);
 
           if (res.ok) {
-            console.log(
-              "[SupportChat] ✅ Message successfully delivered via Socket.IO! Message ID:",
-              res.messageId
-            );
             success = true;
             // Update temp message ID if backend provided messageId
             if (res.messageId) {
@@ -414,15 +354,12 @@ export function useSupportChat() {
               );
             }
           } else {
-            console.warn("[SupportChat] ⚠️ Socket.IO send returned not ok:", res.error);
+            console.warn("[SupportChat] Socket.IO send failed, falling back to REST");
           }
         }
 
         // If socket wasn't used or failed, send via REST API
         if (!success) {
-          console.log(
-            "[SupportChat] 🌐 Delivering message via REST API (POST /api/v1/support/chat/messages)..."
-          );
           const res = await sendSupportMessageApi({
             text: trimmedText,
             ...(payload.attachmentUrl && { attachmentUrl: payload.attachmentUrl }),
@@ -431,10 +368,6 @@ export function useSupportChat() {
           }).unwrap();
 
           if (res) {
-            console.log(
-              "[SupportChat] ✅ Message successfully saved via REST API! Server Message ID:",
-              res.id
-            );
             dispatch(
               supportApi.util.updateQueryData(
                 "getSupportChat",
@@ -460,8 +393,8 @@ export function useSupportChat() {
         }
 
         return success;
-      } catch (err) {
-        console.error("[SupportChat] ❌ Failed to deliver message:", err);
+      } catch (err: any) {
+        console.error("[SupportChat] Failed to deliver message:", err?.data?.message || err?.message || "Delivery failed");
         // Keep optimistic message in cache but mark as failed for retry
         dispatch(
           supportApi.util.updateQueryData(

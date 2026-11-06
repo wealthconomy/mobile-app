@@ -19,7 +19,8 @@ export default function AccountDetailsScreen() {
     bankId: string;
     cardId: string;
   }>();
-  const { banks, cards } = useSelector((state: RootState) => state.payment);
+  const banks = useSelector((state: RootState) => state.payment.banks);
+  const cards = useSelector((state: RootState) => state.payment.cards);
 
   const selectedPaymentMethod = bankId
     ? banks.find((b) => b.id === bankId)

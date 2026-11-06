@@ -29,7 +29,6 @@ export const paymentService = {
   depositViaCard: async (
     data: DepositRequest,
   ): Promise<{ success: boolean; message: string }> => {
-    console.log("Processing deposit:", data);
     await delay(1500); // Simulate network lag
     return {
       success: true,
@@ -43,7 +42,6 @@ export const paymentService = {
   transferFunds: async (
     data: TransferRequest,
   ): Promise<{ success: boolean; message: string }> => {
-    console.log("Processing transfer:", data);
     await delay(1500); // Simulate network lag
     return {
       success: true,

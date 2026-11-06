@@ -2,6 +2,7 @@ import Header from "@/src/components/common/Header";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   ScrollView,
@@ -14,14 +15,53 @@ import {
 import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useEffect } from "react";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/src/store";
+import { useDeleteAccountMutation } from "@/src/store/api/userApi";
 import { useGetKycDocumentsQuery, useGetKycStatusQuery } from "@/src/store/api/kycApi";
+import { logout } from "@/src/store/slices/authSlice";
+import {
+  idDocStatus,
+  faceDocStatus,
+  idRejectionText,
+  faceRejectionText,
+  isLevel2Verified as checkIsLevel2Verified,
+  isLevel2Rejected as checkIsLevel2Rejected,
+  isLevel2Pending as checkIsLevel2Pending,
+  hasLevel2Uploads,
+  hasLevel3AddressDoc as checkHasLevel3AddressDoc,
+  isLevel3Verified as checkIsLevel3Verified,
+  isLevel3Rejected as checkIsLevel3Rejected,
+  isLevel3Pending as checkIsLevel3Pending,
+} from "@/src/features/kyc/utils/kycState";
 
 export default function SecurityScreen() {
   const router = useRouter();
+  const dispatch = useDispatch();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteAccount, { isLoading: isDeleting }] = useDeleteAccountMutation();
   const [showLockedModal, setShowLockedModal] = useState(false);
+  const [kycModalInfo, setKycModalInfo] = useState<{
+    visible: boolean;
+    type: "verified" | "pending";
+    tier: "Level 2" | "Level 3";
+    title: string;
+    badgeText: string;
+    badgeBg: string;
+    badgeColor: string;
+    description: string;
+    primaryButtonText?: string;
+    onPrimaryPress?: () => void;
+  }>({
+    visible: false,
+    type: "verified",
+    tier: "Level 2",
+    title: "",
+    badgeText: "",
+    badgeBg: "",
+    badgeColor: "",
+    description: "",
+  });
   const user = useSelector((state: RootState) => state.auth.user);
   const { data: kycData } = useGetKycStatusQuery(undefined, { refetchOnMountOrArgChange: true });
   const { data: kycDocsResponse } = useGetKycDocumentsQuery(undefined, { refetchOnMountOrArgChange: true });
@@ -32,107 +72,45 @@ export default function SecurityScreen() {
   const currentLevel = kycData?.data?.currentLevel ?? user?.kycLevel ?? 1;
   const kycStatus = kycData?.data?.status ?? user?.kycStatus;
 
-  const ninStatusUpper = (kycDocs?.ninStatus || "").toUpperCase();
-  const faceStatusUpper = (kycDocs?.faceStatus || "").toUpperCase();
-  const utilityStatusUpper = (kycDocs?.utilityStatus || "").toUpperCase();
-  const kycStatusUpper = (kycStatus || "").toUpperCase();
+  const isLevel2Rejected = checkIsLevel2Rejected(kycDocs, user);
+  const isLevel2Verified = checkIsLevel2Verified(kycDocs, user);
+  const isLevel3Verified = checkIsLevel3Verified(kycDocs, user);
+  const hasAllLevel2Data = hasLevel2Uploads(kycDocs, user);
+  const isLevel2Pending = checkIsLevel2Pending(kycDocs, user);
 
-  const isNinRejected = ninStatusUpper === "REJECTED";
-  const isFaceRejected = faceStatusUpper === "REJECTED";
-  const isLevel2Rejected = isNinRejected || isFaceRejected || kycStatusUpper === "REJECTED";
-
-  // Level 2 is verified ONLY if not rejected, and either both are Approved or user is verified level >= 2
-  const isLevel2Verified =
-    !isLevel2Rejected &&
-    ((ninStatusUpper === "APPROVED" && faceStatusUpper === "APPROVED") ||
-      (kycStatusUpper === "VERIFIED" && currentLevel >= 2));
-
-  const isLevel3Verified =
-    isLevel2Verified &&
-    utilityStatusUpper !== "REJECTED" &&
-    (currentLevel >= 3 || utilityStatusUpper === "APPROVED");
-
-  const hasIdUpload = Boolean(kycDocs?.idImageUrl || user?.idImageUrl);
-  const hasFaceUpload = Boolean(
-    kycDocs?.faceImageUrl ||
-    kycDocs?.selfieUrl ||
-    user?.faceImageUrl ||
-    user?.imageUrl ||
-    kycDocs?.faceVerified
-  );
-  const hasAllLevel2Data = hasIdUpload && hasFaceUpload;
-
-  // It is ONLY truly pending if user actually provided BOTH required documents
-  const isLevel2Pending =
-    !isLevel2Verified &&
-    !isLevel2Rejected &&
-    hasAllLevel2Data &&
-    (kycStatusUpper === "PENDING" || ninStatusUpper === "PENDING" || faceStatusUpper === "PENDING");
-
-  const idReason = isNinRejected ? (kycDocs?.ninRejectionReason || kycDocs?.rejectionReason) : null;
-  const faceReason = isFaceRejected ? (kycDocs?.faceRejectionReason || kycDocs?.rejectionReason) : null;
+  const isIdRejected = idDocStatus(kycDocs) === "REJECTED";
+  const isFaceRejected = faceDocStatus(kycDocs) === "REJECTED";
+  const idReason = isIdRejected ? idRejectionText(kycDocs) : null;
+  const faceReason = isFaceRejected ? faceRejectionText(kycDocs) : null;
   const generalReason =
+    idReason ||
+    faceReason ||
+    kycDocs?.kycRejectionReason ||
     kycDocs?.rejectionReason ||
-    kycDocs?.ninRejectionReason ||
-    kycDocs?.faceRejectionReason ||
     user?.kycRejectionReason;
 
   const specificRejectionReason =
-    isNinRejected && isFaceRejected && idReason && faceReason && idReason !== faceReason
+    isIdRejected && isFaceRejected && idReason && faceReason && idReason !== faceReason
       ? `ID: ${idReason} | Face: ${faceReason}`
       : idReason || faceReason || generalReason;
 
   const isLevel2Incomplete = !isLevel2Verified && !isLevel2Rejected && !hasAllLevel2Data;
+  const hasLevel3AddressDoc = checkHasLevel3AddressDoc(kycDocs);
+  const isLevel3Rejected = checkIsLevel3Rejected(kycDocs, user);
+  const isLevel3Pending = checkIsLevel3Pending(kycDocs, user);
 
-  const hasLevel3AddressDoc = Boolean(
-    kycDocs?.addressDocUrl ||
-    kycDocs?.proofOfAddressUrl ||
-    kycDocs?.utilityBillUrl
-  );
-
-  const isLevel3Rejected =
-    !isLevel3Verified &&
-    isLevel2Verified &&
-    hasLevel3AddressDoc &&
-    utilityStatusUpper === "REJECTED";
-
-  const isLevel3Pending =
-    isLevel2Verified &&
-    !isLevel3Verified &&
-    !isLevel3Rejected &&
-    hasLevel3AddressDoc &&
-    (utilityStatusUpper === "PENDING" || utilityStatusUpper === "IN_REVIEW");
-
-  useEffect(() => {
-    console.log("\n================ [APP: SECURITY SCREEN KYC SNAPSHOT] ================");
-    console.log("Redux User Object:", {
-      id: user?.id,
-      name: `${user?.firstName || ""} ${user?.lastName || ""}`,
-      kycLevel: user?.kycLevel,
-      kycStatus: user?.kycStatus,
-      kycVerified: user?.kycVerified,
-      rejectionReason: user?.kycRejectionReason,
-    });
-    console.log("Calculated UI Levels:", {
-      currentLevel,
-      kycStatus,
-      isLevel2Verified,
-      isLevel2Pending,
-      isLevel2Incomplete,
-      hasAllLevel2Data,
-      isLevel3Verified,
-      isLevel3Pending,
-      isLevel3Rejected,
-    });
-    console.log("Raw Server /kyc/status:", kycData);
-    console.log("Raw Server /kyc/documents:", kycDocsResponse);
-    console.log("======================================================================\n");
-  }, [user, currentLevel, kycStatus, isLevel2Verified, isLevel3Verified, isLevel2Pending, isLevel2Incomplete, hasAllLevel2Data, kycData, kycDocsResponse]);
-
-  const handleDeleteAccount = () => {
-    // Simulate deletion and navigate to login
-    setShowDeleteModal(false);
-    router.replace("/(auth)/login");
+  const handleDeleteAccount = async () => {
+    try {
+      await deleteAccount().unwrap();
+      setShowDeleteModal(false);
+      dispatch(logout());
+      Alert.alert("Account Deleted", "Your account has been permanently deleted.");
+      router.replace("/(auth)/login");
+    } catch (err: any) {
+      console.error("Failed to delete account");
+      const msg = err?.data?.message || err?.message || "Failed to delete account. Please try again.";
+      Alert.alert("Error", msg);
+    }
   };
 
   return (
@@ -184,10 +162,36 @@ export default function SecurityScreen() {
               }
               onPress={() => {
                 if (isLevel2Verified) {
-                  Alert.alert(
-                    "Identity Verified ✅",
-                    "Your Level 2 Identity Verification has been approved. You can proceed to Level 3 Address Verification."
-                  );
+                  setKycModalInfo({
+                    visible: true,
+                    type: "verified",
+                    tier: "Level 2",
+                    title: "Identity Verified",
+                    badgeText: "Level 2 Verified",
+                    badgeBg: "#DCFCE7",
+                    badgeColor: "#166534",
+                    description:
+                      "Your Level 2 Identity Verification has been approved. You have full access to daily withdrawals and can proceed to Level 3 Address Verification.",
+                    primaryButtonText: isLevel3Verified ? undefined : "Proceed to Level 3",
+                    onPrimaryPress: () => {
+                      setKycModalInfo((prev) => ({ ...prev, visible: false }));
+                      router.push("/kyc/level3-intro");
+                    },
+                  });
+                  return;
+                }
+                if (isLevel2Pending) {
+                  setKycModalInfo({
+                    visible: true,
+                    type: "pending",
+                    tier: "Level 2",
+                    title: "Verification In Review",
+                    badgeText: "In Review",
+                    badgeBg: "#FEF9C3",
+                    badgeColor: "#854D0E",
+                    description:
+                      "Your Level 2 identity documents have been submitted and are currently being reviewed by compliance. You will be notified once complete.",
+                  });
                   return;
                 }
                 router.push("/kyc/level2-intro");
@@ -229,17 +233,31 @@ export default function SecurityScreen() {
                   return;
                 }
                 if (isLevel3Verified) {
-                  Alert.alert(
-                    "Address Verified ✅",
-                    "Your Level 3 Address Verification is complete. You have full access to unlimited platform privileges."
-                  );
+                  setKycModalInfo({
+                    visible: true,
+                    type: "verified",
+                    tier: "Level 3",
+                    title: "Address Verified",
+                    badgeText: "Level 3 Verified",
+                    badgeBg: "#DCFCE7",
+                    badgeColor: "#166534",
+                    description:
+                      "Your Level 3 Address Verification is complete. You have full access to unlimited platform privileges, deposits, and withdrawals.",
+                  });
                   return;
                 }
                 if (isLevel3Pending) {
-                  Alert.alert(
-                    "Address In Review ⏳",
-                    "Your Level 3 address documents have been submitted and are currently being reviewed by compliance."
-                  );
+                  setKycModalInfo({
+                    visible: true,
+                    type: "pending",
+                    tier: "Level 3",
+                    title: "Address In Review",
+                    badgeText: "In Review",
+                    badgeBg: "#FEF9C3",
+                    badgeColor: "#854D0E",
+                    description:
+                      "Your Level 3 address documents have been submitted and are currently being reviewed by compliance.",
+                  });
                   return;
                 }
                 router.push("/kyc/level3-intro");
@@ -258,13 +276,27 @@ export default function SecurityScreen() {
             />
             <MenuItem
               title="Transaction PIN"
+              subtitle="4-digit PIN for withdrawals and transactions"
               icon={
                 <Ionicons name="keypad-outline" size={24} color="#155D5F" />
               }
               onPress={() => router.push("/profile/security/change-pin")}
             />
             <MenuItem
-              title="Enable Face ID"
+              title="App Lock Passcode"
+              subtitle="6-digit passcode for inactivity lock"
+              icon={
+                <MaterialCommunityIcons
+                  name="shield-key-outline"
+                  size={24}
+                  color="#155D5F"
+                />
+              }
+              onPress={() => router.push("/profile/security/change-passcode")}
+            />
+            <MenuItem
+              title="Face ID & Biometrics"
+              subtitle="Fast unlock with fingerprint or Face ID"
               icon={
                 <MaterialCommunityIcons
                   name="face-recognition"
@@ -289,6 +321,82 @@ export default function SecurityScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Custom KYC Status Feedback Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={kycModalInfo.visible}
+        onRequestClose={() => setKycModalInfo((prev) => ({ ...prev, visible: false }))}
+      >
+        <View className="flex-1 justify-center items-center bg-black/50 px-5">
+          <View className="bg-white rounded-[28px] p-6 w-full max-w-[340px] items-center">
+            {/* Top Icon Badge */}
+            <View
+              className="w-16 h-16 rounded-full justify-center items-center mb-3"
+              style={{
+                backgroundColor: kycModalInfo.type === "verified" ? "#DCFCE7" : "#FEF9C3",
+              }}
+            >
+              <MaterialCommunityIcons
+                name={kycModalInfo.type === "verified" ? "shield-check" : "clock-outline"}
+                size={34}
+                color={kycModalInfo.type === "verified" ? "#166534" : "#854D0E"}
+              />
+            </View>
+
+            {/* Badge */}
+            {kycModalInfo.badgeText ? (
+              <View
+                className="mb-2 px-3 py-1 rounded-full"
+                style={{ backgroundColor: kycModalInfo.badgeBg }}
+              >
+                <Text
+                  className="text-[12px] font-bold"
+                  style={{ color: kycModalInfo.badgeColor }}
+                >
+                  {kycModalInfo.badgeText}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Title */}
+            <Text className="text-[20px] font-extrabold text-[#1E293B] text-center mb-2">
+              {kycModalInfo.title}
+            </Text>
+
+            {/* Description */}
+            <Text className="text-[14px] text-[#64748B] text-center mb-6 leading-5">
+              {kycModalInfo.description}
+            </Text>
+
+            {/* Action Buttons */}
+            <View className="w-full gap-y-3">
+              {kycModalInfo.primaryButtonText && kycModalInfo.onPrimaryPress && (
+                <TouchableOpacity
+                  onPress={kycModalInfo.onPrimaryPress}
+                  activeOpacity={0.8}
+                  className="bg-[#155D5F] py-4 rounded-xl items-center w-full"
+                >
+                  <Text className="text-white font-bold text-[16px]">
+                    {kycModalInfo.primaryButtonText}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                onPress={() => setKycModalInfo((prev) => ({ ...prev, visible: false }))}
+                activeOpacity={0.7}
+                className="bg-[#F1F5F9] py-4 rounded-xl items-center w-full"
+              >
+                <Text className="text-[#475569] font-semibold text-[16px]">
+                  {kycModalInfo.primaryButtonText ? "Close" : "Got It"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Level 3 Locked Modal */}
       <Modal
@@ -375,12 +483,17 @@ export default function SecurityScreen() {
             <View className="w-full gap-y-3">
               <TouchableOpacity
                 onPress={handleDeleteAccount}
+                disabled={isDeleting}
                 activeOpacity={0.8}
-                className="bg-[#CA1212] py-4 rounded-xl items-center w-full"
+                className={`py-4 rounded-xl items-center w-full ${isDeleting ? "bg-[#CA1212]/60" : "bg-[#CA1212]"}`}
               >
-                <Text className="text-white font-bold text-[16px]">
-                  Yes, Delete Account
-                </Text>
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text className="text-white font-bold text-[16px]">
+                    Yes, Delete Account
+                  </Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity

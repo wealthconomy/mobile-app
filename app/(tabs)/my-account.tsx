@@ -4,7 +4,7 @@ import { LogoutModal } from "@/src/features/account/components/LogoutModal";
 import { SavingsSummary } from "@/src/features/account/components/SavingsSummary";
 import { RootState } from "@/src/store";
 import { useLogoutSessionMutation } from "@/src/store/api/authApi";
-import { baseApi } from "@/src/store/api/baseApi";
+import { useIsAuthenticated } from "@/src/hooks/useIsAuthenticated";
 import { useGetKycStatusQuery } from "@/src/store/api/kycApi";
 import { useListNotificationsQuery } from "@/src/store/api/notificationApi";
 import {
@@ -23,6 +23,7 @@ import { useDispatch, useSelector } from "react-redux";
 export default function MyAccountScreen() {
   const router = useRouter();
   const dispatch = useDispatch();
+  const isAuth = useIsAuthenticated();
 
   // Local state
   const [balanceVisible, setBalanceVisible] = useState(true);
@@ -30,8 +31,9 @@ export default function MyAccountScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Auth Redux state for instant cached rendering
-  const { user: authUser, refreshToken } = useSelector(
-    (state: RootState) => state.auth
+  const authUser = useSelector((state: RootState) => state.auth.user);
+  const refreshToken = useSelector(
+    (state: RootState) => state.auth.refreshToken
   );
 
   // RTK Query API Integrations
@@ -39,33 +41,34 @@ export default function MyAccountScreen() {
     data: profileData,
     isLoading: profileLoading,
     refetch: refetchProfile,
-  } = useGetMyProfileQuery();
+  } = useGetMyProfileQuery(undefined, { skip: !isAuth });
 
   const {
     data: summaryData,
     isLoading: summaryLoading,
     refetch: refetchSummary,
-  } = useGetDashboardSummaryQuery();
+  } = useGetDashboardSummaryQuery(undefined, { skip: !isAuth });
 
   const {
     data: walletData,
     isLoading: walletLoading,
     refetch: refetchWallet,
-  } = useGetWalletSummaryQuery();
+  } = useGetWalletSummaryQuery(undefined, { skip: !isAuth });
 
   const {
     data: kycData,
     isLoading: kycLoading,
     refetch: refetchKyc,
-  } = useGetKycStatusQuery();
+  } = useGetKycStatusQuery(undefined, { skip: !isAuth });
 
   const { data: notificationsData, refetch: refetchNotifications } =
     useListNotificationsQuery(
       { limit: 50 },
       {
-        pollingInterval: 10000,
+        pollingInterval: isAuth ? 10000 : 0,
         refetchOnFocus: true,
         refetchOnMountOrArgChange: true,
+        skip: !isAuth,
       }
     );
 
@@ -150,7 +153,6 @@ export default function MyAccountScreen() {
     } catch {
       // Ignore network errors during logout
     } finally {
-      dispatch(baseApi.util.resetApiState());
       dispatch(logout());
       router.replace("/(auth)/login" as any);
     }
@@ -183,7 +185,7 @@ export default function MyAccountScreen() {
         {/* Profile Header Card */}
         <AccountHeader
           user={activeUser}
-          kycLevel={kycData?.data?.currentLevel}
+          kycLevel={effectiveKycLevel}
           kycStatus={kycData?.data?.status}
           loading={isLoading}
           onPressKyc={handleKycPress}

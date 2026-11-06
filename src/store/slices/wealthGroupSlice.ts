@@ -86,8 +86,8 @@ const initialState: WealthGroupState = {
 export const saveGroupsToStorage = async (groups: WealthGroup[]) => {
   try {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(groups));
-  } catch (error) {
-    console.error("Error saving groups to storage:", error);
+  } catch {
+    console.error("Error saving groups to storage");
   }
 };
 
@@ -99,8 +99,8 @@ export const loadGroupsFromStorage = createAsyncThunk(
       if (stored) {
         return JSON.parse(stored) as WealthGroup[];
       }
-    } catch (error) {
-      console.error("Error loading groups from storage:", error);
+    } catch {
+      console.error("Error loading groups from storage");
     }
     return null;
   },

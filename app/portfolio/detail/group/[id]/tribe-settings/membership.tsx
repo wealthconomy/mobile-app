@@ -129,7 +129,12 @@ export default function MembershipRolesScreen() {
                 <Text className="text-[14px] font-medium text-[#155D5F]">
                   Members Limit
                 </Text>
-                <Text className="text-[10px] text-[#64748B]">200 maximum</Text>
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  className="text-[12px] text-[#4B5563] font-semibold font-kumbh-semibold"
+                >
+                  200 maximum
+                </Text>
               </View>
               <TextInput
                 className="bg-[#F3F4F6] rounded-2xl h-16 px-5 text-[#1A1A1A] text-base font-medium"
@@ -137,8 +142,12 @@ export default function MembershipRolesScreen() {
                 keyboardType="numeric"
                 onChangeText={(v) => setLimit(v.replace(/\D/g, ""))}
                 placeholder="e.g. 10"
+                placeholderTextColor="#6B7280"
               />
-              <Text className="text-[10px] text-[#64748B] mt-2">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[12px] text-[#4B5563] font-semibold font-kumbh-semibold mt-2"
+              >
                 {members.length || group?.activeMembersCount || 1} Active Members
               </Text>
             </View>
@@ -211,7 +220,12 @@ export default function MembershipRolesScreen() {
                             <Text className="text-[#1A1A1A] font-bold text-sm" numberOfLines={1}>
                               {reqName}
                             </Text>
-                            <Text className="text-[#64748B] text-xs">Wants to join</Text>
+                            <Text
+                              maxFontSizeMultiplier={1.35}
+                              className="text-[#4B5563] text-[12px] font-semibold font-kumbh-semibold"
+                            >
+                              Wants to join
+                            </Text>
                           </View>
                         </View>
 
@@ -226,7 +240,10 @@ export default function MembershipRolesScreen() {
                               marginRight: 6,
                             }}
                           >
-                            <Text style={{ color: "#EF4444", fontWeight: "700", fontSize: 11 }}>
+                            <Text
+                              maxFontSizeMultiplier={1.35}
+                              style={{ color: "#EF4444", fontWeight: "700", fontSize: 12 }}
+                            >
                               Reject
                             </Text>
                           </TouchableOpacity>
@@ -240,7 +257,10 @@ export default function MembershipRolesScreen() {
                               borderRadius: 8,
                             }}
                           >
-                            <Text style={{ color: "#4CAF50", fontWeight: "700", fontSize: 11 }}>
+                            <Text
+                              maxFontSizeMultiplier={1.35}
+                              style={{ color: "#166534", fontWeight: "700", fontSize: 12 }}
+                            >
                               Approve
                             </Text>
                           </TouchableOpacity>

@@ -23,7 +23,8 @@ import {
   hydrateCompletedPortfolios,
   removeCompletedPortfolio,
 } from "@/src/store/slices/completedPortfolioSlice";
-import { isPortfolioCompleted, getDynamicInterestRateLabel } from "@/src/utils/formatters";
+import { isPortfolioCompleted } from "@/src/utils/formatters";
+import { getGroupedSubscribedRate, getSubscribedPortfolioRate } from "@/src/utils/interestTiers";
 
 const THEME = "#005F61"; // Dark teal for text/buttons
 const THEME_BG = "#D5EDFF"; // Theme light blue
@@ -107,7 +108,18 @@ export default function WealthFlowScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const flowRateLabel = getDynamicInterestRateLabel("flow", systemConfigData, rates, 10);
+
+  const flowConfig = rates?.wealthflow || (rates as any)?.flow;
+  const minFlowKobo = flowConfig?.minTargetAmount ?? flowConfig?.minimumAmount ?? 50000;
+  const minFlowDuration = flowConfig?.minDurationDays ?? flowConfig?.minimumTenureDays ?? 30;
+  const maxFlowDuration = flowConfig?.maxDurationDays ?? flowConfig?.maximumTenureDays ?? 365;
+  const flowPenaltyRate = flowConfig?.earlyLiquidationPenaltyRate ?? flowConfig?.earlyWithdrawalPenaltyPercentage ?? 2;
+  const minFlowNairaFormatted = (minFlowKobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const handleBack = () => {
+    router.replace("/(tabs)/portfolios" as any);
+  };
+
   const allGoals = data?.items || [];
 
   const handleRefresh = async () => {
@@ -178,6 +190,9 @@ export default function WealthFlowScreen() {
   };
 
   const totalBalance = allGoals.reduce((sum, g) => sum + parseFloat(g.balance || "0"), 0);
+  const tiers = (configData?.tiers || (configData as any)?.data?.tiers) as any;
+  const activeFlowRate = getGroupedSubscribedRate(ongoingPlans, tiers);
+  const flowRateLabel = activeFlowRate != null ? `${activeFlowRate}% P.A.` : undefined;
 
   if (loading) {
     return (
@@ -185,7 +200,7 @@ export default function WealthFlowScreen() {
         <StatusBar style="dark" />
         <Header
           title="WealthFlow"
-          onBack={() => router.back()}
+          onBack={handleBack}
           rightElement={<PortfolioPreferenceMenu portfolioType="flow" />}
         />
         <PortfolioDetailSkeleton />
@@ -198,7 +213,7 @@ export default function WealthFlowScreen() {
       <StatusBar style="dark" />
       <Header
         title="WealthFlow"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="flow" />}
       />
 
@@ -224,7 +239,7 @@ export default function WealthFlowScreen() {
             style={{
               width: "100%",
               maxWidth: 365,
-              height: 170,
+              height: 190,
               borderTopLeftRadius: 50,
               borderTopRightRadius: 20,
               borderBottomRightRadius: 50,
@@ -259,30 +274,26 @@ export default function WealthFlowScreen() {
             </View>
 
             <View
-              style={{ position: "absolute", top: 25, left: 20, right: 20, zIndex: 10 }}
+              style={{ position: "absolute", top: 22, left: 20, right: 20, zIndex: 10 }}
             >
               <View
                 className="flex-row items-center justify-between mb-1"
                 style={{ width: 280 }}
               >
                 <View className="flex-row items-center gap-2">
-                  <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-80">
+                  <Text
+                    maxFontSizeMultiplier={1.35}
+                    className="text-[#1A1A1A] text-[13px] font-kumbh-semibold"
+                  >
                     Total Savings
                   </Text>
-                  {showInterest && (
-                    <View
-                      style={{
-                        backgroundColor: "#0EA5E9",
-                        paddingHorizontal: 8,
-                        paddingVertical: 2.5,
-                        borderRadius: 20,
-                      }}
-                    >
-                      <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                  {showInterest && flowRateLabel ? (
+                    <View className="bg-[#E0F2F1] px-2 py-0.5 rounded-full">
+                      <Text className="text-[#005F61] text-[10px] font-kumbh-bold">
                         {flowRateLabel}
                       </Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
                 <TouchableOpacity
                   onPress={() => setShowBalance(!showBalance)}
@@ -296,7 +307,11 @@ export default function WealthFlowScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View className="flex-row items-baseline mb-1">
+              <TouchableOpacity
+                onPress={() => router.push("/education/win-up" as any)}
+                activeOpacity={0.8}
+                className="flex-row items-baseline mb-1"
+              >
                 {showBalance ? (
                   <BalanceText
                     amount={`₦${formatAmount(totalBalance.toString())}`}
@@ -308,14 +323,20 @@ export default function WealthFlowScreen() {
                     ***
                   </Text>
                 )}
-              </View>
+                <Text className="text-[#1A1A1A] text-[34px] font-light ml-4 mb-1">
+                  ›
+                </Text>
+              </TouchableOpacity>
 
               {showInterest && (
                 <View className="flex-row items-center space-x-1">
-                  <Text className="text-[#1A1A1A] text-[12px] font-medium opacity-70">
+                  <Text
+                    maxFontSizeMultiplier={1.35}
+                    className="text-[#1A1A1A] text-[12px] font-kumbh-semibold"
+                  >
                     Your wealth grew to ₦0.00 today
                   </Text>
-                  <ArrowUp size={14} color="#4CAF50" />
+                  <ArrowUp size={14} color="#4CAF50" style={{ marginLeft: 4 }} />
                 </View>
               )}
             </View>
@@ -326,7 +347,7 @@ export default function WealthFlowScreen() {
                 width: 160,
                 height: 40,
                 borderRadius: 18,
-                bottom: 20,
+                bottom: 16,
                 right: 20,
                 elevation: 3,
                 zIndex: 20,
@@ -357,19 +378,32 @@ export default function WealthFlowScreen() {
               >
                 What's on WealthFlow? 🚀
               </Text>
-              <Text
-                className="text-[10px] leading-[15px] mb-4"
-                style={{ color: THEME }}
-              >
-                To make saving effortless and consistent,{" "}
-                <Text className="font-bold">Wealth Flow</Text> allows you to put
-                your{" "}
-                <Text className="font-bold">wealth-building on autopilot.</Text>{" "}
-                It is designed to{" "}
-                <Text className="font-bold">remove the "decision fatigue"</Text>{" "}
-                of saving manually, ensuring you stay disciplined without having
-                to remember.
-              </Text>
+              <View>
+                {[
+                  {
+                    title: "Autopilot Wealth:",
+                    text: "Your interest rate depends on how much you save and for how long.",
+                  },
+                  {
+                    title: "Flow Limits & Rules:",
+                    text: `Minimum target amount is ₦${minFlowNairaFormatted}. Lock duration ranges from ${minFlowDuration} to ${maxFlowDuration} days.`,
+                  },
+                  {
+                    title: "Early Liquidation Rule:",
+                    text: `Breaking a WealthFlow plan early attracts an early withdrawal penalty of ${flowPenaltyRate}%.`,
+                  },
+                ].map((tip, i) => (
+                  <View key={i} className="flex-row mb-3 items-start">
+                    <Text className="mr-2 text-[12px]">🚀</Text>
+                    <Text
+                      className="text-[12px] flex-1 leading-[17px] font-kumbh-semibold"
+                      style={{ color: THEME }}
+                    >
+                      <Text className="font-bold">{tip.title}</Text> {tip.text}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
           )}
 
@@ -387,7 +421,7 @@ export default function WealthFlowScreen() {
                   key={cat.id}
                   style={{
                     width: "48%",
-                    height: 114,
+                    height: 124,
                     backgroundColor: THEME_BG,
                     borderRadius: 15,
                     padding: 12,
@@ -423,13 +457,14 @@ export default function WealthFlowScreen() {
                     />
                   </View>
                   <Text
+                    maxFontSizeMultiplier={1.35}
                     className="font-bold text-[14px] mb-0.5"
                     style={{ color: THEME }}
                   >
                     {cat.title}
                   </Text>
                   <Text
-                    className="text-[9px] opacity-70"
+                    className="text-[13px] leading-[18px] font-kumbh-semibold"
                     style={{ color: THEME }}
                     numberOfLines={2}
                   >
@@ -513,7 +548,7 @@ export default function WealthFlowScreen() {
                 />
               ) : (
                 ongoingPlans.map((plan) => (
-                  <AutoListItem key={plan.id} plan={plan} />
+                  <AutoListItem key={plan.id} plan={plan} tiers={tiers} />
                 ))
               )
             ) : completedPlans.length === 0 ? (
@@ -524,7 +559,7 @@ export default function WealthFlowScreen() {
               />
             ) : (
               completedPlans.map((plan) => (
-                <AutoListItem key={plan.id} plan={plan} isCompleted />
+                <AutoListItem key={plan.id} plan={plan} isCompleted tiers={tiers} />
               ))
             )}
           </View>
@@ -560,14 +595,15 @@ function EmptyState({
         <Text style={{ fontSize: 32 }}>{icon}</Text>
       </View>
       <Text
+        maxFontSizeMultiplier={1.35}
         className="font-bold text-[16px] text-center mb-2"
         style={{ color: "#323232" }}
       >
         {text}
       </Text>
       <Text
-        className="text-[11px] text-center opacity-70"
-        style={{ color: "#6B7280" }}
+        maxFontSizeMultiplier={1.35}
+        className="text-[13px] leading-[18px] font-kumbh-semibold text-center text-[#4B5563]"
       >
         {subtext}
       </Text>
@@ -578,12 +614,15 @@ function EmptyState({
 function AutoListItem({
   plan,
   isCompleted,
+  tiers,
 }: {
   plan: Portfolio;
   isCompleted?: boolean;
+  tiers?: any[];
 }) {
   const THEME_BG = "#D5EDFF";
   const completed = Boolean(isCompleted || isPortfolioCompleted(plan));
+  const itemRate = getSubscribedPortfolioRate(plan, tiers);
   
   const formatAmount = (val: string) => {
     if (!val) return "0.00";
@@ -647,9 +686,18 @@ function AutoListItem({
 
       <View className="flex-1">
         <View className="flex-row justify-between items-center mb-1">
-          <Text className="text-[14px] font-bold text-[#1A1A1A]">
-            {plan.name}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 8 }}>
+            <Text className="text-[14px] font-bold text-[#1A1A1A]" numberOfLines={1}>
+              {plan.name}
+            </Text>
+            {itemRate != null ? (
+              <View className="bg-[#E0F2F1] px-1.5 py-0.5 rounded-full ml-2">
+                <Text style={{ color: "#005F61", fontSize: 9, fontWeight: "700" }}>
+                  {itemRate}% P.A.
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <Text className="text-[14px] font-bold text-[#1A1A1A]">
             ₦{formatAmount(plan.targetAmount)}
           </Text>
@@ -657,9 +705,17 @@ function AutoListItem({
 
         <View className="flex-row justify-between items-center mb-2">
           <View>
-            <Text className="text-[10px] text-[#6B7280]">{plan.metadata?.category || "Flow"}</Text>
+            <Text
+              maxFontSizeMultiplier={1.35}
+              className="text-[12px] leading-[16px] text-[#4B5563] font-kumbh-semibold"
+            >
+              {plan.metadata?.category || "Flow"}
+            </Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 10, color: "#4CAF50", fontWeight: "700" }}>
+              <Text
+                maxFontSizeMultiplier={1.35}
+                style={{ fontSize: 12, color: "#166534", fontWeight: "700" }}
+              >
                 Wealth growth ₦{formatAmount(growthVal.toString())}{" "}
               </Text>
               <ArrowUp size={12} color="#4CAF50" />
@@ -686,12 +742,19 @@ function AutoListItem({
         </View>
 
         <View className="flex-row justify-between items-center">
-          <Text className="text-[10px] text-[#9CA3AF] opacity-80">
+          <Text
+            maxFontSizeMultiplier={1.35}
+            className="text-[12px] text-[#4B5563] font-kumbh-semibold"
+          >
             {Math.round(Math.min(progress * 100, 100))}%
           </Text>
           <Text
-            className="text-[10px] font-bold"
-            style={{ color: isCompleted ? "#4CAF50" : "#9CA3AF" }}
+            maxFontSizeMultiplier={1.35}
+            className="text-[12px] font-kumbh-semibold"
+            style={{
+              color: isCompleted ? "#166534" : "#4B5563",
+              fontWeight: isCompleted ? "700" : "600",
+            }}
           >
             {isCompleted ? "Saving Completed" : `${getDaysLeft()} Days Left`}
           </Text>

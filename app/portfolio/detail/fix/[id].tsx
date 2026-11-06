@@ -35,7 +35,6 @@ import {
   Alert,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   RefreshControl,
@@ -48,6 +47,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import ManageFundsSheet from "@/src/components/portfolio/ManageFundsSheet";
 import { BlurView } from "expo-blur";
@@ -75,21 +75,9 @@ export default function FixDetailScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const { penaltyRate, penaltyRatio } = getDynamicPenaltyRate(
-    "fix",
-    systemConfigData,
-    rates,
-    "2.5%"
-  );
-  const fixInterestRateLabel = getDynamicInterestRateLabel(
-    "fix",
-    systemConfigData,
-    rates,
-    15
-  );
   const { data: txnsData, isLoading: txnsLoading, refetch: refetchTxns } = useGetPortfolioTransactionsQuery(
     { id: id as string },
-    { skip: !id, refetchOnMountOrArgChange: true }
+    { skip: !id, refetchOnMountOrArgChange: 30 }
   );
   const { data: walletSummary, refetch: refetchWallet } = useGetWalletSummaryQuery();
   const walletBalance = (parseFloat(walletSummary?.currentBalance || "0")) / 100;
@@ -112,6 +100,21 @@ export default function FixDetailScreen() {
     lastFixRef.current = fetchedFix;
   }
   const fix = fetchedFix || savedCompletedPlan || lastFixRef.current;
+
+  const { penaltyRate, penaltyRatio } = getDynamicPenaltyRate(
+    "fix",
+    systemConfigData,
+    rates,
+    "2.5%",
+    fix
+  );
+  const fixInterestRateLabel = getDynamicInterestRateLabel(
+    "fix",
+    systemConfigData,
+    rates,
+    15,
+    fix
+  );
 
   const isTransferredOrWithdrawnInTxns = Boolean(
     txnsData?.items?.some((t) => {
@@ -245,7 +248,7 @@ export default function FixDetailScreen() {
       >
         <Stack.Screen options={SCREEN_OPTIONS} />
         <Header title="Review" onBack={handleBack} />
-        <Text style={{ color: "#6B7280" }}>Fix not found</Text>
+        <Text style={{ color: "#4B5563", fontSize: 14, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}>Fix not found</Text>
       </SafeAreaView>
     );
   }
@@ -356,13 +359,13 @@ export default function FixDetailScreen() {
           >
             {fix.name}
           </Text>
-          <Text style={{ color: "#6B7280", fontSize: 14, marginBottom: 16 }}>
+          <Text style={{ color: "#4B5563", fontSize: 14, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginBottom: 16 }}>
             {fix.metadata?.category || "Fix"}
           </Text>
           <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 28 }}>
             ₦{formatAmount(displayBalance)}
           </Text>
-          <Text style={{ color: "#9CA3AF", fontSize: 11, marginTop: 2 }}>
+          <Text style={{ color: "#4B5563", fontSize: 12, lineHeight: 16, fontWeight: "600", marginTop: 2 }}>
             of ₦{formatAmount(fix.targetAmount)} target
           </Text>
         </View>
@@ -399,10 +402,10 @@ export default function FixDetailScreen() {
             marginBottom: 28,
           }}
         >
-          <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
+          <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16 }}>
             {Math.round(Math.min(progress * 100, 100))}%
           </Text>
-          <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
+          <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16 }}>
             {getDaysLeft()} days Left
           </Text>
         </View>
@@ -456,7 +459,7 @@ export default function FixDetailScreen() {
 
       <Text
         style={{
-          color: "#6B7280",
+          color: "#4B5563",
           textAlign: "center",
           fontSize: 14,
           lineHeight: 22,
@@ -596,9 +599,7 @@ export default function FixDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Interest Rate</Text>
-                <Text style={styles.value}>
-                  {fix.interestRate ? `${fix.interestRate}% P.A` : fixInterestRateLabel}
-                </Text>
+                <Text style={styles.value}>{fixInterestRateLabel}</Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Funding Source:</Text>
@@ -685,6 +686,7 @@ export default function FixDetailScreen() {
                   style={{
                     color: "#15803D",
                     fontSize: 12,
+                    fontWeight: "600",
                     textAlign: "center",
                     lineHeight: 18,
                   }}
@@ -729,6 +731,7 @@ export default function FixDetailScreen() {
                 >
                   <View>
                     <Text
+                      maxFontSizeMultiplier={1.35}
                       style={{
                         fontWeight: "700",
                         fontSize: 14,
@@ -738,7 +741,7 @@ export default function FixDetailScreen() {
                       {getCleanTransactionTitle(txn, fix.name)}
                     </Text>
                     <Text
-                      style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}
+                      style={{ fontSize: 12, lineHeight: 16, color: "#4B5563", fontWeight: "600", marginTop: 2 }}
                     >
                       {new Date(txn.createdAt).toLocaleDateString("en-US", {
                         month: "short",
@@ -775,7 +778,7 @@ export default function FixDetailScreen() {
                   alignItems: "center",
                 }}
               >
-                <Text style={{ color: "#9CA3AF", fontSize: 13 }}>
+                <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", lineHeight: 18 }}>
                   No recent transactions found
                 </Text>
               </View>
@@ -787,8 +790,7 @@ export default function FixDetailScreen() {
       {/* TopUp Amount Input Modal */}
       <Modal visible={showTopUpModal} transparent animationType="slide">
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          <KeyboardAwareScreen
             style={styles.modalOverlay}
           >
             <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
@@ -804,7 +806,7 @@ export default function FixDetailScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 16, textAlign: "center" }}>
+                <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", lineHeight: 18, marginBottom: 16, textAlign: "center" }}>
                   Add extra funds directly from your main wallet to speed up your savings goal.
                 </Text>
 
@@ -818,7 +820,7 @@ export default function FixDetailScreen() {
                     <>
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 6 }}>
                         <Text style={styles.inputLabel}>Amount (₦)</Text>
-                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#6B7280" }}>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#4B5563", lineHeight: 16 }}>
                           Wallet Balance: <Text style={{ fontWeight: "700", color: "#059669" }}>₦{formattedBal}</Text>
                         </Text>
                       </View>
@@ -923,7 +925,7 @@ export default function FixDetailScreen() {
                 })()}
               </View>
             </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
+          </KeyboardAwareScreen>
         </TouchableWithoutFeedback>
         <KeyboardDoneAccessory />
       </Modal>
@@ -1009,8 +1011,10 @@ export default function FixDetailScreen() {
             </Text>
             <Text
               style={{
-                fontSize: 12,
-                color: "#6B7280",
+                fontSize: 13,
+                color: "#4B5563",
+                fontFamily: "KumbhSans_600SemiBold",
+                fontWeight: "600",
                 textAlign: "center",
                 marginBottom: 14,
                 lineHeight: 18,
@@ -1048,12 +1052,12 @@ export default function FixDetailScreen() {
                     </Text>
                   </View>
 
-                  <Text style={{ fontSize: 12, color: "#7F1D1D", marginBottom: 12, lineHeight: 16 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: "#7F1D1D", marginBottom: 12, lineHeight: 16 }}>
                     Terminating early will incur a <Text style={{ fontWeight: "700" }}>{penaltyRate}</Text> penalty, deducted from your current balance.
                   </Text>
 
                   <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
-                    <Text style={{ fontSize: 12, color: "#6B7280" }}>Current Balance</Text>
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: "#4B5563", lineHeight: 16 }}>Current Balance</Text>
                     <Text style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}>
                       ₦{balNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </Text>
@@ -1274,7 +1278,9 @@ export default function FixDetailScreen() {
             <Text
               style={{
                 fontSize: 13,
-                color: "#6B7280",
+                color: "#4B5563",
+                fontFamily: "KumbhSans_600SemiBold",
+                fontWeight: "600",
                 textAlign: "center",
                 lineHeight: 20,
                 marginBottom: 16,
@@ -1304,7 +1310,7 @@ export default function FixDetailScreen() {
             >
               <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
                 <Ionicons name="alert-circle" size={18} color="#DC2626" style={{ marginTop: 2 }} />
-                <Text style={{ flex: 1, fontSize: 12, color: "#991B1B", lineHeight: 18 }}>
+                <Text style={{ flex: 1, fontSize: 12, fontWeight: "600", color: "#991B1B", lineHeight: 18 }}>
                   If you urgently need access to your funds before maturity, you can only{" "}
                   <Text style={{ fontWeight: "800" }}>terminate</Text> the plan, which incurs an early breaking penalty fee ({penaltyRate}).
                 </Text>
@@ -1368,10 +1374,11 @@ export default function FixDetailScreen() {
 
 const styles = StyleSheet.create({
   label: {
-    fontSize: 11,
-    color: "#64748B",
+    fontSize: 12,
+    lineHeight: 16,
+    color: "#4B5563",
     marginBottom: 4,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   value: {
     fontSize: 14,

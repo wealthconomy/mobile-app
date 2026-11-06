@@ -20,7 +20,6 @@ import {
   ActivityIndicator,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   RefreshControl,
@@ -34,6 +33,7 @@ import {
   TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import {
   useGetPortfoliosQuery,
@@ -75,18 +75,6 @@ export default function GoalDetailScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const { penaltyRate, penaltyRatio } = getDynamicPenaltyRate(
-    "goal",
-    systemConfigData,
-    rates,
-    "2.5%"
-  );
-  const goalInterestRateLabel = getDynamicInterestRateLabel(
-    "goal",
-    systemConfigData,
-    rates,
-    12
-  );
   const { data: walletSummary, refetch: refetchWallet } = useGetWalletSummaryQuery();
   const walletBalance = (parseFloat(walletSummary?.currentBalance || "0")) / 100;
 
@@ -103,7 +91,7 @@ export default function GoalDetailScreen() {
 
   const { data: txnsData, isLoading: txnsLoading, refetch: refetchTxns } = useGetPortfolioTransactionsQuery(
     { id: id as string },
-    { skip: !id, refetchOnMountOrArgChange: true }
+    { skip: !id, refetchOnMountOrArgChange: 30 }
   );
 
   useFocusEffect(
@@ -126,6 +114,21 @@ export default function GoalDetailScreen() {
     lastGoalRef.current = fetchedGoal;
   }
   const goal = fetchedGoal || savedCompletedPlan || lastGoalRef.current;
+
+  const { penaltyRate, penaltyRatio } = getDynamicPenaltyRate(
+    "goal",
+    systemConfigData,
+    rates,
+    "2.5%",
+    goal
+  );
+  const goalInterestRateLabel = getDynamicInterestRateLabel(
+    "goal",
+    systemConfigData,
+    rates,
+    12,
+    goal
+  );
 
   const isTransferredOrWithdrawnInTxns = Boolean(
     txnsData?.items?.some((t) => {
@@ -247,7 +250,7 @@ export default function GoalDetailScreen() {
       >
         <Stack.Screen options={SCREEN_OPTIONS} />
         <Header title="Review" onBack={handleBack} />
-        <Text style={{ color: "#6B7280" }}>Goal not found</Text>
+        <Text style={{ color: "#4B5563", fontSize: 14, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}>Goal not found</Text>
         <ThemedButton
           title="Go Back"
           onPress={handleBack}
@@ -303,7 +306,7 @@ export default function GoalDetailScreen() {
       setShowTopUpModal(false);
       refetchPortfolios();
     } catch (err: any) {
-      console.error("Top up portfolio failed:", err);
+      console.error("Top up portfolio failed");
       Alert.alert("Failed", err?.data?.message || err?.message || "Top-up request failed.");
     }
   };
@@ -329,7 +332,7 @@ export default function GoalDetailScreen() {
           >
             {goal.name}
           </Text>
-          <Text style={{ color: "#6B7280", fontSize: 14, marginBottom: 16 }}>
+          <Text style={{ color: "#4B5563", fontSize: 14, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginBottom: 16 }}>
             {goal.metadata?.category || "Goal"}
           </Text>
           <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 28 }}>
@@ -369,10 +372,10 @@ export default function GoalDetailScreen() {
             marginBottom: 28,
           }}
         >
-          <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
+          <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16 }}>
             {Math.round(Math.min(progress * 100, 100))}%
           </Text>
-          <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
+          <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16 }}>
             {getDaysLeft()} days Left
           </Text>
         </View>
@@ -424,7 +427,7 @@ export default function GoalDetailScreen() {
 
       <Text
         style={{
-          color: "#6B7280",
+          color: "#4B5563",
           textAlign: "center",
           fontSize: 14,
           lineHeight: 22,
@@ -562,13 +565,13 @@ export default function GoalDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Status</Text>
-                <Text style={[styles.value, { color: isCompleted || goal.status === "COMPLETED" ? "#10B981" : TEAL }]}>
+                <Text style={[styles.value, { color: isCompleted || goal.status === "COMPLETED" ? "#166534" : TEAL }]}>
                   {isCompleted ? "COMPLETED" : (goal.status || "ACTIVE")}
                 </Text>
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Interest Rate</Text>
-                <Text style={styles.value}>{goal.interestRate ? `${goal.interestRate}% P.A` : goalInterestRateLabel}</Text>
+                <Text style={styles.value}>{goalInterestRateLabel}</Text>
               </View>
             </View>
 
@@ -652,6 +655,7 @@ export default function GoalDetailScreen() {
                   style={{
                     color: "#15803D",
                     fontSize: 12,
+                    fontWeight: "600",
                     textAlign: "center",
                     lineHeight: 18,
                   }}
@@ -683,10 +687,13 @@ export default function GoalDetailScreen() {
                   }}
                 >
                   <View style={{ flex: 1, marginRight: 12 }}>
-                    <Text style={{ fontWeight: "700", color: "#1A1A1A", fontSize: 14 }}>
+                    <Text
+                      maxFontSizeMultiplier={1.35}
+                      style={{ fontWeight: "700", color: "#1A1A1A", fontSize: 14 }}
+                    >
                       {getCleanTransactionTitle(txn, goal?.name)}
                     </Text>
-                    <Text style={{ color: "#9CA3AF", fontSize: 11, marginTop: 2 }}>
+                    <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16, marginTop: 2 }}>
                       {new Date(txn.createdAt).toLocaleDateString()} • {txn.reference}
                     </Text>
                   </View>
@@ -703,7 +710,7 @@ export default function GoalDetailScreen() {
               ))
             ) : (
               <View style={{ paddingVertical: 20, alignItems: "center" }}>
-                <Text style={{ color: "#9CA3AF", fontSize: 13 }}>No transactions recorded yet.</Text>
+                <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", lineHeight: 18 }}>No transactions recorded yet.</Text>
               </View>
             )}
           </View>
@@ -713,8 +720,7 @@ export default function GoalDetailScreen() {
       {/* TopUp Modal */}
       <Modal visible={showTopUpModal} transparent animationType="slide">
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          <KeyboardAwareScreen
             style={styles.modalOverlay}
           >
             <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
@@ -730,7 +736,7 @@ export default function GoalDetailScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 16, textAlign: "center" }}>
+                <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", lineHeight: 18, marginBottom: 16, textAlign: "center" }}>
                   Add extra funds directly from your main wallet to speed up your savings goal.
                 </Text>
 
@@ -744,7 +750,7 @@ export default function GoalDetailScreen() {
                     <>
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 6 }}>
                         <Text style={styles.inputLabel}>Amount (₦)</Text>
-                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#6B7280" }}>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#4B5563", lineHeight: 16 }}>
                           Wallet Balance: <Text style={{ fontWeight: "700", color: "#059669" }}>₦{formattedBal}</Text>
                         </Text>
                       </View>
@@ -849,7 +855,7 @@ export default function GoalDetailScreen() {
                 })()}
               </View>
             </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
+          </KeyboardAwareScreen>
         </TouchableWithoutFeedback>
         <KeyboardDoneAccessory />
       </Modal>
@@ -894,8 +900,7 @@ export default function GoalDetailScreen() {
       {/* Terminate Modal */}
       <Modal visible={showTerminateModal} transparent animationType="slide">
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          <KeyboardAwareScreen
             style={styles.modalOverlay}
           >
             <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
@@ -918,9 +923,12 @@ export default function GoalDetailScreen() {
                   Terminate Wealth Fund?
                 </Text>
                 <Text
+                  maxFontSizeMultiplier={1.35}
                   style={{
                     fontSize: 13,
-                    color: "#6B7280",
+                    color: "#4B5563",
+                    fontFamily: "KumbhSans_600SemiBold",
+                    fontWeight: "600",
                     textAlign: "center",
                     marginBottom: 14,
                     lineHeight: 18,
@@ -958,12 +966,12 @@ export default function GoalDetailScreen() {
                         </Text>
                       </View>
 
-                      <Text style={{ fontSize: 12, color: "#7F1D1D", marginBottom: 12, lineHeight: 16 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#7F1D1D", marginBottom: 12, lineHeight: 16 }}>
                         Terminating early will incur a <Text style={{ fontWeight: "700" }}>{penaltyRate}</Text> penalty, deducted from your current balance.
                       </Text>
 
                       <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
-                        <Text style={{ fontSize: 12, color: "#6B7280" }}>Current Balance</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#4B5563", lineHeight: 16 }}>Current Balance</Text>
                         <Text style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}>
                           ₦{balNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </Text>
@@ -1085,7 +1093,7 @@ export default function GoalDetailScreen() {
                 </View>
               </View>
             </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
+          </KeyboardAwareScreen>
         </TouchableWithoutFeedback>
         <KeyboardDoneAccessory />
       </Modal>
@@ -1156,7 +1164,8 @@ export default function GoalDetailScreen() {
 }
 
 function ActivityItem({ title, date, amount, type, isSuccess }: any) {
-  const color = isSuccess || type === "deposit" ? "#4CAF50" : "#F3007A";
+  const iconColor = isSuccess || type === "deposit" ? "#4CAF50" : "#F3007A";
+  const textColor = isSuccess || type === "deposit" ? "#166534" : "#F3007A";
 
   return (
     <View className="flex-row items-center justify-between py-2">
@@ -1171,17 +1180,17 @@ function ActivityItem({ title, date, amount, type, isSuccess }: any) {
                   : "arrow-up-right"
             }
             size={20}
-            color={color}
+            color={iconColor}
           />
         </View>
         <View>
-          <Text className="text-[#1A1A1A] font-bold text-sm tracking-tight">
+          <Text maxFontSizeMultiplier={1.35} className="text-[#1A1A1A] font-bold text-sm tracking-tight">
             {title}
           </Text>
-          <Text className="text-[#64748B] text-[10px] opacity-60">{date}</Text>
+          <Text className="text-[#4B5563] text-xs font-kumbh-semibold">{date}</Text>
         </View>
       </View>
-      <Text style={{ color }} className="font-bold text-[14px]">
+      <Text style={{ color: textColor }} className="font-bold text-[14px]">
         {type === "deposit" ? "+" : "-"}₦{amount}
       </Text>
     </View>
@@ -1191,7 +1200,9 @@ function ActivityItem({ title, date, amount, type, isSuccess }: any) {
 const styles = StyleSheet.create({
   label: {
     fontSize: 12,
-    color: "#64748B",
+    lineHeight: 16,
+    color: "#4B5563",
+    fontWeight: "600",
     marginBottom: 4,
   },
   value: {

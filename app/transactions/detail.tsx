@@ -101,8 +101,8 @@ export default function TransactionDetailScreen() {
         quality: 0.8,
       });
       await Sharing.shareAsync(uri);
-    } catch (error) {
-      console.error("Error sharing image:", error);
+    } catch {
+      console.error("Error sharing image");
     } finally {
       setSharingImage(false);
     }
@@ -138,8 +138,8 @@ export default function TransactionDetailScreen() {
       `;
       const { uri } = await Print.printToFileAsync({ html });
       await Sharing.shareAsync(uri);
-    } catch (error) {
-      console.error("Error sharing PDF:", error);
+    } catch {
+      console.error("Error sharing PDF");
     } finally {
       setSharingPdf(false);
     }

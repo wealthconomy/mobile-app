@@ -21,6 +21,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 
 const TEAL = "#0B575B";
 const TEXT_DARK = "#1A1A1A";
@@ -37,18 +38,21 @@ export default function TopUpScreen() {
   const [amount, setAmount] = useState("");
   const [pin, setPin] = useState("");
   const pinInputRef = useRef<TextInput>(null);
+  const formScrollRef = useRef<ScrollView>(null);
 
   // ─── FORM ─────────────────────────────────────────────────────────────────
   const renderForm = () => {
     const isFormValid = amount.length > 0;
 
     return (
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          className="flex-1 px-5"
-          keyboardShouldPersistTaps="handled"
-        >
+      <KeyboardAwareScreen style={{ flex: 1 }} scrollRef={formScrollRef}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <ScrollView
+            ref={formScrollRef}
+            showsVerticalScrollIndicator={false}
+            className="flex-1 px-5"
+            keyboardShouldPersistTaps="handled"
+          >
           <View style={{ alignItems: "center", marginTop: 40, marginBottom: 32 }}>
             <Image
               source={require("../../assets/images/topup.png")}
@@ -228,6 +232,7 @@ export default function TopUpScreen() {
           />
         </ScrollView>
       </TouchableWithoutFeedback>
+      </KeyboardAwareScreen>
     );
   };
 
@@ -432,14 +437,17 @@ export default function TopUpScreen() {
           else router.back();
         }}
       />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        {step === "form" && renderForm()}
-        {step === "pin" && renderPin()}
-        {step === "success" && renderSuccess()}
-      </KeyboardAvoidingView>
+      {step === "form" ? (
+        renderForm()
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          {step === "pin" && renderPin()}
+          {step === "success" && renderSuccess()}
+        </KeyboardAvoidingView>
+      )}
       <KeyboardDoneAccessory />
     </SafeAreaView>
   );

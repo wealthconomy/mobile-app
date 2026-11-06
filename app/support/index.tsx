@@ -1,4 +1,4 @@
-import { Header } from "@/src/components/common";
+import Header from "@/src/components/common/Header";
 import { Text } from "@/src/components/common/ui/Text";
 import { WiseUpSection } from "@/src/features/home/components/WiseUpSection";
 import { PopularQuestionsSection } from "@/src/features/support/components/PopularQuestionsSection";
@@ -19,25 +19,11 @@ export default function SupportCenterScreen() {
   }, []);
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, paddingHorizontal: 12 }}
-      className="flex-1 bg-white"
-    >
+    <SafeAreaView style={{ flex: 1 }} className="bg-white">
       <StatusBar barStyle="dark-content" />
-      <View className="mb-4">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="w-11 h-11 items-center justify-center -ml-2 mb-2"
-        >
-          <Ionicons name="chevron-back" size={28} color="#000" />
-        </TouchableOpacity>
-
-        <Text variant="h2" className="font-kumbh-extrabold text-[22px]">
-          Customer Service Center
-        </Text>
-      </View>
+      <Header title="Customer Service Center" />
       <ScrollView
-        contentContainerStyle={{ paddingTop: 10 }}
+        contentContainerStyle={{ paddingTop: 10, paddingHorizontal: 16, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
         <SupportOptionsSection loading={loading} />

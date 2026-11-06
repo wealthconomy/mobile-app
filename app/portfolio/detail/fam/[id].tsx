@@ -39,7 +39,6 @@ import {
   Alert,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   RefreshControl,
@@ -52,6 +51,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import ManageFundsSheet from "@/src/components/portfolio/ManageFundsSheet";
 import ConfirmActionModal from "@/src/components/common/ConfirmActionModal";
@@ -89,18 +89,6 @@ export default function FamilyGoalDetailScreen() {
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const { penaltyRate, penaltyRatio } = getDynamicPenaltyRate(
-    "fam",
-    systemConfigData,
-    rates,
-    "2.5%"
-  );
-  const famInterestRateLabel = getDynamicInterestRateLabel(
-    "fam",
-    systemConfigData,
-    rates,
-    10
-  );
   const { data: walletSummary, refetch: refetchWallet } = useGetWalletSummaryQuery();
   const walletBalance = (parseFloat(walletSummary?.currentBalance || "0")) / 100;
 
@@ -116,7 +104,7 @@ export default function FamilyGoalDetailScreen() {
   };
   const { data: txnsData, isLoading: txnsLoading, refetch: refetchTxns } = useGetPortfolioTransactionsQuery(
     { id: id as string },
-    { skip: !id, refetchOnMountOrArgChange: true }
+    { skip: !id, refetchOnMountOrArgChange: 30 }
   );
 
   useFocusEffect(
@@ -143,6 +131,21 @@ export default function FamilyGoalDetailScreen() {
     lastPlanRef.current = fetchedPlan;
   }
   const plan = fetchedPlan || savedCompletedPlan || lastPlanRef.current;
+
+  const { penaltyRate, penaltyRatio } = getDynamicPenaltyRate(
+    "fam",
+    systemConfigData,
+    rates,
+    "2.5%",
+    plan
+  );
+  const famInterestRateLabel = getDynamicInterestRateLabel(
+    "fam",
+    systemConfigData,
+    rates,
+    10,
+    plan
+  );
 
   const isTransferredOrWithdrawnInTxns = Boolean(
     txnsData?.items?.some((t) => {
@@ -261,7 +264,7 @@ export default function FamilyGoalDetailScreen() {
       >
         <Stack.Screen options={SCREEN_OPTIONS} />
         <Header title="Review" onBack={handleBack} />
-        <Text style={{ color: "#6B7280", marginTop: 20 }}>Plan not found</Text>
+        <Text style={{ color: "#4B5563", fontSize: 14, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginTop: 20 }}>Plan not found</Text>
         <TouchableOpacity
           onPress={() => router.replace("/(tabs)/portfolios/wealth-fam")}
           style={{ marginTop: 16, backgroundColor: TEAL, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
@@ -316,9 +319,7 @@ export default function FamilyGoalDetailScreen() {
         pin: actionPin,
       };
 
-      console.log(`👨‍👩‍👧 [WealthFam Withdraw Request] POST /api/v1/portfolios/${plan.id}/withdraw-to-wallet:`, payload);
-      const res = await withdrawToWallet({ id: plan.id, type: "wealthfam", body: payload }).unwrap();
-      console.log("✅ [WealthFam Withdraw Success] Response:", res);
+      await withdrawToWallet({ id: plan.id, type: "wealthfam", body: payload }).unwrap();
 
       Alert.alert("Withdrawal Successful", `Successfully transferred ₦${num.toLocaleString()} to your main wallet.`);
       setShowWithdrawModal(false);
@@ -326,7 +327,7 @@ export default function FamilyGoalDetailScreen() {
       setActionPin("");
       refetchFam();
     } catch (err: any) {
-      console.error("❌ [WealthFam Withdraw Error]:", err);
+      console.error("[WealthFam Withdraw Error] Failed to withdraw");
       const message = err?.data?.message || err?.message || "Failed to withdraw funds. Please check your PIN and balance.";
       Alert.alert("Withdrawal Failed", message);
     } finally {
@@ -342,16 +343,14 @@ export default function FamilyGoalDetailScreen() {
 
     setIsProcessing(true);
     try {
-      console.log(`👨‍👩‍👧 [WealthFam Terminate Request] POST /api/v1/portfolios/${plan.id}/terminate`);
-      const res = await terminatePortfolio({ id: plan.id, body: { pin: actionPin } }).unwrap();
-      console.log("✅ [WealthFam Terminate Success] Response:", res);
+      await terminatePortfolio({ id: plan.id, body: { pin: actionPin } }).unwrap();
 
       Alert.alert("Portfolio Terminated", "Your WealthFam plan has been closed and funds returned to your wallet.");
       setShowTerminateModal(false);
       setActionPin("");
       router.replace("/(tabs)/portfolios/wealth-fam");
     } catch (err: any) {
-      console.error("❌ [WealthFam Terminate Error]:", err);
+      console.error("[WealthFam Terminate Error] Failed to terminate");
       const message = err?.data?.message || err?.message || "Failed to terminate portfolio. Please verify your PIN.";
       Alert.alert("Termination Failed", message);
     } finally {
@@ -381,7 +380,7 @@ export default function FamilyGoalDetailScreen() {
           >
             {plan.name}
           </Text>
-          <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 16 }}>
+          <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", lineHeight: 18, marginBottom: 16 }}>
             {plan.metadata?.familyMemberName
               ? `For ${plan.metadata.familyMemberName} (${plan.metadata.familyCategory || "Family"})`
               : "Family Pot"}
@@ -389,7 +388,7 @@ export default function FamilyGoalDetailScreen() {
           <Text style={{ color: "#1A1A1A", fontWeight: "800", fontSize: 28 }}>
             ₦{formatAmount(displayBalance)}
           </Text>
-          <Text style={{ color: "#9CA3AF", fontSize: 11, marginTop: 2 }}>
+          <Text style={{ color: "#4B5563", fontSize: 12, lineHeight: 16, fontWeight: "600", marginTop: 2 }}>
             of ₦{formatAmount(plan.targetAmount)} target
           </Text>
         </View>
@@ -426,10 +425,10 @@ export default function FamilyGoalDetailScreen() {
             marginBottom: 28,
           }}
         >
-          <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
+          <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16 }}>
             {progressPct}%
           </Text>
-          <Text style={{ color: "#9CA3AF", fontSize: 13, fontWeight: "500" }}>
+          <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16 }}>
             {getDaysLeft()} days Left
           </Text>
         </View>
@@ -484,7 +483,7 @@ export default function FamilyGoalDetailScreen() {
 
       <Text
         style={{
-          color: "#6B7280",
+          color: "#4B5563",
           textAlign: "center",
           fontSize: 14,
           lineHeight: 22,
@@ -586,7 +585,7 @@ export default function FamilyGoalDetailScreen() {
               </View>
               <View style={{ flex: 1, alignItems: "flex-end" }}>
                 <Text style={styles.label}>Interest Rate</Text>
-                <Text style={styles.value}>{plan.interestRate ? `${plan.interestRate}% P.A` : famInterestRateLabel}</Text>
+                <Text style={styles.value}>{famInterestRateLabel}</Text>
               </View>
             </View>
 
@@ -600,7 +599,7 @@ export default function FamilyGoalDetailScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Status</Text>
-                <Text style={[styles.value, { color: isCompleted || plan.status === "COMPLETED" ? "#10B981" : TEAL }]}>
+                <Text style={[styles.value, { color: isCompleted || plan.status === "COMPLETED" ? "#166534" : TEAL }]}>
                   {isCompleted ? "COMPLETED" : (plan.status || "ACTIVE")}
                 </Text>
               </View>
@@ -717,6 +716,7 @@ export default function FamilyGoalDetailScreen() {
                   style={{
                     color: "#15803D",
                     fontSize: 12,
+                    fontWeight: "600",
                     textAlign: "center",
                     lineHeight: 18,
                   }}
@@ -749,10 +749,13 @@ export default function FamilyGoalDetailScreen() {
                   }}
                 >
                   <View style={{ flex: 1, marginRight: 12 }}>
-                    <Text style={{ fontWeight: "700", color: TEXT_DARK, fontSize: 14 }}>
+                    <Text
+                      maxFontSizeMultiplier={1.35}
+                      style={{ fontWeight: "700", color: TEXT_DARK, fontSize: 14 }}
+                    >
                       {getCleanTransactionTitle(txn, plan?.name)}
                     </Text>
-                    <Text style={{ color: "#9CA3AF", fontSize: 11, marginTop: 2 }}>
+                    <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16, marginTop: 2 }}>
                       {new Date(txn.createdAt).toLocaleDateString()} • {txn.reference}
                     </Text>
                   </View>
@@ -769,7 +772,7 @@ export default function FamilyGoalDetailScreen() {
               ))
             ) : (
               <View style={{ paddingVertical: 20, alignItems: "center" }}>
-                <Text style={{ color: "#9CA3AF", fontSize: 13 }}>No transactions recorded yet.</Text>
+                <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", lineHeight: 18 }}>No transactions recorded yet.</Text>
               </View>
             )}
           </View>
@@ -779,8 +782,7 @@ export default function FamilyGoalDetailScreen() {
       {/* ─── STEP 1: CLEAN TOP-UP AMOUNT MODAL ───────────────────────── */}
       <Modal visible={showTopUpModal} transparent animationType="slide">
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          <KeyboardAwareScreen
             style={styles.modalOverlay}
           >
             <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
@@ -796,7 +798,7 @@ export default function FamilyGoalDetailScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 16, textAlign: "center" }}>
+                <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", lineHeight: 18, marginBottom: 16, textAlign: "center" }}>
                   Add extra funds directly from your main wallet to accelerate this family goal.
                 </Text>
 
@@ -810,7 +812,7 @@ export default function FamilyGoalDetailScreen() {
                     <>
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 6 }}>
                         <Text style={styles.inputLabel}>Amount (₦)</Text>
-                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#6B7280" }}>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#4B5563", lineHeight: 16 }}>
                           Wallet Balance: <Text style={{ fontWeight: "700", color: "#059669" }}>₦{formattedBal}</Text>
                         </Text>
                       </View>
@@ -915,7 +917,7 @@ export default function FamilyGoalDetailScreen() {
                 })()}
               </View>
             </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
+          </KeyboardAwareScreen>
         </TouchableWithoutFeedback>
         <KeyboardDoneAccessory />
       </Modal>
@@ -970,7 +972,7 @@ export default function FamilyGoalDetailScreen() {
               Ready to withdraw your savings?
             </Text>
 
-            <Text style={{ color: "#6B7280", fontSize: 13, marginBottom: 20, textAlign: "center", lineHeight: 18, paddingHorizontal: 10 }}>
+            <Text style={{ color: "#4B5563", fontSize: 13, fontWeight: "600", marginBottom: 20, textAlign: "center", lineHeight: 18, paddingHorizontal: 10 }}>
               Your plan has reached maturity! Your full savings balance of <Text style={{ color: TEAL, fontWeight: "bold" }}>₦{formatAmount(plan.balance)}</Text> will be transferred directly to your Main Wallet.
             </Text>
 
@@ -999,8 +1001,7 @@ export default function FamilyGoalDetailScreen() {
       {/* ─── TERMINATE MODAL ───────────────────────────────────────────── */}
       {showTerminateModal && (
         <Modal visible={showTerminateModal} transparent animationType="fade">
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          <KeyboardAwareScreen
             style={styles.modalOverlay}
           >
             <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
@@ -1019,7 +1020,9 @@ export default function FamilyGoalDetailScreen() {
                 <Text
                   style={{
                     fontSize: 13,
-                    color: "#6B7280",
+                    color: "#4B5563",
+                    fontFamily: "KumbhSans_600SemiBold",
+                    fontWeight: "600",
                     textAlign: "center",
                     marginBottom: 14,
                     lineHeight: 20,
@@ -1055,12 +1058,12 @@ export default function FamilyGoalDetailScreen() {
                         </Text>
                       </View>
 
-                      <Text style={{ fontSize: 12, color: "#7F1D1D", marginBottom: 12, lineHeight: 16 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#7F1D1D", marginBottom: 12, lineHeight: 16 }}>
                         Terminating early will incur a <Text style={{ fontWeight: "700" }}>{penaltyRate}</Text> penalty, deducted from your current balance.
                       </Text>
 
                       <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
-                        <Text style={{ fontSize: 12, color: "#6B7280" }}>Current Balance</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#4B5563", lineHeight: 16 }}>Current Balance</Text>
                         <Text style={{ fontSize: 12, fontWeight: "700", color: "#1A1A1A" }}>
                           ₦{balNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </Text>
@@ -1130,7 +1133,7 @@ export default function FamilyGoalDetailScreen() {
                       justifyContent: "center",
                     }}
                   >
-                    <Text style={{ fontSize: 14, color: "#6B7280", fontWeight: "600" }}>Cancel</Text>
+                    <Text style={{ fontSize: 14, color: "#4B5563", fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}>Cancel</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -1164,7 +1167,7 @@ export default function FamilyGoalDetailScreen() {
                 </View>
               </ScrollView>
             </View>
-          </KeyboardAvoidingView>
+          </KeyboardAwareScreen>
         </Modal>
       )}
       {/* Overflow Action Sheet */}
@@ -1232,10 +1235,11 @@ export default function FamilyGoalDetailScreen() {
 
 const styles = StyleSheet.create({
   label: {
-    color: "#6B7280",
-    fontSize: 11,
+    color: "#4B5563",
+    fontSize: 12,
+    lineHeight: 16,
     marginBottom: 6,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   value: {
     color: "#1A1A1A",
@@ -1297,7 +1301,8 @@ const styles = StyleSheet.create({
   },
   sourceText: {
     fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "500",
+    color: "#4B5563",
+    fontFamily: "KumbhSans_600SemiBold",
+    fontWeight: "600",
   },
 });

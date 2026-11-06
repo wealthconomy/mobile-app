@@ -8,10 +8,12 @@ import {
 import { useImageUpload } from "@/src/hooks/useImageUpload";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Check } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 import {
   ActivityIndicator,
   Image,
@@ -30,6 +32,7 @@ const VISIBILITY_OPTIONS = [
 
 export default function GeneralSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const scrollRef = useRef<ScrollView>(null);
   const { data: group, isLoading } = useGetGroupDetailsQuery(id as string, {
     skip: !id,
   });
@@ -57,15 +60,20 @@ export default function GeneralSettingsScreen() {
   }, [group]);
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.8,
-    });
+    suspendAppLock(true);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
 
-    if (!result.canceled) {
-      setCoverImage(result.assets[0].uri);
+      if (!result.canceled) {
+        setCoverImage(result.assets[0].uri);
+      }
+    } finally {
+      suspendAppLock(false);
     }
   };
 
@@ -83,8 +91,8 @@ export default function GeneralSettingsScreen() {
         } else if (coverImage.startsWith("file://") || coverImage.startsWith("content://")) {
           try {
             uploadedCoverUrl = await uploadImage(coverImage, { allowFallback: false });
-          } catch (e) {
-            console.warn("Image upload failed in settings:", e);
+          } catch {
+            console.warn("Image upload failed in settings");
             uploadedCoverUrl = undefined;
           }
         }
@@ -133,8 +141,13 @@ export default function GeneralSettingsScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <Header title="General" onBack={() => router.back()} />
 
-      <View className="flex-1">
-        <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+      <KeyboardAwareScreen style={{ flex: 1 }} scrollRef={scrollRef}>
+        <ScrollView
+          ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          className="flex-1"
+        >
           <View className="px-5 py-6">
             <View className="mb-6">
               <Text className="text-[14px] font-medium text-[#155D5F] mb-3">
@@ -156,6 +169,7 @@ export default function GeneralSettingsScreen() {
                 value={category}
                 onChangeText={setCategory}
                 placeholder="eg., Rent, Festival, Business, etc."
+                placeholderTextColor="#6B7280"
               />
             </View>
 
@@ -176,8 +190,11 @@ export default function GeneralSettingsScreen() {
                 onPress={pickImage}
                 className="w-full h-14 bg-white border border-[#E2E8F0] rounded-2xl flex-row items-center justify-center"
               >
-                <Ionicons name="create-outline" size={20} color="#64748B" />
-                <Text className="ml-2 text-[#64748B] font-medium text-base">
+                <Ionicons name="create-outline" size={20} color="#4B5563" />
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  className="ml-2 text-[#4B5563] font-semibold font-kumbh-semibold text-base"
+                >
                   {coverImage ? "Change picture" : "Upload picture"}
                 </Text>
               </TouchableOpacity>
@@ -227,7 +244,7 @@ export default function GeneralSettingsScreen() {
                         className={`text-base ${
                           visibility === opt
                             ? "text-[#155D5F] font-bold"
-                            : "text-[#64748B]"
+                            : "text-[#4B5563] font-medium"
                         }`}
                       >
                         {opt}
@@ -251,7 +268,7 @@ export default function GeneralSettingsScreen() {
             style={{ backgroundColor: "#155D5F", borderRadius: 16, height: 60 }}
           />
         </View>
-      </View>
+      </KeyboardAwareScreen>
       <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </SafeAreaView>
   );

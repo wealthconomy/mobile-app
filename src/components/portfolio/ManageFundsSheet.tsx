@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Modal,
   View,
@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
   ActivityIndicator,
   StyleSheet,
   Alert,
 } from "react-native";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import ThemedButton from "@/src/components/ThemedButton";
@@ -249,8 +249,7 @@ export default function ManageFundsSheet({
           <TouchableWithoutFeedback onPress={onClose}>
             <View style={StyleSheet.absoluteFill} />
           </TouchableWithoutFeedback>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          <KeyboardAwareScreen
             style={styles.sheetContainer}
           >
             {/* Drag Handle */}
@@ -366,7 +365,10 @@ export default function ManageFundsSheet({
                       <Text style={{ fontWeight: "700", color: TEXT_DARK, fontSize: 13 }}>
                         Withdraw to Main Wallet
                       </Text>
-                      <Text style={{ color: "#6B7280", fontSize: 12, marginTop: 2 }}>
+                      <Text
+                        maxFontSizeMultiplier={1.35}
+                        style={{ color: "#4B5563", fontSize: 13, lineHeight: 18, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginTop: 2 }}
+                      >
                         Funds will be transferred directly to your Main Wallet balance instantly.
                       </Text>
                     </View>
@@ -380,7 +382,12 @@ export default function ManageFundsSheet({
                     {loadingPortfolios ? (
                       <View style={{ paddingVertical: 20, alignItems: "center" }}>
                         <ActivityIndicator color={TEAL} size="small" />
-                        <Text style={{ color: "#6B7280", fontSize: 12, marginTop: 6 }}>Loading portfolios...</Text>
+                        <Text
+                          maxFontSizeMultiplier={1.35}
+                          style={{ color: "#4B5563", fontSize: 13, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginTop: 6 }}
+                        >
+                          Loading portfolios...
+                        </Text>
                       </View>
                     ) : candidatePortfolios.length > 0 ? (
                       <View style={{ gap: 10, marginTop: 8 }}>
@@ -415,7 +422,10 @@ export default function ManageFundsSheet({
                       </View>
                     ) : (
                       <View style={styles.emptyCard}>
-                        <Text style={{ color: "#6B7280", fontSize: 13, textAlign: "center" }}>
+                        <Text
+                          maxFontSizeMultiplier={1.35}
+                          style={{ color: "#4B5563", fontSize: 13, lineHeight: 18, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", textAlign: "center" }}
+                        >
                           No other active portfolios found to transfer funds into.
                         </Text>
                       </View>
@@ -430,7 +440,12 @@ export default function ManageFundsSheet({
                     {loadingPayouts ? (
                       <View style={{ paddingVertical: 20, alignItems: "center" }}>
                         <ActivityIndicator color={TEAL} size="small" />
-                        <Text style={{ color: "#6B7280", fontSize: 12, marginTop: 6 }}>Loading accounts...</Text>
+                        <Text
+                          maxFontSizeMultiplier={1.35}
+                          style={{ color: "#4B5563", fontSize: 13, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginTop: 6 }}
+                        >
+                          Loading accounts...
+                        </Text>
                       </View>
                     ) : payoutAccounts.length > 0 ? (
                       <View style={{ gap: 10, marginTop: 8 }}>
@@ -462,7 +477,10 @@ export default function ManageFundsSheet({
                       </View>
                     ) : (
                       <View style={styles.emptyCard}>
-                        <Text style={{ color: "#6B7280", fontSize: 13, textAlign: "center" }}>
+                        <Text
+                          maxFontSizeMultiplier={1.35}
+                          style={{ color: "#4B5563", fontSize: 13, lineHeight: 18, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", textAlign: "center" }}
+                        >
                           No saved bank accounts found. Please add a bank account in your profile settings.
                         </Text>
                       </View>
@@ -482,7 +500,7 @@ export default function ManageFundsSheet({
                   (!isValidAmount || isNavigating) && styles.submitBtnDisabled,
                 ]}
               />
-            </KeyboardAvoidingView>
+            </KeyboardAwareScreen>
         </View>
       </Modal>
 
@@ -538,10 +556,12 @@ const styles = StyleSheet.create({
     color: TEXT_DARK,
   },
   sheetSubtitle: {
-    fontSize: 12,
-    color: "#6B7280",
+    fontSize: 13,
+    lineHeight: 18,
+    color: "#4B5563",
     marginTop: 2,
-    fontWeight: "500",
+    fontWeight: "600",
+    fontFamily: "KumbhSans_600SemiBold",
   },
   closeBtn: {
     padding: 6,
@@ -571,7 +591,8 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#6B7280",
+    fontFamily: "KumbhSans_600SemiBold",
+    color: "#4B5563",
   },
   activeTabText: {
     color: TEAL,
@@ -617,8 +638,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   quickFillText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "700",
+    fontFamily: "KumbhSans_700Bold",
     color: TEAL,
   },
   amountInputRow: {
@@ -666,7 +688,9 @@ const styles = StyleSheet.create({
   },
   candidateBalance: {
     fontSize: 12,
-    color: "#6B7280",
+    color: "#4B5563",
+    fontFamily: "KumbhSans_600SemiBold",
+    fontWeight: "600",
     marginTop: 2,
   },
   badge: {
@@ -677,8 +701,9 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: "white",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "700",
+    fontFamily: "KumbhSans_700Bold",
   },
   emptyCard: {
     padding: 20,

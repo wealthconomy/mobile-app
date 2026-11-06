@@ -1,29 +1,27 @@
-import { Ionicons } from "@expo/vector-icons";
-import React, { useState, useEffect } from "react";
 import {
-  Image,
+  FloatingCardPreview,
+  KycButton,
+  KycFormInput,
+  KycSectionHeader,
+  KycSelectTrigger,
+} from "@/src/components/common";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useState } from "react";
+import {
   KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import {
-  KycSectionHeader,
-  FloatingCardPreview,
-  KycFormInput,
-  KycSelectTrigger,
-  KycButton,
-} from "@/src/components/common";
 
 const ACTUAL_ID_FALLBACK_URI =
   "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=80";
 
 const ID_TYPES = [
-  "National Identification",
+  "Voter's Card",
   "NIN Slip",
   "Driver's License",
   "International Passport",
@@ -83,19 +81,29 @@ export const Step3ScanSuccessful: React.FC<Step3ScanSuccessfulProps> = ({
       return;
     }
 
-    const cleanIdNumber = data.idNumber ? data.idNumber.replace(/\s+/g, "") : "";
+    const cleanIdNumber = data.idNumber
+      ? data.idNumber.replace(/\s+/g, "")
+      : "";
     if (!cleanIdNumber) {
       setValidationError("Please enter your ID / document number.");
       return;
     }
 
     // NIN-specific validation
-    if (data.idType === "National Identification" || data.idType === "NIN Slip") {
+    if (
+      data.idType === "National Identification" ||
+      data.idType === "NIN Slip"
+    ) {
       if (!/^\d{11}$/.test(cleanIdNumber)) {
-        setValidationError("National Identification Number (NIN) must be exactly 11 numeric digits.");
+        setValidationError(
+          "National Identification Number (NIN) must be exactly 11 numeric digits.",
+        );
         return;
       }
-      if (/^(\d)\1{10}$/.test(cleanIdNumber) || cleanIdNumber === "12345678901") {
+      if (
+        /^(\d)\1{10}$/.test(cleanIdNumber) ||
+        cleanIdNumber === "12345678901"
+      ) {
         setValidationError("Please enter a valid, authentic 11-digit NIN.");
         return;
       }
@@ -185,7 +193,12 @@ export const Step3ScanSuccessful: React.FC<Step3ScanSuccessfulProps> = ({
               label={data.idType ? `${data.idType} Number` : "ID Number"}
               value={data.idNumber}
               onChangeText={(text) => handleChange("idNumber", text)}
-              keyboardType={data.idType === "National Identification" || data.idType === "NIN Slip" ? "numeric" : "default"}
+              keyboardType={
+                data.idType === "National Identification" ||
+                data.idType === "NIN Slip"
+                  ? "numeric"
+                  : "default"
+              }
               bgVariant="white"
             />
 

@@ -7,7 +7,7 @@ import { BookmarkIcon } from "@/src/components/icons/BookmarkIcon";
 import { Audio } from "expo-av";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,10 +18,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 
 export default function BlogDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -34,12 +35,20 @@ export default function BlogDetailScreen() {
   const blog = response?.data;
 
   const [commentText, setCommentText] = useState("");
+  const scrollViewRef = useRef<ScrollView>(null);
   
   const [localIsLiked, setLocalIsLiked] = useState(false);
   const [localLikesCount, setLocalLikesCount] = useState(0);
   const [localIsBookmarked, setLocalIsBookmarked] = useState(false);
   const [localBookmarks, setLocalBookmarks] = useState(0);
   const [localSharesCount, setLocalSharesCount] = useState(0);
+
+  useEffect(() => {
+    const sub = Keyboard.addListener("keyboardDidShow", () => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (blog) {
@@ -78,7 +87,7 @@ export default function BlogDetailScreen() {
       AsyncStorage.setItem(
         `@wealthconomy_blog_shares_${blogId}`,
         String(nextCount)
-      ).catch((err) => console.warn("Failed to persist share count:", err));
+      ).catch(() => console.warn("Failed to persist share count"));
 
       await Share.share(
         Platform.OS === "ios"
@@ -95,8 +104,8 @@ export default function BlogDetailScreen() {
           dialogTitle: `Share "${blog.title}"`,
         }
       );
-    } catch (error) {
-      console.error("Error sharing:", error);
+    } catch {
+      console.error("Error sharing");
     }
   };
 
@@ -125,8 +134,8 @@ export default function BlogDetailScreen() {
           await sound.unloadAsync();
         }
       });
-    } catch (error) {
-      console.log("Error playing sound:", error);
+    } catch {
+      // Audio playback failed silently
     }
     toggleLike(id as string);
   };
@@ -167,14 +176,13 @@ export default function BlogDetailScreen() {
     <SafeAreaView style={{ flex: 1 }} className="bg-white">
       <StatusBar style="light" />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-      >
+      <KeyboardAwareScreen style={{ flex: 1 }}>
         <ScrollView
+          ref={scrollViewRef}
           className="flex-1"
           showsVerticalScrollIndicator={false}
           bounces={false}
+          keyboardShouldPersistTaps="handled"
         >
         <View className="relative h-80">
           <Image
@@ -202,7 +210,7 @@ export default function BlogDetailScreen() {
 
         <View className="px-5 pt-6">
           <View
-            className="px-2 py-0.5 rounded self-start mb-2"
+            className="px-2.5 py-1 rounded-md self-start mb-2"
             style={{
               backgroundColor:
                 blog.category === "WealthFlex"
@@ -219,28 +227,18 @@ export default function BlogDetailScreen() {
             }}
           >
             <Text
-              className="text-[10px] font-bold"
-              style={{
-                color:
-                  blog.category === "WealthFlex"
-                    ? "#F44336"
-                    : blog.category === "WealthGoal"
-                      ? "#F3007A"
-                      : blog.category === "WealthFix"
-                        ? "#FFCF65"
-                        : blog.category === "WealthFam"
-                          ? "#6366F1"
-                          : blog.category === "WealthFlow"
-                            ? "#0EA5E9"
-                            : "#4B5563",
-              }}
+              maxFontSizeMultiplier={1.35}
+              className="text-[13px] leading-[18px] text-[#4B5563] font-kumbh-semibold"
             >
               {blog.category}
             </Text>
           </View>
 
           <View className="mb-4">
-            <Text className="text-[#1A1A1A] font-bold text-[20px] leading-tight mb-2">
+            <Text
+              maxFontSizeMultiplier={1.35}
+              className="text-[#1A1A1A] font-bold text-[20px] leading-tight mb-2"
+            >
               {blog.title}
             </Text>
           </View>
@@ -251,10 +249,16 @@ export default function BlogDetailScreen() {
               className="w-8 h-8 rounded-full bg-gray-200 mr-2.5"
             />
             <View className="flex-1">
-              <Text className="text-[#1A1A1A] font-bold text-xs">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#1A1A1A] font-bold text-[14px] leading-[18px]"
+              >
                 {typeof blog.author === 'string' ? blog.author : blog.author?.name}
               </Text>
-              <Text className="text-[#6B7280] text-[10px]">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-0.5"
+              >
                 {blog.timeAgo}{blog.readingDuration ? ` • ${blog.readingDuration}` : ""}
               </Text>
             </View>
@@ -270,7 +274,10 @@ export default function BlogDetailScreen() {
                 size={20}
                 color={localIsLiked ? "#155D5F" : "#6B7280"}
               />
-              <Text className="text-[#6B7280] text-xs ml-2 font-bold">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold ml-2"
+              >
                 {localLikesCount}
               </Text>
             </TouchableOpacity>
@@ -279,7 +286,10 @@ export default function BlogDetailScreen() {
               className="flex-row items-center"
             >
               <Ionicons name="chatbubble-outline" size={20} color="#6B7280" />
-              <Text className="text-[#6B7280] text-xs ml-2 font-bold">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold ml-2"
+              >
                 {blog.comments?.length || 0}
               </Text>
             </View>
@@ -289,7 +299,10 @@ export default function BlogDetailScreen() {
               className="flex-row items-center"
             >
               <Ionicons name="share-social-outline" size={20} color="#6B7280" />
-              <Text className="text-[#6B7280] text-xs ml-2 font-bold">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold ml-2"
+              >
                 {localSharesCount}
               </Text>
             </TouchableOpacity>
@@ -302,7 +315,10 @@ export default function BlogDetailScreen() {
                 size={20}
                 color={localIsBookmarked ? "#155D5F" : "#6B7280"}
               />
-              <Text className="text-[#6B7280] text-xs ml-2 font-bold">
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold ml-2"
+              >
                 {localBookmarks}
               </Text>
             </TouchableOpacity>
@@ -310,11 +326,23 @@ export default function BlogDetailScreen() {
 
           <View className="h-[1px] bg-gray-100 w-full mb-5 mt-4" />
 
-          <Text className="text-[#4B5563] text-sm leading-relaxed mb-6">
+          <Text
+            style={{
+              fontSize: 16,
+              lineHeight: 26,
+              color: "#374151",
+              fontWeight: "500",
+              fontFamily: "KumbhSans_500Medium",
+            }}
+            className="mb-6"
+          >
             {blog.content}
           </Text>
 
-          <Text className="text-[#1A1A1A] font-bold text-sm mb-6">
+          <Text
+            maxFontSizeMultiplier={1.35}
+            className="text-[#1A1A1A] font-bold text-[14px] leading-[20px] mb-6"
+          >
             Thanks for reading!
           </Text>
 
@@ -340,7 +368,10 @@ export default function BlogDetailScreen() {
                       <Text className="text-[#1A1A1A] font-bold text-sm">
                         {comment.userName || "Anonymous"}
                       </Text>
-                      <Text className="text-[#9CA3AF] text-[10px]">
+                      <Text
+                        maxFontSizeMultiplier={1.35}
+                        className="text-[#4B5563] text-[12px] leading-[16px] font-kumbh-semibold"
+                      >
                         {comment.timeAgo || comment.timePosted}
                       </Text>
                     </View>
@@ -357,7 +388,10 @@ export default function BlogDetailScreen() {
                   size={32}
                   color="#94A3B8"
                 />
-                <Text className="text-[12px] text-[#94A3B8] font-bold mt-2">
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  className="text-[12px] text-[#4B5563] font-kumbh-bold font-bold mt-2"
+                >
                   No comments yet. Be the first to join the conversation!
                 </Text>
               </View>
@@ -370,9 +404,14 @@ export default function BlogDetailScreen() {
             <TextInput
               className="flex-1 text-gray-900 py-1"
               placeholder="Write a message..."
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#6B7280"
               value={commentText}
               onChangeText={setCommentText}
+              onFocus={() => {
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollToEnd({ animated: true });
+                }, 150);
+              }}
               multiline
             />
           </View>
@@ -388,7 +427,7 @@ export default function BlogDetailScreen() {
             )}
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
     </SafeAreaView>
   );
 }

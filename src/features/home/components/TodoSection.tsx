@@ -1,10 +1,33 @@
 import { RootState } from "@/src/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React from "react";
-import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useSelector } from "react-redux";
-import { useGetKycDocumentsQuery } from "@/src/store/api/kycApi";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as LocalAuthentication from "expo-local-authentication";
+import { useKycAutoRefresh } from "@/src/hooks/useKycAutoRefresh";
+import { useIsAuthenticated } from "@/src/hooks/useIsAuthenticated";
+import { useGetWalletTransactionsQuery } from "@/src/store/api/walletApi";
+import {
+  useGetPortfoliosQuery,
+  useGetPortfolioSummaryQuery,
+} from "@/src/store/api/portfolioApi";
+import { useListGroupsQuery } from "@/src/store/api/groupApi";
+import {
+  isLevel2Verified,
+  isLevel2Rejected,
+  isLevel2Pending,
+  hasLevel2Uploads,
+  isLevel3Verified,
+  isLevel3Rejected,
+  isLevel3Pending,
+  hasLevel3AddressDoc,
+  idDocStatus,
+  faceDocStatus,
+  idRejectionText,
+  faceRejectionText,
+} from "@/src/features/kyc/utils/kycState";
 
 interface TodoCardProps {
   title: string;
@@ -27,22 +50,24 @@ const TodoCard = ({
     className="rounded-[15px] p-4 mr-4 relative"
     style={{
       width: 218,
-      height: 91,
+      height: 104,
       backgroundColor: "#FFCF6533",
     }}
   >
     <View className="flex-row justify-between items-start mb-1">
       <Text
-        className="text-[#1A1A1A] font-bold text-[14px] leading-tight flex-1 mr-2"
+        className="text-[#1A1A1A] font-kumbh-bold font-bold text-[14px] leading-tight flex-1 mr-2"
         numberOfLines={1}
+        maxFontSizeMultiplier={1.35}
       >
         {title}
       </Text>
       <View className="mt-[-2px]">{icon}</View>
     </View>
     <Text
-      className="text-[#64748B] text-[10px] leading-[14px] font-medium pr-2"
+      className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold pr-2"
       numberOfLines={2}
+      maxFontSizeMultiplier={1.35}
     >
       {description}
     </Text>
@@ -58,11 +83,172 @@ const TodoCard = ({
 );
 
 export const TodoSection = () => {
+  const isAuth = useIsAuthenticated();
   const user = useSelector((state: RootState) => state.auth.user);
-  const { data: kycDocsResponse } = useGetKycDocumentsQuery(undefined, { refetchOnMountOrArgChange: true });
+  const { kycDocs } = useKycAutoRefresh();
 
-  const kycDocsPayload: any = kycDocsResponse?.data;
-  const kycDocs: any = kycDocsPayload?.data || kycDocsPayload;
+  const [persistedDone, setPersistedDone] = useState<{
+    biometrics: boolean;
+    deposit: boolean;
+    portfolio: boolean;
+    group: boolean;
+  }>({
+    biometrics: false,
+    deposit: false,
+    portfolio: false,
+    group: false,
+  });
+  const [isStorageLoaded, setIsStorageLoaded] = useState(false);
+  const [hasBiometricHardware, setHasBiometricHardware] = useState<boolean | null>(null);
+
+  const markTaskDone = (taskKey: "biometrics" | "deposit" | "portfolio" | "group") => {
+    if (!user?.id) return;
+    setPersistedDone((prev) => {
+      if (prev[taskKey]) return prev;
+      return { ...prev, [taskKey]: true };
+    });
+    AsyncStorage.setItem(`@wealth_todo_done_${user.id}_${taskKey}`, "true").catch(() => {});
+  };
+
+  useEffect(() => {
+    if (!user?.id) {
+      setIsStorageLoaded(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsStorageLoaded(false);
+
+    const keys = [
+      `@wealth_todo_done_${user.id}_biometrics`,
+      `@wealth_todo_done_${user.id}_deposit`,
+      `@wealth_todo_done_${user.id}_portfolio`,
+      `@wealth_todo_done_${user.id}_group`,
+      "@wealth_biometrics_enabled",
+    ];
+
+    Promise.all([
+      AsyncStorage.multiGet(keys),
+      LocalAuthentication.hasHardwareAsync()
+        .then(async (hasHw) => {
+          if (!hasHw) return false;
+          return await LocalAuthentication.isEnrolledAsync();
+        })
+        .catch(() => false),
+    ]).then(([stores, bioSupported]) => {
+      if (!isMounted) return;
+      const storeMap = Object.fromEntries(stores);
+      const isBioStored =
+        storeMap[keys[0]] === "true" ||
+        storeMap[keys[4]] === "true" ||
+        Boolean(user?.biometricsEnabled);
+
+      setPersistedDone({
+        biometrics: isBioStored,
+        deposit: storeMap[keys[1]] === "true",
+        portfolio: storeMap[keys[2]] === "true",
+        group: storeMap[keys[3]] === "true",
+      });
+      setHasBiometricHardware(bioSupported);
+      setIsStorageLoaded(true);
+
+      if (isBioStored && storeMap[keys[0]] !== "true") {
+        AsyncStorage.setItem(`@wealth_todo_done_${user.id}_biometrics`, "true").catch(() => {});
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, user?.biometricsEnabled]);
+
+  const isAuthAndLoaded = Boolean(isAuth && user?.id && isStorageLoaded);
+
+  // 1. First deposit query
+  const {
+    data: depositTxns,
+    isLoading: isDepositLoading,
+    isError: isDepositError,
+  } = useGetWalletTransactionsQuery(
+    { limit: 1, type: "CREDIT", reason: "WALLET_TOPUP" },
+    { skip: !isAuthAndLoaded || persistedDone.deposit }
+  );
+
+  // 2. Goal / Portfolio queries
+  const {
+    data: goalPortfolios,
+    isLoading: isGoalLoading,
+    isError: isGoalError,
+  } = useGetPortfoliosQuery(
+    { type: "wealthgoal", limit: 1 },
+    { skip: !isAuthAndLoaded || persistedDone.portfolio }
+  );
+
+  const {
+    data: portfolioSummary,
+    isLoading: isSummaryLoading,
+    isError: isSummaryError,
+  } = useGetPortfolioSummaryQuery(
+    undefined,
+    { skip: !isAuthAndLoaded || persistedDone.portfolio }
+  );
+
+  // 3. Group query
+  const {
+    data: myGroups,
+    isLoading: isGroupLoading,
+    isError: isGroupError,
+  } = useListGroupsQuery(
+    { myGroupsOnly: true, limit: 1 },
+    { skip: !isAuthAndLoaded || persistedDone.group }
+  );
+
+  // Sync discovered completions
+  useEffect(() => {
+    if (user?.id && user?.biometricsEnabled && !persistedDone.biometrics) {
+      markTaskDone("biometrics");
+    }
+  }, [user?.id, user?.biometricsEnabled, persistedDone.biometrics]);
+
+  useEffect(() => {
+    if (persistedDone.deposit) return;
+    if (depositTxns?.items && depositTxns.items.length > 0) {
+      markTaskDone("deposit");
+    }
+  }, [depositTxns, persistedDone.deposit]);
+
+  useEffect(() => {
+    if (persistedDone.portfolio) return;
+    const hasGoal = Boolean(goalPortfolios?.items && goalPortfolios.items.length > 0);
+    const hasSummaryBalance = Boolean(
+      portfolioSummary?.some((item) => {
+        const bal = Number(item.totalBalance || 0);
+        return !isNaN(bal) && bal > 0;
+      })
+    );
+    if (hasGoal || hasSummaryBalance) {
+      markTaskDone("portfolio");
+    }
+  }, [goalPortfolios, portfolioSummary, persistedDone.portfolio]);
+
+  useEffect(() => {
+    if (persistedDone.group) return;
+    if (myGroups?.items && myGroups.items.length > 0) {
+      markTaskDone("group");
+    }
+  }, [myGroups, persistedDone.group]);
+
+  if (!isAuth) return null;
+
+  const l2Verified = isLevel2Verified(kycDocs, user);
+  const l2Rejected = isLevel2Rejected(kycDocs, user);
+  const l2Pending = isLevel2Pending(kycDocs, user);
+  const l2Uploads = hasLevel2Uploads(kycDocs, user);
+
+  const l3Verified = isLevel3Verified(kycDocs, user);
+  const l3Rejected = isLevel3Rejected(kycDocs, user);
+  const l3Pending = isLevel3Pending(kycDocs, user);
+  const l3HasDoc = hasLevel3AddressDoc(kycDocs);
 
   const hasIdUpload = Boolean(kycDocs?.idImageUrl || user?.idImageUrl);
   const hasFaceUpload = Boolean(
@@ -72,118 +258,113 @@ export const TodoSection = () => {
     user?.imageUrl ||
     kycDocs?.faceVerified
   );
-  const hasAllLevel2Data = hasIdUpload && hasFaceUpload;
-
-  const ninStatusUpper = (kycDocs?.ninStatus || "").toUpperCase();
-  const faceStatusUpper = (kycDocs?.faceStatus || "").toUpperCase();
-  const kycStatusUpper = (user?.kycStatus || kycDocs?.kycStatus || kycDocs?.status || "").toUpperCase();
-
-  const isNinRejected = ninStatusUpper === "REJECTED";
-  const isFaceRejected = faceStatusUpper === "REJECTED";
-  const isKycRejected = isNinRejected || isFaceRejected || kycStatusUpper === "REJECTED";
-
-  const isKycVerified =
-    !isKycRejected &&
-    (kycStatusUpper === "VERIFIED" ||
-      user?.kycVerified === true ||
-      (ninStatusUpper === "APPROVED" && faceStatusUpper === "APPROVED"));
-
-  const isLevel2Complete =
-    !isKycRejected &&
-    ((ninStatusUpper === "APPROVED" && faceStatusUpper === "APPROVED") ||
-      (isKycVerified && (user?.kycLevel || 1) >= 2));
-
-  // If rejected, level is strictly 1. If not complete, level is strictly 1.
-  const currentKycLevel = isKycRejected ? 1 : isLevel2Complete ? Math.max(user?.kycLevel || 2, 2) : 1;
-
-  const userState = {
-    kycLevel: currentKycLevel,
-    isEmailVerified: true,
-    hasFirstGoal: false,
-    hasJoinedTribe: false,
-    hasEnabledSecurity: false,
-    hasFundedWallet: false,
-  };
 
   const onboardingTasks = [];
 
   // 1. KYC Sequential Logic
-  // ONLY truly under review if user has actually provided ALL required Level 2 documents!
-  const isKycPending =
-    !isKycVerified &&
-    !isKycRejected &&
-    hasAllLevel2Data &&
-    (kycStatusUpper === "PENDING" || ninStatusUpper === "PENDING" || faceStatusUpper === "PENDING");
+  if (!l2Verified) {
+    if (l2Rejected) {
+      const isIdRejected = idDocStatus(kycDocs) === "REJECTED";
+      const isFaceRejected = faceDocStatus(kycDocs) === "REJECTED";
+      const idReason = isIdRejected ? idRejectionText(kycDocs) : null;
+      const faceReason = isFaceRejected ? faceRejectionText(kycDocs) : null;
+      const generalReason =
+        idReason ||
+        faceReason ||
+        kycDocs?.kycRejectionReason ||
+        kycDocs?.rejectionReason ||
+        user?.kycRejectionReason;
 
-  const isKycIncomplete = !isLevel2Complete && !isKycRejected && !hasAllLevel2Data;
+      const specificReason =
+        isIdRejected && isFaceRejected && idReason && faceReason && idReason !== faceReason
+          ? `ID: ${idReason} | Face: ${faceReason}`
+          : idReason || faceReason || generalReason || "Please review and resubmit your KYC documents";
 
-  if (isKycRejected) {
-    const idReason = isNinRejected ? (kycDocs?.ninRejectionReason || kycDocs?.rejectionReason) : null;
-    const faceReason = isFaceRejected ? (kycDocs?.faceRejectionReason || kycDocs?.rejectionReason) : null;
-    const generalReason =
-      kycDocs?.rejectionReason ||
-      kycDocs?.ninRejectionReason ||
-      kycDocs?.faceRejectionReason ||
-      user?.kycRejectionReason;
-
-    const specificReason =
-      isNinRejected && isFaceRejected && idReason && faceReason && idReason !== faceReason
-        ? `ID: ${idReason} | Face: ${faceReason}`
-        : idReason || faceReason || generalReason || "Please review and resubmit your KYC documents";
-
-    onboardingTasks.push({
-      id: "kyc-rejected",
-      title: "KYC Needs Attention",
-      description: specificReason,
-      icon: <Ionicons name="alert-circle-outline" size={18} color="#DC2626" />,
-      onPress: () => router.push("/kyc/level2-intro"),
-      isComplete: false,
-    });
-  } else if (isKycIncomplete && (user?.kycStatus === "PENDING" || user?.kycStatus === "pending" || hasIdUpload || hasFaceUpload)) {
-    // Incomplete submission: Documents missing, let user click to continue and add full info!
-    onboardingTasks.push({
-      id: "kyc-incomplete",
-      title: "Complete KYC Level 2",
-      description: !hasIdUpload
-        ? "Upload your Government ID to complete verification"
-        : "Complete your live face scan to finish verification",
-      icon: <Ionicons name="alert-circle-outline" size={18} color="#D97706" />,
-      onPress: () => router.push("/kyc/level2-intro"),
-      isComplete: false,
-    });
-  } else if (isKycPending) {
-    onboardingTasks.push({
-      id: "kyc-pending",
-      title: "KYC Under Review",
-      description: "Your documents are currently being verified by compliance",
-      icon: <Ionicons name="time-outline" size={18} color="#D97706" />,
-      onPress: () => router.push("/kyc/level2-intro"),
-      isComplete: false,
-    });
-  } else if (userState.kycLevel === 1 || !isLevel2Complete) {
-    onboardingTasks.push({
-      id: "kyc2",
-      title: "Proceed to level 2",
-      description: "Complete your KYC registration to enable withdrawal",
-      icon: <Ionicons name="id-card-outline" size={18} color="#1A1A1A" />,
-      onPress: () => router.push("/kyc/level2-intro"),
-      isComplete: false,
-    });
-  } else if (userState.kycLevel === 2) {
-    onboardingTasks.push({
-      id: "kyc3",
-      title: "Proceed to level 3",
-      description: "Upgrade your account for higher limits and features",
-      icon: (
-        <Ionicons name="shield-checkmark-outline" size={18} color="#1A1A1A" />
-      ),
-      onPress: () => router.push("/kyc/level3-intro"),
-      isComplete: false,
-    });
+      onboardingTasks.push({
+        id: "kyc-rejected",
+        title: "KYC Needs Attention",
+        description: specificReason,
+        icon: <Ionicons name="alert-circle-outline" size={18} color="#DC2626" />,
+        onPress: () => router.push("/kyc/level2-intro"),
+        isComplete: false,
+      });
+    } else if (l2Pending) {
+      onboardingTasks.push({
+        id: "kyc-pending",
+        title: "KYC Under Review",
+        description: "Your documents are currently being verified by compliance",
+        icon: <Ionicons name="time-outline" size={18} color="#D97706" />,
+        onPress: () => router.push("/kyc/level2-intro"),
+        isComplete: false,
+      });
+    } else if (!l2Uploads && (user?.kycStatus === "PENDING" || user?.kycStatus === "pending" || hasIdUpload || hasFaceUpload)) {
+      onboardingTasks.push({
+        id: "kyc-incomplete",
+        title: "Complete KYC Level 2",
+        description: !hasIdUpload
+          ? "Upload your Government ID to complete verification"
+          : "Complete your live face scan to finish verification",
+        icon: <Ionicons name="alert-circle-outline" size={18} color="#D97706" />,
+        onPress: () => router.push("/kyc/level2-intro"),
+        isComplete: false,
+      });
+    } else {
+      onboardingTasks.push({
+        id: "kyc2",
+        title: "Proceed to level 2",
+        description: "Complete your KYC registration to enable withdrawal",
+        icon: <Ionicons name="id-card-outline" size={18} color="#1A1A1A" />,
+        onPress: () => router.push("/kyc/level2-intro"),
+        isComplete: false,
+      });
+    }
+  } else {
+    // Level 2 is verified -> Level 3 cards
+    if (l3Verified) {
+      // Level 3 verified -> no KYC card
+    } else if (l3Rejected) {
+      onboardingTasks.push({
+        id: "kyc3-rejected",
+        title: "Address Needs Attention",
+        description:
+          kycDocs?.utilityRejectionReason ||
+          user?.kycRejectionReason ||
+          "Please review and resubmit your address document",
+        icon: <Ionicons name="alert-circle-outline" size={18} color="#DC2626" />,
+        onPress: () => router.push("/kyc/level3-intro"),
+        isComplete: false,
+      });
+    } else if (l3Pending) {
+      onboardingTasks.push({
+        id: "kyc3-pending",
+        title: "Address Under Review",
+        description: "Your Level 3 address documents are being verified",
+        icon: <Ionicons name="time-outline" size={18} color="#D97706" />,
+        onPress: () => router.push("/kyc/level3-intro"),
+        isComplete: false,
+      });
+    } else if (!l3HasDoc) {
+      onboardingTasks.push({
+        id: "kyc3",
+        title: "Proceed to level 3",
+        description: "Upgrade your account for higher limits and features",
+        icon: (
+          <Ionicons name="shield-checkmark-outline" size={18} color="#1A1A1A" />
+        ),
+        onPress: () => router.push("/kyc/level3-intro"),
+        isComplete: false,
+      });
+    }
   }
 
   // 2. Security
-  if (!userState.hasEnabledSecurity) {
+  const isBiometricsDone = Boolean(persistedDone.biometrics || user?.biometricsEnabled);
+  const showSecurityCard =
+    isStorageLoaded &&
+    hasBiometricHardware === true &&
+    !isBiometricsDone;
+
+  if (showSecurityCard) {
     onboardingTasks.push({
       id: "security",
       title: "Secure Your Account",
@@ -195,7 +376,15 @@ export const TodoSection = () => {
   }
 
   // 4. Wallet Funding
-  if (!userState.hasFundedWallet) {
+  const showDepositCard =
+    isStorageLoaded &&
+    !persistedDone.deposit &&
+    !isDepositLoading &&
+    !isDepositError &&
+    Boolean(depositTxns) &&
+    (!depositTxns?.items || depositTxns.items.length === 0);
+
+  if (showDepositCard) {
     onboardingTasks.push({
       id: "fund",
       title: "Fund Your Wallet",
@@ -207,7 +396,27 @@ export const TodoSection = () => {
   }
 
   // 5. First Goal
-  if (!userState.hasFirstGoal) {
+  const hasFundedGoalOrPortfolio =
+    Boolean(goalPortfolios?.items && goalPortfolios.items.length > 0) ||
+    Boolean(
+      portfolioSummary?.some((item) => {
+        const bal = Number(item.totalBalance || 0);
+        return !isNaN(bal) && bal > 0;
+      })
+    );
+
+  const showGoalCard =
+    isStorageLoaded &&
+    !persistedDone.portfolio &&
+    !isGoalLoading &&
+    !isGoalError &&
+    !isSummaryLoading &&
+    !isSummaryError &&
+    Boolean(goalPortfolios) &&
+    Boolean(portfolioSummary) &&
+    !hasFundedGoalOrPortfolio;
+
+  if (showGoalCard) {
     onboardingTasks.push({
       id: "first-goal",
       title: "Set your first Goal",
@@ -219,7 +428,15 @@ export const TodoSection = () => {
   }
 
   // 6. Join a Tribe
-  if (!userState.hasJoinedTribe) {
+  const showGroupCard =
+    isStorageLoaded &&
+    !persistedDone.group &&
+    !isGroupLoading &&
+    !isGroupError &&
+    Boolean(myGroups) &&
+    (!myGroups?.items || myGroups.items.length === 0);
+
+  if (showGroupCard) {
     onboardingTasks.push({
       id: "join-tribe",
       title: "Join a Tribe",
@@ -235,13 +452,15 @@ export const TodoSection = () => {
   return (
     <View>
       <View className="flex-row justify-between items-center mb-4">
-        <Text className="text-[#1A1A1A] font-bold text-lg">Todo</Text>
+        <Text className="text-[#1A1A1A] font-bold text-lg" maxFontSizeMultiplier={1.35}>
+          Todo
+        </Text>
       </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        className="-mx-5 px-5"
-        contentContainerStyle={{ paddingRight: 20 }}
+        className="-mx-5"
+        contentContainerStyle={{ paddingHorizontal: 20 }}
       >
         {onboardingTasks.map((task) => (
           <TodoCard

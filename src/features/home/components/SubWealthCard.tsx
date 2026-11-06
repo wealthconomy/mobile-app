@@ -115,7 +115,10 @@ export const SubWealthCard = ({
         {/* Top Section */}
         <View className="flex-row items-center justify-between mb-1">
           <View className="flex-row items-center gap-2">
-            <Text className="text-white text-[15px] font-medium opacity-90">
+            <Text
+              maxFontSizeMultiplier={1.35}
+              className="text-white text-[15px] font-medium opacity-90"
+            >
               Total Savings
             </Text>
             {badge && (
@@ -123,11 +126,14 @@ export const SubWealthCard = ({
                 style={{
                   backgroundColor: badgeBg,
                   paddingHorizontal: 8,
-                  paddingVertical: 2.5,
+                  paddingVertical: 3,
                   borderRadius: 20,
                 }}
               >
-                <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 12 }}
+                >
                   {badge}
                 </Text>
               </View>
@@ -156,7 +162,10 @@ export const SubWealthCard = ({
             </Text>
           )}
           <View className="flex-row items-center space-x-1">
-            <Text className="text-white text-[13px] font-medium opacity-80">
+            <Text
+              maxFontSizeMultiplier={1.35}
+              className="text-white text-[13px] font-kumbh-semibold opacity-95"
+            >
               Your wealth grew by ₦{growthFormatted} today
             </Text>
             <ArrowUp size={14} color="#95F370" />
@@ -166,13 +175,14 @@ export const SubWealthCard = ({
         {/* Bottom Section */}
         {/* Description Text */}
         <Text
-          className="text-white text-[10px] font-medium opacity-100"
+          maxFontSizeMultiplier={1.35}
+          className="text-white text-[13px] font-kumbh-semibold opacity-100"
           style={{
             position: "absolute",
-            width: Platform.OS === "android" ? 135 : 170,
-            top: Platform.OS === "android" ? 126 : 138,
-            left: 10,
-            lineHeight: 14,
+            width: Platform.OS === "android" ? 135 : 150,
+            top: Platform.OS === "android" ? 122 : 124,
+            left: 14,
+            lineHeight: 18,
           }}
         >
           {description}
@@ -185,19 +195,19 @@ export const SubWealthCard = ({
             className="bg-[#FFCF65] items-center justify-center"
             style={{
               position: "absolute",
-              width: Platform.OS === "android" ? 136 : 150,
-              height: Platform.OS === "android" ? 32 : 37,
-              top: Platform.OS === "android" ? 116 : 123,
-              left: Platform.OS === "android" ? undefined : 186,
-              right: Platform.OS === "android" ? 10 : undefined,
+              width: Platform.OS === "android" ? 140 : 150,
+              height: Platform.OS === "android" ? 34 : 37,
+              top: Platform.OS === "android" ? 116 : 120,
+              right: 14,
               borderRadius: Platform.OS === "android" ? 16 : 18,
             }}
             activeOpacity={0.9}
           >
             <Text
+              maxFontSizeMultiplier={1.35}
               className="text-[#1A1A1A] font-bold"
               style={{
-                fontSize: Platform.OS === "android" ? 11 : 12,
+                fontSize: 13,
               }}
             >
               Transfer to Portfolio

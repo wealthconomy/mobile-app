@@ -11,6 +11,11 @@ import {
   useMarkNotificationReadMutation,
 } from "@/src/store/api/notificationApi";
 import { Ionicons } from "@expo/vector-icons";
+import {
+  isKycNotification,
+  isSupportNotification,
+  isValidAppRoute,
+} from "@/src/features/profile/utils/notificationHelpers";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
@@ -78,8 +83,8 @@ export default function NotificationsScreen() {
     try {
       await markAllRead().unwrap();
       refetch();
-    } catch (error) {
-      console.error("Failed to mark all notifications read:", error);
+    } catch {
+      console.error("Failed to mark all notifications read");
     }
   };
 
@@ -87,14 +92,41 @@ export default function NotificationsScreen() {
     if (!item.isRead) {
       try {
         await markRead({ id: item.id }).unwrap();
-      } catch (error) {
-        console.error("Failed to mark notification read:", error);
+      } catch {
+        console.error("Failed to mark notification read");
       }
     }
-    if (item.data?.route) {
-      router.push(item.data.route as any);
+    const isReferral =
+      (typeof (item as any).type === "string" &&
+        (item as any).type.toLowerCase().includes("referral")) ||
+      (typeof item.kind === "string" &&
+        item.kind.toLowerCase().includes("referral")) ||
+      (typeof item.title === "string" &&
+        item.title.toLowerCase().includes("referral")) ||
+      (typeof item.data?.type === "string" &&
+        item.data.type.toLowerCase().includes("referral"));
+
+    const safePush = (targetRoute: string) => {
+      try {
+        router.push(targetRoute as any);
+      } catch {
+        // If route is invalid or navigation fails, stay on the list, never crash
+      }
+    };
+
+    if (isKycNotification(item)) {
+      safePush("/profile/security");
+    } else if (isReferral) {
+      safePush("/profile/my-referrals");
+    } else if (isSupportNotification(item)) {
+      const targetRoute = isValidAppRoute(item.data?.route)
+        ? item.data.route.trim()
+        : "/support/chat";
+      safePush(targetRoute);
+    } else if (isValidAppRoute(item.data?.route)) {
+      safePush(item.data.route.trim());
     } else if (item.kind === "group" && item.data?.groupId) {
-      router.push(`/portfolio/detail/group/${item.data.groupId}` as any);
+      safePush(`/portfolio/detail/group/${item.data.groupId}`);
     }
   };
 

@@ -49,11 +49,52 @@ export const AccountHeader = React.memo(
       return (first + last).toUpperCase();
     }, [user]);
 
+    const isPending =
+      kycStatus?.toUpperCase() === "PENDING" ||
+      kycStatus?.toLowerCase() === "pending";
+    const isVerified =
+      kycStatus?.toUpperCase() === "VERIFIED" ||
+      kycStatus?.toUpperCase() === "APPROVED";
+    const isRejected =
+      kycStatus?.toUpperCase() === "REJECTED";
+
     const formattedKycStatus = useMemo(() => {
       const level = kycLevel ?? user?.kycLevel ?? 1;
-      const status = kycStatus ? ` • ${kycStatus}` : "";
-      return `KYC level ${level}${status}`;
-    }, [kycLevel, user?.kycLevel, kycStatus]);
+      if (isPending) {
+        return `KYC level ${level} • In Review`;
+      }
+      if (isVerified) {
+        return `KYC level ${level} • Verified`;
+      }
+      if (isRejected) {
+        return `KYC level ${level} • Action Required`;
+      }
+      return `KYC level ${level}`;
+    }, [kycLevel, user?.kycLevel, isPending, isVerified, isRejected]);
+
+    const badgeBg = isVerified
+      ? "#DCFCE7"
+      : isRejected
+      ? "#FEF2F2"
+      : isPending
+      ? "#FEF9C3"
+      : "#FFF1D6";
+
+    const badgeColor = isVerified
+      ? "#166534"
+      : isRejected
+      ? "#DC2626"
+      : isPending
+      ? "#854D0E"
+      : "#D97706";
+
+    const iconColor = isVerified
+      ? "#16A34A"
+      : isRejected
+      ? "#DC2626"
+      : isPending
+      ? "#CA8A04"
+      : "#F59E0B";
 
     return (
       <Animated.View
@@ -87,11 +128,15 @@ export const AccountHeader = React.memo(
               <TouchableOpacity
                 onPress={onPressKyc}
                 activeOpacity={0.8}
-                className="flex-row items-center bg-[#FFF1D6] px-2.5 py-1 rounded-full mt-1.5 self-start"
+                style={{ backgroundColor: badgeBg }}
+                className="flex-row items-center px-2.5 py-1 rounded-full mt-1.5 self-start"
               >
-                <Ionicons name="medal" size={12} color="#F59E0B" />
-                <Text className="text-[10px] font-bold text-[#D97706] ml-1 capitalize">
-                  {formattedKycStatus.toLowerCase()}
+                <Ionicons name="medal" size={12} color={iconColor} />
+                <Text
+                  style={{ color: badgeColor }}
+                  className="text-[10px] font-bold ml-1"
+                >
+                  {formattedKycStatus}
                 </Text>
               </TouchableOpacity>
             </>

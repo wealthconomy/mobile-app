@@ -12,9 +12,17 @@ import {
 } from "@expo-google-fonts/kumbh-sans";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
-import { GlobalLockoutModal } from "../src/components/common/GlobalLockoutModal";
-import { ActivityIndicator, View } from "react-native";
+import { useEffect, useRef } from "react";
+import {
+  GlobalLockoutModal,
+  DEV_FORCE_LOCKOUT,
+} from "../src/components/common/GlobalLockoutModal";
+import { AppInactivityLockModal } from "../src/components/common/AppInactivityLockModal";
+import { UpdateRequiredModal } from "../src/components/common/UpdateRequiredModal";
+import { SoftUpdatePrompt } from "../src/components/common/SoftUpdatePrompt";
+import { useAppUpdateRequired } from "../src/hooks/useAppUpdateRequired";
+import { useSoftAppUpdate } from "../src/hooks/useSoftAppUpdate";
+import { ActivityIndicator, AppState, AppStateStatus, View } from "react-native";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider, useDispatch, useSelector } from "react-redux";
@@ -26,8 +34,16 @@ import {
   registerPushTokenWithBackend,
   setupPushNotificationListeners,
 } from "../src/services/pushNotificationService";
+import { lockAppForInactivity, isAppLockSuspended } from "../src/store/slices/appStatusSlice";
 
 const queryClient = new QueryClient();
+
+/**
+ * Inactivity Lock Timeout in milliseconds.
+ * Set to 0 to lock immediately upon the app moving to background.
+ * Can be changed to > 0 (e.g. 45000) for a delayed background lock.
+ */
+const LOCK_TIMEOUT_MS = 0;
 
 export { ErrorBoundary } from "expo-router";
 
@@ -52,12 +68,6 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync().catch(() => {});
-    }
-  }, [loaded]);
-
   if (!loaded) return null;
 
   return (
@@ -72,9 +82,59 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
-  const { isAuthenticated, hasCompletedOnboarding, isLoading } = useSelector(
+  const {
+    isUpdateRequired,
+    minAppVersion,
+    currentVersion: requiredHookCurrentVersion,
+    isReady,
+  } = useAppUpdateRequired();
+  const {
+    isSoftPromptCandidate,
+    isForcedUpdateByDeadline,
+    currentVersion: softHookCurrentVersion,
+    latestAppVersion,
+    updateDeadline,
+    updateMessage,
+    isSnoozed,
+    dismissPrompt,
+  } = useSoftAppUpdate();
+  const { isAuthenticated, hasCompletedOnboarding, isLoading, user } = useSelector(
     (state: RootState) => state.auth,
   );
+  const { isLocked, isInactivityLocked } = useSelector(
+    (state: RootState) => state.appStatus,
+  );
+
+  const appVersion = softHookCurrentVersion || requiredHookCurrentVersion || null;
+  const isForcedUpdate = isUpdateRequired || isForcedUpdateByDeadline;
+  const forcedUpdateMessage = isForcedUpdateByDeadline ? (updateMessage || null) : null;
+  const requiredVersion = isForcedUpdateByDeadline ? latestAppVersion : minAppVersion;
+
+  const isEffectiveLocked = isLocked || Boolean(__DEV__ && DEV_FORCE_LOCKOUT);
+
+  const currentPath = segments.join("/");
+  const isExemptScreen =
+    segments[0] === "(auth)" ||
+    segments[0] === "onboarding" ||
+    currentPath.includes("setup-pin") ||
+    currentPath.includes("change-passcode");
+
+  const isSoftPromptEligible =
+    isAuthenticated &&
+    hasCompletedOnboarding &&
+    !isExemptScreen &&
+    !isForcedUpdate &&
+    !isEffectiveLocked &&
+    !isInactivityLocked;
+
+  const showSoftPrompt = isSoftPromptCandidate && !isSnoozed && isSoftPromptEligible;
+
+  // Hide native splash screen only once both fonts and initial version check are ready
+  useEffect(() => {
+    if (isReady) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isReady]);
 
   useEffect(() => {
     dispatch(loadAuthFromStorage());
@@ -93,6 +153,126 @@ function RootLayoutNav() {
     };
   }, [isAuthenticated, dispatch]);
 
+  const backgroundTimeRef = useRef<number | null>(null);
+  const latestStateRef = useRef({
+    segments,
+    user,
+    isAuthenticated,
+    hasCompletedOnboarding,
+  });
+
+  useEffect(() => {
+    latestStateRef.current = {
+      segments,
+      user,
+      isAuthenticated,
+      hasCompletedOnboarding,
+    };
+  }, [segments, user, isAuthenticated, hasCompletedOnboarding]);
+
+  // Cold-start lock safeguard: ensure passcode modal is showing before dashboard renders
+  const coldStartLockCheckedRef = useRef(false);
+  useEffect(() => {
+    if (isLoading) return;
+    if (!coldStartLockCheckedRef.current) {
+      coldStartLockCheckedRef.current = true;
+      const currentPath = segments.join("/");
+      const isExemptScreen =
+        segments[0] === "(auth)" ||
+        segments[0] === "onboarding" ||
+        currentPath.includes("setup-pin") ||
+        currentPath.includes("change-passcode");
+
+      if (
+        isAuthenticated &&
+        hasCompletedOnboarding &&
+        user?.hasAppPasscode &&
+        !isExemptScreen
+      ) {
+        dispatch(lockAppForInactivity());
+      }
+    }
+  }, [
+    isLoading,
+    isAuthenticated,
+    hasCompletedOnboarding,
+    user?.hasAppPasscode,
+    segments,
+    dispatch,
+  ]);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      // 3. Do NOT lock on 'inactive' alone (iOS system dialogs, Face ID prompt, notification shade)
+      if (nextAppState === "background") {
+        // 4. Do NOT lock when lock is temporarily suspended (camera, photo picker, document picker, biometrics)
+        if (isAppLockSuspended()) {
+          return;
+        }
+
+        const {
+          segments: currentSegments,
+          user: currentUser,
+          isAuthenticated: isAuth,
+          hasCompletedOnboarding: isOnboarded,
+        } = latestStateRef.current;
+
+        const currentPath = currentSegments.join("/");
+        // 5. Never lock on login, signup, onboarding, or passcode-creation screens
+        const isExemptScreen =
+          currentSegments[0] === "(auth)" ||
+          currentSegments[0] === "onboarding" ||
+          currentPath.includes("setup-pin") ||
+          currentPath.includes("change-passcode");
+
+        const hasPasscode = Boolean(currentUser?.hasAppPasscode);
+        const isEligibleToLock =
+          isAuth && isOnboarded && hasPasscode && !isExemptScreen;
+
+        if (isEligibleToLock) {
+          if (LOCK_TIMEOUT_MS === 0) {
+            // Immediate lock on background transition
+            dispatch(lockAppForInactivity());
+          } else {
+            backgroundTimeRef.current = Date.now();
+          }
+        }
+      } else if (nextAppState === "active") {
+        if (
+          LOCK_TIMEOUT_MS > 0 &&
+          backgroundTimeRef.current &&
+          !isAppLockSuspended()
+        ) {
+          const {
+            segments: currentSegments,
+            user: currentUser,
+            isAuthenticated: isAuth,
+            hasCompletedOnboarding: isOnboarded,
+          } = latestStateRef.current;
+
+          const currentPath = currentSegments.join("/");
+          const isExemptScreen =
+            currentSegments[0] === "(auth)" ||
+            currentSegments[0] === "onboarding" ||
+            currentPath.includes("setup-pin") ||
+            currentPath.includes("change-passcode");
+
+          const hasPasscode = Boolean(currentUser?.hasAppPasscode);
+          const isEligibleToLock =
+            isAuth && isOnboarded && hasPasscode && !isExemptScreen;
+
+          const elapsedMs = Date.now() - backgroundTimeRef.current;
+          if (isEligibleToLock && elapsedMs >= LOCK_TIMEOUT_MS) {
+            dispatch(lockAppForInactivity());
+          }
+        }
+        backgroundTimeRef.current = null;
+      }
+    };
+
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription.remove();
+  }, [dispatch]);
 
   useEffect(() => {
     if (isLoading) {
@@ -101,6 +281,19 @@ function RootLayoutNav() {
 
     const inAuthGroup = segments[0] === "(auth)";
     const inOnboarding = segments[0] === "onboarding";
+    const inSetupPin = inAuthGroup && segments[1] === "setup-pin";
+    const inPasswordResetFlow =
+      inAuthGroup &&
+      (segments[1] === "forgot-password" ||
+        segments[1] === "otp" ||
+        segments[1] === "reset-password" ||
+        segments[1] === "success");
+
+    // Check if authenticated user needs to setup their transaction PIN or app passcode
+    const needsSecuritySetup =
+      isAuthenticated &&
+      user &&
+      (user.hasTransactionPin === false || user.hasAppPasscode === false);
 
     if (!hasCompletedOnboarding) {
       if (!inOnboarding) {
@@ -110,10 +303,16 @@ function RootLayoutNav() {
       if (!inAuthGroup) {
         router.replace("/(auth)/login" as any);
       }
+    } else if (needsSecuritySetup) {
+      if (!inSetupPin && !inPasswordResetFlow) {
+        router.replace("/(auth)/setup-pin" as any);
+      }
     } else if (inAuthGroup || inOnboarding) {
-      router.replace("/(tabs)" as any);
+      if (!inSetupPin && !inPasswordResetFlow) {
+        router.replace("/(tabs)" as any);
+      }
     }
-  }, [isAuthenticated, hasCompletedOnboarding, segments, isLoading]);
+  }, [isAuthenticated, hasCompletedOnboarding, segments, isLoading, user]);
 
   if (isLoading) {
     return (
@@ -157,6 +356,14 @@ function RootLayoutNav() {
             />
             <Stack.Screen
               name="education/wise-up"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="education/library"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="education/library/[id]"
               options={{ headerShown: false }}
             />
             <Stack.Screen
@@ -247,6 +454,18 @@ function RootLayoutNav() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
+              name="profile/about"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="profile/terms"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="profile/privacy"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
               name="support/reading-list"
               options={{ headerShown: false }}
             />
@@ -271,13 +490,39 @@ function RootLayoutNav() {
               name="payment/insert-pin"
               options={{ headerShown: false }}
             />
+            <Stack.Screen
+              name="payment/return"
+              options={{ headerShown: false }}
+            />
             <Stack.Screen name="modal" options={{ presentation: "modal" }} />
           </Stack>
         </ThemeProvider>
       </QueryClientProvider>
-      {/* GlobalLockoutModal must sit outside QueryClientProvider but inside Provider/SafeAreaProvider
-          so it renders above all screens while still having Redux access */}
-      <GlobalLockoutModal />
+      {/* Global modals: Lockout and Inactivity Session Shield */}
+      {!isForcedUpdate && (
+        <>
+          <GlobalLockoutModal />
+          {!isEffectiveLocked && <AppInactivityLockModal />}
+        </>
+      )}
+      {/* Soft update prompt (only when not forced, not locked, not on exempt screen, etc.) */}
+      {!isEffectiveLocked && (
+        <SoftUpdatePrompt
+          visible={showSoftPrompt}
+          currentVersion={appVersion}
+          latestAppVersion={latestAppVersion}
+          updateDeadline={updateDeadline}
+          updateMessage={updateMessage}
+          onDismiss={dismissPrompt}
+        />
+      )}
+      {/* Full-screen absolute overlay: Update Required */}
+      <UpdateRequiredModal
+        visible={isForcedUpdate}
+        message={forcedUpdateMessage}
+        currentVersion={appVersion}
+        requiredVersion={requiredVersion}
+      />
     </SafeAreaProvider>
   );
 }

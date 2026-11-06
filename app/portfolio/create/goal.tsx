@@ -5,7 +5,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCreatePortfolioMutation, useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
 import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
-import { getDynamicInterestRateLabel, getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { useInterestQuote } from "@/src/hooks/useInterestQuote";
+import { getTierBounds } from "@/src/utils/interestTiers";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 import { useFocusEffect } from "@react-navigation/native";
@@ -27,6 +29,7 @@ import {
 } from "react-native";
 import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -43,6 +46,7 @@ const CATEGORY_DETAILS: Record<string, { subtitle: string; emoji: string }> = {
 };
 
 export default function CreateGoalScreen() {
+  const formScrollRef = useRef<ScrollView>(null);
   const { category: initialCategory } = useLocalSearchParams<{
     category: string;
   }>();
@@ -59,16 +63,22 @@ export default function CreateGoalScreen() {
   });
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
-  const goalInterestRateLabel = getDynamicInterestRateLabel(
-    "goal",
-    systemConfigData,
-    configData?.rates || (configData as any)?.data?.rates,
-    12
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const goalConfig = rates?.wealthgoal || (rates as any)?.goal;
+  const goalTierBounds = getTierBounds(
+    (configData?.tiers || (configData as any)?.data?.tiers) as any,
+    "WEALTH_GOAL"
   );
+  const rawMinGoalNaira = (goalTierBounds as any)?.minAmountNaira ?? ((goalTierBounds as any)?.minAmountKobo != null ? (goalTierBounds as any).minAmountKobo / 100 : (goalConfig?.minTargetAmount ? goalConfig.minTargetAmount / 100 : 1000));
+  const minGoalNaira = Math.min(rawMinGoalNaira > 0 ? rawMinGoalNaira : 1000, 1000);
+  const minGoalDuration = goalTierBounds.minDurationDays ?? goalConfig?.minDurationDays ?? goalConfig?.minimumTenureDays ?? 30;
+  const maxGoalDuration = goalTierBounds.maxDurationDays ?? goalConfig?.maxDurationDays ?? goalConfig?.maximumTenureDays ?? 730;
+  const minGoalNairaFormatted = minGoalNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const { penaltyRate } = getDynamicPenaltyRate(
     "goal",
     systemConfigData,
-    configData?.rates || (configData as any)?.data?.rates,
+    rates,
     "3%"
   );
 
@@ -91,18 +101,16 @@ export default function CreateGoalScreen() {
   const [isManual, setIsManual] = useState(false);
   
   // Date State
-  const minDate = new Date();
-  minDate.setDate(minDate.getDate() + 1); // at least tomorrow
   const [endDate, setEndDate] = useState<Date>(() => {
     const d = new Date();
-    d.setFullYear(d.getFullYear() + 1);
+    d.setDate(d.getDate() + minGoalDuration);
     return d;
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [calMode, setCalMode] = useState<"days" | "months" | "years">("days");
   const [calViewDate, setCalViewDate] = useState<Date>(() => {
     const d = new Date();
-    d.setFullYear(d.getFullYear() + 1);
+    d.setDate(d.getDate() + minGoalDuration);
     return d;
   });
 
@@ -110,6 +118,35 @@ export default function CreateGoalScreen() {
   const [pin, setPin] = useState("");
   const [isNavigating, setIsNavigating] = useState(false);
   const pinInputRef = useRef<TextInput>(null);
+
+  const targetAmountVal = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
+  const autoSaveAmountVal = parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) || 0;
+  const manualDepositVal = parseFloat(manualDepositAmount.replace(/[^\d.]/g, "")) || 0;
+  const goalInitialAmountNaira = isManual ? manualDepositVal : autoSaveAmountVal;
+  // Dynamic rate and earnings match the selected target amount (or initial saving if target not yet entered)
+  const effectiveGoalAmountNaira = targetAmountVal > 0 ? targetAmountVal : goalInitialAmountNaira;
+
+  const nowZero = new Date();
+  nowZero.setHours(0, 0, 0, 0);
+  const endZero = new Date(endDate);
+  endZero.setHours(0, 0, 0, 0);
+  const goalDurationDays = Math.max(1, Math.ceil((endZero.getTime() - nowZero.getTime()) / (1000 * 3600 * 24)));
+  const isGoalDurationValid = goalDurationDays >= minGoalDuration && (maxGoalDuration == null || goalDurationDays <= maxGoalDuration);
+  const isGoalAmountValid = effectiveGoalAmountNaira >= minGoalNaira;
+
+  const {
+    rate: quotedRate,
+    projectedInterestNaira,
+    isLoading: isQuoteLoading,
+    isError: isQuoteError,
+    isReady: isQuoteReady,
+    matchedTier,
+  } = useInterestQuote({
+    type: "goal",
+    amountNaira: effectiveGoalAmountNaira,
+    durationDays: isGoalDurationValid ? goalDurationDays : undefined,
+    enabled: wealthPreference === "Interest Based" && isGoalAmountValid && isGoalDurationValid,
+  });
 
   const [showFreqDropdown, setShowFreqDropdown] = useState(false);
 
@@ -146,16 +183,7 @@ export default function CreateGoalScreen() {
     }
   };
 
-  const calculateEstimatedInterest = () => {
-    if (wealthPreference === "Impact Wealth") return "0.00";
-    const target = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
-    const now = new Date().getTime();
-    const end = endDate.getTime();
-    const days = Math.max(1, Math.ceil((end - now) / (1000 * 3600 * 24)));
-    // Estimated ~12% per annum on average progressive balance
-    const interest = ((target * 0.12 * days) / 365) * 0.5;
-    return interest.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+
 
   const getDaysInMonth = (month: number, year: number) =>
     new Date(year, month + 1, 0).getDate();
@@ -169,6 +197,8 @@ export default function CreateGoalScreen() {
     const firstDay = getFirstDayOfMonth(month, year);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const minAllowedDate = new Date(today);
+    minAllowedDate.setDate(minAllowedDate.getDate() + minGoalDuration);
     const dayNames = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
     const days: React.ReactElement[] = [];
 
@@ -179,7 +209,7 @@ export default function CreateGoalScreen() {
     for (let day = 1; day <= daysInMonth; day++) {
       const cellDate = new Date(year, month, day);
       cellDate.setHours(0, 0, 0, 0);
-      const isPast = cellDate <= today;
+      const isPast = cellDate < minAllowedDate;
       const isSelected =
         endDate.getDate() === day &&
         endDate.getMonth() === month &&
@@ -219,7 +249,7 @@ export default function CreateGoalScreen() {
           {dayNames.map((d) => (
             <Text
               key={d}
-              style={{ width: "14.28%" as any, textAlign: "center", fontSize: 13, fontWeight: "600", color: "#6B7280" }}
+              style={{ width: "14.28%" as any, textAlign: "center", fontSize: 13, fontWeight: "600", fontFamily: "KumbhSans_600SemiBold", color: "#4B5563" }}
             >
               {d}
             </Text>
@@ -360,17 +390,14 @@ export default function CreateGoalScreen() {
         },
       };
 
-      console.log("🎯 [WealthGoal Create Request] Payload:\n", JSON.stringify(body, null, 2));
-
       const res: any = await createPortfolio({ type: "wealthgoal", body }).unwrap();
-      console.log("✅ [WealthGoal Create Success] Response:\n", JSON.stringify(res, null, 2));
 
       if (res?.id) {
         setCreatedGoalId(res.id);
       }
       setStep("success");
     } catch (err: any) {
-      console.error("❌ [WealthGoal Create Error] Full Error:\n", JSON.stringify(err, null, 2));
+      console.error("[WealthGoal Create Error] Failed to create portfolio");
       const rawMsg = err?.data?.message;
       const errorMsg = Array.isArray(rawMsg)
         ? rawMsg.join(", ")
@@ -420,7 +447,8 @@ export default function CreateGoalScreen() {
       {showRules && (
         <View
           style={{
-            width: 366,
+            width: "100%",
+            maxWidth: 366,
             borderRadius: 15,
             backgroundColor: "#FFE6F2B2",
           }}
@@ -430,39 +458,39 @@ export default function CreateGoalScreen() {
             className="absolute right-4 top-4 z-10"
             onPress={() => setShowRules(false)}
           >
-            <Ionicons name="close" size={20} color="#F3007A" />
+            <Ionicons name="close" size={20} color="#A20050" />
           </TouchableOpacity>
           <Text
-            style={{ color: "#F3007A" }}
-            className="font-extrabold text-[12px] mb-4"
+            style={{ color: "#A20050" }}
+            className="font-extrabold text-[13px] leading-[18px] mb-4"
           >
             Important "Need to Know" Rules
           </Text>
           <View className="space-y-4 gap-4">
             {wealthPreference === "Interest Based" && (
               <Text
-                style={{ color: "#F3007A" }}
-                className="text-[11px] leading-[16px]"
+                style={{ color: "#A20050" }}
+                className="text-[13px] leading-[18px] font-kumbh-semibold"
               >
                 👉{" "}
                 <Text
-                  style={{ color: "#F3007A" }}
-                  className="font-bold text-[12px]"
+                  style={{ color: "#A20050" }}
+                  className="font-bold text-[13px]"
                 >
                   Interest Rate:
                 </Text>{" "}
-                Currently, Target Savings offers around {goalInterestRateLabel}, paid daily
+                Your interest rate depends on how much you save and for how long, paid daily
                 into your Flex account.
               </Text>
             )}
             <Text
-              style={{ color: "#F3007A" }}
-              className="text-[11px] leading-[16px]"
+              style={{ color: "#A20050" }}
+              className="text-[13px] leading-[18px] font-kumbh-semibold"
             >
               👉{" "}
               <Text
-                style={{ color: "#F3007A" }}
-                className="font-bold text-[12px]"
+                style={{ color: "#A20050" }}
+                className="font-bold text-[13px]"
               >
                 The {penaltyRate} Breaking Fee:
               </Text>{" "}
@@ -470,13 +498,13 @@ export default function CreateGoalScreen() {
               set, a {penaltyRate} penalty fee applies to ensure financial discipline.
             </Text>
             <Text
-              style={{ color: "#F3007A" }}
-              className="text-[11px] leading-[16px]"
+              style={{ color: "#A20050" }}
+              className="text-[13px] leading-[18px] font-kumbh-semibold"
             >
               👉{" "}
               <Text
-                style={{ color: "#F3007A" }}
-                className="font-bold text-[12px]"
+                style={{ color: "#A20050" }}
+                className="font-bold text-[13px]"
               >
                 Goal Completion:
               </Text>{" "}
@@ -498,13 +526,13 @@ export default function CreateGoalScreen() {
               onPress={() => setWealthPreference("Interest Based")}
               style={{ flex: 1, backgroundColor: wealthPreference === "Interest Based" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: wealthPreference === "Interest Based" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: wealthPreference === "Interest Based" ? 2 : 0 }}
             >
-              <Text style={{ color: wealthPreference === "Interest Based" ? "#1A1A1A" : "#6B7280", fontWeight: wealthPreference === "Interest Based" ? "700" : "500", fontSize: 13 }}>Interest Based</Text>
+              <Text style={{ color: wealthPreference === "Interest Based" ? "#1A1A1A" : "#4B5563", fontWeight: "600", fontFamily: "KumbhSans_600SemiBold", fontSize: 13 }}>Interest Based</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               onPress={() => setWealthPreference("Impact Wealth")}
               style={{ flex: 1, backgroundColor: wealthPreference === "Impact Wealth" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: wealthPreference === "Impact Wealth" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: wealthPreference === "Impact Wealth" ? 2 : 0 }}
             >
-              <Text style={{ color: wealthPreference === "Impact Wealth" ? "#1A1A1A" : "#6B7280", fontWeight: wealthPreference === "Impact Wealth" ? "700" : "500", fontSize: 13 }}>Impact Wealth</Text>
+              <Text style={{ color: wealthPreference === "Impact Wealth" ? "#1A1A1A" : "#4B5563", fontWeight: "600", fontFamily: "KumbhSans_600SemiBold", fontSize: 13 }}>Impact Wealth</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -516,7 +544,7 @@ export default function CreateGoalScreen() {
           </Text>
           <TextInput
             placeholder="e.g., 'Tuition fee,' 'New Laptop,' or 'Wedding'"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#6B7280"
             className="bg-[#F3F4F6] p-4 rounded-xl text-[#1A1A1A] text-sm"
             value={goalName}
             onChangeText={setGoalName}
@@ -530,7 +558,7 @@ export default function CreateGoalScreen() {
           </Text>
           <TextInput
             placeholder="Rent, Travel, Education, Business, etc."
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#6B7280"
             className="bg-[#F3F4F6] p-4 rounded-xl text-[#1A1A1A] text-sm"
             value={category}
             onChangeText={setCategory}
@@ -556,7 +584,7 @@ export default function CreateGoalScreen() {
           </Text>
           <TextInput
             placeholder="₦0.00"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#6B7280"
             className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] font-bold text-base"
             keyboardType="numeric"
             value={amount ? `₦${amount}` : ""}
@@ -567,9 +595,9 @@ export default function CreateGoalScreen() {
             }}
           />
           {parseFloat(amount.replace(/[^\d.]/g, "")) > 0 &&
-            parseFloat(amount.replace(/[^\d.]/g, "")) < 1000 && (
-              <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
-                Minimum target goal is ₦1,000.00
+            parseFloat(amount.replace(/[^\d.]/g, "")) < minGoalNaira && (
+              <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
+                Minimum target goal is ₦{minGoalNairaFormatted}
               </Text>
             )}
         </View>
@@ -580,7 +608,7 @@ export default function CreateGoalScreen() {
             <Text className="text-[#1A1A1A] font-bold text-[12px]">
               Manual Savings
             </Text>
-            <Text className="text-[#9CA3AF] text-[10px]">
+            <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-0.5">
               {isManual
                 ? "You will manually top up whenever you wish."
                 : "Automatic recurring debit enabled."}
@@ -603,7 +631,7 @@ export default function CreateGoalScreen() {
                 Starting Deposit (₦)
               </Text>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Text style={{ color: "#6B7280", fontSize: 11, fontWeight: "500" }}>
+                <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600" }}>
                   Wallet:{" "}
                   <Text style={{ color: "#1A1A1A", fontWeight: "700" }}>
                     ₦{walletBalanceNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -618,7 +646,7 @@ export default function CreateGoalScreen() {
                     borderRadius: 6,
                   }}
                 >
-                  <Text style={{ color: "#155D5F", fontSize: 10, fontWeight: "700" }}>
+                  <Text style={{ color: "#155D5F", fontSize: 12, fontWeight: "700" }}>
                     + Fund
                   </Text>
                 </TouchableOpacity>
@@ -626,7 +654,7 @@ export default function CreateGoalScreen() {
             </View>
             <TextInput
               placeholder="₦1,000.00"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#6B7280"
               className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] font-bold text-base"
               keyboardType="numeric"
               value={manualDepositAmount ? `₦${manualDepositAmount}` : ""}
@@ -645,27 +673,27 @@ export default function CreateGoalScreen() {
               const targetVal = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
               if (depositVal > walletBalanceNaira) {
                 return (
-                  <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                  <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
                     ⚠️ Insufficient wallet balance. Fund your wallet or enter a lower starting amount.
                   </Text>
                 );
               }
               if (depositVal > targetVal && targetVal > 0) {
                 return (
-                  <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                  <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
                     Starting deposit cannot exceed target goal amount.
                   </Text>
                 );
               }
               if (depositVal > 0 && depositVal < 100) {
                 return (
-                  <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                  <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
                     Minimum starting deposit is ₦100.00
                   </Text>
                 );
               }
               return (
-                <Text className="text-[#9CA3AF] text-[10px] mt-1">
+                <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-1">
                   Initial amount debited from your wallet today to kickstart your savings goal.
                 </Text>
               );
@@ -735,7 +763,7 @@ export default function CreateGoalScreen() {
                   Auto-Save Amount (₦)
                 </Text>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={{ color: "#6B7280", fontSize: 11, fontWeight: "500" }}>
+                  <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600" }}>
                     Wallet:{" "}
                     <Text style={{ color: "#1A1A1A", fontWeight: "700" }}>
                       ₦{walletBalanceNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -750,7 +778,7 @@ export default function CreateGoalScreen() {
                       borderRadius: 6,
                     }}
                   >
-                    <Text style={{ color: "#155D5F", fontSize: 10, fontWeight: "700" }}>
+                    <Text style={{ color: "#155D5F", fontSize: 12, fontWeight: "700" }}>
                       + Fund
                     </Text>
                   </TouchableOpacity>
@@ -758,7 +786,7 @@ export default function CreateGoalScreen() {
               </View>
               <TextInput
                 placeholder="₦0.00"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="#6B7280"
                 className="bg-[#F8F8F8] p-4 rounded-xl text-[#1A1A1A] font-bold text-base"
                 keyboardType="numeric"
                 value={autoSaveAmount ? `₦${autoSaveAmount}` : ""}
@@ -777,14 +805,14 @@ export default function CreateGoalScreen() {
                 const autoVal = parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) || 0;
                 if (autoVal > walletBalanceNaira) {
                   return (
-                    <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                    <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
                       ⚠️ Insufficient wallet balance for initial auto-save deduction.
                     </Text>
                   );
                 }
                 if (autoVal > targetVal && targetVal > 0) {
                   return (
-                    <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "500" }}>
+                    <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
                       Auto-save cannot exceed target goal amount.
                     </Text>
                   );
@@ -801,14 +829,14 @@ export default function CreateGoalScreen() {
                       }}
                       style={{ marginTop: 6 }}
                     >
-                      <Text style={{ color: "#0B575B", fontSize: 11, fontWeight: "600" }}>
+                      <Text style={{ color: "#0B575B", fontSize: 12, fontWeight: "600", lineHeight: 16 }}>
                         💡 Recommended: {calculateRecommendedSaving()?.split(" (")[0]}
                       </Text>
                     </TouchableOpacity>
                   );
                 }
                 return (
-                  <Text className="text-[#9CA3AF] text-[10px] mt-1">
+                  <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-1">
                     First amount debited today, then automatically deducted {frequency.toLowerCase()}.
                   </Text>
                 );
@@ -818,32 +846,116 @@ export default function CreateGoalScreen() {
         )}
 
         {/* End Date Picker */}
-        <View>
-          <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
-            Target End Date
-          </Text>
-          <TouchableOpacity
-            onPress={() => {
-              setCalViewDate(new Date(endDate));
-              setShowDatePicker(true);
-            }}
-            activeOpacity={0.7}
-            className="bg-[#F3F4F6] p-4 rounded-xl flex-row justify-between items-center"
-          >
-            <Text className="text-[#1A1A1A] font-medium text-sm">
-              {endDate.toLocaleDateString("en-US", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}
-            </Text>
-            <Ionicons name="calendar-outline" size={20} color="#155D5F" />
-          </TouchableOpacity>
-          <Text className="text-[#9CA3AF] text-[10px] mt-1.5 italic">
-            Note: To earn the full interest, you must meet your target amount
-            and reach this date
-          </Text>
-        </View>
+        {(() => {
+          const nowZero = new Date();
+          nowZero.setHours(0, 0, 0, 0);
+          const endZero = new Date(endDate);
+          endZero.setHours(0, 0, 0, 0);
+          const durationDays = Math.max(1, Math.ceil((endZero.getTime() - nowZero.getTime()) / (1000 * 3600 * 24)));
+          const isBelowMinDuration = durationDays < minGoalDuration;
+          const isAboveMaxDuration = durationDays > maxGoalDuration;
+
+          return (
+            <View>
+              <Text className="text-[#1A1A1A] font-bold text-[12px] mb-2">
+                Target End Date
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setCalViewDate(new Date(endDate));
+                  setShowDatePicker(true);
+                }}
+                activeOpacity={0.7}
+                className="bg-[#F3F4F6] p-4 rounded-xl flex-row justify-between items-center"
+                style={{
+                  borderWidth: (isBelowMinDuration || isAboveMaxDuration) ? 1 : 0,
+                  borderColor: (isBelowMinDuration || isAboveMaxDuration) ? "#EF4444" : "transparent",
+                }}
+              >
+                <Text className="text-[#1A1A1A] font-medium text-sm">
+                  {endDate.toLocaleDateString("en-US", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })} ({durationDays} days)
+                </Text>
+                <Ionicons name="calendar-outline" size={20} color="#155D5F" />
+              </TouchableOpacity>
+              {isBelowMinDuration && (
+                <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
+                  Minimum lock duration is {minGoalDuration} days
+                </Text>
+              )}
+              {isAboveMaxDuration && (
+                <Text style={{ color: "#EF4444", fontSize: 12, lineHeight: 16, marginTop: 4, fontWeight: "600" }}>
+                  Maximum lock duration is {maxGoalDuration} days
+                </Text>
+              )}
+              {!isBelowMinDuration && !isAboveMaxDuration && (
+                <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-1.5 italic">
+                  Note: To earn the full interest, you must meet your target amount
+                  and reach this date
+                </Text>
+              )}
+            </View>
+          );
+        })()}
+
+        {/* Tiered Interest Quote Card */}
+        {wealthPreference === "Interest Based" && (
+          <View style={{ marginTop: -8 }}>
+            {isQuoteLoading ? (
+              <View
+                style={{
+                  backgroundColor: "#F8FAFC",
+                  borderRadius: 12,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                }}
+              >
+                <Text style={{ color: "#64748B", fontSize: 13, fontWeight: "600" }}>
+                  Calculating...
+                </Text>
+              </View>
+            ) : isQuoteReady && quotedRate != null ? (
+              <View
+                style={{
+                  backgroundColor: "#F0FDF4",
+                  borderRadius: 12,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: "#BBF7D0",
+                }}
+              >
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ color: "#166534", fontSize: 13, fontWeight: "700" }}>
+                    Your rate: {quotedRate}% P.A.
+                  </Text>
+                  {projectedInterestNaira != null && (
+                    <Text style={{ color: "#15803D", fontSize: 13, fontWeight: "700" }}>
+                      Estimated earnings: +₦{formatAmount(projectedInterestNaira.toFixed(2))}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            ) : isGoalAmountValid && isGoalDurationValid && (isQuoteError || !isQuoteReady) ? (
+              <View
+                style={{
+                  backgroundColor: "#F8FAFC",
+                  borderRadius: 12,
+                  padding: 12,
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                }}
+              >
+                <Text style={{ color: "#64748B", fontSize: 12, fontWeight: "600" }}>
+                  Your rate is confirmed when you create the plan
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        )}
       </View>
 
       {/* Custom Calendar Modal */}
@@ -953,13 +1065,20 @@ export default function CreateGoalScreen() {
         const targetVal = parseFloat(amount.replace(/[^\d.]/g, "")) || 0;
         const autoSaveVal = parseFloat(autoSaveAmount.replace(/[^\d.]/g, "")) || 0;
         const manualDepositVal = parseFloat(manualDepositAmount.replace(/[^\d.]/g, "")) || 0;
-        const isTargetValid = targetVal >= 1000;
+        const isTargetValid = targetVal >= minGoalNaira;
+        const nowZero = new Date();
+        nowZero.setHours(0, 0, 0, 0);
+        const endZero = new Date(endDate);
+        endZero.setHours(0, 0, 0, 0);
+        const durationDays = Math.max(1, Math.ceil((endZero.getTime() - nowZero.getTime()) / (1000 * 3600 * 24)));
+        const isDurationValid = durationDays >= minGoalDuration && durationDays <= maxGoalDuration;
         const isAutoSaveValid = !isManual && autoSaveVal >= 100 && autoSaveVal <= targetVal && autoSaveVal <= walletBalanceNaira;
         const isManualDepositValid = isManual && manualDepositVal >= 100 && manualDepositVal <= targetVal && manualDepositVal <= walletBalanceNaira;
         const isFormValid =
           goalName.trim().length > 0 &&
           category.trim().length > 0 &&
           isTargetValid &&
+          isDurationValid &&
           (isManual ? isManualDepositValid : isAutoSaveValid);
         
         return (
@@ -985,7 +1104,7 @@ export default function CreateGoalScreen() {
 
     return (
       <View className="px-5">
-        <Text className="text-[#6B7280] text-[13px] mb-8 mt-4">
+        <Text className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mb-8 mt-4">
           Please, recheck and confirm before creating your goal.
         </Text>
 
@@ -1002,7 +1121,7 @@ export default function CreateGoalScreen() {
           {/* Row 1 */}
           <View className="flex-row justify-between mb-8">
             <View>
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                 Goal Amount
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1010,7 +1129,7 @@ export default function CreateGoalScreen() {
               </Text>
             </View>
             <View className="items-end">
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                 Category
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1022,7 +1141,7 @@ export default function CreateGoalScreen() {
           {/* Row 2 */}
           <View className="flex-row justify-between mb-8">
             <View>
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                 Funding Source
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1030,7 +1149,7 @@ export default function CreateGoalScreen() {
               </Text>
             </View>
             <View className="items-end">
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                 End Date
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1042,15 +1161,19 @@ export default function CreateGoalScreen() {
           {/* Row 3 */}
           <View className="flex-row justify-between mb-8">
             <View>
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                 {wealthPreference === "Interest Based" ? "Interest Rate" : "Preference"}
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
-                {wealthPreference === "Interest Based" ? goalInterestRateLabel : "Impact Wealth"}
+                {wealthPreference === "Interest Based"
+                  ? isQuoteReady && quotedRate != null
+                    ? `${quotedRate}% P.A.`
+                    : "Rate confirmed on creation"
+                  : "Impact Wealth"}
               </Text>
             </View>
             <View className="items-end">
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                 Method
               </Text>
               <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1059,10 +1182,26 @@ export default function CreateGoalScreen() {
             </View>
           </View>
 
+          {/* Row 3.5: Estimated Return */}
+          {wealthPreference === "Interest Based" && (
+            <View className="flex-row justify-between mb-8">
+              <View>
+                <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
+                  Estimated Return
+                </Text>
+                <Text style={{ color: "#155D5F", fontWeight: "700", fontSize: 16 }}>
+                  {isQuoteReady && projectedInterestNaira != null
+                    ? `+₦${formatAmount(projectedInterestNaira.toFixed(2))}`
+                    : "Rate confirmed on creation"}
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Row 4: Debit Today */}
           <View className="flex-row justify-between mb-2">
             <View>
-              <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+              <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                 Debit Today
               </Text>
               <Text style={{ color: "#155D5F", fontWeight: "700", fontSize: 16 }}>
@@ -1071,7 +1210,7 @@ export default function CreateGoalScreen() {
             </View>
             {!isManual ? (
               <View className="items-end">
-                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                   Auto-Debit Schedule
                 </Text>
                 <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1080,7 +1219,7 @@ export default function CreateGoalScreen() {
               </View>
             ) : (
               <View className="items-end">
-                <Text className="text-[#6B7280] text-[11px] mb-2 font-medium">
+                <Text className="text-[#4B5563] text-[12px] leading-[16px] mb-2 font-kumbh-semibold">
                   Deposit Type
                 </Text>
                 <Text className="text-[#1A1A1A] font-bold text-[16px]">
@@ -1131,7 +1270,7 @@ export default function CreateGoalScreen() {
       <Text className="text-[#1A1A1A] font-extrabold text-[24px] mt-6 mb-2">
         Insert your Pin
       </Text>
-      <Text className="text-[#6B7280] text-center text-[13px] mb-10 leading-[20px] px-4">
+      <Text className="text-[#4B5563] font-kumbh-semibold text-center text-[13px] mb-10 leading-[20px] px-4">
         You must insert your pin to confirm to completely create your Wealth
         Goal
       </Text>
@@ -1164,7 +1303,7 @@ export default function CreateGoalScreen() {
       />
 
       <View className="mb-10 px-8">
-        <Text className="text-[#6B7280] text-center text-[12px]">
+        <Text className="text-[#4B5563] font-kumbh-semibold text-center text-[13px] leading-[18px]">
           If you have forgotten your pin, change it from your settings page
         </Text>
       </View>
@@ -1203,7 +1342,7 @@ export default function CreateGoalScreen() {
         You have set a Wealth Goal🥳🎯
       </Text>
 
-      <Text className="text-[#6B7280] text-center text-[14px] leading-[22px] mb-8 px-2">
+      <Text className="text-[#4B5563] font-kumbh-semibold text-center text-[14px] leading-[22px] mb-8 px-2">
         Congratulations, WealthBuilder! Your WealthGoal has been created and funded successfully. Your savings journey towards your target has begun!🥳{"\n\n"}
         <Text className="font-bold text-[#1A1A1A]">
           Target Goal: ₦{formatAmount(amount)}{"\n"}
@@ -1265,19 +1404,18 @@ export default function CreateGoalScreen() {
           }}
         />
       )}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          className="flex-1"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 40 }}
-        >
-          <View className="py-2">
-            {step === "form" && (
+      {step === "form" ? (
+        <KeyboardAwareScreen style={{ flex: 1 }} scrollRef={formScrollRef}>
+          <ScrollView
+            ref={formScrollRef}
+            keyboardShouldPersistTaps="handled"
+            className="flex-1"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
+            <View className="py-2">
               <View>
-                <Text className="px-5 text-[#6B7280] text-[13px] mb-4">
+                <Text className="px-5 text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mb-4">
                   Start aiming towards your goal
                 </Text>
                 {CATEGORY_DETAILS[category] && (
@@ -1298,24 +1436,38 @@ export default function CreateGoalScreen() {
                       </Text>
                     </View>
                     <View className="flex-1">
-                      <Text className="font-extrabold text-[16px] text-[#F3007A] mb-0.5">
+                      <Text className="font-extrabold text-[16px] text-[#A20050] mb-0.5">
                         {category}
                       </Text>
-                      <Text className="text-[11px] text-[#F3007A] opacity-70">
+                      <Text className="text-[13px] leading-[18px] text-[#A20050] font-kumbh-semibold">
                         {CATEGORY_DETAILS[category].subtitle}
                       </Text>
                     </View>
                   </View>
                 )}
               </View>
-            )}
-            {step === "form" && renderForm()}
-            {step === "preview" && renderPreview()}
-            {step === "pin" && renderPin()}
-            {step === "success" && renderSuccess()}
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+              {renderForm()}
+            </View>
+          </ScrollView>
+        </KeyboardAwareScreen>
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <ScrollView
+            className="flex-1"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
+            <View className="py-2">
+              {step === "preview" && renderPreview()}
+              {step === "pin" && renderPin()}
+              {step === "success" && renderSuccess()}
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }

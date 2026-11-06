@@ -80,7 +80,7 @@ export default function FlexTransactionsScreen() {
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const { data, isLoading, isFetching, refetch } = useGetWalletTransactionsQuery(
     { limit: 20, after: cursor },
-    { refetchOnMountOrArgChange: true }
+    { refetchOnMountOrArgChange: 30 }
   );
 
   useFocusEffect(

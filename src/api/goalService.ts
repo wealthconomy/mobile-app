@@ -24,7 +24,7 @@ export const goalService = {
     try {
       memoryGoals = [goal, ...memoryGoals];
     } catch (error) {
-      console.error("Error saving goal:", error);
+      console.error("Error saving goal");
       throw error;
     }
   },
@@ -35,8 +35,8 @@ export const goalService = {
   getGoals: async (): Promise<WealthGoal[]> => {
     try {
       return memoryGoals;
-    } catch (error) {
-      console.error("Error getting goals:", error);
+    } catch {
+      console.error("Error getting goals");
       return [];
     }
   },
@@ -53,7 +53,7 @@ export const goalService = {
         g.id === id ? { ...g, ...updates } : g,
       );
     } catch (error) {
-      console.error("Error updating goal:", error);
+      console.error("Error updating goal");
       throw error;
     }
   },

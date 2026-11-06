@@ -7,6 +7,7 @@ export interface ApiResponse<T> {
   message: string;
   statusCode: number;
   data: T;
+  success?: boolean;
 }
 
 export interface PaginatedResponse<T> {
@@ -16,6 +17,43 @@ export interface PaginatedResponse<T> {
   limit: number;
   totalPages: number;
 }
+
+const isPublicEndpoint = (url: string): boolean => {
+  if (!url) return false;
+  const cleanUrl = url.split("?")[0].trim().toLowerCase();
+
+  // Public config, health, or static routes
+  if (
+    cleanUrl.includes("/public/") ||
+    cleanUrl.startsWith("/public") ||
+    cleanUrl.startsWith("public/") ||
+    cleanUrl.includes("/health")
+  ) {
+    return true;
+  }
+
+  // Public authentication endpoints
+  if (
+    cleanUrl.endsWith("/auth/login") ||
+    cleanUrl.endsWith("/auth/register") ||
+    cleanUrl.endsWith("/auth/request-otp") ||
+    cleanUrl.endsWith("/auth/verify-otp") ||
+    cleanUrl.endsWith("/auth/forgot-password") ||
+    cleanUrl.endsWith("/auth/reset-password") ||
+    cleanUrl.endsWith("/auth/refresh") ||
+    cleanUrl.endsWith("/auth/biometric-login") ||
+    cleanUrl.endsWith("/auth/logout")
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+// Module-level single-flight synchronization
+let refreshPromise: Promise<boolean> | null = null;
+let hasDispatchedLogout = false;
+let lastSessionToken: string | null = null;
 
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: process.env.EXPO_PUBLIC_API_URL,
@@ -40,45 +78,111 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
   api,
   extraOptions
 ) => {
+  const requestUrl = typeof args === "string" ? args : args.url;
+  const state = api.getState() as RootState;
+  const requestToken = state.auth.token;
+  const isPublic = isPublicEndpoint(requestUrl);
+
+  // 1. Guard against firing protected requests without a token
+  if (!requestToken && !isPublic) {
+    return {
+      error: {
+        status: 401,
+        data: {
+          message: "Not authenticated",
+        },
+      },
+    };
+  }
+
+  // Reset single-flight logout tracking if a new session token is detected
+  if (requestToken && requestToken !== lastSessionToken) {
+    lastSessionToken = requestToken;
+    hasDispatchedLogout = false;
+    refreshPromise = null;
+  }
+
   let result = await rawBaseQuery(args, api, extraOptions);
 
   if (result.error && result.error.status === 401) {
-    const refreshToken = (api.getState() as RootState).auth.refreshToken;
+    const currentState = api.getState() as RootState;
+    const currentToken = currentState.auth.token;
+    const isAuthenticated = currentState.auth.isAuthenticated;
+    const refreshToken = currentState.auth.refreshToken;
 
+    // 2. Ignore 401 if state is not authenticated or token changed while request was in-flight
+    if (!isAuthenticated || !currentToken || currentToken !== requestToken) {
+      return result;
+    }
+
+    // Do not force logout if operating with mock tokens or without backend URL configured
+    if (currentToken.startsWith("mock-jwt-token") || !process.env.EXPO_PUBLIC_API_URL) {
+      return result;
+    }
+
+    // 3. Single-flight refresh attempt
     if (refreshToken) {
-      // Attempt to get a new pair of tokens
-      const refreshResult = await rawBaseQuery(
-        {
-          url: "/auth/refresh",
-          method: "POST",
-          body: { refreshToken },
-        },
-        api,
-        extraOptions
-      );
+      if (!refreshPromise) {
+        refreshPromise = (async () => {
+          try {
+            const refreshResult = await rawBaseQuery(
+              {
+                url: "/auth/refresh",
+                method: "POST",
+                body: { refreshToken },
+              },
+              api,
+              extraOptions
+            );
 
-      if (refreshResult.data) {
-        const res = refreshResult.data as ApiResponse<{
-          accessToken: string;
-          refreshToken: string;
-          user: any;
-        }>;
-        // Store the new tokens and user profile
-        api.dispatch(
-          setCredentials({
-            user: res.data.user,
-            token: res.data.accessToken,
-            refreshToken: res.data.refreshToken,
-          })
-        );
-        // Retry the original request with the newly issued token
+            if (refreshResult.data) {
+              const res = refreshResult.data as ApiResponse<{
+                accessToken: string;
+                refreshToken: string;
+                user: any;
+              }>;
+
+              if (res?.data?.accessToken) {
+                lastSessionToken = res.data.accessToken;
+                hasDispatchedLogout = false;
+                api.dispatch(
+                  setCredentials({
+                    user: res.data.user,
+                    token: res.data.accessToken,
+                    refreshToken: res.data.refreshToken,
+                  })
+                );
+                return true;
+              }
+            }
+            return false;
+          } catch {
+            return false;
+          } finally {
+            refreshPromise = null;
+          }
+        })();
+      }
+
+      const refreshSuccess = await refreshPromise;
+      if (refreshSuccess) {
+        // Retry original request with newly issued credentials
         result = await rawBaseQuery(args, api, extraOptions);
       } else {
-        // Refresh failed - revoke session client-side
-        api.dispatch(logout());
+        // 4. Never dispatch logout when already logged out, and ensure single-flight logout per session
+        const latestState = api.getState() as RootState;
+        if (latestState.auth.isAuthenticated && !hasDispatchedLogout) {
+          hasDispatchedLogout = true;
+          api.dispatch(logout());
+        }
       }
     } else {
-      api.dispatch(logout());
+      // No refresh token available - single-flight logout
+      const latestState = api.getState() as RootState;
+      if (latestState.auth.isAuthenticated && !hasDispatchedLogout) {
+        hasDispatchedLogout = true;
+        api.dispatch(logout());
+      }
     }
   }
 
@@ -165,8 +269,8 @@ const baseQueryWithLockout: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQu
           })
         );
       }
-    } catch (e) {
-      console.warn("⚠️ [baseQueryWithLockout] Error while checking lockout status:", e);
+    } catch {
+      console.warn("[baseQueryWithLockout] Error while checking lockout status");
     }
   }
 
@@ -176,6 +280,6 @@ const baseQueryWithLockout: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQu
 export const baseApi = createApi({
   reducerPath: "baseApi",
   baseQuery: baseQueryWithLockout,
-  tagTypes: ["User", "WealthGroup", "Portfolio", "Payment", "Auth", "Kyc", "File", "Notification", "Referral", "Blog", "Library", "Wallet", "PayoutAccount", "Withdrawal", "Activity", "SupportChat"],
+  tagTypes: ["User", "WealthGroup", "Portfolio", "Payment", "Auth", "Kyc", "File", "Notification", "Referral", "Blog", "Library", "Wallet", "PayoutAccount", "Withdrawal", "Activity", "SupportChat", "GroupReport"],
   endpoints: () => ({}),
 });

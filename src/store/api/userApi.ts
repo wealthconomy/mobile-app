@@ -1,4 +1,4 @@
-import { setCredentials } from "../slices/authSlice";
+import { setCredentials, setBiometricsEnabled } from "../slices/authSlice";
 import { RootState } from "../index";
 import { baseApi, ApiResponse } from "./baseApi";
 
@@ -26,6 +26,31 @@ export interface UserProfile {
   walletBalance?: string;
   totalSavings?: string;
   totalInterest?: string;
+  kycLevel?: number;
+  kycStatus?: string;
+  hasTransactionPin?: boolean;
+  hasAppPasscode?: boolean;
+  pinHash?: string | null;
+}
+
+export interface SetupPasscodeRequest {
+  passcode: string;
+}
+
+export interface VerifyPasscodeRequest {
+  passcode: string;
+}
+
+export interface UpdatePasscodeRequest {
+  oldPasscode: string;
+  newPasscode: string;
+}
+
+export interface JoinWaitlistRequest {
+  feature: string;
+  email?: string;
+  fullName?: string;
+  intendedInvestment?: string;
 }
 
 export interface UpdateProfileRequest {
@@ -52,6 +77,18 @@ export interface VerifyPinRequest {
 export interface UpdatePinRequest {
   oldPin: string;
   newPin: string;
+}
+
+export interface ResetPinRequest {
+  newPin: string;
+  password?: string;
+  otp?: string;
+}
+
+export interface ResetPasscodeRequest {
+  newPasscode: string;
+  password?: string;
+  otp?: string;
 }
 
 export interface NotificationSettingsRequest {
@@ -92,9 +129,6 @@ export const userApi = baseApi.injectEndpoints({
       async onQueryStarted(_, { dispatch, queryFulfilled, getState }) {
         try {
           const { data } = await queryFulfilled;
-          console.log("\n================ [APP: GET /user/me PROFILE RESPONSE] ================");
-          console.log(JSON.stringify(data, null, 2));
-          console.log("======================================================================\n");
           const token = (getState() as RootState).auth.token || "";
           const refreshToken = (getState() as RootState).auth.refreshToken || "";
           if (token && data.data) {
@@ -106,8 +140,8 @@ export const userApi = baseApi.injectEndpoints({
               })
             );
           }
-        } catch (err: any) {
-          console.log("❌ [APP: GET /user/me FAILED]:", err?.error || err);
+        } catch {
+          // Ignore AbortError and network cancellations
         }
       },
     }),
@@ -186,12 +220,78 @@ export const userApi = baseApi.injectEndpoints({
         body,
       }),
       invalidatesTags: ["User"],
+      async onQueryStarted(body, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(setBiometricsEnabled(body.biometricsEnabled));
+        } catch {
+          // Handled by caller
+        }
+      },
     }),
     deleteAccount: builder.mutation<ApiResponse<{ ok: boolean }>, void>({
       query: () => ({
         url: "/user/account",
         method: "DELETE",
       }),
+    }),
+    setupPasscode: builder.mutation<ApiResponse<any>, SetupPasscodeRequest>({
+      query: (body) => ({
+        url: "/user/passcode/setup",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["User"],
+    }),
+    verifyPasscode: builder.mutation<ApiResponse<{ valid: boolean }>, VerifyPasscodeRequest>({
+      query: (body) => ({
+        url: "/user/passcode/verify",
+        method: "POST",
+        body,
+      }),
+    }),
+    updatePasscode: builder.mutation<ApiResponse<any>, UpdatePasscodeRequest>({
+      query: (body) => ({
+        url: "/user/passcode/update",
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["User"],
+    }),
+    joinWaitlist: builder.mutation<ApiResponse<any>, JoinWaitlistRequest>({
+      query: (body) => ({
+        url: "/waitlist",
+        method: "POST",
+        body,
+      }),
+    }),
+    forgotPin: builder.mutation<ApiResponse<any>, void>({
+      query: () => ({
+        url: "/user/pin/forgot",
+        method: "POST",
+      }),
+    }),
+    resetPin: builder.mutation<ApiResponse<any>, ResetPinRequest>({
+      query: (body) => ({
+        url: "/user/pin/reset",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["User"],
+    }),
+    forgotPasscode: builder.mutation<ApiResponse<any>, void>({
+      query: () => ({
+        url: "/user/passcode/forgot",
+        method: "POST",
+      }),
+    }),
+    resetPasscode: builder.mutation<ApiResponse<any>, ResetPasscodeRequest>({
+      query: (body) => ({
+        url: "/user/passcode/reset",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["User"],
     }),
   }),
   overrideExisting: true,
@@ -206,7 +306,15 @@ export const {
   useSetupPinMutation,
   useVerifyPinMutation,
   useUpdatePinMutation,
+  useForgotPinMutation,
+  useResetPinMutation,
   useUpdateNotificationSettingsMutation,
   useToggleBiometricsMutation,
   useDeleteAccountMutation,
+  useSetupPasscodeMutation,
+  useVerifyPasscodeMutation,
+  useUpdatePasscodeMutation,
+  useForgotPasscodeMutation,
+  useResetPasscodeMutation,
+  useJoinWaitlistMutation,
 } = userApi;

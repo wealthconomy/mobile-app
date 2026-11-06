@@ -1,12 +1,13 @@
+import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
 import { BalanceText } from "@/src/components/common/BalanceText";
 import Header from "@/src/components/common/Header";
 import { PortfolioPreferenceMenu } from "@/src/components/common/PortfolioPreferenceMenu";
-import { AppRefreshIndicator } from "@/src/components/common/AppRefreshIndicator";
+import { RootState } from "@/src/store";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect, router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ArrowUp, Eye, EyeOff } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -17,9 +18,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSelector } from "react-redux";
-import { RootState } from "@/src/store";
 import Svg, { Path, Rect } from "react-native-svg";
+import { useSelector } from "react-redux";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -59,28 +59,56 @@ const TransferMoneyIcon = () => (
   </Svg>
 );
 
-import {
-  useGetPortfoliosQuery,
-  useGetPortfolioConfigQuery,
-} from "@/src/store/api/portfolioApi";
-import { useGetWalletSummaryQuery, useGetWalletTransactionsQuery } from "@/src/store/api/walletApi";
 import { PortfolioDetailSkeleton } from "@/src/features/home/components/DashboardSkeletons";
+import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
+import {
+  useGetPortfolioConfigQuery,
+  useGetPortfoliosQuery,
+} from "@/src/store/api/portfolioApi";
+import {
+  useGetWalletSummaryQuery,
+  useGetWalletTransactionsQuery,
+} from "@/src/store/api/walletApi";
 import { WalletTransaction } from "@/src/types/wallet";
-import { getCleanTransactionTitle } from "@/src/utils/formatters";
+import { useInterestQuote } from "@/src/hooks/useInterestQuote";
+import {
+  getCleanTransactionTitle,
+} from "@/src/utils/formatters";
 
 export default function WealthFlexScreen() {
   const [showBalance, setShowBalance] = useState(true);
   const [showTips, setShowTips] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
-  const { data: walletData, refetch: refetchWallet } = useGetWalletSummaryQuery();
-  const { data, isLoading: loading, refetch: refetchFlex } = useGetPortfoliosQuery({ type: "wealthflex", limit: 1 });
+
+  const { data: walletData, refetch: refetchWallet } =
+    useGetWalletSummaryQuery();
+  const {
+    data,
+    isLoading: loading,
+    refetch: refetchFlex,
+  } = useGetPortfoliosQuery({ type: "wealthflex", limit: 1 });
   const { data: configData } = useGetPortfolioConfigQuery();
+  const { data: systemConfigData } = useGetSystemConfigsQuery();
   const rates = configData?.rates || (configData as any)?.data?.rates;
-  const flexRateLabel = rates?.wealthflex?.label || "5% P.A.";
+  const flexConfig = rates?.wealthflex || (rates as any)?.flex;
+  const minDepositKobo =
+    flexConfig?.minDeposit ?? flexConfig?.minimumAmount ?? 10000;
+  const maxDepositKobo =
+    flexConfig?.maxDeposit ?? flexConfig?.maximumAmount ?? 500000000;
+  const minDepositNaira = (minDepositKobo / 100).toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const maxDepositNaira = (maxDepositKobo / 100).toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
   const flexPortfolio = data?.items?.[0];
 
-  const { data: txData, refetch: refetchTx } = useGetWalletTransactionsQuery({ limit: 3 });
+  const { data: txData, refetch: refetchTx } = useGetWalletTransactionsQuery({
+    limit: 3,
+  });
   const transactions = txData?.items || [];
 
   const handleRefresh = async () => {
@@ -97,8 +125,12 @@ export default function WealthFlexScreen() {
       refetchFlex();
       refetchWallet();
       refetchTx();
-    }, [refetchFlex, refetchWallet, refetchTx])
+    }, [refetchFlex, refetchWallet, refetchTx]),
   );
+
+  const handleBack = () => {
+    router.replace("/(tabs)/portfolios" as any);
+  };
 
   const formatAmount = (val?: string) => {
     if (!val) return "0.00";
@@ -107,17 +139,31 @@ export default function WealthFlexScreen() {
   };
 
   const balanceValue = flexPortfolio?.balance ?? walletData?.currentBalance;
+  const balanceNaira = parseFloat(balanceValue || "0") / 100;
   const amount = `₦${formatAmount(balanceValue)}`;
+
+  const {
+    rate: flexRate,
+    tierName: flexTierName,
+  } = useInterestQuote({
+    type: "flex",
+    amountNaira: balanceNaira,
+    enabled: balanceNaira > 0,
+  });
+  const flexRateLabel = flexRate != null ? `${flexRate}% P.A.` : undefined;
   const dailyGrowthFormatted = (
     flexPortfolio?.dailyGrowth
       ? parseFloat(flexPortfolio.dailyGrowth.toString()) / 100
       : walletData?.dailyGrowth
-      ? parseFloat(walletData.dailyGrowth.toString()) / 100
-      : 0
-  ).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  
+        ? parseFloat(walletData.dailyGrowth.toString()) / 100
+        : 0
+  ).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
   const portfolioPreference = useSelector(
-    (state: RootState) => state.portfolioPreference.flex
+    (state: RootState) => state.portfolioPreference.flex,
   );
   const showInterest = portfolioPreference !== "Impact Wealth";
 
@@ -127,7 +173,7 @@ export default function WealthFlexScreen() {
         <StatusBar style="dark" />
         <Header
           title="WealthFlex"
-          onBack={() => router.back()}
+          onBack={handleBack}
           rightElement={<PortfolioPreferenceMenu portfolioType="flex" />}
         />
         <PortfolioDetailSkeleton />
@@ -140,7 +186,7 @@ export default function WealthFlexScreen() {
       <StatusBar style="dark" />
       <Header
         title="WealthFlex"
-        onBack={() => router.back()}
+        onBack={handleBack}
         rightElement={<PortfolioPreferenceMenu portfolioType="flex" />}
       />
 
@@ -149,7 +195,11 @@ export default function WealthFlexScreen() {
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 100 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 10,
+          paddingBottom: 100,
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -166,12 +216,12 @@ export default function WealthFlexScreen() {
           style={{
             width: "100%",
             maxWidth: 365,
-            height: 170,
+            height: 190,
             borderTopLeftRadius: 50,
             borderTopRightRadius: 20,
             borderBottomRightRadius: 50,
             borderBottomLeftRadius: 20,
-            backgroundColor: "#F4433633", // Red with 20% opacity
+            backgroundColor: "#FFF0EF",
             shadowColor: "#323232",
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.12,
@@ -200,11 +250,11 @@ export default function WealthFlexScreen() {
             />
           </View>
 
-          {/* Text Container - Restored absolute positioning */}
+          {/* Text Container */}
           <View
             style={{
               position: "absolute",
-              top: 28,
+              top: 22,
               left: 20,
               right: 20,
               zIndex: 10,
@@ -212,23 +262,19 @@ export default function WealthFlexScreen() {
           >
             <View className="flex-row items-center justify-between mb-1">
               <View className="flex-row items-center gap-2">
-                <Text className="text-[#1A1A1A] text-[13px] font-medium opacity-90">
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  className="text-[#1A1A1A] text-[13px] font-kumbh-semibold"
+                >
                   Total Savings
                 </Text>
-                {showInterest && (
-                  <View
-                    style={{
-                      backgroundColor: "#F44336",
-                      paddingHorizontal: 8,
-                      paddingVertical: 2.5,
-                      borderRadius: 20,
-                    }}
-                  >
-                    <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                {showInterest && flexRateLabel ? (
+                  <View className="bg-[#E8F5E9] px-2 py-0.5 rounded-full">
+                    <Text className="text-[#2E7D32] text-[10px] font-kumbh-bold">
                       {flexRateLabel}
                     </Text>
                   </View>
-                )}
+                ) : null}
               </View>
               <TouchableOpacity
                 onPress={() => setShowBalance(!showBalance)}
@@ -243,25 +289,59 @@ export default function WealthFlexScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Amount Section */}
-            <View className="mb-2">
+            {/* Amount Section with Chevron */}
+            <TouchableOpacity
+              onPress={() => router.push("/education/win-up" as any)}
+              activeOpacity={0.8}
+              className="flex-row items-baseline mb-1"
+            >
               {showBalance ? (
-                <BalanceText amount={amount} fontSize={32} color="#1A1A1A" />
+                <BalanceText amount={amount} fontSize={31} color="#1A1A1A" />
               ) : (
-                <Text className="text-[#1A1A1A] text-[32px] font-extrabold tracking-tight">
+                <Text className="text-[#1A1A1A] text-[31px] font-extrabold tracking-tight">
                   ***
                 </Text>
               )}
-              {showInterest && (
-              <View className="flex-row items-center space-x-1 mt-1">
-                <Text className="text-[#64748B] text-[13px] font-medium opacity-80">
+              <Text className="text-[#1A1A1A] text-[34px] font-light ml-4 mb-1">
+                ›
+              </Text>
+            </TouchableOpacity>
+
+            {showInterest && (
+              <View className="flex-row items-center space-x-1">
+                <Text
+                  maxFontSizeMultiplier={1.35}
+                  className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold"
+                >
                   Your wealth grew by ₦{dailyGrowthFormatted} today
                 </Text>
                 <ArrowUp size={14} color="#4CAF50" style={{ marginLeft: 4 }} />
               </View>
-              )}
-            </View>
+            )}
           </View>
+
+          <TouchableOpacity
+            className="absolute bg-white items-center justify-center"
+            style={{
+              width: 170,
+              height: 40,
+              borderRadius: 18,
+              bottom: 16,
+              right: 20,
+              elevation: 3,
+              zIndex: 20,
+            }}
+            onPress={() =>
+              router.push({
+                pathname: "/wallet/deposit",
+                params: { plan: "WealthFlex" },
+              })
+            }
+          >
+            <Text className="text-[#F44336] font-bold text-[14px]">
+              Wealth Deposit
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Whats on wealthflex card (Tips Box) */}
@@ -280,18 +360,18 @@ export default function WealthFlexScreen() {
             </TouchableOpacity>
 
             <Text
-              className="font-extrabold text-[12px] mb-4"
-              style={{ lineHeight: 12, color: "#F44336" }}
+              className="font-extrabold text-[13px] mb-4"
+              style={{ lineHeight: 18, color: "#991B1B" }}
             >
               What's on WealthFlex?
             </Text>
 
             <View>
               <View className="flex-row mb-3 items-start">
-                <Text className="mr-2 text-[10px]">👉</Text>
+                <Text className="mr-2 text-[13px]">👉</Text>
                 <Text
-                  className="text-[10px] flex-1 leading-[15px]"
-                  style={{ color: "#F44336" }}
+                  className="text-[13px] flex-1 leading-[18px] font-kumbh-semibold"
+                  style={{ color: "#991B1B" }}
                 >
                   <Text className="font-bold">Fast Funding:</Text> Use "Deposit
                   Funds" to see your unique wealth account details for the
@@ -299,14 +379,28 @@ export default function WealthFlexScreen() {
                 </Text>
               </View>
 
-              <View className="flex-row items-start">
-                <Text className="mr-2 text-[10px]">👉</Text>
+              <View className="flex-row mb-3 items-start">
+                <Text className="mr-2 text-[13px]">👉</Text>
                 <Text
-                  className="text-[10px] flex-1 leading-[15px]"
-                  style={{ color: "#F44336" }}
+                  className="text-[13px] flex-1 leading-[18px] font-kumbh-semibold"
+                  style={{ color: "#991B1B" }}
                 >
                   <Text className="font-bold">Instant Impact:</Text> Watch your
-                  funds reflect in seconds and start growing immediately.
+                  funds reflect in seconds. {flexRateLabel ? `Currently earning ${flexRateLabel}${flexTierName ? ` (${flexTierName})` : ""}, based on your wallet balance.` : "Your interest rate depends on your balance."}
+                </Text>
+              </View>
+
+              <View className="flex-row items-start">
+                <Text className="mr-2 text-[13px]">👉</Text>
+                <Text
+                  className="text-[13px] flex-1 leading-[18px] font-kumbh-semibold"
+                  style={{ color: "#991B1B" }}
+                >
+                  <Text className="font-bold">Deposit Limits:</Text> Minimum
+                  deposit is{" "}
+                  <Text className="font-bold">₦{minDepositNaira}</Text> and
+                  maximum is{" "}
+                  <Text className="font-bold">₦{maxDepositNaira}</Text>.
                 </Text>
               </View>
             </View>
@@ -318,12 +412,12 @@ export default function WealthFlexScreen() {
           <TouchableOpacity
             className="flex-row items-center flex-1"
             style={{
-              height: 75,
+              minHeight: 78,
               borderRadius: 13,
               backgroundColor: "#F06358",
-              paddingTop: 21,
+              paddingTop: 12,
               paddingRight: 16,
-              paddingBottom: 21,
+              paddingBottom: 12,
               paddingLeft: 11,
               gap: 10,
             }}
@@ -342,7 +436,7 @@ export default function WealthFlexScreen() {
               <Text className="text-white font-bold text-[14px]">
                 Wealth Deposit
               </Text>
-              <Text className="text-white mt-2 text-[10px]">
+              <Text className="text-white opacity-95 mt-1 text-[12px] font-kumbh-semibold">
                 {"Add to your WealthFlex"}
               </Text>
             </View>
@@ -351,14 +445,14 @@ export default function WealthFlexScreen() {
           <TouchableOpacity
             className="flex-row items-center flex-1"
             style={{
-              height: 75,
+              minHeight: 78,
               borderRadius: 13,
               backgroundColor: "#FFF2F1",
               borderWidth: 0.7,
               borderColor: "#F06358",
-              paddingTop: 21,
+              paddingTop: 12,
               paddingRight: 16,
-              paddingBottom: 21,
+              paddingBottom: 12,
               paddingLeft: 11,
               gap: 10,
             }}
@@ -384,8 +478,8 @@ export default function WealthFlexScreen() {
               >
                 Withdraw Funds
               </Text>
-              <Text className="text-[10px] mt-2" style={{ color: "#F06358" }}>
-                {"Move or send to other\nportfolios"}
+              <Text className="text-[12px] mt-1 font-kumbh-semibold" style={{ color: "#B91C1C" }}>
+                {"Move or send to your\ntraditional bank"}
               </Text>
             </View>
           </TouchableOpacity>
@@ -419,9 +513,16 @@ export default function WealthFlexScreen() {
             }}
           >
             {transactions.length === 0 ? (
-              <Text className="text-center text-gray-500 py-4">No transactions found</Text>
+              <Text
+                maxFontSizeMultiplier={1.35}
+                className="text-center text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold py-4"
+              >
+                No transactions found
+              </Text>
             ) : (
-              transactions.map((tx) => <TransactionItem key={tx.id} item={tx} />)
+              transactions.map((tx) => (
+                <TransactionItem key={tx.id} item={tx} />
+              ))
             )}
           </View>
         </View>
@@ -435,9 +536,12 @@ function TransactionItem({ item }: { item: WalletTransaction }) {
 
   const getIcon = () => {
     switch (item.reason) {
-      case "WALLET_TOPUP": return <CardDepositIcon />;
-      case "WITHDRAWAL": return <TransferMoneyIcon />;
-      default: return isCredit ? <ReceivedMoneyIcon /> : <TransferMoneyIcon />;
+      case "WALLET_TOPUP":
+        return <CardDepositIcon />;
+      case "WITHDRAWAL":
+        return <TransferMoneyIcon />;
+      default:
+        return isCredit ? <ReceivedMoneyIcon /> : <TransferMoneyIcon />;
     }
   };
 
@@ -458,7 +562,7 @@ function TransactionItem({ item }: { item: WalletTransaction }) {
   const formattedDate = new Date(item.createdAt).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric"
+    year: "numeric",
   });
 
   const getTitle = () => {
@@ -477,7 +581,12 @@ function TransactionItem({ item }: { item: WalletTransaction }) {
         alignItems: "center",
       }}
       activeOpacity={0.9}
-      onPress={() => router.push({ pathname: "/transactions/detail", params: { id: item.id } } as any)}
+      onPress={() =>
+        router.push({
+          pathname: "/transactions/detail",
+          params: { id: item.id },
+        } as any)
+      }
     >
       <View
         className={`w-11 h-11 items-center justify-center mr-3 ${getIconBg()} rounded-full`}
@@ -486,21 +595,33 @@ function TransactionItem({ item }: { item: WalletTransaction }) {
       </View>
       <View className="flex-1">
         <Text
+          maxFontSizeMultiplier={1.35}
           className="text-[#1A1A1A] font-bold text-[13px] mb-1"
           numberOfLines={1}
         >
           {getTitle()}
         </Text>
-        <Text className="text-[#9CA3AF] text-[10px] font-medium">{formattedDate}</Text>
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-[#4B5563] text-[12px] leading-[16px] font-kumbh-semibold"
+        >
+          {formattedDate}
+        </Text>
       </View>
       <View className="items-end">
         <Text
-          className={`font-bold text-[13px] mb-1.5 ${isCredit ? "text-[#10B981]" : "text-[#DC2626]"}`}
+          maxFontSizeMultiplier={1.35}
+          className={`font-bold text-[13px] mb-1.5 ${isCredit ? "text-[#166534]" : "text-[#DC2626]"}`}
         >
           {isCredit ? "+" : "-"}₦{formatAmount(item.amount)}
         </Text>
-        <View className="bg-[#E7F5F5] px-2 py-0.5 rounded-md">
-          <Text className="text-[#155D5F] text-[9px] font-bold">Success</Text>
+        <View className="bg-[#E7F5F5] px-2 py-1 rounded-md">
+          <Text
+            maxFontSizeMultiplier={1.35}
+            className="text-[#155D5F] text-[12px] font-bold"
+          >
+            Success
+          </Text>
         </View>
       </View>
     </TouchableOpacity>

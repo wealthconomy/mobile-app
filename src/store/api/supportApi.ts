@@ -13,7 +13,6 @@ export const supportApi = baseApi.injectEndpoints({
         method: "GET",
       }),
       transformResponse: (response: ApiResponse<SupportChat | null> | SupportChat | null) => {
-        console.log("[supportApi] 📦 GET /support/chat raw response:", response);
         if (response && typeof response === "object" && "data" in response) {
           return response.data ?? null;
         }
@@ -21,24 +20,12 @@ export const supportApi = baseApi.injectEndpoints({
       },
       providesTags: [{ type: "SupportChat", id: "ACTIVE" }],
       async onQueryStarted(_arg, { queryFulfilled }) {
-        console.log("[supportApi] 🚀 Dispatched GET /support/chat request");
         try {
-          const { data, meta } = await queryFulfilled;
-          console.log("[supportApi] ✅ GET /support/chat success:", {
-            status: (meta as any)?.response?.status,
-            chatId: (data as any)?.id,
-            stage: (data as any)?.stage,
-            messagesCount: (data as any)?.messages?.length ?? 0,
-            hasActiveChat: Boolean(data),
-          });
+          await queryFulfilled;
         } catch (error: any) {
           const err = error?.error || error;
-          console.error("[supportApi] ❌ GET /support/chat failed:", {
-            status: err?.status,
-            statusCode: err?.data?.statusCode,
-            message: err?.data?.message || err?.message || err?.error,
-            fullData: err?.data,
-          });
+          const msg = err?.data?.message || err?.message || "Request failed";
+          console.error(`[supportApi] GET /support/chat failed: ${msg}`);
         }
       },
     }),
@@ -51,26 +38,14 @@ export const supportApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: [{ type: "SupportChat", id: "ACTIVE" }],
       transformResponse: (response: ApiResponse<SupportMessage> | SupportMessage) => {
-        console.log("[supportApi] 📦 POST /support/chat/messages raw response:", response);
         if ("data" in response && response.data) {
           return response.data;
         }
         return response as SupportMessage;
       },
       async onQueryStarted(payload, { dispatch, queryFulfilled }) {
-        console.log("[supportApi] 🚀 POST /support/chat/messages dispatched:", {
-          hasText: Boolean(payload.text),
-          textSnippet: payload.text?.substring(0, 30),
-          attachmentUrl: payload.attachmentUrl,
-          fileType: payload.fileType,
-        });
         try {
-          const { data: sentMessage, meta } = await queryFulfilled;
-          console.log("[supportApi] ✅ POST /support/chat/messages success:", {
-            status: (meta as any)?.response?.status,
-            messageId: sentMessage.id,
-            time: sentMessage.time,
-          });
+          const { data: sentMessage } = await queryFulfilled;
           dispatch(
             supportApi.util.updateQueryData("getSupportChat", undefined, (draft) => {
               if (!draft) {
@@ -113,12 +88,8 @@ export const supportApi = baseApi.injectEndpoints({
           );
         } catch (error: any) {
           const err = error?.error || error;
-          console.error("[supportApi] ❌ POST /support/chat/messages failed:", {
-            status: err?.status,
-            statusCode: err?.data?.statusCode,
-            message: err?.data?.message || err?.message || err?.error,
-            fullData: err?.data,
-          });
+          const msg = err?.data?.message || err?.message || "Request failed";
+          console.error(`[supportApi] POST /support/chat/messages failed: ${msg}`);
         }
       },
     }),

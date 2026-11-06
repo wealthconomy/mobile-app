@@ -138,7 +138,7 @@ export default function FinanceSettingsScreen() {
                         className={`text-base capitalize ${
                           frequency === freq
                             ? "text-[#155D5F] font-bold"
-                            : "text-[#64748B]"
+                            : "text-[#4B5563] font-medium"
                         }`}
                       >
                         {freq.toLowerCase()}

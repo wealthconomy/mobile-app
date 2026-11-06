@@ -2,7 +2,9 @@ import Header from "@/src/components/common/Header";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { useCreatePortfolioMutation, useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
 import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
-import { getDynamicInterestRateLabel, getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { useInterestQuote } from "@/src/hooks/useInterestQuote";
+import { getTierBounds } from "@/src/utils/interestTiers";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 import { useFocusEffect } from "@react-navigation/native";
@@ -28,6 +30,7 @@ import {
 } from "react-native";
 import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 
 const TEAL = "#0B575B";
 
@@ -45,6 +48,7 @@ const DURATION_PRESETS = [
 ];
 
 export default function CreateFixScreen() {
+  const formScrollRef = useRef<ScrollView>(null);
   const params = useLocalSearchParams<{
     amount: string;
     duration: string;
@@ -71,12 +75,6 @@ export default function CreateFixScreen() {
   const loading = isCreating || isVerifyingPin;
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
-  const fixInterestRateLabel = getDynamicInterestRateLabel(
-    "fix",
-    systemConfigData,
-    configData?.rates || (configData as any)?.data?.rates,
-    15
-  );
   const { penaltyRate } = getDynamicPenaltyRate(
     "fix",
     systemConfigData,
@@ -95,18 +93,46 @@ export default function CreateFixScreen() {
     }, [refetchWallet])
   );
 
+  const fixConfig = configData?.rates?.wealthfix || (configData as any)?.data?.rates?.wealthfix;
+  const fixTierBounds = getTierBounds(
+    (configData?.tiers || (configData as any)?.data?.tiers) as any,
+    "WEALTH_FIX"
+  );
+  const rawMinFixNaira = (fixTierBounds as any)?.minAmountNaira ?? ((fixTierBounds as any)?.minAmountKobo != null ? (fixTierBounds as any).minAmountKobo / 100 : (fixConfig?.minTargetAmount ? fixConfig.minTargetAmount / 100 : 1000));
+  const minFixNaira = Math.min(rawMinFixNaira > 0 ? rawMinFixNaira : 1000, 1000);
+  const minFixDuration = fixTierBounds.minDurationDays ?? fixConfig?.minDurationDays ?? fixConfig?.minimumTenureDays ?? 30;
+  const maxFixDuration = fixTierBounds.maxDurationDays ?? fixConfig?.maxDurationDays ?? fixConfig?.maximumTenureDays ?? 730;
+  const minFixNairaFormatted = minFixNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const walletBalanceNaira = (parseFloat(walletData?.currentBalance || "0") / 100);
   const enteredAmountNum = parseFloat(initialAmount.replace(/[^\d.]/g, "")) || 0;
   const isInsufficientBalance = enteredAmountNum > walletBalanceNaira && enteredAmountNum > 0;
+  const isBelowMinTarget = enteredAmountNum > 0 && enteredAmountNum < minFixNaira;
+
+  const durationNum = parseInt(duration, 10) || 0;
+  const isBelowMinDuration = duration.length > 0 && durationNum < minFixDuration;
+  const isAboveMaxDuration = duration.length > 0 && maxFixDuration != null && durationNum > maxFixDuration;
+  const isFixDurationValid = durationNum >= minFixDuration && (maxFixDuration == null || durationNum <= maxFixDuration);
+  const isFixAmountValid = enteredAmountNum >= minFixNaira;
+
+  const {
+    rate: quotedRate,
+    projectedInterestNaira,
+    isLoading: isQuoteLoading,
+    isError: isQuoteError,
+    isReady: isQuoteReady,
+  } = useInterestQuote({
+    type: "fix",
+    amountNaira: enteredAmountNum,
+    durationDays: isFixDurationValid ? durationNum : undefined,
+    enabled: wealthPreference === "Interest Based" && isFixAmountValid && isFixDurationValid,
+  });
 
   // Date picker state
   const [endDate, setEndDate] = useState<Date>(() => {
     const d = new Date();
-    if (params.duration) {
-      d.setDate(d.getDate() + (parseInt(params.duration, 10) || 180));
-    } else {
-      d.setDate(d.getDate() + 180);
-    }
+    const initialDays = params.duration ? (parseInt(params.duration, 10) || minFixDuration) : minFixDuration;
+    d.setDate(d.getDate() + Math.max(initialDays, minFixDuration));
     return d;
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -129,12 +155,6 @@ export default function CreateFixScreen() {
     if (!val) return "0.00";
     const num = val.replace(/,/g, "");
     return num.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  };
-
-  const calculateInterest = () => {
-    const amt = parseFloat(initialAmount.replace(/,/g, "")) || 0;
-    const dur = parseInt(duration) || 0;
-    return ((amt * 0.1 * dur) / 365).toFixed(2);
   };
 
   const selectDurationDays = (days: number) => {
@@ -179,7 +199,9 @@ export default function CreateFixScreen() {
     for (let day = 1; day <= daysInMonth; day++) {
       const cellDate = new Date(year, month, day);
       cellDate.setHours(0, 0, 0, 0);
-      const isPast = cellDate <= today;
+      const minAllowedDate = new Date(today);
+      minAllowedDate.setDate(minAllowedDate.getDate() + minFixDuration);
+      const isPast = cellDate < minAllowedDate;
       const isSelected =
         duration !== "" &&
         endDate.getDate() === day &&
@@ -220,7 +242,7 @@ export default function CreateFixScreen() {
           {dayNames.map((d) => (
             <Text
               key={d}
-              style={{ width: "14.28%" as any, textAlign: "center", fontSize: 13, fontWeight: "600", color: "#6B7280" }}
+              style={{ width: "14.28%" as any, textAlign: "center", fontSize: 13, fontWeight: "600", fontFamily: "KumbhSans_600SemiBold", color: "#4B5563" }}
             >
               {d}
             </Text>
@@ -316,7 +338,12 @@ export default function CreateFixScreen() {
 
   // ─── FORM STEP ───────────────────────────────────────────────────────────────
   const renderFormStep = () => (
-    <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-5">
+    <ScrollView
+      ref={formScrollRef}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      className="flex-1 px-5"
+    >
       {/* Header text */}
       <View className="mb-6 mt-2">
         <View className="flex-row items-center justify-between">
@@ -332,13 +359,23 @@ export default function CreateFixScreen() {
                 borderRadius: 20,
               }}
             >
-              <Text style={{ color: "#AB7600", fontSize: 10, fontWeight: "700" }}>
-                Earn ₦{formatAmount(calculateInterest())}
+              <Text
+                maxFontSizeMultiplier={1.35}
+                style={{ color: "#92400E", fontSize: 12, fontWeight: "700" }}
+              >
+                {isQuoteLoading
+                  ? "Calculating..."
+                  : isQuoteReady && projectedInterestNaira != null
+                  ? `Earn ₦${formatAmount(projectedInterestNaira.toFixed(2))}`
+                  : "Earn upfront interest"}
               </Text>
             </View>
           )}
         </View>
-        <Text className="text-[#6B7280] text-[13px] mt-1">
+        <Text
+          maxFontSizeMultiplier={1.35}
+          className="text-[#4B5563] text-[13px] leading-[18px] font-kumbh-semibold mt-1"
+        >
           {lockType === "WealthFix"
             ? "Edit and setup your WealthFix"
             : `Lock ₦${formatAmount(initialAmount)} for ${duration} days`}
@@ -359,11 +396,12 @@ export default function CreateFixScreen() {
             style={{ position: "absolute", right: 12, top: 12, zIndex: 10 }}
             onPress={() => setShowInterestCard(false)}
           >
-            <Ionicons name="close" size={18} color="#D48E00" />
+            <Ionicons name="close" size={18} color="#92400E" />
           </TouchableOpacity>
           <Text
+            maxFontSizeMultiplier={1.35}
             style={{
-              color: "#D48E00",
+              color: "#92400E",
               fontWeight: "700",
               fontSize: 13,
               marginBottom: 8,
@@ -373,19 +411,16 @@ export default function CreateFixScreen() {
           </Text>
           <Text
             style={{
-              color: "#D48E00",
-              fontSize: 11,
-              opacity: 0.85,
-              lineHeight: 17,
+              color: "#92400E",
+              fontSize: 13,
+              fontWeight: "600",
+              fontFamily: "KumbhSans_600SemiBold",
+              lineHeight: 18,
             }}
           >
             Wealth Fix is unique because the interest is paid upfront.{"\n\n"}
-            <Text style={{ fontWeight: "700" }}>Calculation:</Text> The interest
-            is calculated based on how long you lock the funds (rates up to {fixInterestRateLabel}).{"\n"}•{" "}
-            <Text style={{ fontWeight: "700" }}>Short term (10–90 days):</Text>{" "}
-            Standard competitive rates.{"\n"}•{" "}
-            <Text style={{ fontWeight: "700" }}>Long term (1–3 years):</Text>{" "}
-            Maximum yield rates (up to {fixInterestRateLabel}).{"\n\n"}
+            <Text style={{ fontWeight: "700" }}>Calculation:</Text> Your interest rate
+            depends on how much you save and for how long.{"\n\n"}
             <Text style={{ fontWeight: "700" }}>Payment:</Text> As soon as you
             create the Wealth Fix, the interest is immediately credited to your
             Wealthconomy wallet, while the "capital" remains locked until the
@@ -408,13 +443,13 @@ export default function CreateFixScreen() {
             onPress={() => setWealthPreference("Interest Based")}
             style={{ flex: 1, backgroundColor: wealthPreference === "Interest Based" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: wealthPreference === "Interest Based" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: wealthPreference === "Interest Based" ? 2 : 0 }}
           >
-            <Text style={{ color: wealthPreference === "Interest Based" ? "#1A1A1A" : "#6B7280", fontWeight: wealthPreference === "Interest Based" ? "700" : "500", fontSize: 13 }}>Interest Based</Text>
+            <Text style={{ color: wealthPreference === "Interest Based" ? "#1A1A1A" : "#4B5563", fontWeight: "600", fontFamily: "KumbhSans_600SemiBold", fontSize: 13 }}>Interest Based</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             onPress={() => setWealthPreference("Impact Wealth")}
             style={{ flex: 1, backgroundColor: wealthPreference === "Impact Wealth" ? "#FFFFFF" : "transparent", paddingVertical: 12, borderRadius: 8, alignItems: "center", shadowColor: wealthPreference === "Impact Wealth" ? "#000" : "transparent", shadowOpacity: 0.1, shadowRadius: 2, elevation: wealthPreference === "Impact Wealth" ? 2 : 0 }}
           >
-            <Text style={{ color: wealthPreference === "Impact Wealth" ? "#1A1A1A" : "#6B7280", fontWeight: wealthPreference === "Impact Wealth" ? "700" : "500", fontSize: 13 }}>Impact Wealth</Text>
+            <Text style={{ color: wealthPreference === "Impact Wealth" ? "#1A1A1A" : "#4B5563", fontWeight: "600", fontFamily: "KumbhSans_600SemiBold", fontSize: 13 }}>Impact Wealth</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -442,7 +477,7 @@ export default function CreateFixScreen() {
         >
           <TextInput
             placeholder='e.g., "September Rent" or "Emergency Backup"'
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#6B7280"
             value={title}
             onChangeText={setTitle}
             style={{ fontSize: 14, color: "#1A1A1A" }}
@@ -470,7 +505,15 @@ export default function CreateFixScreen() {
             {lockType === "WealthFix" ? "Target Amount" : "Amount To Fix"}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Text style={{ color: "#6B7280", fontSize: 11, fontWeight: "500" }}>
+            <Text
+              style={{
+                color: "#4B5563",
+                fontSize: 12,
+                lineHeight: 16,
+                fontWeight: "600",
+                fontFamily: "KumbhSans_600SemiBold",
+              }}
+            >
               Wallet:{" "}
               <Text style={{ color: "#1A1A1A", fontWeight: "700" }}>
                 ₦{walletBalanceNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -485,7 +528,10 @@ export default function CreateFixScreen() {
                 borderRadius: 6,
               }}
             >
-              <Text style={{ color: TEAL, fontSize: 10, fontWeight: "700" }}>
+              <Text
+                maxFontSizeMultiplier={1.35}
+                style={{ color: TEAL, fontSize: 12, fontWeight: "700" }}
+              >
                 + Fund
               </Text>
             </TouchableOpacity>
@@ -516,7 +562,7 @@ export default function CreateFixScreen() {
           </Text>
           <TextInput
             placeholder="3,500,000.00"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#6B7280"
             keyboardType="numeric"
             value={initialAmount}
             onChangeText={(val) => {
@@ -533,6 +579,20 @@ export default function CreateFixScreen() {
             }}
           />
         </View>
+        {isBelowMinTarget && (
+          <Text
+            style={{
+              color: "#EF4444",
+              fontSize: 12,
+              lineHeight: 16,
+              marginTop: 4,
+              fontWeight: "600",
+              fontFamily: "KumbhSans_600SemiBold",
+            }}
+          >
+            Minimum target amount is ₦{minFixNairaFormatted}
+          </Text>
+        )}
         {isInsufficientBalance && (
           <View
             style={{
@@ -551,8 +611,10 @@ export default function CreateFixScreen() {
             <Text
               style={{
                 color: "#DC2626",
-                fontSize: 11,
+                fontSize: 12,
+                lineHeight: 16,
                 fontWeight: "600",
+                fontFamily: "KumbhSans_600SemiBold",
                 flex: 1,
                 marginRight: 8,
               }}
@@ -568,7 +630,10 @@ export default function CreateFixScreen() {
                 borderRadius: 6,
               }}
             >
-              <Text style={{ color: "#FFFFFF", fontSize: 11, fontWeight: "700" }}>
+              <Text
+                maxFontSizeMultiplier={1.35}
+                style={{ color: "#FFFFFF", fontSize: 12, fontWeight: "700" }}
+              >
                 Fund Wallet
               </Text>
             </TouchableOpacity>
@@ -608,11 +673,13 @@ export default function CreateFixScreen() {
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
+            borderWidth: (isBelowMinDuration || isAboveMaxDuration) ? 1 : 0,
+            borderColor: (isBelowMinDuration || isAboveMaxDuration) ? "#EF4444" : "transparent",
           }}
         >
           <Text
             style={{
-              color: duration ? "#1A1A1A" : "#9CA3AF",
+              color: duration ? "#1A1A1A" : "#6B7280",
               fontSize: 14,
               fontWeight: duration ? "600" : "400",
             }}
@@ -627,7 +694,95 @@ export default function CreateFixScreen() {
           </Text>
           <Ionicons name="calendar-outline" size={20} color={TEAL} />
         </TouchableOpacity>
+        {isBelowMinDuration && (
+          <Text
+            style={{
+              color: "#EF4444",
+              fontSize: 12,
+              lineHeight: 16,
+              marginTop: 4,
+              fontWeight: "600",
+              fontFamily: "KumbhSans_600SemiBold",
+            }}
+          >
+            Minimum lock duration is {minFixDuration} days
+          </Text>
+        )}
+        {isAboveMaxDuration && (
+          <Text
+            style={{
+              color: "#EF4444",
+              fontSize: 12,
+              lineHeight: 16,
+              marginTop: 4,
+              fontWeight: "600",
+              fontFamily: "KumbhSans_600SemiBold",
+            }}
+          >
+            Maximum lock duration is {maxFixDuration} days
+          </Text>
+        )}
       </View>
+
+      {/* Tiered Interest Quote Card under duration selector */}
+      {wealthPreference === "Interest Based" && (
+        <View style={{ marginBottom: 18 }}>
+          {isQuoteLoading ? (
+            <View
+              style={{
+                backgroundColor: "#F8FAFC",
+                borderRadius: 12,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <Text style={{ color: "#64748B", fontSize: 13, fontWeight: "600" }}>
+                Calculating...
+              </Text>
+              <ActivityIndicator size="small" color={TEAL} />
+            </View>
+          ) : isQuoteReady && quotedRate != null ? (
+            <View
+              style={{
+                backgroundColor: "#F0FDF4",
+                borderRadius: 12,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: "#BBF7D0",
+              }}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ color: "#166534", fontSize: 13, fontWeight: "700" }}>
+                  Your rate: {quotedRate}% P.A.
+                </Text>
+                {projectedInterestNaira != null && (
+                  <Text style={{ color: "#15803D", fontSize: 13, fontWeight: "700" }}>
+                    Estimated earnings: +₦{formatAmount(projectedInterestNaira.toFixed(2))}
+                  </Text>
+                )}
+              </View>
+            </View>
+          ) : isFixAmountValid && isFixDurationValid && (isQuoteError || !isQuoteReady) ? (
+            <View
+              style={{
+                backgroundColor: "#F8FAFC",
+                borderRadius: 12,
+                padding: 12,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+              }}
+            >
+              <Text style={{ color: "#64748B", fontSize: 12, fontWeight: "600" }}>
+                Your rate is confirmed when you create the plan
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      )}
 
       {/* Funding Source (Read-only) */}
       <View style={{ marginBottom: 18 }}>
@@ -676,7 +831,15 @@ export default function CreateFixScreen() {
           >
             Manual
           </Text>
-          <Text style={{ color: "#6B7280", fontSize: 11, lineHeight: 16 }}>
+          <Text
+            style={{
+              color: "#4B5563",
+              fontSize: 13,
+              lineHeight: 18,
+              fontWeight: "600",
+              fontFamily: "KumbhSans_600SemiBold",
+            }}
+          >
             "Top Up" whenever you have spare cash (no automation)
           </Text>
         </View>
@@ -723,7 +886,15 @@ export default function CreateFixScreen() {
           >
             Consent
           </Text>
-          <Text style={{ color: "#6B7280", fontSize: 11, lineHeight: 16 }}>
+          <Text
+            style={{
+              color: "#4B5563",
+              fontSize: 13,
+              lineHeight: 18,
+              fontWeight: "600",
+              fontFamily: "KumbhSans_600SemiBold",
+            }}
+          >
             You must check a box agreeing that you cannot break the lock once it
             is created.
           </Text>
@@ -756,6 +927,9 @@ export default function CreateFixScreen() {
           title.trim().length > 0 &&
           enteredAmountNum > 0 &&
           !isInsufficientBalance &&
+          !isBelowMinTarget &&
+          !isBelowMinDuration &&
+          !isAboveMaxDuration &&
           Boolean(duration) &&
           isConsent;
         return (
@@ -797,7 +971,7 @@ export default function CreateFixScreen() {
         >
           WealthFix Preview 🔒
         </Text>
-        <Text style={{ color: "#6B7280", fontSize: 13 }}>
+        <Text style={{ color: "#4B5563", fontSize: 13, lineHeight: 18, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}>
           {lockType}: ₦{formatAmount(initialAmount)} for {duration} days
         </Text>
       </View>
@@ -829,10 +1003,12 @@ export default function CreateFixScreen() {
           <View>
             <Text
               style={{
-                color: "#6B7280",
-                fontSize: 11,
+                color: "#4B5563",
+                fontSize: 12,
+                lineHeight: 16,
+                fontFamily: "KumbhSans_600SemiBold",
                 marginBottom: 6,
-                fontWeight: "500",
+                fontWeight: "600",
               }}
             >
               Amount To Fix
@@ -844,10 +1020,12 @@ export default function CreateFixScreen() {
           <View style={{ alignItems: "flex-end" }}>
             <Text
               style={{
-                color: "#6B7280",
-                fontSize: 11,
+                color: "#4B5563",
+                fontSize: 12,
+                lineHeight: 16,
+                fontFamily: "KumbhSans_600SemiBold",
                 marginBottom: 6,
-                fontWeight: "500",
+                fontWeight: "600",
               }}
             >
               Lock Duration
@@ -868,25 +1046,33 @@ export default function CreateFixScreen() {
           <View>
             <Text
               style={{
-                color: "#6B7280",
-                fontSize: 11,
+                color: "#4B5563",
+                fontSize: 12,
+                lineHeight: 16,
+                fontFamily: "KumbhSans_600SemiBold",
                 marginBottom: 6,
-                fontWeight: "500",
+                fontWeight: "600",
               }}
             >
               {wealthPreference === "Interest Based" ? "Interest Rate" : "Preference"}
             </Text>
             <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 16 }}>
-              {wealthPreference === "Interest Based" ? fixInterestRateLabel : "Impact Wealth"}
+              {wealthPreference === "Interest Based"
+                ? isQuoteReady && quotedRate != null
+                  ? `${quotedRate}% P.A.`
+                  : "Rate confirmed on creation"
+                : "Impact Wealth"}
             </Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
             <Text
               style={{
-                color: "#6B7280",
-                fontSize: 11,
+                color: "#4B5563",
+                fontSize: 12,
+                lineHeight: 16,
+                fontFamily: "KumbhSans_600SemiBold",
                 marginBottom: 6,
-                fontWeight: "500",
+                fontWeight: "600",
               }}
             >
               End Date
@@ -911,10 +1097,12 @@ export default function CreateFixScreen() {
           <View>
             <Text
               style={{
-                color: "#6B7280",
-                fontSize: 11,
+                color: "#4B5563",
+                fontSize: 12,
+                lineHeight: 16,
+                fontFamily: "KumbhSans_600SemiBold",
                 marginBottom: 6,
-                fontWeight: "500",
+                fontWeight: "600",
               }}
             >
               Funding Source
@@ -927,16 +1115,20 @@ export default function CreateFixScreen() {
             <View style={{ alignItems: "flex-end" }}>
               <Text
                 style={{
-                  color: "#6B7280",
-                  fontSize: 11,
+                  color: "#4B5563",
+                  fontSize: 12,
+                  lineHeight: 16,
+                  fontFamily: "KumbhSans_600SemiBold",
                   marginBottom: 6,
-                  fontWeight: "500",
+                  fontWeight: "600",
                 }}
               >
                 Estimated Return
               </Text>
               <Text style={{ color: TEAL, fontWeight: "700", fontSize: 16 }}>
-                +₦{formatAmount(calculateInterest())}
+                {isQuoteReady && projectedInterestNaira != null
+                  ? `+₦${formatAmount(projectedInterestNaira.toFixed(2))}`
+                  : "Rate confirmed on creation"}
               </Text>
             </View>
           )}
@@ -1002,7 +1194,7 @@ export default function CreateFixScreen() {
           {agreedPenalty && <Check size={13} color="white" />}
         </View>
         <Text
-          style={{ flex: 1, color: "#6B7280", fontSize: 12, lineHeight: 18 }}
+          style={{ flex: 1, color: "#4B5563", fontSize: 13, lineHeight: 18, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}
         >
           You must agree that early withdrawal from a Wealth Fix is discouraged
           and will attract a penalty to ensure financial discipline.
@@ -1035,7 +1227,7 @@ export default function CreateFixScreen() {
           {acknowledgedTemptation && <Check size={13} color="white" />}
         </View>
         <Text
-          style={{ flex: 1, color: "#6B7280", fontSize: 12, lineHeight: 18 }}
+          style={{ flex: 1, color: "#4B5563", fontSize: 13, lineHeight: 18, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600" }}
         >
           You must also acknowledge that the lock feature is designed to "block
           temptation," and breaking the lock undermines their wealth-building
@@ -1093,7 +1285,7 @@ export default function CreateFixScreen() {
       await createPortfolio({ type: "wealthfix", body }).unwrap();
       setStep("success");
     } catch (err: any) {
-      console.error("Failed to create fix portfolio:", err);
+      console.error("Failed to create fix portfolio");
       const rawMsg = err?.data?.message;
       const errorMsg = Array.isArray(rawMsg) ? rawMsg.join(", ") : rawMsg || err?.message || "Verification Failed";
       if (typeof errorMsg === "string" && errorMsg.toLowerCase().includes("not set")) {
@@ -1142,7 +1334,9 @@ export default function CreateFixScreen() {
       <Text
         style={{
           fontSize: 13,
-          color: "#6B7280",
+          color: "#4B5563",
+          fontFamily: "KumbhSans_600SemiBold",
+          fontWeight: "600",
           textAlign: "center",
           marginBottom: 40,
           lineHeight: 20,
@@ -1202,10 +1396,12 @@ export default function CreateFixScreen() {
       <View style={{ marginBottom: 40, paddingHorizontal: 16 }}>
         <Text
           style={{
-            color: "#6B7280",
+            color: "#4B5563",
             textAlign: "center",
-            fontSize: 12,
+            fontSize: 13,
             lineHeight: 18,
+            fontFamily: "KumbhSans_600SemiBold",
+            fontWeight: "600",
           }}
         >
           If you have forgotten your pin, change it from your settings page
@@ -1273,8 +1469,10 @@ export default function CreateFixScreen() {
 
       <Text
         style={{
-          color: "#6B7280",
+          color: "#4B5563",
           fontSize: 13,
+          fontFamily: "KumbhSans_600SemiBold",
+          fontWeight: "600",
           textAlign: "center",
           lineHeight: 21,
           marginBottom: 48,
@@ -1290,14 +1488,16 @@ export default function CreateFixScreen() {
         </Text>{" "}
         until{" "}
         <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-          [24th Dec 2026]
+          {endDate.toLocaleDateString("en-US", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}
         </Text>
         .{"\n\n"}You've successfully blocked temptation and set your money on a
-        path to grow by{" "}
-        <Text style={{ fontWeight: "700", color: "#1A1A1A" }}>
-          (₦{formatAmount(calculateInterest())})
-        </Text>
-        . It's a win for your future self!
+        path to grow{isQuoteReady && projectedInterestNaira != null
+          ? ` by an estimated (₦${formatAmount(projectedInterestNaira.toFixed(2))})`
+          : ""}. It's a win for your future self!
       </Text>
 
       <TouchableOpacity
@@ -1332,29 +1532,34 @@ export default function CreateFixScreen() {
         }}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        {step === "form" && renderFormStep()}
-        {step === "preview" && renderPreviewStep()}
-        {step === "pin" && (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 40 }}
-          >
-            {renderPinStep()}
-          </ScrollView>
-        )}
-        {step === "success" && (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 40 }}
-          >
-            {renderSuccessStep()}
-          </ScrollView>
-        )}
-      </KeyboardAvoidingView>
+      {step === "form" ? (
+        <KeyboardAwareScreen style={{ flex: 1 }} scrollRef={formScrollRef}>
+          {renderFormStep()}
+        </KeyboardAwareScreen>
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          {step === "preview" && renderPreviewStep()}
+          {step === "pin" && (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              {renderPinStep()}
+            </ScrollView>
+          )}
+          {step === "success" && (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              {renderSuccessStep()}
+            </ScrollView>
+          )}
+        </KeyboardAvoidingView>
+      )}
 
       {/* Custom Calendar Modal */}
       <Modal
@@ -1407,8 +1612,10 @@ export default function CreateFixScreen() {
                   <Text
                     style={{
                       fontSize: 12,
+                      lineHeight: 16,
+                      fontFamily: "KumbhSans_600SemiBold",
                       fontWeight: "700",
-                      color: "#6B7280",
+                      color: "#4B5563",
                       marginBottom: 8,
                     }}
                   >

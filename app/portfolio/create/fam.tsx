@@ -3,7 +3,9 @@ import { AppCalendarModal, AppDatePickerField } from "@/src/components/common";
 import { ThemedButton } from "@/src/components/ThemedButton";
 import { useCreatePortfolioMutation, useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
 import { useGetSystemConfigsQuery } from "@/src/store/api/groupApi";
-import { getDynamicInterestRateLabel, getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { getDynamicPenaltyRate } from "@/src/utils/formatters";
+import { useInterestQuote } from "@/src/hooks/useInterestQuote";
+import { getTierBounds } from "@/src/utils/interestTiers";
 import { useVerifyPinMutation } from "@/src/store/api/userApi";
 import { CreatePortfolioRequest } from "@/src/types/portfolio";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,6 +25,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const TEAL = "#0B575B";
@@ -33,6 +36,7 @@ const FAMILY_CATEGORIES = ["Kids", "Spouse", "Parent", "Siblings"];
 const FREQUENCIES = ["Daily", "Weekly", "Monthly"];
 
 export default function CreateFamScreen() {
+  const formScrollRef = useRef<ScrollView>(null);
   const params = useLocalSearchParams<{
     category: string;
     amount: string;
@@ -55,10 +59,6 @@ export default function CreateFamScreen() {
   const [endDateText, setEndDateText] = useState("");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(null);
-
-  const minTargetDate = new Date();
-  minTargetDate.setDate(minTargetDate.getDate() + 1);
-  minTargetDate.setHours(0, 0, 0, 0);
 
   const handleSelectDate = (date: Date) => {
     setSelectedEndDate(date);
@@ -83,18 +83,55 @@ export default function CreateFamScreen() {
   const [verifyPin] = useVerifyPinMutation();
   const { data: configData } = useGetPortfolioConfigQuery();
   const { data: systemConfigData } = useGetSystemConfigsQuery();
-  const famInterestRateLabel = getDynamicInterestRateLabel(
-    "fam",
-    systemConfigData,
-    configData?.rates || (configData as any)?.data?.rates,
-    10
+  const rates = configData?.rates || (configData as any)?.data?.rates;
+  const famConfig = rates?.wealthfam || rates?.fam;
+  const famTierBounds = getTierBounds(
+    (configData?.tiers || (configData as any)?.data?.tiers) as any,
+    "WEALTH_FAM"
   );
+  const rawMinFamNaira = (famTierBounds as any)?.minAmountNaira ?? ((famTierBounds as any)?.minAmountKobo != null ? (famTierBounds as any).minAmountKobo / 100 : (famConfig?.minTargetAmount ? famConfig.minTargetAmount / 100 : 1000));
+  const minFamNaira = Math.min(rawMinFamNaira > 0 ? rawMinFamNaira : 1000, 1000);
+  const minFamNairaFormatted = minFamNaira.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const minFamDuration = famTierBounds.minDurationDays ?? famConfig?.minDurationDays ?? famConfig?.minimumTenureDays ?? 30;
+  const maxFamDuration = famTierBounds.maxDurationDays ?? famConfig?.maxDurationDays ?? famConfig?.maximumTenureDays ?? 730;
+
+  const initialDepositNaira = parseFloat(initialDeposit.replace(/,/g, "")) || 0;
+  const targetAmountNaira = parseFloat(targetAmount.replace(/,/g, "")) || 0;
+  const effectiveFamAmountNaira = targetAmountNaira > 0 ? targetAmountNaira : initialDepositNaira;
+  let famDurationDays = 0;
+  if (selectedEndDate) {
+    const todayZero = new Date();
+    todayZero.setHours(0, 0, 0, 0);
+    const selZero = new Date(selectedEndDate);
+    selZero.setHours(0, 0, 0, 0);
+    famDurationDays = Math.max(1, Math.ceil((selZero.getTime() - todayZero.getTime()) / (1000 * 3600 * 24)));
+  }
+  const isFamDurationValid = famDurationDays >= minFamDuration && (maxFamDuration == null || famDurationDays <= maxFamDuration);
+  const isFamAmountValid = effectiveFamAmountNaira >= minFamNaira || initialDepositNaira >= 100;
+
+  const {
+    rate: quotedRate,
+    projectedInterestNaira,
+    isLoading: isQuoteLoading,
+    isError: isQuoteError,
+    isReady: isQuoteReady,
+  } = useInterestQuote({
+    type: "fam",
+    amountNaira: Math.max(effectiveFamAmountNaira, 100),
+    durationDays: isFamDurationValid ? famDurationDays : undefined,
+    enabled: wealthPreference === "Interest Based" && isFamAmountValid && isFamDurationValid,
+  });
+
   const { penaltyRate: famPenaltyRate } = getDynamicPenaltyRate(
     "fam",
     systemConfigData,
-    configData?.rates || (configData as any)?.data?.rates,
+    rates,
     "2.5%"
   );
+
+  const minTargetDate = new Date();
+  minTargetDate.setDate(minTargetDate.getDate() + minFamDuration);
+  minTargetDate.setHours(0, 0, 0, 0);
 
   const formatAmount = (val: string) => {
     const n = val.replace(/\D/g, "");
@@ -123,21 +160,28 @@ export default function CreateFamScreen() {
     return new Date(Date.now() + 365 * 86400000).toISOString();
   };
 
-  const calculateGrowth = () => {
-    const amt = parseFloat(targetAmount.replace(/,/g, "")) || 0;
-    return ((amt * 0.12 * 365) / 365).toFixed(2);
-  };
+
 
   const isFormValid = () => {
     const targetAmt = parseFloat(targetAmount.replace(/,/g, "")) || 0;
     const initialAmt = parseFloat(initialDeposit.replace(/,/g, "")) || 0;
+    let durationDays = 0;
+    if (selectedEndDate) {
+      const todayZero = new Date();
+      todayZero.setHours(0, 0, 0, 0);
+      const selZero = new Date(selectedEndDate);
+      selZero.setHours(0, 0, 0, 0);
+      durationDays = Math.max(1, Math.ceil((selZero.getTime() - todayZero.getTime()) / (1000 * 3600 * 24)));
+    }
+    const isDurationValid = selectedEndDate ? (durationDays >= minFamDuration && durationDays <= maxFamDuration) : endDateText.length >= 10;
     return (
       familyCategory.length > 0 &&
       membersName.trim().length > 0 &&
-      targetAmt > 0 &&
+      targetAmt >= minFamNaira &&
       initialAmt >= 100 &&
       frequency.length > 0 &&
-      endDateText.length >= 10
+      endDateText.length >= 10 &&
+      isDurationValid
     );
   };
 
@@ -146,9 +190,7 @@ export default function CreateFamScreen() {
     setIsSubmitting(true);
 
     try {
-      console.log("👨‍👩‍👧 [WealthFam Create] Verifying PIN...");
       await verifyPin({ pin: enteredPin }).unwrap();
-      console.log("✅ [WealthFam Create] PIN verified successfully");
 
       const targetAmountKobo = Math.round((parseFloat(targetAmount.replace(/,/g, "")) || 0) * 100);
       const initialDepositKobo = Math.round((parseFloat(initialDeposit.replace(/,/g, "")) || 100) * 100);
@@ -177,17 +219,14 @@ export default function CreateFamScreen() {
         },
       };
 
-      console.log("👨‍👩‍👧 [WealthFam Create Request] POST /api/v1/portfolios/wealthfam with payload:\n", JSON.stringify(payload, null, 2));
-
-      const res = await createPortfolio({
+      await createPortfolio({
         type: "wealthfam",
         body: payload,
       }).unwrap();
 
-      console.log("✅ [WealthFam Create Success] Received response:\n", JSON.stringify(res, null, 2));
       setStep("success");
     } catch (err: any) {
-      console.error("❌ [WealthFam Create Error] Failed to create portfolio:\n", JSON.stringify(err, null, 2));
+      console.error("[WealthFam Create Error] Failed to create portfolio");
       const message =
         err?.data?.message ||
         err?.message ||
@@ -201,7 +240,12 @@ export default function CreateFamScreen() {
 
   // ─── FORM ─────────────────────────────────────────────────────────────────
   const renderForm = () => (
-    <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-5">
+    <ScrollView
+      ref={formScrollRef}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      className="flex-1 px-5"
+    >
       {/* What's on WealthFam? */}
       {showInfoCard && (
         <View
@@ -220,6 +264,7 @@ export default function CreateFamScreen() {
             <Ionicons name="close" size={18} color="#560FF1" />
           </TouchableOpacity>
           <Text
+            maxFontSizeMultiplier={1.35}
             style={{
               color: "#560FF1",
               fontWeight: "700",
@@ -243,7 +288,7 @@ export default function CreateFamScreen() {
             {
               icon: "🛡️",
               bold: "Secured Interest:",
-              text: ` Earn up to ${famInterestRateLabel} interest on family funds until maturity or activate Anytime Withdrawal as needed.`,
+              text: " Your interest rate depends on how much you save and for how long on family funds until maturity or activate Anytime Withdrawal as needed.",
             },
             {
               icon: "⚠️",
@@ -263,8 +308,10 @@ export default function CreateFamScreen() {
               <Text
                 style={{
                   color: "#560FF1",
-                  fontSize: 12,
+                  fontSize: 13,
                   lineHeight: 18,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
                   flex: 1,
                 }}
               >
@@ -285,7 +332,7 @@ export default function CreateFamScreen() {
         >
           <Text
             style={{
-              color: familyCategory ? "#1A1A1A" : "#9CA3AF",
+              color: familyCategory ? "#1A1A1A" : "#6B7280",
               fontSize: 15,
               fontWeight: familyCategory ? "600" : "400",
             }}
@@ -334,7 +381,7 @@ export default function CreateFamScreen() {
         <Text style={styles.inputLabel}>Member's Name</Text>
         <TextInput
           placeholder="e.g. Sharon, Junior, Dad"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#6B7280"
           value={membersName}
           onChangeText={setMembersName}
           style={styles.textInput}
@@ -342,33 +389,76 @@ export default function CreateFamScreen() {
       </View>
 
       {/* Target Amount */}
-      <View style={{ marginBottom: 20 }}>
-        <Text style={styles.inputLabel}>Target Goal Amount (₦)</Text>
-        <TextInput
-          placeholder="e.g. 1,000,000"
-          placeholderTextColor="#9CA3AF"
-          value={targetAmount}
-          onChangeText={(v) => setTargetAmount(formatAmount(v))}
-          keyboardType="numeric"
-          style={styles.textInput}
-        />
-        <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>
-          The final target milestone you want to reach
-        </Text>
-      </View>
+      {(() => {
+        const targetAmtNum = parseFloat(targetAmount.replace(/,/g, "")) || 0;
+        const isBelowMinTarget = targetAmtNum > 0 && targetAmtNum < minFamNaira;
+
+        return (
+          <View style={{ marginBottom: 20 }}>
+            <Text style={styles.inputLabel}>Target Goal Amount (₦)</Text>
+            <TextInput
+              placeholder="e.g. 1,000,000"
+              placeholderTextColor="#6B7280"
+              value={targetAmount}
+              onChangeText={(v) => setTargetAmount(formatAmount(v))}
+              keyboardType="numeric"
+              style={[
+                styles.textInput,
+                isBelowMinTarget && { borderWidth: 1, borderColor: "#EF4444" },
+              ]}
+            />
+            {isBelowMinTarget ? (
+              <Text
+                style={{
+                  color: "#EF4444",
+                  fontSize: 12,
+                  lineHeight: 16,
+                  marginTop: 4,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                }}
+              >
+                Minimum target goal amount is ₦{minFamNairaFormatted}
+              </Text>
+            ) : (
+              <Text
+                style={{
+                  fontSize: 13,
+                  lineHeight: 18,
+                  color: "#4B5563",
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                  marginTop: 4,
+                }}
+              >
+                The final target milestone you want to reach
+              </Text>
+            )}
+          </View>
+        );
+      })()}
 
       {/* Starting / Initial Deposit */}
       <View style={{ marginBottom: 20 }}>
         <Text style={styles.inputLabel}>Starting Contribution (₦)</Text>
         <TextInput
           placeholder="e.g. 1,000 (Min ₦100)"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#6B7280"
           value={initialDeposit}
           onChangeText={(v) => setInitialDeposit(formatAmount(v))}
           keyboardType="numeric"
           style={styles.textInput}
         />
-        <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>
+        <Text
+          style={{
+            fontSize: 13,
+            lineHeight: 18,
+            color: "#4B5563",
+            fontWeight: "600",
+            fontFamily: "KumbhSans_600SemiBold",
+            marginTop: 4,
+          }}
+        >
           Amount deducted from funding source to open and activate this pot
         </Text>
       </View>
@@ -382,7 +472,7 @@ export default function CreateFamScreen() {
         >
           <Text
             style={{
-              color: frequency ? "#1A1A1A" : "#9CA3AF",
+              color: frequency ? "#1A1A1A" : "#6B7280",
               fontSize: 15,
               fontWeight: frequency ? "600" : "400",
             }}
@@ -437,13 +527,120 @@ export default function CreateFamScreen() {
       </View>
 
       {/* End Date (Target Date) */}
-      <AppDatePickerField
-        label="Target End Date"
-        placeholder="Select Target End Date"
-        value={endDateText}
-        onPress={() => setShowDatePicker(true)}
-        helperText="Target maturity date (must be in the future)"
-      />
+      {(() => {
+        let durationDays = 0;
+        if (selectedEndDate) {
+          const todayZero = new Date();
+          todayZero.setHours(0, 0, 0, 0);
+          const selZero = new Date(selectedEndDate);
+          selZero.setHours(0, 0, 0, 0);
+          durationDays = Math.max(1, Math.ceil((selZero.getTime() - todayZero.getTime()) / (1000 * 3600 * 24)));
+        }
+        const isBelowMinDuration = selectedEndDate && durationDays < minFamDuration;
+        const isAboveMaxDuration = selectedEndDate && durationDays > maxFamDuration;
+
+        return (
+          <View style={{ marginBottom: 20 }}>
+            <AppDatePickerField
+              label="Target End Date"
+              placeholder="Select Target End Date"
+              value={selectedEndDate ? `${endDateText} (${durationDays} days)` : endDateText}
+              onPress={() => setShowDatePicker(true)}
+              helperText={
+                isBelowMinDuration
+                  ? `Minimum lock duration is ${minFamDuration} days`
+                  : isAboveMaxDuration
+                  ? `Maximum lock duration is ${maxFamDuration} days`
+                  : "Target maturity date (must be in the future)"
+              }
+            />
+            {isBelowMinDuration && (
+              <Text
+                style={{
+                  color: "#EF4444",
+                  fontSize: 12,
+                  lineHeight: 16,
+                  marginTop: 4,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                }}
+              >
+                Minimum lock duration is {minFamDuration} days
+              </Text>
+            )}
+            {isAboveMaxDuration && (
+              <Text
+                style={{
+                  color: "#EF4444",
+                  fontSize: 12,
+                  lineHeight: 16,
+                  marginTop: 4,
+                  fontWeight: "600",
+                  fontFamily: "KumbhSans_600SemiBold",
+                }}
+              >
+                Maximum lock duration is {maxFamDuration} days
+              </Text>
+            )}
+          </View>
+        );
+      })()}
+
+      {/* Tiered Interest Quote Card */}
+      {wealthPreference === "Interest Based" && (
+        <View style={{ marginBottom: 20 }}>
+          {isQuoteLoading ? (
+            <View
+              style={{
+                backgroundColor: "#F8FAFC",
+                borderRadius: 12,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+              }}
+            >
+              <Text style={{ color: "#64748B", fontSize: 13, fontWeight: "600" }}>
+                Calculating...
+              </Text>
+            </View>
+          ) : isQuoteReady && quotedRate != null ? (
+            <View
+              style={{
+                backgroundColor: "#F0FDF4",
+                borderRadius: 12,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: "#BBF7D0",
+              }}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ color: "#166534", fontSize: 13, fontWeight: "700" }}>
+                  Your rate: {quotedRate}% P.A.
+                </Text>
+                {projectedInterestNaira != null && (
+                  <Text style={{ color: "#15803D", fontSize: 13, fontWeight: "700" }}>
+                    Estimated earnings: +₦{formatAmount(projectedInterestNaira.toFixed(2))}
+                  </Text>
+                )}
+              </View>
+            </View>
+          ) : isFamAmountValid && isFamDurationValid && (isQuoteError || !isQuoteReady) ? (
+            <View
+              style={{
+                backgroundColor: "#F8FAFC",
+                borderRadius: 12,
+                padding: 12,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+              }}
+            >
+              <Text style={{ color: "#64748B", fontSize: 12, fontWeight: "600" }}>
+                Your rate is confirmed when you create the plan
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      )}
 
       <AppCalendarModal
         visible={showDatePicker}
@@ -536,7 +733,16 @@ export default function CreateFamScreen() {
           <Text style={{ color: "#1A1A1A", fontWeight: "700", fontSize: 14 }}>
             Manual Mode
           </Text>
-          <Text style={{ color: "#6B7280", fontSize: 12, marginTop: 2 }}>
+          <Text
+            style={{
+              color: "#4B5563",
+              fontSize: 13,
+              lineHeight: 18,
+              fontWeight: "600",
+              fontFamily: "KumbhSans_600SemiBold",
+              marginTop: 2,
+            }}
+          >
             Switch on to deposit manually whenever you choose.
           </Text>
         </View>
@@ -603,7 +809,7 @@ export default function CreateFamScreen() {
         >
           {familyCategory} - {membersName}
         </Text>
-        <Text style={{ color: "#6B7280", fontSize: 13, marginTop: 4 }}>
+        <Text style={{ color: "#4B5563", fontSize: 13, lineHeight: 18, fontFamily: "KumbhSans_600SemiBold", fontWeight: "600", marginTop: 4 }}>
           Target: ₦{targetAmount || "0.00"}
         </Text>
       </View>
@@ -672,14 +878,39 @@ export default function CreateFamScreen() {
           style={{
             flexDirection: "row",
             justifyContent: "space-between",
-            marginBottom: 8,
+            marginBottom: 24,
           }}
         >
           <View>
             <Text style={styles.previewLabel}>Interest Rate</Text>
-            <Text style={styles.previewValue}>{famInterestRateLabel}</Text>
+            <Text style={styles.previewValue}>
+              {wealthPreference === "Interest Based"
+                ? isQuoteReady && quotedRate != null
+                  ? `${quotedRate}% P.A.`
+                  : "Rate confirmed on creation"
+                : "Impact Wealth"}
+            </Text>
           </View>
         </View>
+
+        {wealthPreference === "Interest Based" && (
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              marginBottom: 8,
+            }}
+          >
+            <View>
+              <Text style={styles.previewLabel}>Estimated Return</Text>
+              <Text style={[styles.previewValue, { color: TEAL }]}>
+                {isQuoteReady && projectedInterestNaira != null
+                  ? `+₦${formatAmount(projectedInterestNaira.toFixed(2))}`
+                  : "Rate confirmed on creation"}
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Decorative receipt zig-zag */}
@@ -759,8 +990,10 @@ export default function CreateFamScreen() {
       </Text>
       <Text
         style={{
-          color: "#6B7280",
+          color: "#4B5563",
           fontSize: 13,
+          fontFamily: "KumbhSans_600SemiBold",
+          fontWeight: "600",
           textAlign: "center",
           marginBottom: 32,
           lineHeight: 20,
@@ -864,8 +1097,10 @@ export default function CreateFamScreen() {
 
       <Text
         style={{
-          color: "#6B7280",
+          color: "#4B5563",
           fontSize: 14,
+          fontFamily: "KumbhSans_600SemiBold",
+          fontWeight: "600",
           textAlign: "center",
           lineHeight: 22,
           marginBottom: 40,
@@ -924,23 +1159,29 @@ export default function CreateFamScreen() {
         }}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        {step === "form" && renderForm()}
-        {step === "preview" && renderPreview()}
-        {step === "pin" && renderPin()}
-        {step === "success" && renderSuccess()}
-      </KeyboardAvoidingView>
+      {step === "form" ? (
+        <KeyboardAwareScreen style={{ flex: 1 }} scrollRef={formScrollRef}>
+          {renderForm()}
+        </KeyboardAwareScreen>
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          {step === "preview" && renderPreview()}
+          {step === "pin" && renderPin()}
+          {step === "success" && renderSuccess()}
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   inputLabel: {
-    color: "#6B7280",
+    color: "#4B5563",
     fontSize: 13,
+    fontFamily: "KumbhSans_600SemiBold",
     fontWeight: "700",
     marginBottom: 8,
   },
@@ -988,9 +1229,11 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F3F4F6",
   },
   previewLabel: {
-    color: "#6B7280",
+    color: "#4B5563",
     fontSize: 12,
-    fontWeight: "500",
+    lineHeight: 16,
+    fontFamily: "KumbhSans_600SemiBold",
+    fontWeight: "600",
     marginBottom: 4,
   },
   previewValue: {

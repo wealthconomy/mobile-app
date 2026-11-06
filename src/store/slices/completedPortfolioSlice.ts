@@ -25,16 +25,16 @@ export const hydrateCompletedPortfolios = createAsyncThunk(
           return map;
         }
       }
-    } catch (err) {
-      console.error("Failed to hydrate completed portfolios:", err);
+    } catch {
+      console.error("Failed to hydrate completed portfolios");
     }
     return {};
   }
 );
 
 const persistCompletedMap = (map: Record<string, Portfolio>) => {
-  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(map)).catch((err) =>
-    console.error("Failed to persist completed portfolios to AsyncStorage:", err)
+  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(map)).catch(() =>
+    console.error("Failed to persist completed portfolios to AsyncStorage")
   );
 };
 

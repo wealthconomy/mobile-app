@@ -1,33 +1,40 @@
+import { KeyboardAwareScreen } from "@/src/components/common/KeyboardAwareScreen";
+import { Skeleton } from "@/src/components/common/skeletons";
+import { useSupportChat } from "@/src/features/support/hooks/useSupportChat";
+import { useImageUpload } from "@/src/hooks/useImageUpload";
+import { useKeyboardOverlap } from "@/src/hooks/useKeyboardOverlap";
+import { suspendAppLock } from "@/src/store/slices/appStatusSlice";
+import { SupportMessage } from "@/src/types/support";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import * as ImagePicker from "expo-image-picker";
-import * as ImageManipulator from "expo-image-manipulator";
-import * as WebBrowser from "expo-web-browser";
 import * as Clipboard from "expo-clipboard";
-import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import * as ImageManipulator from "expo-image-manipulator";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
+import * as Sharing from "expo-sharing";
+import * as WebBrowser from "expo-web-browser";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
-  KeyboardAvoidingView,
+  Keyboard,
   Linking,
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { useSupportChat } from "@/src/features/support/hooks/useSupportChat";
-import { useImageUpload } from "@/src/hooks/useImageUpload";
-import { SupportMessage } from "@/src/types/support";
-import { Skeleton } from "@/src/components/common/skeletons";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 function getMessageTimestamp(item?: any): string {
   if (!item) return "";
@@ -97,12 +104,13 @@ function isSupportMessage(item: any): boolean {
     item.senderRole === "SUPER_ADMIN" ||
     item.role === "ADMIN" ||
     item.isAdmin === true ||
-    (typeof item.sender === "string" && item.sender.toLowerCase() === "admin") ||
+    (typeof item.sender === "string" &&
+      item.sender.toLowerCase() === "admin") ||
     (typeof item.senderName === "string" &&
       (item.senderName === "Admin Support" ||
         item.senderName === "Admin" ||
         /\b(admin\s*support|support\s*team|wealthconomy\s*support)\b/i.test(
-          item.senderName
+          item.senderName,
         )))
   );
 }
@@ -132,7 +140,12 @@ function ChatSkeletonLoading() {
             style={{ marginBottom: 6 }}
             color="#E5E7EB"
           />
-          <Skeleton width="100%" height={56} borderRadius={16} color="#F3F4F6" />
+          <Skeleton
+            width="100%"
+            height={56}
+            borderRadius={16}
+            color="#F3F4F6"
+          />
         </View>
       </View>
 
@@ -142,7 +155,9 @@ function ChatSkeletonLoading() {
       </View>
 
       {/* Customer Follow-up Skeleton */}
-      <View style={{ alignSelf: "flex-end", maxWidth: "55%", marginBottom: 14 }}>
+      <View
+        style={{ alignSelf: "flex-end", maxWidth: "55%", marginBottom: 14 }}
+      >
         <Skeleton width={130} height={38} borderRadius={14} color="#E7F5F5" />
       </View>
 
@@ -163,7 +178,12 @@ function ChatSkeletonLoading() {
             style={{ marginBottom: 6 }}
             color="#E5E7EB"
           />
-          <Skeleton width="100%" height={68} borderRadius={16} color="#F3F4F6" />
+          <Skeleton
+            width="100%"
+            height={68}
+            borderRadius={16}
+            color="#F3F4F6"
+          />
         </View>
       </View>
 
@@ -235,6 +255,24 @@ export default function ChatScreen() {
   const [hasSubmittedFeedback, setHasSubmittedFeedback] = useState(false);
   const flatListRef = useRef<FlatList<SupportMessage>>(null);
 
+  const { isKeyboardVisible } = useKeyboardOverlap();
+  const isAndroidKeyboardVisible =
+    Platform.OS === "android" && isKeyboardVisible;
+  const [emptyContainerHeight, setEmptyContainerHeight] = useState(0);
+  const [emptyContentHeight, setEmptyContentHeight] = useState(0);
+  const shouldCenterEmptyState =
+    !isAndroidKeyboardVisible &&
+    emptyContainerHeight > 0 &&
+    emptyContentHeight > 0 &&
+    emptyContentHeight < emptyContainerHeight;
+
+  useEffect(() => {
+    const sub = Keyboard.addListener("keyboardDidShow", () => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => sub.remove();
+  }, []);
+
   // Staged Attachment State
   const [stagedAttachment, setStagedAttachment] = useState<{
     uri: string;
@@ -266,7 +304,7 @@ export default function ChatScreen() {
     if (asset.fileSize && asset.fileSize > 15 * 1024 * 1024) {
       Alert.alert(
         "File Too Large",
-        "Please select an image smaller than 15MB to ensure fast upload."
+        "Please select an image smaller than 15MB to ensure fast upload.",
       );
       return;
     }
@@ -284,24 +322,16 @@ export default function ChatScreen() {
     // 2. Client-side Image Compression via expo-image-manipulator
     let uploadUri = asset.uri;
     try {
-      console.log("[SupportChat] 🖼️ Optimizing image resolution & compression...");
       const manipResult = await ImageManipulator.manipulateAsync(
         asset.uri,
         [{ resize: { width: 1400 } }],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
       );
       if (manipResult?.uri) {
         uploadUri = manipResult.uri;
-        console.log("[SupportChat] ✅ Image optimized successfully:", {
-          originalUri: asset.uri,
-          optimizedUri: uploadUri,
-        });
       }
-    } catch (compressionErr) {
-      console.warn(
-        "[SupportChat] ⚠️ Image optimization skipped, using original:",
-        compressionErr
-      );
+    } catch {
+      console.warn("[SupportChat] Image optimization skipped, using original");
     }
 
     try {
@@ -321,11 +351,11 @@ export default function ChatScreen() {
         setStagedAttachment(null);
         setSendError("Failed to upload image. Please try again.");
       }
-    } catch (err: any) {
-      console.error("Error uploading image:", err);
+    } catch {
+      console.error("[SupportChat] Error uploading image");
       setStagedAttachment(null);
       setSendError(
-        "Unable to upload image. Please check your network connection."
+        "Unable to upload image. Please check your network connection.",
       );
     } finally {
       setIsUploadingAttachment(false);
@@ -335,34 +365,32 @@ export default function ChatScreen() {
   const handleLaunchCamera = async () => {
     setShowAttachmentSheet(false);
     setTimeout(async () => {
+      suspendAppLock(true);
       try {
-        console.log("[SupportChat] 📸 Requesting camera permissions...");
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== "granted") {
           Alert.alert(
             "Camera Permission Required",
-            "Please allow camera access in your device settings to take and send photos."
+            "Please allow camera access in your device settings to take and send photos.",
           );
           return;
         }
-        console.log("[SupportChat] 📸 Launching camera...");
         const result = await ImagePicker.launchCameraAsync({
           mediaTypes: ["images"],
           allowsEditing: false,
           quality: 0.85,
         });
 
-        console.log("[SupportChat] 📸 Camera result:", {
-          canceled: result.canceled,
-          count: result.assets?.length,
-        });
-
         if (!result.canceled && result.assets && result.assets.length > 0) {
           await processSelectedAsset(result.assets[0]);
         }
       } catch (err: any) {
-        console.error("[SupportChat] ❌ Error launching camera:", err);
-        setSendError("Unable to access camera: " + (err?.message || "Unknown error"));
+        console.error("[SupportChat] Error launching camera");
+        setSendError(
+          "Unable to access camera: " + (err?.message || "Unknown error"),
+        );
+      } finally {
+        suspendAppLock(false);
       }
     }, 120);
   };
@@ -370,37 +398,37 @@ export default function ChatScreen() {
   const handleLaunchGallery = async () => {
     setShowAttachmentSheet(false);
     setTimeout(async () => {
+      suspendAppLock(true);
       try {
-        console.log("[SupportChat] 🖼️ Launching photo library...");
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ["images"],
           allowsEditing: false,
           quality: 0.85,
         });
 
-        console.log("[SupportChat] 🖼️ Gallery result:", {
-          canceled: result.canceled,
-          count: result.assets?.length,
-        });
-
         if (!result.canceled && result.assets && result.assets.length > 0) {
           await processSelectedAsset(result.assets[0]);
         }
       } catch (err: any) {
-        console.error("[SupportChat] ❌ Error picking image:", err);
+        console.error("[SupportChat] Error picking image");
         try {
-          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          const { status } =
+            await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (status !== "granted") {
             Alert.alert(
               "Permission Required",
-              "Please allow photo library access in your device settings to select pictures."
+              "Please allow photo library access in your device settings to select pictures.",
             );
             return;
           }
         } catch {
           // Ignore secondary permission check failure
         }
-        setSendError("Unable to open photo library: " + (err?.message || "Unknown error"));
+        setSendError(
+          "Unable to open photo library: " + (err?.message || "Unknown error"),
+        );
+      } finally {
+        suspendAppLock(false);
       }
     }, 120);
   };
@@ -417,7 +445,7 @@ export default function ChatScreen() {
           const localUri = `${FileSystem.cacheDirectory}${Date.now()}_${filename}`;
           const downloadRes = await FileSystem.downloadAsync(
             previewImageUrl,
-            localUri
+            localUri,
           );
           await Sharing.shareAsync(downloadRes.uri);
         } else {
@@ -426,8 +454,8 @@ export default function ChatScreen() {
       } else {
         await Linking.openURL(previewImageUrl);
       }
-    } catch (err) {
-      console.error("[SupportChat] Error sharing preview image:", err);
+    } catch {
+      console.error("[SupportChat] Error sharing preview image");
       Alert.alert("Unable to share", "Could not share or save this image.");
     } finally {
       setIsSharingImage(false);
@@ -437,33 +465,6 @@ export default function ChatScreen() {
   const handlePickImage = () => {
     setShowAttachmentSheet(true);
   };
-
-  // Log render state for debugging
-  useEffect(() => {
-    console.log("[ChatScreen] 📱 Render State:", {
-      isLoading,
-      hasError: Boolean(error),
-      errorStatus,
-      errorMessage,
-      isChatNotFound,
-      messagesCount: messages.length,
-      isSocketConnected,
-      isAdminOnline,
-      stage,
-      forceNewChat,
-    });
-  }, [
-    isLoading,
-    error,
-    errorStatus,
-    errorMessage,
-    isChatNotFound,
-    messages.length,
-    isSocketConnected,
-    isAdminOnline,
-    stage,
-    forceNewChat,
-  ]);
 
   // Auto-scroll to latest message on messages update
   useEffect(() => {
@@ -475,10 +476,11 @@ export default function ChatScreen() {
     }
   }, [messages.length]);
 
-
-  const handleOpenDocument = async (url?: string | null, fileName?: string | null) => {
+  const handleOpenDocument = async (
+    url?: string | null,
+    _fileName?: string | null,
+  ) => {
     if (!url) return;
-    console.log("[SupportChat] 📄 Attempting to open document URL:", url, { fileName });
 
     try {
       // 1. Try opening via Expo WebBrowser (In-App Browser Custom Tab)
@@ -486,8 +488,8 @@ export default function ChatScreen() {
         presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
         toolbarColor: "#155D5F",
       });
-    } catch (browserError) {
-      console.warn("[SupportChat] ⚠️ WebBrowser failed, trying fallbacks:", browserError);
+    } catch {
+      console.warn("[SupportChat] WebBrowser failed, trying fallbacks");
       try {
         const canOpen = await Linking.canOpenURL(url);
         if (canOpen) {
@@ -497,11 +499,11 @@ export default function ChatScreen() {
           const docsViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
           await Linking.openURL(docsViewerUrl);
         }
-      } catch (fallbackError) {
-        console.error("[SupportChat] ❌ Failed to open document:", fallbackError);
+      } catch {
+        console.error("[SupportChat] Failed to open document");
         Alert.alert(
           "Unable to open document",
-          "Could not open this document. Please check your internet connection or verify the link."
+          "Could not open this document. Please check your internet connection or verify the link.",
         );
       }
     }
@@ -511,7 +513,11 @@ export default function ChatScreen() {
     const textToSend = inputText.trim();
     const attachmentToSend = stagedAttachment;
 
-    if ((!textToSend && !attachmentToSend?.url) || isSending || isUploadingAttachment) {
+    if (
+      (!textToSend && !attachmentToSend?.url) ||
+      isSending ||
+      isUploadingAttachment
+    ) {
       return;
     }
 
@@ -531,7 +537,7 @@ export default function ChatScreen() {
       setInputText(textToSend);
       setStagedAttachment(attachmentToSend);
       setSendError(
-        "Message could not be sent. Please check your connection and tap send again."
+        "Message could not be sent. Please check your connection and tap send again.",
       );
     }
   };
@@ -636,9 +642,7 @@ export default function ChatScreen() {
     const showDateDivider =
       !prevDate || (currentDate !== "" && currentDate !== prevDate);
     const dateLabel =
-      showDateDivider && currentTimestamp
-        ? getDateLabel(currentTimestamp)
-        : "";
+      showDateDivider && currentTimestamp ? getDateLabel(currentTimestamp) : "";
 
     // 2. Message Clustering & Type Transitions
     const prevItem = index > 0 ? messages[index - 1] : null;
@@ -710,12 +714,12 @@ export default function ChatScreen() {
                 item.isFailed
                   ? "bg-red-50 border border-red-300 rounded-2xl"
                   : !isMe
-                  ? `bg-[#F3F4F6] text-[#323232] rounded-2xl ${
-                      !isFirstInCluster ? "rounded-tl-md" : "rounded-tl-none"
-                    } ${!isLastInCluster ? "rounded-bl-md" : ""}`
-                  : `bg-[#E7F5F5] text-[#155D5F] rounded-2xl ${
-                      !isFirstInCluster ? "rounded-tr-md" : "rounded-tr-none"
-                    } ${!isLastInCluster ? "rounded-br-md" : ""}`
+                    ? `bg-[#F3F4F6] text-[#323232] rounded-2xl ${
+                        !isFirstInCluster ? "rounded-tl-md" : "rounded-tl-none"
+                      } ${!isLastInCluster ? "rounded-bl-md" : ""}`
+                    : `bg-[#E7F5F5] text-[#155D5F] rounded-2xl ${
+                        !isFirstInCluster ? "rounded-tr-md" : "rounded-tr-none"
+                      } ${!isLastInCluster ? "rounded-br-md" : ""}`
               }`}
             >
               {/* Attachment Display */}
@@ -724,7 +728,9 @@ export default function ChatScreen() {
                   {item.fileType === "image" ||
                   /\.(jpg|jpeg|png|webp|gif)$/i.test(item.attachmentUrl) ? (
                     <TouchableOpacity
-                      onPress={() => setPreviewImageUrl(item.attachmentUrl || null)}
+                      onPress={() =>
+                        setPreviewImageUrl(item.attachmentUrl || null)
+                      }
                       activeOpacity={0.9}
                       className="rounded-xl overflow-hidden bg-black/5 border border-black/5"
                     >
@@ -734,26 +740,41 @@ export default function ChatScreen() {
                         resizeMode="cover"
                       />
                       <View className="absolute bottom-2 right-2 bg-black/60 px-2 py-0.5 rounded-full flex-row items-center">
-                        <Ionicons name="expand-outline" size={12} color="#FFFFFF" />
+                        <Ionicons
+                          name="expand-outline"
+                          size={12}
+                          color="#FFFFFF"
+                        />
                       </View>
                     </TouchableOpacity>
                   ) : (
                     <TouchableOpacity
-                      onPress={() => handleOpenDocument(item.attachmentUrl, item.fileName)}
+                      onPress={() =>
+                        handleOpenDocument(item.attachmentUrl, item.fileName)
+                      }
                       activeOpacity={0.8}
                       className="p-3 rounded-2xl bg-white border border-gray-200/90 shadow-xs max-w-[260px]"
                     >
                       <View className="flex-row items-center">
                         <View className="w-10 h-10 rounded-xl bg-[#155D5F]/10 items-center justify-center mr-3">
-                          <Ionicons name="document-text" size={22} color="#155D5F" />
+                          <Ionicons
+                            name="document-text"
+                            size={22}
+                            color="#155D5F"
+                          />
                         </View>
                         <View className="flex-1 min-w-0 pr-1">
-                          <Text className="text-xs font-bold text-gray-800" numberOfLines={1}>
+                          <Text
+                            className="text-xs font-bold text-gray-800"
+                            numberOfLines={1}
+                          >
                             {item.fileName || "Document attachment"}
                           </Text>
                           <View className="flex-row items-center mt-0.5">
                             <View className="bg-red-50 px-1.5 py-0.5 rounded mr-1.5 border border-red-100">
-                              <Text className="text-[9px] font-bold text-red-600">PDF</Text>
+                              <Text className="text-[9px] font-bold text-red-600">
+                                PDF
+                              </Text>
                             </View>
                             <Text className="text-[10px] text-[#155D5F] font-semibold">
                               Tap to open / view
@@ -761,7 +782,11 @@ export default function ChatScreen() {
                           </View>
                         </View>
                         <View className="w-7 h-7 rounded-full bg-gray-50 border border-gray-200 items-center justify-center">
-                          <Ionicons name="arrow-down-outline" size={14} color="#155D5F" />
+                          <Ionicons
+                            name="arrow-down-outline"
+                            size={14}
+                            color="#155D5F"
+                          />
                         </View>
                       </View>
                     </TouchableOpacity>
@@ -840,7 +865,9 @@ export default function ChatScreen() {
           className="absolute self-center z-50 bg-[#1F2937]/90 px-4 py-2 rounded-full shadow-lg flex-row items-center border border-white/20"
         >
           <Ionicons name="checkmark-circle" size={15} color="#10B981" />
-          <Text className="text-white text-xs font-semibold ml-1.5">{copiedToast}</Text>
+          <Text className="text-white text-xs font-semibold ml-1.5">
+            {copiedToast}
+          </Text>
         </View>
       )}
 
@@ -883,8 +910,8 @@ export default function ChatScreen() {
               stage === "active"
                 ? "bg-[#DCFCE7]"
                 : stage === "queue"
-                ? "bg-[#FEF3C7]"
-                : "bg-gray-100"
+                  ? "bg-[#FEF3C7]"
+                  : "bg-gray-100"
             }`}
           >
             <Text
@@ -892,8 +919,8 @@ export default function ChatScreen() {
                 stage === "active"
                   ? "text-[#15803D]"
                   : stage === "queue"
-                  ? "text-[#B45309]"
-                  : "text-gray-600"
+                    ? "text-[#B45309]"
+                    : "text-gray-600"
               }`}
             >
               {stage}
@@ -908,21 +935,29 @@ export default function ChatScreen() {
 
       {/* Financial Security Advisory Banner */}
       {showSecurityNotice && (
-        <View className="mx-4 my-1.5 px-3.5 py-2 bg-blue-50/70 border border-blue-100 rounded-xl flex-row items-center justify-between shadow-xs">
-          <View className="flex-row items-center flex-1 mr-2">
-            <Ionicons name="shield-checkmark" size={16} color="#155D5F" />
-            <Text className="text-[11px] text-gray-600 ml-2 font-medium leading-4">
-              <Text className="font-bold text-[#155D5F]">Security Advisory: </Text>
+        <View className="mx-4 my-1.5 px-3.5 py-2.5 bg-blue-50/70 border border-blue-100 rounded-xl flex-row items-start justify-between shadow-xs">
+          <View className="flex-row items-start flex-1 mr-2">
+            <Ionicons
+              name="shield-checkmark"
+              size={16}
+              color="#155D5F"
+              style={{ marginTop: 1 }}
+            />
+            <Text className="text-[11px] text-gray-600 ml-2 font-medium leading-4 flex-1">
+              <Text className="font-bold text-[#155D5F]">
+                Security Advisory:{" "}
+              </Text>
               Never share your account PIN, password, or full card digits.
             </Text>
           </View>
           <TouchableOpacity
             onPress={() => setShowSecurityNotice(false)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            className="p-0.5 -mt-0.5 -mr-0.5 rounded-full active:bg-blue-100/60"
             accessibilityLabel="Dismiss security advisory"
             accessibilityRole="button"
           >
-            <Ionicons name="close" size={15} color="#9CA3AF" />
+            <Ionicons name="close" size={16} color="#f32e07ff" />
           </TouchableOpacity>
         </View>
       )}
@@ -958,16 +993,17 @@ export default function ChatScreen() {
                 {errorStatus === 401
                   ? "• Session Expired"
                   : errorStatus === 404
-                  ? "• Not Found"
-                  : errorStatus === 500
-                  ? "• Server Error"
-                  : ""}
+                    ? "• Not Found"
+                    : errorStatus === 500
+                      ? "• Server Error"
+                      : ""}
               </Text>
             </View>
           )}
 
           <Text className="text-sm text-gray-500 text-center mt-1 mb-4 max-w-[280px]">
-            {errorMessage || "Please check your network connection and try again."}
+            {errorMessage ||
+              "Please check your network connection and try again."}
           </Text>
 
           {/* Action buttons */}
@@ -1000,7 +1036,9 @@ export default function ChatScreen() {
               color="#6B7280"
             />
             <Text className="text-xs text-gray-500 font-medium ml-1">
-              {showErrorDiagnostics ? "Hide Technical Details" : "View Technical Details"}
+              {showErrorDiagnostics
+                ? "Hide Technical Details"
+                : "View Technical Details"}
             </Text>
           </TouchableOpacity>
 
@@ -1009,28 +1047,60 @@ export default function ChatScreen() {
               <Text className="text-[11px] font-bold text-gray-700 mb-1">
                 Endpoint: GET /api/v1/support/chat
               </Text>
-              <Text className="text-[10px] text-gray-600 font-mono" numberOfLines={6}>
+              <Text
+                className="text-[10px] text-gray-600 font-mono"
+                numberOfLines={6}
+              >
                 {JSON.stringify(rawError || error, null, 2)}
               </Text>
             </View>
           )}
         </View>
       ) : messages.length === 0 ? (
-        <View className="flex-1 px-6 justify-center items-center">
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: shouldCenterEmptyState ? "center" : "flex-start",
+            paddingHorizontal: 24,
+            paddingTop: isAndroidKeyboardVisible ? 12 : 20,
+            paddingBottom: 24,
+            alignItems: "center",
+          }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          onLayout={(e) => setEmptyContainerHeight(e.nativeEvent.layout.height)}
+          onContentSizeChange={(_w, h) => setEmptyContentHeight(h)}
+        >
           <Image
             source={require("../../assets/images/logo1.png")}
-            className="w-16 h-16 rounded-2xl mb-4 opacity-90"
+            style={
+              isAndroidKeyboardVisible
+                ? { width: 56, height: 56, marginBottom: 8 }
+                : { width: 64, height: 64, marginBottom: 16 }
+            }
+            className="rounded-2xl opacity-90"
             resizeMode="contain"
           />
           <Text className="text-lg font-bold text-gray-800 text-center">
             Wealthconomy Support
           </Text>
-          <Text className="text-sm text-gray-500 text-center mt-2 mb-6 leading-5 max-w-[280px]">
-            Hello! How can our support team assist you today? Pick a topic or type a message below.
+          <Text
+            className={`text-sm text-gray-500 text-center leading-5 max-w-[280px] ${
+              isAndroidKeyboardVisible ? "mt-1 mb-3" : "mt-2 mb-6"
+            }`}
+          >
+            Hello! How can our support team assist you today? Pick a topic or
+            type a message below.
           </Text>
 
           {/* Topics Section with Distinct Gaps */}
-          <View className="w-full mb-3 flex-row items-center justify-between px-1">
+          <View
+            className={`w-full flex-row items-center justify-between px-1 ${
+              isAndroidKeyboardVisible ? "mb-2" : "mb-3"
+            }`}
+          >
             <Text className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
               Suggested Topics
             </Text>
@@ -1045,7 +1115,7 @@ export default function ChatScreen() {
                 onPress={() => handlePromptSelect(p.text)}
                 activeOpacity={0.7}
                 className="flex-row items-center bg-white border border-gray-200/80 p-3.5 rounded-2xl shadow-sm active:bg-gray-50"
-                style={{ marginBottom: 12 }}
+                style={{ marginBottom: isAndroidKeyboardVisible ? 8 : 12 }}
               >
                 <View className="w-9 h-9 rounded-xl bg-[#155D5F]/10 items-center justify-center mr-3">
                   <Ionicons name={p.icon} size={19} color="#155D5F" />
@@ -1054,7 +1124,10 @@ export default function ChatScreen() {
                   <Text className="text-[13px] font-bold text-gray-800">
                     {p.label}
                   </Text>
-                  <Text className="text-[11px] text-gray-400 mt-0.5" numberOfLines={1}>
+                  <Text
+                    className="text-[11px] text-gray-400 mt-0.5"
+                    numberOfLines={1}
+                  >
                     {p.text}
                   </Text>
                 </View>
@@ -1062,7 +1135,7 @@ export default function ChatScreen() {
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </ScrollView>
       ) : (
         <View className="flex-1 relative">
           <FlatList
@@ -1105,8 +1178,8 @@ export default function ChatScreen() {
       )}
 
       {/* Input Bar & Attachment Preview */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      <KeyboardAwareScreen
+        style={null}
         keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
         {/* Staged Attachment Preview Strip */}
@@ -1139,9 +1212,7 @@ export default function ChatScreen() {
                 {stagedAttachment.name}
               </Text>
               <Text className="text-[11px] text-gray-500 mt-0.5 font-medium">
-                {isUploadingAttachment
-                  ? "Uploading image..."
-                  : "Ready to send"}
+                {isUploadingAttachment ? "Uploading image..." : "Ready to send"}
               </Text>
             </View>
 
@@ -1215,7 +1286,10 @@ export default function ChatScreen() {
                 disabled={!canSend}
               >
                 {isSending || isUploadingAttachment ? (
-                  <ActivityIndicator size="small" color={canSend ? "#FFFFFF" : "#408688"} />
+                  <ActivityIndicator
+                    size="small"
+                    color={canSend ? "#FFFFFF" : "#408688"}
+                  />
                 ) : (
                   <Ionicons
                     name="send"
@@ -1227,7 +1301,7 @@ export default function ChatScreen() {
             );
           })()}
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScreen>
 
       {/* Attachment Options Action Sheet (In-page overlay to avoid native modal dismissal collision with ImagePicker) */}
       {showAttachmentSheet && (
@@ -1260,7 +1334,8 @@ export default function ChatScreen() {
                 Add Attachment
               </Text>
               <Text className="text-xs text-gray-500 mb-4">
-                Take a photo or choose an image to attach to your support message.
+                Take a photo or choose an image to attach to your support
+                message.
               </Text>
 
               <View className="mb-2">
@@ -1307,7 +1382,9 @@ export default function ChatScreen() {
                 onPress={() => setShowAttachmentSheet(false)}
                 className="mt-3 py-3 items-center rounded-xl bg-gray-100 active:bg-gray-200"
               >
-                <Text className="text-sm font-semibold text-gray-700">Cancel</Text>
+                <Text className="text-sm font-semibold text-gray-700">
+                  Cancel
+                </Text>
               </TouchableOpacity>
             </Pressable>
           </Pressable>
