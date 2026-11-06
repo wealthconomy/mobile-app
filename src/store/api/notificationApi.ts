@@ -47,6 +47,23 @@ export interface MarkReadRequest {
   id: string;
 }
 
+export interface RegisterPushTokenDto {
+  token: string;
+  platform: "ios" | "android" | "web";
+  deviceId?: string;
+  environment?: "production" | "development";
+}
+
+export interface DeregisterPushTokenDto {
+  token: string;
+}
+
+export interface NotificationSettingsDto {
+  pushNotifications: boolean;
+  emailNotifications: boolean;
+  inAppNotifications: boolean;
+}
+
 export const notificationApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     listNotifications: builder.query<ApiResponse<NotificationsListResponse>, NotificationsListQueryParams | void>({
@@ -71,6 +88,34 @@ export const notificationApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["Notification"],
     }),
+    registerPushToken: builder.mutation<ApiResponse<{ ok: boolean }>, RegisterPushTokenDto>({
+      query: (body) => ({
+        url: "/users/me/push-token",
+        method: "POST",
+        body,
+      }),
+    }),
+    deregisterPushToken: builder.mutation<ApiResponse<{ ok: boolean }>, DeregisterPushTokenDto>({
+      query: (body) => ({
+        url: "/users/me/push-token",
+        method: "DELETE",
+        body,
+      }),
+    }),
+    getNotificationSettings: builder.query<ApiResponse<NotificationSettingsDto>, void>({
+      query: () => ({
+        url: "/users/me/notification-settings",
+      }),
+      providesTags: ["Notification"],
+    }),
+    updateNotificationSettings: builder.mutation<ApiResponse<NotificationSettingsDto>, Partial<NotificationSettingsDto>>({
+      query: (body) => ({
+        url: "/users/me/notification-settings",
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["Notification"],
+    }),
   }),
   overrideExisting: true,
 });
@@ -79,4 +124,8 @@ export const {
   useListNotificationsQuery,
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
+  useRegisterPushTokenMutation,
+  useDeregisterPushTokenMutation,
+  useGetNotificationSettingsQuery,
+  useUpdateNotificationSettingsMutation,
 } = notificationApi;

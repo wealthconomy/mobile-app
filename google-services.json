@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "460376815276",
+    "project_id": "project-wealthconomy",
+    "storage_bucket": "project-wealthconomy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:460376815276:android:95ed9de8e688219e38d109",
+        "android_client_info": {
+          "package_name": "com.wealth070steam.Wealthconomy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMN1rL5mAhBX14GnZILUd8bDI2j-jO83E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -13,6 +13,7 @@ import {
 } from "@/src/store/api/userApi";
 import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
 import { logout } from "@/src/store/slices/authSlice";
+import { deregisterPushTokenFromBackend } from "@/src/services/pushNotificationService";
 import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { Alert, RefreshControl, ScrollView, StatusBar } from "react-native";
@@ -145,6 +146,7 @@ export default function MyAccountScreen() {
       if (refreshToken) {
         await logoutSession({ refreshToken }).unwrap();
       }
+      await deregisterPushTokenFromBackend(dispatch);
     } catch {
       // Ignore network errors during logout
     } finally {

@@ -5,7 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobileapp",
+    "scheme": [
+      "mobileapp",
+      "wealthconomy"
+    ],
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/icon.png",
@@ -14,6 +17,10 @@
     },
     "ios": {
       "supportsTablet": true,
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "entitlements": {
+        "aps-environment": "production"
+      },
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Wealthconomy needs access to your photo library so you can select and upload profile photos and KYC verification documents.",
         "NSCameraUsageDescription": "Wealthconomy needs access to your camera so you can take profile photos and capture identification documents for secure KYC verification.",
@@ -22,6 +29,8 @@
       "bundleIdentifier": "com.wealth070steam.Wealthconomy"
     },
     "android": {
+      "package": "com.wealth070steam.Wealthconomy",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/icon.png",
@@ -34,7 +43,8 @@
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -49,6 +59,16 @@
         {
           "photosPermission": "Wealthconomy needs access to your photo library so you can select and upload profile photos and KYC verification documents.",
           "cameraPermission": "Wealthconomy needs access to your camera so you can take profile photos and capture identification documents for secure KYC verification."
+        }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "dynamic"
+          }
         }
       ]
     ],

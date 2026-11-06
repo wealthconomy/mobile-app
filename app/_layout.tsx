@@ -22,6 +22,10 @@ import "../global.css";
 import { AppDispatch, RootState, store } from "../src/store";
 import { loadAuthFromStorage } from "../src/store/slices/authSlice";
 import { loadGroupsFromStorage } from "../src/store/slices/wealthGroupSlice";
+import {
+  registerPushTokenWithBackend,
+  setupPushNotificationListeners,
+} from "../src/services/pushNotificationService";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +80,18 @@ function RootLayoutNav() {
     dispatch(loadAuthFromStorage());
     dispatch(loadGroupsFromStorage());
   }, [dispatch]);
+
+  // Push notifications lifecycle & deep linking listeners
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    registerPushTokenWithBackend(dispatch);
+    const unsubscribe = setupPushNotificationListeners(dispatch, isAuthenticated);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [isAuthenticated, dispatch]);
 
 
   useEffect(() => {
