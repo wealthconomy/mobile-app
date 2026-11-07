@@ -1,8 +1,8 @@
 import Header from "@/src/components/common/Header";
 import {
-  useGetNotificationSettingsQuery,
+  useGetMyProfileQuery,
   useUpdateNotificationSettingsMutation,
-} from "@/src/store/api/notificationApi";
+} from "@/src/store/api/userApi";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function NotificationSettingsScreen() {
-  const { data: response, isLoading } = useGetNotificationSettingsQuery();
+  const { data: response, isLoading } = useGetMyProfileQuery();
   const [updateSettings] = useUpdateNotificationSettingsMutation();
 
   const [settings, setSettings] = useState({
