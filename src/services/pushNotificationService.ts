@@ -149,6 +149,11 @@ export async function registerPushTokenWithBackend(
       return;
     }
 
+    console.log("==========================================");
+    console.log("📱 FCM Device Token for Testing:");
+    console.log(token);
+    console.log("==========================================");
+
     const deviceId = await getDeviceId();
     const platform = Platform.OS === "ios" ? "ios" : "android";
     const environment = __DEV__ ? "development" : "production";
