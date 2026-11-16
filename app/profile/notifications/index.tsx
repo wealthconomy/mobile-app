@@ -16,6 +16,11 @@ import {
   isSupportNotification,
   isValidAppRoute,
 } from "@/src/features/profile/utils/notificationHelpers";
+import {
+  resolveExplicitNotificationRoute,
+  resolveNotificationTarget,
+  ResolvedNotificationTarget,
+} from "@/src/utils/notificationRouter";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
@@ -106,7 +111,7 @@ export default function NotificationsScreen() {
       (typeof item.data?.type === "string" &&
         item.data.type.toLowerCase().includes("referral"));
 
-    const safePush = (targetRoute: string) => {
+    const safePush = (targetRoute: ResolvedNotificationTarget) => {
       try {
         router.push(targetRoute as any);
       } catch {
@@ -119,14 +124,26 @@ export default function NotificationsScreen() {
     } else if (isReferral) {
       safePush("/profile/my-referrals");
     } else if (isSupportNotification(item)) {
-      const targetRoute = isValidAppRoute(item.data?.route)
-        ? item.data.route.trim()
-        : "/support/chat";
+      const targetRoute =
+        resolveExplicitNotificationRoute(item.data?.route, item.data) ??
+        "/support/chat";
       safePush(targetRoute);
     } else if (isValidAppRoute(item.data?.route)) {
-      safePush(item.data.route.trim());
-    } else if (item.kind === "group" && item.data?.groupId) {
-      safePush(`/portfolio/detail/group/${item.data.groupId}`);
+      const targetRoute =
+        resolveExplicitNotificationRoute(item.data?.route, item.data) ??
+        item.data.route.trim();
+      safePush(targetRoute);
+    } else if (item.kind === "group" && (item.data?.groupId || item.data?.id)) {
+      safePush(`/portfolio/detail/group/${item.data?.groupId || item.data?.id}`);
+    } else {
+      const fallbackTarget = resolveNotificationTarget({
+        ...(item.data || {}),
+        category: (item as any).category ?? item.data?.category,
+        type: (item as any).type ?? item.data?.type ?? item.kind,
+      });
+      if (fallbackTarget && fallbackTarget !== "/profile/notifications") {
+        safePush(fallbackTarget);
+      }
     }
   };
 
@@ -211,7 +228,7 @@ export default function NotificationsScreen() {
       <FlatList<NotificationItem | number>
         data={isQueryLoading && !notificationsResponse ? [1, 2, 3, 4, 5] : filteredItems}
         keyExtractor={(item, idx) =>
-          typeof item === "object" ? item.id : idx.toString()
+          typeof item === "object" && item !== null ? item.id : idx.toString()
         }
         renderItem={({ item }) =>
           typeof item === "number" ? (
