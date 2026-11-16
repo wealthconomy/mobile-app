@@ -32,6 +32,7 @@ import { loadAuthFromStorage } from "../src/store/slices/authSlice";
 import { loadGroupsFromStorage } from "../src/store/slices/wealthGroupSlice";
 import {
   registerPushTokenWithBackend,
+  setNotificationNavigationReady,
   setupPushNotificationListeners,
 } from "../src/services/pushNotificationService";
 import { lockAppForInactivity, isAppLockSuspended } from "../src/store/slices/appStatusSlice";
@@ -119,9 +120,26 @@ function RootLayoutNav() {
     currentPath.includes("setup-pin") ||
     currentPath.includes("change-passcode");
 
+  const needsSecuritySetup = Boolean(
+    isAuthenticated &&
+      user &&
+      (user.hasTransactionPin === false || user.hasAppPasscode === false),
+  );
+
   const isSoftPromptEligible =
     isAuthenticated &&
     hasCompletedOnboarding &&
+    !isExemptScreen &&
+    !isForcedUpdate &&
+    !isEffectiveLocked &&
+    !isInactivityLocked;
+
+  const isNotificationNavReady =
+    !isLoading &&
+    Boolean(segments[0]) &&
+    isAuthenticated &&
+    hasCompletedOnboarding &&
+    !needsSecuritySetup &&
     !isExemptScreen &&
     !isForcedUpdate &&
     !isEffectiveLocked &&
@@ -142,6 +160,10 @@ function RootLayoutNav() {
   }, [dispatch]);
 
   // Push notifications lifecycle & deep linking listeners
+  useEffect(() => {
+    setNotificationNavigationReady(isNotificationNavReady);
+  }, [isNotificationNavReady]);
+
   useEffect(() => {
     if (!isAuthenticated) return;
 
