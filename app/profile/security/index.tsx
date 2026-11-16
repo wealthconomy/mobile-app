@@ -292,7 +292,7 @@ export default function SecurityScreen() {
                   color="#155D5F"
                 />
               }
-              onPress={() => router.push("/profile/security/change-passcode")}
+              onPress={() => router.push("/profile/security/change-passcode" as any)}
             />
             <MenuItem
               title="Face ID & Biometrics"

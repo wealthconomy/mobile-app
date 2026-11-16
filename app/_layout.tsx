@@ -30,6 +30,11 @@ import "../global.css";
 import { AppDispatch, RootState, store } from "../src/store";
 import { loadAuthFromStorage } from "../src/store/slices/authSlice";
 import { loadGroupsFromStorage } from "../src/store/slices/wealthGroupSlice";
+import {
+  registerPushTokenWithBackend,
+  setNotificationNavigationReady,
+  setupPushNotificationListeners,
+} from "../src/services/pushNotificationService";
 import { lockAppForInactivity, isAppLockSuspended } from "../src/store/slices/appStatusSlice";
 
 const queryClient = new QueryClient();
@@ -115,9 +120,26 @@ function RootLayoutNav() {
     currentPath.includes("setup-pin") ||
     currentPath.includes("change-passcode");
 
+  const needsSecuritySetup = Boolean(
+    isAuthenticated &&
+      user &&
+      (user.hasTransactionPin === false || user.hasAppPasscode === false),
+  );
+
   const isSoftPromptEligible =
     isAuthenticated &&
     hasCompletedOnboarding &&
+    !isExemptScreen &&
+    !isForcedUpdate &&
+    !isEffectiveLocked &&
+    !isInactivityLocked;
+
+  const isNotificationNavReady =
+    !isLoading &&
+    Boolean(segments[0]) &&
+    isAuthenticated &&
+    hasCompletedOnboarding &&
+    !needsSecuritySetup &&
     !isExemptScreen &&
     !isForcedUpdate &&
     !isEffectiveLocked &&
@@ -136,6 +158,22 @@ function RootLayoutNav() {
     dispatch(loadAuthFromStorage());
     dispatch(loadGroupsFromStorage());
   }, [dispatch]);
+
+  // Push notifications lifecycle & deep linking listeners
+  useEffect(() => {
+    setNotificationNavigationReady(isNotificationNavReady);
+  }, [isNotificationNavReady]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    registerPushTokenWithBackend(dispatch);
+    const unsubscribe = setupPushNotificationListeners(dispatch, isAuthenticated);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [isAuthenticated, dispatch]);
 
   const backgroundTimeRef = useRef<number | null>(null);
   const latestStateRef = useRef({
@@ -265,7 +303,7 @@ function RootLayoutNav() {
 
     const inAuthGroup = segments[0] === "(auth)";
     const inOnboarding = segments[0] === "onboarding";
-    const inSetupPin = inAuthGroup && segments[1] === "setup-pin";
+    const inSetupPin = inAuthGroup && (segments[1] as string) === "setup-pin";
     const inPasswordResetFlow =
       inAuthGroup &&
       (segments[1] === "forgot-password" ||
