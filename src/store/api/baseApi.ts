@@ -1,7 +1,13 @@
-import { createApi, fetchBaseQuery, BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
+import {
+  BaseQueryFn,
+  createApi,
+  FetchArgs,
+  fetchBaseQuery,
+  FetchBaseQueryError,
+} from "@reduxjs/toolkit/query/react";
 import { RootState } from "../index";
-import { logout, setCredentials } from "../slices/authSlice";
 import { setLockout } from "../slices/appStatusSlice";
+import { logout, setCredentials } from "../slices/authSlice";
 
 export interface ApiResponse<T> {
   message: string;
@@ -62,7 +68,10 @@ const rawBaseQuery = fetchBaseQuery({
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
     }
-    if (!endpoint?.toLowerCase().includes("upload") && !headers.has("content-type")) {
+    if (
+      !endpoint?.toLowerCase().includes("upload") &&
+      !headers.has("content-type")
+    ) {
       headers.set("content-type", "application/json");
     }
     return headers;
@@ -73,11 +82,11 @@ const rawBaseQuery = fetchBaseQuery({
  * Advanced Re-authentication interceptor
  * Automatically catches 401 errors and hits /auth/refresh with rotating refreshToken.
  */
-const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
-  args,
-  api,
-  extraOptions
-) => {
+const baseQueryWithReauth: BaseQueryFn<
+  string | FetchArgs,
+  unknown,
+  FetchBaseQueryError
+> = async (args, api, extraOptions) => {
   const requestUrl = typeof args === "string" ? args : args.url;
   const state = api.getState() as RootState;
   const requestToken = state.auth.token;
@@ -116,7 +125,10 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
     }
 
     // Do not force logout if operating with mock tokens or without backend URL configured
-    if (currentToken.startsWith("mock-jwt-token") || !process.env.EXPO_PUBLIC_API_URL) {
+    if (
+      currentToken.startsWith("mock-jwt-token") ||
+      !process.env.EXPO_PUBLIC_API_URL
+    ) {
       return result;
     }
 
@@ -132,7 +144,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
                 body: { refreshToken },
               },
               api,
-              extraOptions
+              extraOptions,
             );
 
             if (refreshResult.data) {
@@ -150,7 +162,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
                     user: res.data.user,
                     token: res.data.accessToken,
                     refreshToken: res.data.refreshToken,
-                  })
+                  }),
                 );
                 return true;
               }
@@ -197,17 +209,18 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
  * Only fires when the user is authenticated — errors on the login screen surface
  * normally to the form instead of being swallowed by the lockout modal.
  */
-const baseQueryWithLockout: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
-  args,
-  api,
-  extraOptions
-) => {
+const baseQueryWithLockout: BaseQueryFn<
+  string | FetchArgs,
+  unknown,
+  FetchBaseQueryError
+> = async (args, api, extraOptions) => {
   const result = await baseQueryWithReauth(args, api, extraOptions);
 
   if (result.error) {
     try {
       // Only intercept for authenticated users — leave login/signup errors alone
-      const isAuthenticated = (api.getState() as RootState).auth.isAuthenticated;
+      const isAuthenticated = (api.getState() as RootState).auth
+        .isAuthenticated;
       if (!isAuthenticated) return result;
 
       const status = result.error.status;
@@ -216,61 +229,65 @@ const baseQueryWithLockout: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQu
       const rawMsg = Array.isArray(errorData?.message)
         ? errorData.message.join(" ")
         : typeof errorData?.message === "string"
-        ? errorData.message
-        : typeof errorData?.error === "string"
-        ? errorData.error
-        : typeof errorData?.code === "string"
-        ? errorData.code
-        : typeof errorData === "string"
-        ? errorData
-        : "";
+          ? errorData.message
+          : typeof errorData?.error === "string"
+            ? errorData.error
+            : typeof errorData?.code === "string"
+              ? errorData.code
+              : typeof errorData === "string"
+                ? errorData
+                : "";
 
       const errorMsg = rawMsg.toLowerCase();
-      const errorCode: string = (typeof errorData?.code === "string" ? errorData.code : "").toUpperCase();
+      const errorCode: string = (
+        typeof errorData?.code === "string" ? errorData.code : ""
+      ).toUpperCase();
       const lockoutMessage = Array.isArray(errorData?.message)
         ? errorData.message.join(", ")
         : typeof errorData?.message === "string"
-        ? errorData.message
-        : undefined;
+          ? errorData.message
+          : undefined;
 
       // 1. Maintenance Mode — HTTP 503 or message contains "maintenance"
-      if (status === 503 || errorMsg.includes('maintenance')) {
+      if (status === 503 || errorMsg.includes("maintenance")) {
         api.dispatch(
           setLockout({
-            type: 'MAINTENANCE',
-            title: 'System Under Maintenance',
+            type: "MAINTENANCE",
+            title: "System Under Maintenance",
             message:
               lockoutMessage ||
-              'Wealthconomy is currently undergoing scheduled maintenance. Please check back shortly.',
-          })
+              "Wealthconomy is currently undergoing scheduled maintenance. Please check back shortly.",
+          }),
         );
       }
       // 2. Account Suspended
-      else if (errorMsg.includes('suspend') || errorCode === 'USER_SUSPENDED') {
+      else if (errorMsg.includes("suspend") || errorCode === "USER_SUSPENDED") {
         api.dispatch(
           setLockout({
-            type: 'SUSPENDED',
-            title: 'Account Suspended',
+            type: "SUSPENDED",
+            title: "Account Suspended",
             message:
               lockoutMessage ||
-              'Your account has been temporarily suspended by the administration. Please contact support.',
-          })
+              "Your account has been temporarily suspended by the administration. Please contact support.",
+          }),
         );
       }
       // 3. Account Blocked
-      else if (errorMsg.includes('block') || errorCode === 'USER_BLOCKED') {
+      else if (errorMsg.includes("block") || errorCode === "USER_BLOCKED") {
         api.dispatch(
           setLockout({
-            type: 'BLOCKED',
-            title: 'Account Blocked',
+            type: "BLOCKED",
+            title: "Account Blocked",
             message:
               lockoutMessage ||
-              'Your account has been permanently blocked due to policy or compliance violations.',
-          })
+              "Your account has been permanently blocked due to policy or compliance violations.",
+          }),
         );
       }
     } catch {
-      console.warn("[baseQueryWithLockout] Error while checking lockout status");
+      console.warn(
+        "[baseQueryWithLockout] Error while checking lockout status",
+      );
     }
   }
 
@@ -280,6 +297,24 @@ const baseQueryWithLockout: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQu
 export const baseApi = createApi({
   reducerPath: "baseApi",
   baseQuery: baseQueryWithLockout,
-  tagTypes: ["User", "WealthGroup", "Portfolio", "Payment", "Auth", "Kyc", "File", "Notification", "Referral", "Blog", "Library", "Wallet", "PayoutAccount", "Withdrawal", "Activity", "SupportChat", "GroupReport"],
+  tagTypes: [
+    "User",
+    "WealthGroup",
+    "Portfolio",
+    "Payment",
+    "Auth",
+    "Kyc",
+    "File",
+    "Notification",
+    "Referral",
+    "Blog",
+    "Library",
+    "Wallet",
+    "PayoutAccount",
+    "Withdrawal",
+    "Activity",
+    "SupportChat",
+    "GroupReport",
+  ],
   endpoints: () => ({}),
 });
