@@ -218,8 +218,6 @@ export default function ProfileScreen() {
   const onSubmit = async (data: ProfileFormData) => {
     try {
       await updateProfile({
-        firstName: data.firstName.trim(),
-        lastName: data.lastName.trim(),
         phone: data.phone.trim(),
         ...(profileImage && profileImage.startsWith("http") ? { imageUrl: profileImage } : {}),
       }).unwrap();
@@ -301,12 +299,14 @@ export default function ProfileScreen() {
             name="firstName"
             label="First Name"
             isEditing={isEditing}
+            isReadOnly
           />
           <EditableField
             control={control}
             name="lastName"
             label="Last Name"
             isEditing={isEditing}
+            isReadOnly
           />
           <EditableField
             control={control}
@@ -373,7 +373,12 @@ const EditableField = ({
   isReadOnly?: boolean;
 }) => (
   <View style={{ gap: 6 }}>
-    <Text style={{ fontSize: 13, fontWeight: "600", color: "#6B7280" }}>{label}</Text>
+    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+      <Text style={{ fontSize: 13, fontWeight: "600", color: "#6B7280" }}>{label}</Text>
+      {isReadOnly && isEditing ? (
+        <Text style={{ fontSize: 11, fontWeight: "500", color: "#9CA3AF" }}>Non-editable</Text>
+      ) : null}
+    </View>
     <Controller
       control={control}
       name={name}
@@ -394,6 +399,7 @@ const EditableField = ({
               onBlur={onBlur}
               onChangeText={onChange}
               value={value}
+              keyboardType={name === "phone" ? "phone-pad" : "default"}
               style={{
                 fontSize: 15,
                 fontWeight: "600",
@@ -409,7 +415,7 @@ const EditableField = ({
               style={{
                 fontSize: 15,
                 fontWeight: "600",
-                color: isReadOnly ? "#9CA3AF" : "#4B5563",
+                color: isReadOnly && isEditing ? "#9CA3AF" : "#323232",
               }}
             >
               {value || "Not set"}

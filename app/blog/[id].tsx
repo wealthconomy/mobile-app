@@ -183,6 +183,7 @@ export default function BlogDetailScreen() {
           showsVerticalScrollIndicator={false}
           bounces={false}
           keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: 40 }}
         >
         <View className="relative h-80">
           <Image
@@ -282,6 +283,7 @@ export default function BlogDetailScreen() {
               </Text>
             </TouchableOpacity>
 
+            {/* Comments disabled for now
             <View
               className="flex-row items-center"
             >
@@ -293,6 +295,7 @@ export default function BlogDetailScreen() {
                 {blog.comments?.length || 0}
               </Text>
             </View>
+            */}
 
             <TouchableOpacity
               onPress={handleShare}
@@ -346,7 +349,8 @@ export default function BlogDetailScreen() {
             Thanks for reading!
           </Text>
 
-          {/* Comments Section */}
+          {/* Comments Section - disabled for now */}
+          {/*
           <View className="mb-10">
             <Text className="text-[#1A1A1A] font-bold text-base mb-4">
               Comments ({blog.comments?.length || 0})
@@ -397,8 +401,10 @@ export default function BlogDetailScreen() {
               </View>
             )}
           </View>
+          */}
         </View>
         </ScrollView>
+        {/* Bottom Comment Input - disabled for now
         <View className="px-5 py-3 border-t border-gray-100 bg-white flex-row items-center">
           <View className="flex-1 bg-gray-50 rounded-full px-4 py-2 flex-row items-center border border-gray-200">
             <TextInput
@@ -427,6 +433,7 @@ export default function BlogDetailScreen() {
             )}
           </TouchableOpacity>
         </View>
+        */}
       </KeyboardAwareScreen>
     </SafeAreaView>
   );

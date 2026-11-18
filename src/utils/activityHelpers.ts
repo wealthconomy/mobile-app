@@ -366,15 +366,23 @@ export function getFriendlyActivityTitle(item?: {
   // 2. Top up for portfolio
   const topUpMatch = desc.match(/top up for portfolio:\s*(.+)/i);
   if (topUpMatch?.[1]) {
-    const target = cleanTitleFigures(topUpMatch[1]);
-    return target ? `Portfolio Top-up: ${target}` : "Portfolio Top-up";
+    const rawTopUpTarget = topUpMatch[1];
+    const topUpFamMatch = rawTopUpTarget.match(/^(Kids|Spouse|Parent|Sibling|Others)\s*[-_–—]\s*(.+)$/i);
+    const topUpTarget = topUpFamMatch
+      ? `${topUpFamMatch[1]} (${cleanTitleFigures(topUpFamMatch[2])})`
+      : cleanTitleFigures(rawTopUpTarget);
+    return topUpTarget ? `Portfolio Top-up: ${topUpTarget}` : "Portfolio Top-up";
   }
 
   // 3. Funded portfolio
   const fundedMatch = desc.match(/funded\s+\w+\s+portfolio:\s*(.+)/i);
   if (fundedMatch?.[1]) {
-    const target = cleanTitleFigures(fundedMatch[1]);
-    return target ? `Portfolio Funding: ${target}` : "Portfolio Funding";
+    const rawFundedTarget = fundedMatch[1];
+    const fundedFamMatch = rawFundedTarget.match(/^(Kids|Spouse|Parent|Sibling|Others)\s*[-_–—]\s*(.+)$/i);
+    const fundedTarget = fundedFamMatch
+      ? `${fundedFamMatch[1]} (${cleanTitleFigures(fundedFamMatch[2])})`
+      : cleanTitleFigures(rawFundedTarget);
+    return fundedTarget ? `Portfolio Funding: ${fundedTarget}` : "Portfolio Funding";
   }
 
   // 4. Contribution to wealthgroup

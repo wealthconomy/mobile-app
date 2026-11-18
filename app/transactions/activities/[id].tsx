@@ -7,6 +7,7 @@ import {
   extractActivityAmount,
 } from "@/src/utils/activityHelpers";
 import {
+  cleanNarrativeText,
   formatCurrencyInText,
   formatMetadataKey,
   formatMetadataValue,
@@ -199,13 +200,12 @@ export default function ActivityDetailScreen() {
             {activity.description ? (
               <View className="bg-[#F9FAFB] p-4 rounded-xl mb-4 border border-[#F3F4F6]">
                 <Text className="text-[13px] font-bold text-[#374151] leading-[18px]">
-                  {formatCurrencyInText(activity.description)}
+                  {cleanNarrativeText(activity.description)}
                 </Text>
               </View>
             ) : null}
 
             <View className="gap-y-5">
-              <DetailRow label="Activity ID" value={activity.id} />
               <DetailRow label="Type" value={badge.label} />
               {amountStr && !hasMetadataAmount && (
                 <DetailRow label="Amount" value={amountStr} isSuccess />
@@ -216,24 +216,33 @@ export default function ActivityDetailScreen() {
               />
 
               {hasMetadata &&
-                Object.entries(activity.metadata!).map(([key, val]) => {
-                  const formattedKey = formatMetadataKey(key);
-                  const formattedVal = formatMetadataValue(key, val);
-                  const isAmountKey =
-                    key.toLowerCase().includes("amount") ||
-                    key.toLowerCase().includes("interest") ||
-                    key.toLowerCase().includes("credit") ||
-                    key.toLowerCase().includes("kobo");
+                Object.entries(activity.metadata!)
+                  .filter(([key]) => {
+                    const lowerKey = key.toLowerCase();
+                    return (
+                      lowerKey !== "id" &&
+                      lowerKey !== "activityid" &&
+                      lowerKey !== "activity_id"
+                    );
+                  })
+                  .map(([key, val]) => {
+                    const formattedKey = formatMetadataKey(key);
+                    const formattedVal = formatMetadataValue(key, val);
+                    const isAmountKey =
+                      key.toLowerCase().includes("amount") ||
+                      key.toLowerCase().includes("interest") ||
+                      key.toLowerCase().includes("credit") ||
+                      key.toLowerCase().includes("kobo");
 
-                  return (
-                    <DetailRow
-                      key={key}
-                      label={formattedKey}
-                      value={formattedVal}
-                      isSuccess={isAmountKey}
-                    />
-                  );
-                })}
+                    return (
+                      <DetailRow
+                        key={key}
+                        label={formattedKey}
+                        value={formattedVal}
+                        isSuccess={isAmountKey}
+                      />
+                    );
+                  })}
             </View>
           </View>
         </View>

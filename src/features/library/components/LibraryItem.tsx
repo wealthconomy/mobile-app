@@ -82,10 +82,12 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
                     <Ionicons name="heart" size={12} color="#EF4444" />
                     <Text className="text-[#4B5563] text-[12px] font-kumbh-semibold ml-1">{material.likesCount}</Text>
                   </View>
-                  <View className="flex-row items-center ml-3">
-                    <Ionicons name="chatbubble-outline" size={12} color="#6B7280" />
-                    <Text className="text-[#4B5563] text-[12px] font-kumbh-semibold ml-1">{material.commentsCount}</Text>
-                  </View>
+                    {/* Comments disabled for now
+                    <View className="flex-row items-center ml-3">
+                      <Ionicons name="chatbubble-outline" size={12} color="#6B7280" />
+                      <Text className="text-[#4B5563] text-[12px] font-kumbh-semibold ml-1">{material.commentsCount}</Text>
+                    </View>
+                    */}
                 </View>
               )}
             </View>
@@ -229,10 +231,12 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({
                       <Ionicons name="heart" size={12} color="#EF4444" />
                       <Text className="text-[#4B5563] text-[12px] font-kumbh-semibold ml-1">{material.likesCount}</Text>
                     </View>
+                    {/* Comments disabled for now
                     <View className="flex-row items-center">
                       <Ionicons name="chatbubble-outline" size={12} color="#6B7280" />
                       <Text className="text-[#4B5563] text-[12px] font-kumbh-semibold ml-1">{material.commentsCount}</Text>
                     </View>
+                    */}
                   </View>
                 )}
               </View>

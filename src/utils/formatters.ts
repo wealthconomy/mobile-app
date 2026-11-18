@@ -4,7 +4,8 @@ import { Portfolio } from "@/src/types/portfolio";
  * Converts a kobo numeric value or string to formatted Naira (e.g. 200000 -> ₦2,000.00).
  */
 export const formatKoboAmount = (val: number | string): string => {
-  const num = typeof val === "string" ? parseFloat(val.replace(/[^0-9.-]/g, "")) : val;
+  const num =
+    typeof val === "string" ? parseFloat(val.replace(/[^0-9.-]/g, "")) : val;
   if (isNaN(num)) return String(val);
   const isNegative = num < 0;
   const naira = Math.abs(num) / 100;
@@ -20,12 +21,18 @@ export const formatKoboAmount = (val: number | string): string => {
  * Uses a manual thousands separator without Intl.
  * Invalid, missing, or non-positive values return null.
  */
-export const formatNairaWhole = (kobo?: number | string | null): string | null => {
+export const formatNairaWhole = (
+  kobo?: number | string | null,
+): string | null => {
   if (kobo === null || kobo === undefined || kobo === "") return null;
-  const num = typeof kobo === "string" ? parseFloat(kobo.replace(/,/g, "").trim()) : Number(kobo);
+  const num =
+    typeof kobo === "string"
+      ? parseFloat(kobo.replace(/,/g, "").trim())
+      : Number(kobo);
   if (isNaN(num) || !isFinite(num) || num <= 0) return null;
 
-  const addCommas = (str: string): string => str.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const addCommas = (str: string): string =>
+    str.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const nairaVal = num / 100;
 
   if (num % 100 === 0) {
@@ -43,12 +50,18 @@ export const formatNairaWhole = (kobo?: number | string | null): string | null =
  */
 export const formatCurrencyInText = (text?: string): string => {
   if (!text) return "";
-  
+
   let formatted = text;
 
   // Clean up raw referral reward descriptions with kobo or bare numbers: "referral reward :50000", "Referral reward: 50000", "referral reward : 50000", etc.
-  formatted = formatted.replace(/\breferral\s+(?:reward|bonus|credit)\s*:\s*\d+(?:\.\d+)?(?:\s*kobos?)?/gi, "Referral Reward");
-  formatted = formatted.replace(/\breferral\s+(?:reward|bonus|credit)\s*:\s*₦\s*[\d,]+(?:\.\d+)?/gi, "Referral Reward");
+  formatted = formatted.replace(
+    /\breferral\s+(?:reward|bonus|credit)\s*:\s*\d+(?:\.\d+)?(?:\s*kobos?)?/gi,
+    "Referral Reward",
+  );
+  formatted = formatted.replace(
+    /\breferral\s+(?:reward|bonus|credit)\s*:\s*₦\s*[\d,]+(?:\.\d+)?/gi,
+    "Referral Reward",
+  );
 
   // Also if text is just "referral reward" or "referral bonus" or "referral credit", make it title-cased "Referral Reward"
   if (/^referral\s+(?:reward|bonus|credit)$/i.test(formatted.trim())) {
@@ -56,37 +69,46 @@ export const formatCurrencyInText = (text?: string): string => {
   }
 
   // 1. Handle "₦200000" or "₦ 200000" (raw integer after ₦ without commas or decimals)
-  formatted = formatted.replace(/₦\s*(\d{3,})\b(?!\s*[\.,]\d)/g, (_, rawKoboStr) => {
-    const kobo = parseFloat(rawKoboStr);
-    if (isNaN(kobo)) return `₦${rawKoboStr}`;
-    const naira = kobo / 100;
-    return `₦${naira.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  });
+  formatted = formatted.replace(
+    /₦\s*(\d{3,})\b(?!\s*[\.,]\d)/g,
+    (_, rawKoboStr) => {
+      const kobo = parseFloat(rawKoboStr);
+      if (isNaN(kobo)) return `₦${rawKoboStr}`;
+      const naira = kobo / 100;
+      return `₦${naira.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+    },
+  );
 
   // 2. Explicit kobo e.g. "200000 kobo" -> "₦2,000.00"
-  formatted = formatted.replace(/\b(\d+(?:\.\d+)?)\s*kobos?\b/gi, (_, koboStr) => {
-    const kobo = parseFloat(koboStr);
-    if (isNaN(kobo)) return `${koboStr} kobo`;
-    const naira = kobo / 100;
-    return `₦${naira.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  });
+  formatted = formatted.replace(
+    /\b(\d+(?:\.\d+)?)\s*kobos?\b/gi,
+    (_, koboStr) => {
+      const kobo = parseFloat(koboStr);
+      if (isNaN(kobo)) return `${koboStr} kobo`;
+      const naira = kobo / 100;
+      return `₦${naira.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+    },
+  );
 
   // 3. Bare 4+ digit integers not preceded by ₦ or $ and not followed by % or date separators (e.g. 200000 in text)
-  formatted = formatted.replace(/(?<![₦$\d,])\b(\d{4,})\b(?!\s*%|\s*:\s*\d|\s*-[0-1]\d)/g, (_, bareNumStr) => {
-    const kobo = parseFloat(bareNumStr);
-    if (isNaN(kobo)) return bareNumStr;
-    const naira = kobo / 100;
-    return `₦${naira.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  });
+  formatted = formatted.replace(
+    /(?<![₦$\d,])\b(\d{4,})\b(?!\s*%|\s*:\s*\d|\s*-[0-1]\d)/g,
+    (_, bareNumStr) => {
+      const kobo = parseFloat(bareNumStr);
+      if (isNaN(kobo)) return bareNumStr;
+      const naira = kobo / 100;
+      return `₦${naira.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+    },
+  );
 
   return formatted;
 };
@@ -142,7 +164,11 @@ export function formatMetadataValue(key: string, val: any): string {
 
   if (isMonetaryKey) {
     const cleanedNum = parseFloat(strVal.replace(/[^0-9.-]/g, ""));
-    if (!isNaN(cleanedNum) && !strVal.startsWith("₦") && !strVal.startsWith("$")) {
+    if (
+      !isNaN(cleanedNum) &&
+      !strVal.startsWith("₦") &&
+      !strVal.startsWith("$")
+    ) {
       return formatKoboAmount(cleanedNum);
     }
   }
@@ -162,7 +188,7 @@ export const getCleanTransactionTitle = (
     type?: string;
     action?: string;
   },
-  defaultSourceName?: string
+  defaultSourceName?: string,
 ): string => {
   if (!tx) return "Transaction";
 
@@ -199,7 +225,9 @@ export const getCleanTransactionTitle = (
     }
 
     // 2. Parse "from X to Y" out of description string (e.g. "Transfer from WealthFix to WealthGoal" or "Transfer 50000 kobo from WealthFix to WealthGoal")
-    const fromToMatch = desc.match(/transfer(?:.*?)(?:from\s+(.+?)\s+to\s+(.+?)|to\s+(.+?)\s+from\s+(.+?))$/i);
+    const fromToMatch = desc.match(
+      /transfer(?:.*?)(?:from\s+(.+?)\s+to\s+(.+?)|to\s+(.+?)\s+from\s+(.+?))$/i,
+    );
     if (fromToMatch) {
       const parsedFrom = (fromToMatch[1] || fromToMatch[4] || fromName)?.trim();
       const parsedTo = (fromToMatch[2] || fromToMatch[3] || toName)?.trim();
@@ -266,6 +294,19 @@ export const getCleanTransactionTitle = (
     return "Portfolio Withdrawal";
   }
 
+  // Portfolio Creation / Funding
+  if (
+    ref.startsWith("PORTFOLIO_CREATION") ||
+    ref.startsWith("PORTFOLIO_FUND") ||
+    desc.toLowerCase().startsWith("funded ") ||
+    desc.toLowerCase().includes("funded ")
+  ) {
+    if (desc) {
+      return cleanNarrativeText(desc);
+    }
+    return "Portfolio Funding";
+  }
+
   // Referral Reward
   const isReferral =
     reason.toUpperCase().includes("REFERRAL") ||
@@ -277,7 +318,7 @@ export const getCleanTransactionTitle = (
       Object.entries(meta).some(
         ([k, v]) =>
           k.toLowerCase().includes("referral") ||
-          (typeof v === "string" && v.toLowerCase().includes("referral"))
+          (typeof v === "string" && v.toLowerCase().includes("referral")),
       ));
 
   if (isReferral) {
@@ -301,20 +342,130 @@ export const getCleanTransactionTitle = (
       return "Referral Reward";
     default: {
       if (desc) {
-        return formatCurrencyInText(desc);
+        return cleanNarrativeText(desc);
       }
-      return reason || "Transaction";
+      return reason ? cleanNarrativeText(reason) : "Transaction";
     }
   }
+};
+
+/**
+ * Transforms raw database/backend narratives, descriptions, and enums into friendly, presentable text:
+ * - Replaces enum codes with canonical brand names (e.g. WEALTH_FAM -> WealthFam, WEALTH_FIX -> WealthFix, etc.)
+ * - Replaces raw underscores and hyphens in portfolio narratives (e.g. "Funded WEALTH_FAM portfolio: Kids - Sharon" -> "Funded WealthFam Portfolio: Kids (Sharon)")
+ * - Formats uppercase snake_case enums (e.g. PORTFOLIO_CREATION -> Portfolio Funding)
+ * - Converts raw kobo amounts to formatted Naira
+ */
+export const cleanNarrativeText = (rawText?: string): string => {
+  if (!rawText) return "";
+
+  let cleaned = formatCurrencyInText(rawText).trim();
+
+  // 1. Replace all uppercase product enum codes with clean branded names
+  cleaned = cleaned
+    .replace(/\bWEALTH[_\s-]?FAM\b/gi, "WealthFam")
+    .replace(/\bWEALTH[_\s-]?FIX\b/gi, "WealthFix")
+    .replace(/\bWEALTH[_\s-]?FLEX\b/gi, "WealthFlex")
+    .replace(/\bWEALTH[_\s-]?GOAL\b/gi, "WealthGoal")
+    .replace(/\bWEALTH[_\s-]?FLOW\b/gi, "WealthFlow")
+    .replace(/\bWEALTH[_\s-]?GROUP\b/gi, "WealthGroup")
+    .replace(/\bWEALTH[_\s-]?VEST\b/gi, "WealthVest");
+
+  // 2. Specific WealthFam pattern: (Funded|Top up for|Withdrawal from|...) <Product> portfolio: <Category> - <Member>
+  // e.g. "Funded WealthFam portfolio: Kids - Sharon" -> "Funded WealthFam Portfolio: Kids (Sharon)"
+  cleaned = cleaned.replace(
+    /\b(Funded|Top up for|Top-up for|Withdrawal from|Contribution to|Refund from)\s+(Wealth[A-Za-z]+)\s+portfolio:\s*(Kids|Spouse|Parent|Sibling|Others)\s*[-_–—]\s*([^,\n\r]+)/gi,
+    (_, action, prod, cat, member) => {
+      const act = action.toLowerCase().startsWith("funded")
+        ? "Funded"
+        : action.toLowerCase().includes("top")
+          ? "Top-up for"
+          : action.toLowerCase().startsWith("with")
+            ? "Withdrawal from"
+            : action.toLowerCase().startsWith("refund")
+              ? "Refund from"
+              : "Contribution to";
+      return `${act} ${prod} Portfolio: ${cat} (${member.trim()})`;
+    },
+  );
+
+  // 3. General portfolio pattern: (Funded|Top up for|...) <Product> portfolio: <Name>
+  cleaned = cleaned.replace(
+    /\b(Funded|Top up for|Top-up for|Withdrawal from|Contribution to|Refund from)\s+(Wealth[A-Za-z]+)\s+portfolio:\s*(.+)/gi,
+    (_, action, prod, name) => {
+      const act = action.toLowerCase().startsWith("funded")
+        ? "Funded"
+        : action.toLowerCase().includes("top")
+          ? "Top-up for"
+          : action.toLowerCase().startsWith("with")
+            ? "Withdrawal from"
+            : action.toLowerCase().startsWith("refund")
+              ? "Refund from"
+              : "Contribution to";
+      const trimmedName = name.trim();
+      const famMatch = trimmedName.match(
+        /^(Kids|Spouse|Parent|Sibling|Others)\s*[-_–—]\s*(.+)$/i,
+      );
+      if (famMatch) {
+        return `${act} ${prod} Portfolio: ${famMatch[1]} (${famMatch[2].trim()})`;
+      }
+      return `${act} ${prod} Portfolio: ${trimmedName}`;
+    },
+  );
+
+  // 4. Handle "portfolio: <Name>" without action prefix if present
+  cleaned = cleaned.replace(
+    /\bportfolio:\s*(Kids|Spouse|Parent|Sibling|Others)\s*[-_–—]\s*([^,\n\r]+)/gi,
+    "Portfolio: $1 ($2)",
+  );
+  cleaned = cleaned.replace(/\bportfolio:\s*/gi, "Portfolio: ");
+
+  // 5. Replace any standalone SCREAMING_SNAKE_CASE enum phrases
+  const KNOWN_ENUM_MAP: Record<string, string> = {
+    PORTFOLIO_CREATION: "Portfolio Funding",
+    PORTFOLIO_FUNDING: "Portfolio Funding",
+    PORTFOLIO_TOPUP: "Portfolio Top-up",
+    PORTFOLIO_WITHDRAW: "Portfolio Withdrawal",
+    PORTFOLIO_WITHDRAWAL: "Portfolio Withdrawal",
+    PORTFOLIO_TERMINATE: "Portfolio Termination Refund",
+    PORTFOLIO_TERMINATION: "Portfolio Termination Refund",
+    WALLET_TOPUP: "Wallet Top-up",
+    REFERRAL_CREDIT: "Referral Reward",
+    REFERRAL_REWARD: "Referral Reward",
+    SAVINGS_INTEREST: "Savings Interest",
+    INTEREST_CREDIT: "Interest Credited",
+    INTEREST_ACCRUAL: "Interest Accrual",
+    CARD_FUNDING: "Card Funding",
+    BANK_TRANSFER: "Bank Transfer",
+    SECURITY_PIN_RESET: "Transaction PIN Reset",
+  };
+
+  cleaned = cleaned.replace(/\b[A-Z]{2,}(?:_[A-Z0-9]+)+\b/g, (match) => {
+    if (KNOWN_ENUM_MAP[match]) return KNOWN_ENUM_MAP[match];
+    // Generic fallback for any other SNAKE_CASE string: convert to Title Case words
+    return match
+      .split("_")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ");
+  });
+
+  // 6. Clean up any remaining awkward underscores
+  cleaned = cleaned
+    .replace(/[_-]{2,}/g, " ")
+    .replace(/\s*_\s*/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return cleaned;
 };
 
 /**
  * Returns a human-friendly narrative for a transaction (avoiding raw enums like "OTHER").
  */
 export const getCleanTransactionNarrative = (tx?: {
+  reference: any;
   reason?: string;
   description?: string;
-  reference?: string;
 }): string => {
   if (!tx) return "Wallet Transaction";
 
@@ -343,12 +494,24 @@ export const getCleanTransactionNarrative = (tx?: {
       case "REFERRAL_CREDIT":
         return "Referral Reward";
       default:
-        return tx.reason;
+        return cleanNarrativeText(tx.reason ?? "");
     }
   }
 
   if (tx.description) {
-    return formatCurrencyInText(tx.description);
+    return cleanNarrativeText(tx.description);
+  }
+
+  if (tx.reference?.startsWith("PORTFOLIO_CREATION")) {
+    return "Portfolio Funding";
+  }
+
+  if (tx.reference?.startsWith("PORTFOLIO_TOPUP")) {
+    return "Portfolio Top-up";
+  }
+
+  if (tx.reference?.startsWith("PORTFOLIO_WITHDRAW")) {
+    return "Portfolio Withdrawal";
   }
 
   return "Wallet Transaction";
@@ -360,7 +523,7 @@ export interface PortfolioZeroBalanceBannerInfo {
 }
 
 export const getPortfolioZeroBalanceBannerInfo = (
-  transactions?: { type?: string; reference?: string }[]
+  transactions?: { type?: string; reference?: string }[],
 ): PortfolioZeroBalanceBannerInfo => {
   const fallback: PortfolioZeroBalanceBannerInfo = {
     title: "Funds Fully Withdrawn",
@@ -374,7 +537,9 @@ export const getPortfolioZeroBalanceBannerInfo = (
   // Find the most recent DEBIT transaction (txnsData is already sorted createdAt descending)
   const debitTxn = transactions.find((t) => {
     const type = t.type?.toUpperCase() || "";
-    return type === "DEBIT" || type.includes("DEBIT") || type.includes("WITHDRAW");
+    return (
+      type === "DEBIT" || type.includes("DEBIT") || type.includes("WITHDRAW")
+    );
   });
 
   if (!debitTxn || !debitTxn.reference) {
@@ -384,7 +549,10 @@ export const getPortfolioZeroBalanceBannerInfo = (
   const ref = debitTxn.reference.trim();
 
   // 1. Starts with PORTFOLIO_WITHDRAW_
-  if (ref.startsWith("PORTFOLIO_WITHDRAW_") || ref.startsWith("PORTFOLIO_WITHDRAW")) {
+  if (
+    ref.startsWith("PORTFOLIO_WITHDRAW_") ||
+    ref.startsWith("PORTFOLIO_WITHDRAW")
+  ) {
     return {
       title: "Funds Transferred to Wallet",
       subtitle:
@@ -409,7 +577,8 @@ export const getPortfolioZeroBalanceBannerInfo = (
   ) {
     return {
       title: "Funds Transferred to Bank",
-      subtitle: "All funds from this plan have been transferred to your bank account.",
+      subtitle:
+        "All funds from this plan have been transferred to your bank account.",
     };
   }
 
@@ -421,7 +590,7 @@ export const getPortfolioZeroBalanceBannerInfo = (
  */
 export const formatEarlyTerminationPenaltyRate = (
   rateVal: any,
-  fallback = "2.5%"
+  fallback = "2.5%",
 ): string => {
   if (rateVal === undefined || rateVal === null || rateVal === "") {
     return fallback;
@@ -478,7 +647,7 @@ export const getDynamicPenaltyRate = (
   systemConfigs?: { items?: Array<{ key: string; value: string }> } | any,
   portfolioConfigRates?: any,
   fallback = "2.5%",
-  item?: any
+  item?: any,
 ): { penaltyRate: string; penaltyRatio: number } => {
   const normType = (portfolioType || "")
     .toUpperCase()
@@ -567,7 +736,7 @@ export const getDynamicInterestRateLabel = (
   systemConfigs?: { items?: Array<{ key: string; value: string }> } | any,
   portfolioConfigRates?: any,
   fallbackRate = 12,
-  item?: any
+  item?: any,
 ): string => {
   // 1. Check individual item first
   if (item) {
@@ -600,9 +769,9 @@ export const getDynamicInterestRateLabel = (
   if (configRateObj) {
     const formattedConfigLabel = formatInterestRateLabel(
       configRateObj.label ??
-      configRateObj.annualInterestRate ??
-      configRateObj.rate ??
-      configRateObj.interestRate
+        configRateObj.annualInterestRate ??
+        configRateObj.rate ??
+        configRateObj.interestRate,
     );
     if (formattedConfigLabel) {
       return formattedConfigLabel;
@@ -669,7 +838,9 @@ export const isPortfolioDateEnded = (dateStr?: string | null): boolean => {
     if (parts.length === 3) {
       const [day, month, year] = parts;
       if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-        return new Date(year, month - 1, day, 23, 59, 59).getTime() <= Date.now();
+        return (
+          new Date(year, month - 1, day, 23, 59, 59).getTime() <= Date.now()
+        );
       }
     }
   }
@@ -685,7 +856,10 @@ export const isPortfolioDateEnded = (dateStr?: string | null): boolean => {
  */
 export const isPortfolioCompleted = (g?: Portfolio | null): boolean => {
   if (!g) return false;
-  const s = (g.status || (g as any).state || "").toString().trim().toUpperCase();
+  const s = (g.status || (g as any).state || "")
+    .toString()
+    .trim()
+    .toUpperCase();
   const isCompletedStatus =
     s === "COMPLETED" ||
     s === "TERMINATED" ||
@@ -696,9 +870,8 @@ export const isPortfolioCompleted = (g?: Portfolio | null): boolean => {
     s === "LIQUIDATED";
 
   const isDateEnded = isPortfolioDateEnded(
-    g.maturityDate || (g as any).endDate || (g as any).targetDate
+    g.maturityDate || (g as any).endDate || (g as any).targetDate,
   );
 
   return isCompletedStatus || isDateEnded;
 };
-

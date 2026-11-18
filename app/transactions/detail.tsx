@@ -20,6 +20,7 @@ import {
   formatCurrencyInText,
   getCleanTransactionTitle,
   getCleanTransactionNarrative,
+  cleanNarrativeText,
 } from "@/src/utils/formatters";
 
 export default function TransactionDetailScreen() {
@@ -75,7 +76,7 @@ export default function TransactionDetailScreen() {
 
   const title = getCleanTransactionTitle(transaction);
   const narrative = getCleanTransactionNarrative(transaction);
-  const formattedDescription = formatCurrencyInText(transaction.description);
+  const formattedDescription = cleanNarrativeText(transaction.description);
   const amountFormatted = formatAmount(transaction.amount);
 
   // Extract termination penalty if present in description

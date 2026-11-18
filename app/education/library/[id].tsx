@@ -225,7 +225,7 @@ export default function LibraryMaterialDetailScreen() {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={{ flex: 1 }}
         >
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           <View className="px-5 py-6">
             {/* Cover image */}
             <View className="w-full h-56 rounded-2xl bg-gray-100 mb-6">
@@ -357,6 +357,7 @@ export default function LibraryMaterialDetailScreen() {
                     </View>
                   )}
 
+                  {/* Comments count - disabled for now
                   <View className="flex-row items-center px-4 py-2">
                     <Ionicons
                       name="chatbubble-outline"
@@ -367,8 +368,11 @@ export default function LibraryMaterialDetailScreen() {
                       {material.commentsCount} Comments
                     </Text>
                   </View>
+                  */}
                 </View>
 
+                {/* Comments Section - disabled for now */}
+                {/*
                 <Text className="text-lg font-bold text-gray-900 mb-4">
                   Comments
                 </Text>
@@ -414,12 +418,14 @@ export default function LibraryMaterialDetailScreen() {
                     </Text>
                   </View>
                 )}
+                */}
               </>
             )}
           </View>
         </ScrollView>
 
-        {/* Comment Input — documents only */}
+        {/* Comment Input — documents only - disabled for now */}
+        {/*
         {material.contentType === "document" && (
           <View className="px-5 py-3 border-t border-gray-100 bg-white flex-row items-center">
             <View className="flex-1 bg-gray-50 rounded-full px-4 py-2 flex-row items-center border border-gray-200">
@@ -445,6 +451,7 @@ export default function LibraryMaterialDetailScreen() {
             </TouchableOpacity>
           </View>
         )}
+        */}
       </KeyboardAvoidingView>
       )}
     </SafeAreaView>
