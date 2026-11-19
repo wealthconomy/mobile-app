@@ -28,6 +28,25 @@ let isNavigationReady = false;
 let hasCheckedInitialNotification = false;
 let hasRegisteredBackgroundHandler = false;
 
+// Cache of recently received message IDs to prevent duplicate processing
+const processedMessageIds = new Map<string, number>();
+
+function isDuplicateMessage(messageId?: string): boolean {
+  if (!messageId) return false;
+  const now = Date.now();
+  // Prune entries older than 30 seconds
+  for (const [id, timestamp] of processedMessageIds.entries()) {
+    if (now - timestamp > 30000) {
+      processedMessageIds.delete(id);
+    }
+  }
+  if (processedMessageIds.has(messageId)) {
+    return true;
+  }
+  processedMessageIds.set(messageId, now);
+  return false;
+}
+
 function logPushEvent(stage: string, payload?: unknown) {
   const timestamp = new Date().toISOString();
   console.log(`\n========== [PUSH][${stage}] ${timestamp} ==========`);
@@ -314,6 +333,13 @@ export function setupPushNotificationListeners(
   const unsubscribeForeground = onMessage(
     messagingInstance,
     async (remoteMessage: RemoteMessage) => {
+      if (isDuplicateMessage(remoteMessage.messageId)) {
+        logPushEvent("DUPLICATE_MESSAGE_SKIPPED", {
+          messageId: remoteMessage.messageId,
+        });
+        return;
+      }
+
       logPushEvent("RECEIVED_FOREGROUND", {
         messageId: remoteMessage.messageId,
         sentTime: remoteMessage.sentTime,
@@ -337,16 +363,30 @@ export function setupPushNotificationListeners(
           : undefined);
 
       if (title || body) {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: title ?? "Wealthconomy",
-            body: body ?? "",
-            data: remoteMessage.data ?? {},
-            sound: "default",
-          },
-          trigger: null, // show immediately
-        });
-        logPushEvent("LOCAL_BANNER_DISPLAYED", { title, body });
+        // NOTE: On iOS, if remoteMessage.notification is present, iOS (UNUserNotificationCenter)
+        // already presents the remote notification natively via setNotificationHandler({ shouldShowBanner: true }).
+        // Scheduling a local notification here on iOS causes a duplicate banner!
+        const isIosRemoteWithNotification =
+          Platform.OS === "ios" && Boolean(remoteMessage.notification);
+
+        if (!isIosRemoteWithNotification) {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: title ?? "Wealthconomy",
+              body: body ?? "",
+              data: remoteMessage.data ?? {},
+              sound: "default",
+            },
+            trigger: null, // show immediately
+          });
+          logPushEvent("LOCAL_BANNER_DISPLAYED", { title, body });
+        } else {
+          logPushEvent("IOS_NATIVE_BANNER_HANDLED", {
+            note: "iOS displayed remote banner natively via setNotificationHandler; skipped local duplicate",
+            title,
+            body,
+          });
+        }
       } else {
         logPushEvent("FOREGROUND_SILENT_DATA_ONLY", remoteMessage.data ?? {});
       }
