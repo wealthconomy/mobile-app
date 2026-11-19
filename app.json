@@ -16,6 +16,7 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "icon": "./assets/images/icon-ios.png",
       "supportsTablet": true,
       "deploymentTarget": "15.1",
       "googleServicesFile": "./GoogleService-Info.plist",
@@ -33,10 +34,9 @@
       "package": "com.wealthconomy.app",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundImage": "./assets/images/icon.png",
-        "monochromeImage": "./assets/images/icon.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "usesCleartextTraffic": true,
       "predictiveBackGestureEnabled": false,
