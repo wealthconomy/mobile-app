@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.wealth070steam.Wealthconomy</string>
+	<string>com.wealthconomy.app</string>
 	<key>PROJECT_ID</key>
 	<string>project-wealthconomy</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:460376815276:ios:f97b2879ed7a0ec038d109</string>
+	<string>1:460376815276:ios:ac795a8b9088a9a438d109</string>
 </dict>
 </plist>
