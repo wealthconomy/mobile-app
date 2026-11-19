@@ -1045,17 +1045,6 @@ export default function CreateFlowScreen() {
           </Text>
         </View>
       )}
-
-      <TouchableOpacity
-        style={{ alignItems: "center", marginBottom: 40 }}
-        disabled={isSubmitting || isCreating}
-        onPress={() => pinInputRef.current?.focus()}
-      >
-        <Ionicons name="finger-print" size={36} color={TEAL} />
-        <Text style={{ color: TEAL, fontWeight: "700", fontSize: 14, marginTop: 8 }}>
-          Use biometric authentication
-        </Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 

@@ -373,12 +373,7 @@ const EditableField = ({
   isReadOnly?: boolean;
 }) => (
   <View style={{ gap: 6 }}>
-    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-      <Text style={{ fontSize: 13, fontWeight: "600", color: "#6B7280" }}>{label}</Text>
-      {isReadOnly && isEditing ? (
-        <Text style={{ fontSize: 11, fontWeight: "500", color: "#9CA3AF" }}>Non-editable</Text>
-      ) : null}
-    </View>
+    <Text style={{ fontSize: 13, fontWeight: "600", color: "#6B7280" }}>{label}</Text>
     <Controller
       control={control}
       name={name}

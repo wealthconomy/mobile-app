@@ -350,6 +350,41 @@ export const getCleanTransactionTitle = (
 };
 
 /**
+ * Returns a neat, user-friendly label for any portfolio product type (e.g. "WEALTH_GOAL" -> "Wealth Goal").
+ */
+export const formatPortfolioType = (type?: string): string => {
+  if (!type) return "Portfolio";
+  const clean = type.trim().replace(/[_-]/g, "").toLowerCase();
+  switch (clean) {
+    case "wealthgoal":
+    case "goal":
+      return "Wealth Goal";
+    case "wealthfix":
+    case "fix":
+      return "Wealth Fix";
+    case "wealthflex":
+    case "flex":
+      return "Wealth Flex";
+    case "wealthfam":
+    case "fam":
+      return "Wealth Fam";
+    case "wealthflow":
+    case "flow":
+      return "Wealth Flow";
+    case "wealthgroup":
+    case "group":
+      return "Wealth Group";
+    case "wealthvest":
+    case "vest":
+      return "Wealth Vest";
+    default:
+      return type
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+};
+
+/**
  * Transforms raw database/backend narratives, descriptions, and enums into friendly, presentable text:
  * - Replaces enum codes with canonical brand names (e.g. WEALTH_FAM -> WealthFam, WEALTH_FIX -> WealthFix, etc.)
  * - Replaces raw underscores and hyphens in portfolio narratives (e.g. "Funded WEALTH_FAM portfolio: Kids - Sharon" -> "Funded WealthFam Portfolio: Kids (Sharon)")

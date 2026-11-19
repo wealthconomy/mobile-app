@@ -267,23 +267,6 @@ export default function InsertPinScreen() {
     }
   };
 
-  const handleBiometricAuth = () => {
-    Alert.alert(
-      "Biometric Authentication",
-      "Please enter your 4-digit transaction PIN to proceed securely.",
-      [
-        {
-          text: "OK",
-          onPress: () => {
-            if (!isProcessing && !showSuccessModal) {
-              inputRef.current?.focus();
-            }
-          },
-        },
-      ],
-    );
-  };
-
   const handleSuccessConfirm = () => {
     Keyboard.dismiss();
     inputRef.current?.blur();
@@ -548,25 +531,6 @@ export default function InsertPinScreen() {
             <Text style={{ color: TEAL, fontWeight: "700" }}>
               change it from your settings page
             </Text>
-          </Text>
-        </TouchableOpacity>
-
-        {/* Biometric Fingerprint Button */}
-        <TouchableOpacity
-          style={{ alignItems: "center", marginBottom: 20 }}
-          onPress={handleBiometricAuth}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="finger-print" size={38} color={TEAL} />
-          <Text
-            style={{
-              color: TEAL,
-              fontWeight: "700",
-              fontSize: 14,
-              marginTop: 8,
-            }}
-          >
-            Use fingerprint
           </Text>
         </TouchableOpacity>
       </ScrollView>

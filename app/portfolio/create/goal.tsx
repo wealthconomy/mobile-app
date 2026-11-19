@@ -1308,13 +1308,6 @@ export default function CreateGoalScreen() {
         </Text>
       </View>
 
-      <View className="items-center mb-12">
-        <Ionicons name="finger-print" size={36} color="#155D5F" />
-        <Text className="text-[#155D5F] font-bold mt-2 text-[14px]">
-          Use fingerprint
-        </Text>
-      </View>
-
       {loading && (
         <View className="items-center">
           <Text className="text-[#F3007A] font-bold">Creating Goal...</Text>

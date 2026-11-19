@@ -1407,18 +1407,6 @@ export default function CreateFixScreen() {
           If you have forgotten your pin, change it from your settings page
         </Text>
       </View>
-
-      <TouchableOpacity
-        style={{ alignItems: "center", marginBottom: 40 }}
-        onPress={() => setStep("success")}
-      >
-        <Ionicons name="finger-print" size={36} color={TEAL} />
-        <Text
-          style={{ color: TEAL, fontWeight: "700", fontSize: 14, marginTop: 8 }}
-        >
-          Use fingerprint
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 

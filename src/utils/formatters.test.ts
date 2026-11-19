@@ -1,5 +1,6 @@
 import {
   cleanNarrativeText,
+  formatPortfolioType,
   getCleanTransactionNarrative,
   getCleanTransactionTitle,
 } from "./formatters";
@@ -61,5 +62,15 @@ describe("formatters - cleanNarrativeText and transaction narratives", () => {
     expect(getCleanTransactionNarrative(tx)).toBe(
       "Funded WealthFam Portfolio: Kids (Sharon)"
     );
+  });
+
+  it("formats portfolio types cleanly without underscores", () => {
+    expect(formatPortfolioType("WEALTH_GOAL")).toBe("Wealth Goal");
+    expect(formatPortfolioType("Wealth_goal")).toBe("Wealth Goal");
+    expect(formatPortfolioType("WEALTH_FIX")).toBe("Wealth Fix");
+    expect(formatPortfolioType("WEALTH_FAM")).toBe("Wealth Fam");
+    expect(formatPortfolioType("WEALTH_FLOW")).toBe("Wealth Flow");
+    expect(formatPortfolioType("WEALTH_FLEX")).toBe("Wealth Flex");
+    expect(formatPortfolioType("WEALTH_GROUP")).toBe("Wealth Group");
   });
 });

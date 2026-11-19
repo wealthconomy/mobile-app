@@ -21,6 +21,7 @@ import { BlurView } from "expo-blur";
 import { useGetPortfoliosQuery } from "@/src/store/api/portfolioApi";
 import { useGetUserPayoutAccountsQuery } from "@/src/store/api/payoutAccountApi";
 import { Portfolio, PortfolioType } from "@/src/types/portfolio";
+import { formatPortfolioType } from "@/src/utils/formatters";
 
 const TEAL = "#0B575B";
 const TEAL_LIGHT = "#EEF6F6";
@@ -114,20 +115,7 @@ export default function ManageFundsSheet({
   };
 
   const getTypeLabel = (typeStr: string) => {
-    switch (typeStr?.toLowerCase()) {
-      case "wealthgoal":
-        return "Goal";
-      case "wealthfix":
-        return "Fix";
-      case "wealthflex":
-        return "Flex";
-      case "wealthfam":
-        return "Fam";
-      case "wealthflow":
-        return "Flow";
-      default:
-        return typeStr || "Portfolio";
-    }
+    return formatPortfolioType(typeStr);
   };
 
   const getReturnUrl = () => {

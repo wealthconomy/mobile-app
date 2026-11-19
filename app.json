@@ -27,7 +27,8 @@
         "NSCameraUsageDescription": "Wealthconomy needs access to your camera so you can take profile photos and capture identification documents for secure KYC verification.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bundleIdentifier": "com.wealth070steam.Wealthconomy"
+      "bundleIdentifier": "com.wealth070steam.Wealthconomy",
+      "buildNumber": "2"
     },
     "android": {
       "package": "com.wealth070steam.Wealthconomy",

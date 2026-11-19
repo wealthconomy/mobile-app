@@ -757,7 +757,11 @@ export default function FlowDetailScreen() {
                       {getCleanTransactionTitle(txn, plan?.name)}
                     </Text>
                     <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600", lineHeight: 16, marginTop: 2 }}>
-                      {new Date(txn.createdAt).toLocaleDateString()} • {txn.reference}
+                      {new Date(txn.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
                     </Text>
                   </View>
                   <Text
