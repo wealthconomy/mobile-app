@@ -690,18 +690,19 @@ export default function SignupScreen() {
 
           {/* T&C Checkbox */}
           <Animated.View entering={FadeInDown.duration(600).delay(650)}>
-          <TouchableOpacity
-            onPress={() => {
-              setAgreeToTerms(!agreeToTerms);
-              clearError("terms");
-            }}
+          <View
             style={{
               flexDirection: "row",
               alignItems: "flex-start",
               marginBottom: errors.terms ? 6 : 24,
             }}
           >
-            <View
+            <TouchableOpacity
+              onPress={() => {
+                setAgreeToTerms(!agreeToTerms);
+                clearError("terms");
+              }}
+              activeOpacity={0.7}
               style={{
                 width: 18,
                 height: 18,
@@ -726,7 +727,7 @@ export default function SignupScreen() {
                   ✓
                 </Text>
               )}
-            </View>
+            </TouchableOpacity>
             <Text
               style={{
                 color: SECONDARY,
@@ -736,15 +737,21 @@ export default function SignupScreen() {
               }}
             >
               I agree with the{" "}
-              <Text style={{ color: PRIMARY, fontWeight: "600" }}>
+              <Text
+                onPress={() => router.push("/profile/terms" as any)}
+                style={{ color: PRIMARY, fontWeight: "600", textDecorationLine: "underline" }}
+              >
                 Terms and Conditions
               </Text>{" "}
               and{" "}
-              <Text style={{ color: PRIMARY, fontWeight: "600" }}>
+              <Text
+                onPress={() => router.push("/profile/privacy" as any)}
+                style={{ color: PRIMARY, fontWeight: "600", textDecorationLine: "underline" }}
+              >
                 Privacy Policy
               </Text>
             </Text>
-          </TouchableOpacity>
+          </View>
           {errors.terms ? (
             <Text style={{ color: ERROR, fontSize: 12, marginBottom: 16 }}>
               {errors.terms}

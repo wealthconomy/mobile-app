@@ -1,6 +1,32 @@
 import Header from "@/src/components/common/Header";
+import {
+  hasLevel3AddressDoc as checkHasLevel3AddressDoc,
+  isLevel2Pending as checkIsLevel2Pending,
+  isLevel2Rejected as checkIsLevel2Rejected,
+  isLevel2Verified as checkIsLevel2Verified,
+  isLevel3Pending as checkIsLevel3Pending,
+  isLevel3Rejected as checkIsLevel3Rejected,
+  isLevel3Verified as checkIsLevel3Verified,
+  faceDocStatus,
+  faceRejectionText,
+  hasLevel2Uploads,
+  idDocStatus,
+  idRejectionText,
+} from "@/src/features/kyc/utils/kycState";
+import { RootState } from "@/src/store";
+import {
+  useGetKycDocumentsQuery,
+  useGetKycStatusQuery,
+} from "@/src/store/api/kycApi";
+import { useGetPortfolioSummaryQuery } from "@/src/store/api/portfolioApi";
+import { useDeleteAccountMutation } from "@/src/store/api/userApi";
+import { useGetWalletSummaryQuery } from "@/src/store/api/walletApi";
+import { logout } from "@/src/store/slices/authSlice";
+import { formatKoboAmount } from "@/src/utils/formatters";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,33 +38,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { RootState } from "@/src/store";
-import { useDeleteAccountMutation } from "@/src/store/api/userApi";
-import { useGetKycDocumentsQuery, useGetKycStatusQuery } from "@/src/store/api/kycApi";
-import { logout } from "@/src/store/slices/authSlice";
-import {
-  idDocStatus,
-  faceDocStatus,
-  idRejectionText,
-  faceRejectionText,
-  isLevel2Verified as checkIsLevel2Verified,
-  isLevel2Rejected as checkIsLevel2Rejected,
-  isLevel2Pending as checkIsLevel2Pending,
-  hasLevel2Uploads,
-  hasLevel3AddressDoc as checkHasLevel3AddressDoc,
-  isLevel3Verified as checkIsLevel3Verified,
-  isLevel3Rejected as checkIsLevel3Rejected,
-  isLevel3Pending as checkIsLevel3Pending,
-} from "@/src/features/kyc/utils/kycState";
 
 export default function SecurityScreen() {
   const router = useRouter();
   const dispatch = useDispatch();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showBalanceBlockedModal, setShowBalanceBlockedModal] = useState(false);
   const [deleteAccount, { isLoading: isDeleting }] = useDeleteAccountMutation();
   const [showLockedModal, setShowLockedModal] = useState(false);
   const [kycModalInfo, setKycModalInfo] = useState<{
@@ -63,14 +70,41 @@ export default function SecurityScreen() {
     description: "",
   });
   const user = useSelector((state: RootState) => state.auth.user);
-  const { data: kycData } = useGetKycStatusQuery(undefined, { refetchOnMountOrArgChange: true });
-  const { data: kycDocsResponse } = useGetKycDocumentsQuery(undefined, { refetchOnMountOrArgChange: true });
+  const { data: kycData } = useGetKycStatusQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+  const { data: kycDocsResponse } = useGetKycDocumentsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+  const { data: wallet } = useGetWalletSummaryQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+  const { data: portfolioSummary } = useGetPortfolioSummaryQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
 
   const kycDocsPayload: any = kycDocsResponse?.data;
   const kycDocs: any = kycDocsPayload?.data || kycDocsPayload;
 
   const currentLevel = kycData?.data?.currentLevel ?? user?.kycLevel ?? 1;
   const kycStatus = kycData?.data?.status ?? user?.kycStatus;
+
+  // Calculate active wallet and portfolio balance to prevent accidental loss
+  const walletBalanceKobo = Number(wallet?.currentBalance || 0);
+  const portfolioBalanceKobo = (portfolioSummary || []).reduce(
+    (sum, item) => sum + Number(item.totalBalance || 0),
+    0,
+  );
+  const totalBalanceKobo = walletBalanceKobo + portfolioBalanceKobo;
+  const hasFundsRemaining = totalBalanceKobo > 0;
+
+  const handleOpenDeleteModal = () => {
+    if (hasFundsRemaining) {
+      setShowBalanceBlockedModal(true);
+      return;
+    }
+    setShowDeleteModal(true);
+  };
 
   const isLevel2Rejected = checkIsLevel2Rejected(kycDocs, user);
   const isLevel2Verified = checkIsLevel2Verified(kycDocs, user);
@@ -90,25 +124,73 @@ export default function SecurityScreen() {
     user?.kycRejectionReason;
 
   const specificRejectionReason =
-    isIdRejected && isFaceRejected && idReason && faceReason && idReason !== faceReason
+    isIdRejected &&
+    isFaceRejected &&
+    idReason &&
+    faceReason &&
+    idReason !== faceReason
       ? `ID: ${idReason} | Face: ${faceReason}`
       : idReason || faceReason || generalReason;
 
-  const isLevel2Incomplete = !isLevel2Verified && !isLevel2Rejected && !hasAllLevel2Data;
+  const isLevel2Incomplete =
+    !isLevel2Verified && !isLevel2Rejected && !hasAllLevel2Data;
   const hasLevel3AddressDoc = checkHasLevel3AddressDoc(kycDocs);
   const isLevel3Rejected = checkIsLevel3Rejected(kycDocs, user);
   const isLevel3Pending = checkIsLevel3Pending(kycDocs, user);
 
   const handleDeleteAccount = async () => {
+    if (hasFundsRemaining) {
+      setShowDeleteModal(false);
+      setShowBalanceBlockedModal(true);
+      return;
+    }
     try {
       await deleteAccount().unwrap();
       setShowDeleteModal(false);
       dispatch(logout());
-      Alert.alert("Account Deleted", "Your account has been permanently deleted.");
+      Alert.alert(
+        "Account Deleted",
+        "Your account has been permanently deleted.",
+      );
       router.replace("/(auth)/login");
     } catch (err: any) {
-      console.error("Failed to delete account");
-      const msg = err?.data?.message || err?.message || "Failed to delete account. Please try again.";
+      console.error("Failed to delete account", JSON.stringify(err));
+      const errCode = err?.data?.errorCode;
+      const status = err?.status;
+      const msg =
+        err?.data?.message ||
+        err?.message ||
+        "Failed to delete account. Please try again.";
+
+      // If the backend already deleted the account (e.g. 403 / 401 / ACCOUNT_DELETED / USER_NOT_FOUND)
+      if (
+        status === 403 ||
+        status === 401 ||
+        errCode === "ACCOUNT_DELETED" ||
+        msg.toLowerCase().includes("deleted") ||
+        msg.toLowerCase().includes("not found")
+      ) {
+        setShowDeleteModal(false);
+        dispatch(logout());
+        Alert.alert(
+          "Account Deleted",
+          "Your account has been permanently deleted.",
+        );
+        router.replace("/(auth)/login");
+        return;
+      }
+
+      // If backend rejected because user still has active funds/investments
+      if (
+        msg.toLowerCase().includes("fund") ||
+        msg.toLowerCase().includes("balance") ||
+        msg.toLowerCase().includes("investment")
+      ) {
+        setShowDeleteModal(false);
+        setShowBalanceBlockedModal(true);
+        return;
+      }
+
       Alert.alert("Error", msg);
     }
   };
@@ -133,25 +215,29 @@ export default function SecurityScreen() {
                 isLevel2Verified
                   ? "National ID & biometric face verified"
                   : isLevel2Rejected
-                  ? specificRejectionReason
-                    ? `Rejected: ${specificRejectionReason}`
-                    : "Verification rejected - tap to review & re-upload"
-                  : isLevel2Incomplete
-                  ? "Incomplete - Tap to upload ID & Face ID"
-                  : isLevel2Pending
-                  ? "ID & face selfie submitted - under review"
-                  : "Scan your ID & verify with Face ID"
+                    ? specificRejectionReason
+                      ? `Rejected: ${specificRejectionReason}`
+                      : "Verification rejected - tap to review & re-upload"
+                    : isLevel2Incomplete
+                      ? "Incomplete - Tap to upload ID & Face ID"
+                      : isLevel2Pending
+                        ? "ID & face selfie submitted - under review"
+                        : "Scan your ID & verify with Face ID"
               }
               badge={
                 isLevel2Verified
                   ? { text: "Verified", bg: "#DCFCE7", color: "#166534" }
                   : isLevel2Rejected
-                  ? { text: "Action Required", bg: "#FEF2F2", color: "#DC2626" }
-                  : isLevel2Incomplete
-                  ? { text: "Incomplete", bg: "#FEF3C7", color: "#B45309" }
-                  : isLevel2Pending
-                  ? { text: "In Review", bg: "#FEF9C3", color: "#854D0E" }
-                  : { text: "Required", bg: "#E0F2FE", color: "#0369A1" }
+                    ? {
+                        text: "Action Required",
+                        bg: "#FEF2F2",
+                        color: "#DC2626",
+                      }
+                    : isLevel2Incomplete
+                      ? { text: "Incomplete", bg: "#FEF3C7", color: "#B45309" }
+                      : isLevel2Pending
+                        ? { text: "In Review", bg: "#FEF9C3", color: "#854D0E" }
+                        : { text: "Required", bg: "#E0F2FE", color: "#0369A1" }
               }
               icon={
                 <MaterialCommunityIcons
@@ -172,7 +258,9 @@ export default function SecurityScreen() {
                     badgeColor: "#166534",
                     description:
                       "Your Level 2 Identity Verification has been approved. You have full access to daily withdrawals and can proceed to Level 3 Address Verification.",
-                    primaryButtonText: isLevel3Verified ? undefined : "Proceed to Level 3",
+                    primaryButtonText: isLevel3Verified
+                      ? undefined
+                      : "Proceed to Level 3",
                     onPrimaryPress: () => {
                       setKycModalInfo((prev) => ({ ...prev, visible: false }));
                       router.push("/kyc/level3-intro");
@@ -203,27 +291,41 @@ export default function SecurityScreen() {
                 isLevel3Rejected
                   ? "Document rejected - tap to review & re-upload"
                   : isLevel3Verified
-                  ? "Residential address & passport verified"
-                  : isLevel3Pending
-                  ? "Documents submitted and currently under review"
-                  : "Proof of residency & international passport"
+                    ? "Residential address & passport verified"
+                    : isLevel3Pending
+                      ? "Documents submitted and currently under review"
+                      : "Proof of residency & international passport"
               }
               badge={
                 isLevel3Verified
                   ? { text: "Verified", bg: "#DCFCE7", color: "#166534" }
                   : isLevel3Rejected
-                  ? { text: "Action Required", bg: "#FEF2F2", color: "#DC2626" }
-                  : isLevel3Pending
-                  ? { text: "In Review", bg: "#FEF9C3", color: "#854D0E" }
-                  : isLevel2Verified
-                  ? { text: "Upgrade", bg: "#E0F2FE", color: "#0369A1" }
-                  : { text: "Locked", bg: "#F1F5F9", color: "#64748B" }
+                    ? {
+                        text: "Action Required",
+                        bg: "#FEF2F2",
+                        color: "#DC2626",
+                      }
+                    : isLevel3Pending
+                      ? { text: "In Review", bg: "#FEF9C3", color: "#854D0E" }
+                      : isLevel2Verified
+                        ? { text: "Upgrade", bg: "#E0F2FE", color: "#0369A1" }
+                        : { text: "Locked", bg: "#F1F5F9", color: "#64748B" }
               }
               icon={
                 <Ionicons
-                  name={isLevel3Verified || isLevel2Verified ? "location-outline" : "lock-closed-outline"}
+                  name={
+                    isLevel3Verified || isLevel2Verified
+                      ? "location-outline"
+                      : "lock-closed-outline"
+                  }
                   size={24}
-                  color={isLevel3Rejected ? "#DC2626" : isLevel3Verified || isLevel2Verified ? "#155D5F" : "#94A3B8"}
+                  color={
+                    isLevel3Rejected
+                      ? "#DC2626"
+                      : isLevel3Verified || isLevel2Verified
+                        ? "#155D5F"
+                        : "#94A3B8"
+                  }
                 />
               }
               isLocked={!isLevel2Verified}
@@ -292,7 +394,9 @@ export default function SecurityScreen() {
                   color="#155D5F"
                 />
               }
-              onPress={() => router.push("/profile/security/change-passcode" as any)}
+              onPress={() =>
+                router.push("/profile/security/change-passcode" as any)
+              }
             />
             <MenuItem
               title="Face ID & Biometrics"
@@ -316,7 +420,7 @@ export default function SecurityScreen() {
                   color="#CA1212"
                 />
               }
-              onPress={() => setShowDeleteModal(true)}
+              onPress={handleOpenDeleteModal}
             />
           </View>
         </View>
@@ -327,7 +431,9 @@ export default function SecurityScreen() {
         animationType="fade"
         transparent={true}
         visible={kycModalInfo.visible}
-        onRequestClose={() => setKycModalInfo((prev) => ({ ...prev, visible: false }))}
+        onRequestClose={() =>
+          setKycModalInfo((prev) => ({ ...prev, visible: false }))
+        }
       >
         <View className="flex-1 justify-center items-center bg-black/50 px-5">
           <View className="bg-white rounded-[28px] p-6 w-full max-w-[340px] items-center">
@@ -335,11 +441,16 @@ export default function SecurityScreen() {
             <View
               className="w-16 h-16 rounded-full justify-center items-center mb-3"
               style={{
-                backgroundColor: kycModalInfo.type === "verified" ? "#DCFCE7" : "#FEF9C3",
+                backgroundColor:
+                  kycModalInfo.type === "verified" ? "#DCFCE7" : "#FEF9C3",
               }}
             >
               <MaterialCommunityIcons
-                name={kycModalInfo.type === "verified" ? "shield-check" : "clock-outline"}
+                name={
+                  kycModalInfo.type === "verified"
+                    ? "shield-check"
+                    : "clock-outline"
+                }
                 size={34}
                 color={kycModalInfo.type === "verified" ? "#166534" : "#854D0E"}
               />
@@ -372,20 +483,23 @@ export default function SecurityScreen() {
 
             {/* Action Buttons */}
             <View className="w-full gap-y-3">
-              {kycModalInfo.primaryButtonText && kycModalInfo.onPrimaryPress && (
-                <TouchableOpacity
-                  onPress={kycModalInfo.onPrimaryPress}
-                  activeOpacity={0.8}
-                  className="bg-[#155D5F] py-4 rounded-xl items-center w-full"
-                >
-                  <Text className="text-white font-bold text-[16px]">
-                    {kycModalInfo.primaryButtonText}
-                  </Text>
-                </TouchableOpacity>
-              )}
+              {kycModalInfo.primaryButtonText &&
+                kycModalInfo.onPrimaryPress && (
+                  <TouchableOpacity
+                    onPress={kycModalInfo.onPrimaryPress}
+                    activeOpacity={0.8}
+                    className="bg-[#155D5F] py-4 rounded-xl items-center w-full"
+                  >
+                    <Text className="text-white font-bold text-[16px]">
+                      {kycModalInfo.primaryButtonText}
+                    </Text>
+                  </TouchableOpacity>
+                )}
 
               <TouchableOpacity
-                onPress={() => setKycModalInfo((prev) => ({ ...prev, visible: false }))}
+                onPress={() =>
+                  setKycModalInfo((prev) => ({ ...prev, visible: false }))
+                }
                 activeOpacity={0.7}
                 className="bg-[#F1F5F9] py-4 rounded-xl items-center w-full"
               >
@@ -433,7 +547,9 @@ export default function SecurityScreen() {
                 className="bg-[#155D5F] py-4 rounded-xl items-center w-full"
               >
                 <Text className="text-white font-bold text-[16px]">
-                  {isLevel2Pending ? "View Level 2 Status" : "Go to Level 2 Verification"}
+                  {isLevel2Pending
+                    ? "View Level 2 Status"
+                    : "Go to Level 2 Verification"}
                 </Text>
               </TouchableOpacity>
 
@@ -457,8 +573,20 @@ export default function SecurityScreen() {
         visible={showDeleteModal}
         onRequestClose={() => setShowDeleteModal(false)}
       >
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }}>
-          <BlurView experimentalBlurMethod="dimezisBlurView" intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: 20,
+          }}
+        >
+          <BlurView
+            experimentalBlurMethod="dimezisBlurView"
+            intensity={40}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             activeOpacity={1}
@@ -509,11 +637,105 @@ export default function SecurityScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Custom Cannot Delete Due to Funds Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showBalanceBlockedModal}
+        onRequestClose={() => setShowBalanceBlockedModal(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: 20,
+          }}
+        >
+          <BlurView
+            experimentalBlurMethod="dimezisBlurView"
+            intensity={40}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowBalanceBlockedModal(false)}
+          />
+          <View className="bg-white rounded-[28px] p-6 w-full max-w-[340px] items-center">
+            <View className="w-16 h-16 bg-[#FFF7ED] rounded-full justify-center items-center mb-4 border border-[#FFEDD5]">
+              <MaterialCommunityIcons
+                name="wallet-outline"
+                size={34}
+                color="#EA580C"
+              />
+            </View>
+            <Text className="text-[20px] font-extrabold text-[#1E293B] text-center mb-2">
+              Cannot Delete Account
+            </Text>
+            <Text className="text-[14px] text-[#64748B] text-center mb-6 leading-5">
+              {totalBalanceKobo > 0
+                ? `You currently have ${formatKoboAmount(
+                    totalBalanceKobo,
+                  )} across your wallet and portfolios.\n\nPlease withdraw all funds and liquidate active investments before deleting your account to avoid loss of funds.`
+                : "Please withdraw all funds and liquidate active investments before deleting your account to avoid permanent loss of funds."}
+            </Text>
+
+            <View className="w-full gap-y-3">
+              <TouchableOpacity
+                onPress={() => {
+                  setShowBalanceBlockedModal(false);
+                  router.push("/wallet/withdraw" as any);
+                }}
+                activeOpacity={0.8}
+                className="bg-[#155D5F] py-4 rounded-xl items-center w-full"
+              >
+                <Text className="text-white font-bold text-[16px]">
+                  Go to Withdraw Funds
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setShowBalanceBlockedModal(false);
+                  router.push("/(tabs)/portfolios" as any);
+                }}
+                activeOpacity={0.7}
+                className="bg-[#F1F5F9] py-4 rounded-xl items-center w-full"
+              >
+                <Text className="text-[#334155] font-semibold text-[16px]">
+                  View Portfolios
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setShowBalanceBlockedModal(false)}
+                activeOpacity={0.7}
+                className="py-2 items-center w-full"
+              >
+                <Text className="text-[#94A3B8] font-semibold text-[15px]">
+                  Dismiss
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-const MenuItem = ({ title, subtitle, icon, onPress, titleColor, badge, isLocked }: any) => (
+const MenuItem = ({
+  title,
+  subtitle,
+  icon,
+  onPress,
+  titleColor,
+  badge,
+  isLocked,
+}: any) => (
   <TouchableOpacity
     onPress={onPress}
     activeOpacity={0.7}
@@ -552,13 +774,19 @@ const MenuItem = ({ title, subtitle, icon, onPress, titleColor, badge, isLocked 
           )}
         </View>
         {subtitle && (
-          <Text className="text-[12px] text-[#6B7280] font-medium mt-0.5" numberOfLines={1}>
+          <Text
+            className="text-[12px] text-[#6B7280] font-medium mt-0.5"
+            numberOfLines={1}
+          >
             {subtitle}
           </Text>
         )}
       </View>
     </View>
-    <Ionicons name={isLocked ? "lock-closed" : "chevron-forward"} size={18} color={isLocked ? "#94A3B8" : "#9CA3AF"} />
+    <Ionicons
+      name={isLocked ? "lock-closed" : "chevron-forward"}
+      size={18}
+      color={isLocked ? "#94A3B8" : "#9CA3AF"}
+    />
   </TouchableOpacity>
 );
-

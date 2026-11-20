@@ -10,6 +10,10 @@ import {
 } from "@/src/store/api/paymentApi";
 import { useGetPortfolioConfigQuery } from "@/src/store/api/portfolioApi";
 import { useGetWalletSummaryQuery, walletApi } from "@/src/store/api/walletApi";
+import { useGetKycStatusQuery, useGetKycDocumentsQuery } from "@/src/store/api/kycApi";
+import { updateKycLevel } from "@/src/store/slices/authSlice";
+import { isLevel2Verified } from "@/src/features/kyc/utils/kycState";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import * as Clipboard from "expo-clipboard";
@@ -62,6 +66,25 @@ export default function DepositScreen() {
 
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
+  const { data: kycData, isLoading: isLoadingKycStatus } = useGetKycStatusQuery(undefined, { refetchOnMountOrArgChange: true });
+  const { data: kycDocsResponse, isLoading: isLoadingKycDocs } = useGetKycDocumentsQuery(undefined, { refetchOnMountOrArgChange: true });
+
+  const kycDocsPayload: any = kycDocsResponse?.data;
+  const kycDocs: any = kycDocsPayload?.data || kycDocsPayload;
+  const currentKycLevel = kycData?.data?.currentLevel ?? user?.kycLevel ?? 1;
+  const kycStatus = String(kycData?.data?.status || user?.kycStatus || "").toUpperCase();
+
+  const isKycVerified =
+    isLevel2Verified(kycDocs, user) ||
+    (currentKycLevel >= 2 && (kycStatus === "VERIFIED" || kycStatus === "APPROVED"));
+
+  useEffect(() => {
+    if (isKycVerified && (user?.kycLevel || 1) < 2) {
+      dispatch(updateKycLevel(2));
+      AsyncStorage.setItem("@wealth_kyc_level_2_completed", "true").catch(() => {});
+    }
+  }, [isKycVerified, user?.kycLevel, dispatch]);
+
   const { data: wallet, refetch: refetchWallet } = useGetWalletSummaryQuery(
     undefined,
     {
@@ -82,7 +105,7 @@ export default function DepositScreen() {
 
   // Auto-generate virtual account if modal is opened and accountNumber is missing
   const generateVirtualAccount = useCallback(async () => {
-    if (!user || wallet?.accountNumber) return;
+    if (!user || wallet?.accountNumber || !isKycVerified) return;
 
     setVaLoading(true);
     setVaError(null);
@@ -126,7 +149,7 @@ export default function DepositScreen() {
       console.error("Failed to generate virtual account");
       Alert.alert("Account Generation Failed", errMsg);
     }
-  }, [user, wallet?.accountNumber, createVirtualAccount, refetchWallet]);
+  }, [user, wallet?.accountNumber, isKycVerified, createVirtualAccount, refetchWallet]);
 
   useEffect(() => {
     if (showBankModal && !wallet?.accountNumber && !vaError && !vaLoading) {
@@ -774,6 +797,38 @@ export default function DepositScreen() {
           {step === "preview" && renderPreview()}
         </ScrollView>
       </KeyboardAwareScreen>
+
+      {/* KYC Level 2 Verification Gate Modal */}
+      <Modal visible={!isKycVerified && !isLoadingKycStatus && !isLoadingKycDocs} transparent animationType="fade">
+        <View className="flex-1 bg-black/60 justify-center items-center px-6">
+          <View className="bg-white rounded-[28px] p-7 items-center w-full max-w-[340px]">
+            <View className="w-16 h-16 rounded-full bg-[#155D5F]/10 items-center justify-center mb-4">
+              <Ionicons name="shield-outline" size={34} color="#155D5F" />
+            </View>
+            <Text className="text-[#1A1A1A] font-extrabold text-[20px] text-center mb-2">
+              Identity Verification Required
+            </Text>
+            <Text className="text-[#64748B] text-[13.5px] text-center mb-6 leading-[20px]">
+              To make deposits and prevent unauthorized financial transactions, Central Bank & Anti-Money Laundering (AML) regulations require you to complete KYC Level 2 identity verification.
+            </Text>
+            <ThemedButton
+              title="Verify Identity Now"
+              onPress={() => {
+                router.replace("/kyc/level2-intro");
+              }}
+              style={{ width: "100%", backgroundColor: "#155D5F", height: 50, borderRadius: 14 }}
+            />
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="mt-3.5 py-2"
+            >
+              <Text className="text-[#64748B] font-semibold text-[14px]">
+                Go Back
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={showSuccess} transparent animationType="fade">
         <View className="flex-1 justify-center items-center px-10">

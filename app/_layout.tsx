@@ -114,9 +114,14 @@ function RootLayoutNav() {
   const isEffectiveLocked = isLocked || Boolean(__DEV__ && DEV_FORCE_LOCKOUT);
 
   const currentPath = segments.join("/");
+  const isPublicLegalScreen =
+    currentPath === "profile/terms" ||
+    currentPath === "profile/privacy";
+
   const isExemptScreen =
     segments[0] === "(auth)" ||
     segments[0] === "onboarding" ||
+    isPublicLegalScreen ||
     currentPath.includes("setup-pin") ||
     currentPath.includes("change-passcode");
 
@@ -303,6 +308,10 @@ function RootLayoutNav() {
 
     const inAuthGroup = segments[0] === "(auth)";
     const inOnboarding = segments[0] === "onboarding";
+    const currentPath = segments.join("/");
+    const isPublicLegalScreen =
+      currentPath === "profile/terms" ||
+      currentPath === "profile/privacy";
     const inSetupPin = inAuthGroup && (segments[1] as string) === "setup-pin";
     const inPasswordResetFlow =
       inAuthGroup &&
@@ -318,11 +327,11 @@ function RootLayoutNav() {
       (user.hasTransactionPin === false || user.hasAppPasscode === false);
 
     if (!hasCompletedOnboarding) {
-      if (!inOnboarding) {
+      if (!inOnboarding && !isPublicLegalScreen) {
         router.replace("/onboarding" as any);
       }
     } else if (!isAuthenticated) {
-      if (!inAuthGroup) {
+      if (!inAuthGroup && !isPublicLegalScreen) {
         router.replace("/(auth)/login" as any);
       }
     } else if (needsSecuritySetup) {

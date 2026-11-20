@@ -284,6 +284,13 @@ const baseQueryWithLockout: BaseQueryFn<
           }),
         );
       }
+      // 4. Account Deleted - Immediately log out
+      else if (
+        status === 403 &&
+        (errorCode === "ACCOUNT_DELETED" || errorMsg.includes("account has been deleted") || errorMsg.includes("account deleted"))
+      ) {
+        api.dispatch(logout());
+      }
     } catch {
       console.warn(
         "[baseQueryWithLockout] Error while checking lockout status",

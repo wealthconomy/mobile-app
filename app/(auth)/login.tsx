@@ -62,6 +62,22 @@ export default function LoginScreen() {
       setIsSubmitting(true);
       const res = await loginMutation({ email: email.trim(), password }).unwrap();
       const tokens = res.data;
+      const user = tokens?.user as any;
+
+      // Check if the account has been marked deleted or deactivated
+      const isDeletedAccount =
+        user?.isDeleted === true ||
+        user?.status === "DELETED" ||
+        user?.status === "INACTIVE" ||
+        Boolean(user?.deletedAt);
+
+      if (isDeletedAccount) {
+        setGeneralError(
+          "This account has been deleted. Please contact Wealthconomy support if you wish to reactivate your account."
+        );
+        return;
+      }
+
       if (tokens?.accessToken) {
         dispatch(
           setCredentials({
@@ -80,6 +96,14 @@ export default function LoginScreen() {
       const lower = msgStr.toLowerCase();
 
       if (
+        lower.includes("deleted") ||
+        lower.includes("deactivated") ||
+        lower.includes("account has been deleted")
+      ) {
+        setGeneralError(
+          "This account has been deleted. Please contact Wealthconomy support if you wish to reactivate your account."
+        );
+      } else if (
         lower.includes("invalid credential") ||
         lower.includes("unauthorized") ||
         lower.includes("incorrect") ||
