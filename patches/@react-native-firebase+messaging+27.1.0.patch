@@ -1,0 +1,22 @@
+diff --git a/node_modules/@react-native-firebase/messaging/android/src/main/java/io/invertase/firebase/messaging/ReactNativeFirebaseMessagingSerializer.kt b/node_modules/@react-native-firebase/messaging/android/src/main/java/io/invertase/firebase/messaging/ReactNativeFirebaseMessagingSerializer.kt
+index 5ac5c20..2a2f9e7 100644
+--- a/node_modules/@react-native-firebase/messaging/android/src/main/java/io/invertase/firebase/messaging/ReactNativeFirebaseMessagingSerializer.kt
++++ b/node_modules/@react-native-firebase/messaging/android/src/main/java/io/invertase/firebase/messaging/ReactNativeFirebaseMessagingSerializer.kt
+@@ -181,7 +181,7 @@ open class ReactNativeFirebaseMessagingSerializer {
+       if (notification.titleLocalizationArgs != null) {
+         notificationMap.putArray(
+           "titleLocArgs",
+-          Arguments.fromJavaArgs(notification.titleLocalizationArgs),
++          Arguments.fromJavaArgs(notification.titleLocalizationArgs as Array<Any>?),
+         )
+       }
+ 
+@@ -196,7 +196,7 @@ open class ReactNativeFirebaseMessagingSerializer {
+       if (notification.bodyLocalizationArgs != null) {
+         notificationMap.putArray(
+           "bodyLocArgs",
+-          Arguments.fromJavaArgs(notification.bodyLocalizationArgs),
++          Arguments.fromJavaArgs(notification.bodyLocalizationArgs as Array<Any>?),
+         )
+       }
+ 
